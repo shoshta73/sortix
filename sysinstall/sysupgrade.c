@@ -71,6 +71,7 @@ static struct mountpoint* mountpoints;
 static size_t mountpoints_used;
 static bool fs_made = false;
 static char fs[] = "/tmp/fs.XXXXXX";
+static int exit_gui_code = -1;
 
 static bool add_installation(struct blockdevice* bdev,
                              struct release* release,
@@ -327,6 +328,14 @@ void exit_handler(void)
 	}
 	if ( fs_made )
 		rmdir(fs);
+	if ( 0 <= exit_gui_code )
+		gui_shutdown(exit_gui_code);
+}
+
+void exit_gui(int code)
+{
+	exit_gui_code = code;
+	exit(code);
 }
 
 int main(void)
@@ -775,7 +784,7 @@ int main(void)
 		while ( true )
 		{
 			promptx(input, sizeof(input),
-				   "Upgrade? (yes/no/poweroff/reboot/halt)", "yes", true);
+				   "Upgrade? (yes/no/exit/poweroff/reboot/halt)", "yes", true);
 			if ( !strcasecmp(input, "yes") )
 				break;
 			else if ( !strcasecmp(input, "no") )
@@ -788,12 +797,14 @@ int main(void)
 				     "'halt' or cancel the upgrade.\n");
 				continue;
 			}
-			else if ( !strcasecmp(input, "poweroff") )
+			else if ( !strcasecmp(input, "exit") )
 				exit(0);
+			else if ( !strcasecmp(input, "poweroff") )
+				exit_gui(0);
 			else if ( !strcasecmp(input, "reboot") )
-				exit(1);
+				exit_gui(1);
 			else if ( !strcasecmp(input, "halt") )
-				exit(2);
+				exit_gui(2);
 			else if ( !strcasecmp(input, "!") )
 				break;
 			else
@@ -931,12 +942,14 @@ int main(void)
 	while ( true )
 	{
 		prompt(input, sizeof(input),
-		       "What now? (poweroff/reboot/halt)", "reboot");
-		if ( !strcasecmp(input, "poweroff") )
-			return 0;
-		if ( !strcasecmp(input, "reboot") )
-			return 1;
-		if ( !strcasecmp(input, "halt") )
-			return 2;
+		       "What now? (exit/poweroff/reboot/halt)", "reboot");
+		if ( !strcasecmp(input, "exit") )
+			exit(0);
+		else if ( !strcasecmp(input, "poweroff") )
+			exit_gui(0);
+		else if ( !strcasecmp(input, "reboot") )
+			exit_gui(1);
+		else if ( !strcasecmp(input, "halt") )
+			exit_gui(2);
 	}
 }

@@ -10,11 +10,13 @@
 .Op Fl \-default Ns = Ns Ar default-boot-menu-option
 .Op Fl \-disable-append-title
 .Op Fl \-disable-dhclient
+.Op Fl \-disable-gui
 .Op Fl \-disable-network-drivers
 .Op Fl \-disable-src
 .Op Fl \-disable-sshd
 .Op Fl \-enable-append-title
 .Op Fl \-enable-dhclient
+.Op Fl \-enable-gui
 .Op Fl \-enable-network-drivers
 .Op Fl \-enable-src
 .Op Fl \-enable-sshd
@@ -102,6 +104,16 @@ GRUB variable to
 causing the bootloader to load additional configuration that turns off the
 .Xr dhclient 8
 daemon on boot.
+.It Fl \-disable-gui
+Disable the GUI by setting the
+.Sy enable_gui
+GRUB variable to
+.Sy false ,
+which makes the bootloader configuration not append
+.Sy -gui
+to the requested
+.Xr init 8
+target.
 .It Fl \-disable-network-drivers
 Disable network drivers by setting the
 .Sy enable_network_drivers
@@ -141,6 +153,16 @@ GRUB variable to
 selecting the default behavior of starting the
 .Xr dhclient 8
 daemon.
+.It Fl \-enable-gui
+Enable the GUI by setting the
+.Sy enable_gui
+GRUB variable to
+.Sy true ,
+which makes the bootloader configuration append
+.Sy -gui
+to the requested
+.Xr init 8
+target.
 .It Fl \-enable-network-drivers
 Enable network drivers by setting the
 .Sy enable_network_drivers
@@ -306,6 +328,12 @@ To customize a release so it starts the SSH server
 automatically using the SSH configuration found in the liveconfig directory:
 .Bd -literal
 tix-iso-bootconfig --liveconfig=liveconfig --enable-sshd bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Boot to Console Instead of GUI By Default
+To customize a release so it boots to a console instead of the GUI:
+.Bd -literal
+tix-iso-bootconfig --disable-gui bootconfig
 tix-iso-add sortix.iso bootconfig
 .Ed
 .Sh SEE ALSO

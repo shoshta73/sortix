@@ -29,7 +29,10 @@
 
 static void suggest_logout(void)
 {
-	fprintf(stderr, " Exiting your shell normally to logout.\n");
+	if ( getenv("DISPLAY_SOCKET") )
+		fprintf(stderr, " Pressing Ctrl-Alt-Del to exit desktop.\n");
+	else
+		fprintf(stderr, " Exiting your shell normally to logout.\n");
 }
 
 enum category

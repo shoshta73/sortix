@@ -339,6 +339,7 @@ static bool etc_made = false;
 static char etc[] = "/tmp/etc.XXXXXX";
 static bool fs_made = false;
 static char fs[] = "/tmp/fs.XXXXXX";
+static int exit_gui_code = -1;
 
 static void unmount_all_but_root(void)
 {
@@ -367,6 +368,14 @@ void exit_handler(void)
 		rmdir(fs);
 	if ( etc_made )
 		execute((const char*[]) { "rm", "-rf", etc, NULL }, "");
+	if ( 0 <= exit_gui_code )
+		gui_shutdown(exit_gui_code);
+}
+
+void exit_gui(int code)
+{
+	exit_gui_code = code;
+	exit(code);
 }
 
 int main(void)
@@ -471,6 +480,7 @@ int main(void)
 
 	install_configurationf("upgrade.conf", "a", "src = yes\n");
 
+	// TODO: GUI support.
 	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);
 	while ( kblayout_setable )
 	{
@@ -829,7 +839,7 @@ int main(void)
 	{
 		prompt(input, sizeof(input),
 		       "Install " BRAND_DISTRIBUTION_NAME "? "
-		       "(yes/no/poweroff/reboot/halt)", "yes");
+		       "(yes/no/exit/poweroff/reboot/halt)", "yes");
 		if ( !strcasecmp(input, "yes") )
 			break;
 		else if ( !strcasecmp(input, "no") )
@@ -840,12 +850,14 @@ int main(void)
 			     "'halt' to cancel the installation.\n");
 			continue;
 		}
-		else if ( !strcasecmp(input, "poweroff") )
+		else if ( !strcasecmp(input, "exit") )
 			exit(0);
+		else if ( !strcasecmp(input, "poweroff") )
+			exit_gui(0);
 		else if ( !strcasecmp(input, "reboot") )
-			exit(1);
+			exit_gui(1);
 		else if ( !strcasecmp(input, "halt") )
-			exit(2);
+			exit_gui(2);
 		else
 			continue;
 	}
@@ -1278,14 +1290,16 @@ int main(void)
 	while ( true )
 	{
 		prompt(input, sizeof(input),
-		       "What now? (poweroff/reboot/halt/boot)", "boot");
-		if ( !strcasecmp(input, "poweroff") )
+		       "What now? (exit/poweroff/reboot/halt/boot)", "boot");
+		if ( !strcasecmp(input, "exit") )
 			exit(0);
-		if ( !strcasecmp(input, "reboot") )
-			exit(1);
-		if ( !strcasecmp(input, "halt") )
-			exit(2);
-		if ( !strcasecmp(input, "boot") )
+		else if ( !strcasecmp(input, "poweroff") )
+			exit_gui(0);
+		else if ( !strcasecmp(input, "reboot") )
+			exit_gui(1);
+		else if ( !strcasecmp(input, "halt") )
+			exit_gui(2);
+		else if ( !strcasecmp(input, "boot") )
 		{
 			unmount_all_but_root();
 			unsetenv("SYSINSTALL_TARGET");

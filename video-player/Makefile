@@ -1,5 +1,3 @@
-SOFTWARE_MEANT_FOR_SORTIX=1
-include ../build-aux/platform.mak
 include ../build-aux/compiler.mak
 include ../build-aux/version.mak
 include ../build-aux/dirs.mak
@@ -7,22 +5,22 @@ include ../build-aux/dirs.mak
 OPTLEVEL?=-g -O2
 CXXFLAGS?=$(OPTLEVEL)
 
-CXXFLAGS:=$(CXXFLAGS) -std=gnu++11 -Wall -Wextra -fno-exceptions -fno-rtti -fcheck-new
+CPPFLAGS:=$(CPPFLAGS)
+CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -fno-exceptions -fno-rtti -fcheck-new
 
-BINARY:=trianglix
-
-LIBS:=-ldispd
+BINARY:=video-player
+LIBS:=-lswscale -lavformat -lavcodec -lavutil -ldisplay
 
 all: $(BINARY)
 
 .PHONY: all install clean
 
+%: %.cpp
+	$(CXX) -std=gnu++11 $(CPPFLAGS) $(CXXFLAGS) $< -o $@ $(LIBS)
+
 install: all
 	mkdir -p $(DESTDIR)$(BINDIR)
 	install $(BINARY) $(DESTDIR)$(BINDIR)
 
-%: %.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@ $(LIBS)
-
 clean:
-	rm -f $(BINARY) *.o
+	rm -f $(BINARY)

@@ -36,7 +36,11 @@
 #include <timespec.h>
 #include <unistd.h>
 
-#include <dispd.h>
+#include <display.h>
+
+uint32_t WINDOW_ID = 0;
+uint32_t WINDOW_WIDTH = 800;
+uint32_t WINDOW_HEIGHT = 512;
 
 static inline float RandomFloat()
 {
@@ -60,7 +64,7 @@ static inline float RandomAngle()
 
 static inline uint32_t MakeColor(uint8_t r, uint8_t g, uint8_t b)
 {
-	return b << 0UL | g << 8UL | r << 16UL;
+	return b << 0UL | g << 8UL | r << 16UL | 0xFF << 24UL;
 }
 
 static const size_t STARFIELD_WIDTH = 512UL;
@@ -108,31 +112,6 @@ bool pop_is_key_just_down(int abskbkey)
 		return false;
 	clock_gettime(CLOCK_MONOTONIC, &key_handled_last[abskbkey]);
 	return true;
-}
-
-void FetchKeyboardInput()
-{
-	// Read the keyboard input from the user.
-	const unsigned termmode = TERMMODE_KBKEY
-	                        | TERMMODE_SIGNAL
-	                        | TERMMODE_NONBLOCK;
-	if ( settermmode(0, termmode) )
-		error(1, errno, "settermmode");
-	uint32_t codepoint;
-	ssize_t numbytes;
-	while ( 0 < (numbytes = read(0, &codepoint, sizeof(codepoint))) )
-	{
-		int kbkey = KBKEY_DECODE(codepoint);
-		if( !kbkey )
-			continue;
-		int abskbkey = (kbkey < 0) ? -kbkey : kbkey;
-		if ( MAXKEYNUM <= (size_t) abskbkey )
-			continue;
-		bool is_key_down_event = 0 < kbkey;
-		if ( !keysdown[abskbkey] && is_key_down_event )
-			keyspending[abskbkey] = true;
-		keysdown[abskbkey] = is_key_down_event;
-	}
 }
 
 static size_t xres;
@@ -1143,25 +1122,85 @@ void Render()
 		obj->Render();
 	}
 }
-void RunFrame(struct dispd_window* window)
+
+void on_disconnect(void*)
 {
-	struct dispd_framebuffer* fb = dispd_begin_render(window);
-	if ( !fb )
-	{
-		error(0, 0, "unable to begin rendering dispd window");
-		gamerunning = false;
+	exit(0);
+}
+
+void on_quit(void*, uint32_t)
+{
+	exit(0);
+}
+
+void on_resize(void*, uint32_t window_id,  uint32_t width, uint32_t height)
+{
+	if ( window_id != WINDOW_ID )
 		return;
+	WINDOW_WIDTH = width;
+	WINDOW_HEIGHT = height;
+}
+
+void on_keyboard(void*, uint32_t window_id, uint32_t codepoint)
+{
+	if ( window_id != WINDOW_ID )
+		return;
+	int kbkey = KBKEY_DECODE(codepoint);
+	if( !kbkey )
+		return;
+	int abskbkey = (kbkey < 0) ? -kbkey : kbkey;
+	if ( MAXKEYNUM <= (size_t) abskbkey )
+		return;
+	bool is_key_down_event = 0 < kbkey;
+	if ( !keysdown[abskbkey] && is_key_down_event )
+		keyspending[abskbkey] = true;
+	keysdown[abskbkey] = is_key_down_event;
+}
+
+void RunFrame(struct display_connection* connection)
+{
+	struct display_event_handlers handlers;
+	memset(&handlers, 0, sizeof(handlers));
+	handlers.disconnect_handler = on_disconnect;
+	handlers.quit_handler = on_quit;
+	handlers.resize_handler = on_resize;
+	handlers.keyboard_handler = on_keyboard;
+
+	while ( display_poll_event(connection, &handlers) == 0 );
+
+	size_t old_framesize = framesize;
+
+	xres = WINDOW_WIDTH;
+	yres = WINDOW_HEIGHT;
+	bpp = 32;
+	linesize = WINDOW_WIDTH;
+	framesize = WINDOW_WIDTH * sizeof(uint32_t) * WINDOW_HEIGHT;
+	if ( old_framesize != framesize )
+	{
+		free(buf);
+		buf = (uint32_t*) malloc(framesize);
 	}
-	xres = dispd_get_framebuffer_width(fb);
-	yres = dispd_get_framebuffer_height(fb);
-	bpp = dispd_get_framebuffer_format(fb);
-	linesize = dispd_get_framebuffer_pitch(fb) / (bpp / 8);
-	framesize = dispd_get_framebuffer_pitch(fb) * yres;
-	buf = (uint32_t*) dispd_get_framebuffer_data(fb);
-	FetchKeyboardInput();
+
 	GameLogic();
 	Render();
-	dispd_finish_render(fb);
+
+	static int fps_counter = 0;
+	fps_counter++;
+	static time_t last_frame_sec = 0;
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	if ( now.tv_sec != last_frame_sec )
+	{
+		char* title = NULL;
+		asprintf(&title, "Asteroids (fps %i)", fps_counter);
+		display_title_window(connection, WINDOW_ID, title);
+		free(title);
+		fps_counter = 0;
+		last_frame_sec = now.tv_sec;
+	}
+
+	display_render_window(connection, WINDOW_ID, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, buf);
+	display_show_window(connection, WINDOW_ID);
 }
 
 void InitGame()
@@ -1172,64 +1211,24 @@ void InitGame()
 	new AsteroidField;
 }
 
-static struct termios saved_tio;
-
-static void restore_terminal_on_exit(void)
-{
-	tcsetattr(0, TCSAFLUSH, &saved_tio);
-}
-
-static void restore_terminal_on_signal(int signum)
-{
-	if ( signum == SIGTSTP )
-	{
-		struct termios tio;
-		tcgetattr(0, &tio);
-		tcsetattr(0, TCSAFLUSH, &saved_tio);
-		raise(SIGSTOP);
-		tcgetattr(0, &saved_tio);
-		tcsetattr(0, TCSAFLUSH, &tio);
-		return;
-	}
-	tcsetattr(0, TCSAFLUSH, &saved_tio);
-	raise(signum);
-}
-
 int main(int argc, char* argv[])
 {
-	if ( !isatty(0) )
-		error(1, errno, "standard input");
-	if ( tcgetattr(0, &saved_tio) < 0 )
-		error(1, errno, "tcsetattr: standard input");
-	if ( atexit(restore_terminal_on_exit) != 0 )
-		error(1, errno, "atexit");
-	struct sigaction sa;
-	memset(&sa, 0, sizeof(sa));
-	sa.sa_handler = restore_terminal_on_signal;
-	sigaction(SIGTSTP, &sa, NULL);
-	sa.sa_flags = SA_RESETHAND;
-	sigaction(SIGINT, &sa, NULL);
-	sigaction(SIGQUIT, &sa, NULL);
-	sigaction(SIGTERM, &sa, NULL);
+	struct display_connection* connection = display_connect_default();
+	if ( !connection && errno == ECONNREFUSED )
+		display_spawn(argc, argv);
+	if ( !connection )
+		error(1, errno, "Could not connect to display server");
 
-	if ( !dispd_initialize(&argc, &argv) )
-		error(1, 0, "couldn't initialize dispd library");
-	struct dispd_session* session = dispd_attach_default_session();
-	if ( !session )
-		error(1, 0, "couldn't attach to dispd default session");
-	if ( !dispd_session_setup_game_rgba(session) )
-		error(1, 0, "couldn't setup dispd rgba session");
-	struct dispd_window* window = dispd_create_window_game_rgba(session);
-	if ( !window )
-		error(1, 0, "couldn't create dispd rgba window");
+	display_create_window(connection, WINDOW_ID);
+	display_resize_window(connection, WINDOW_ID, WINDOW_WIDTH, WINDOW_HEIGHT);
+	display_title_window(connection, WINDOW_ID, "Asteroids");
 
 	InitGame();
 	gamerunning = true;
 	for ( framenum = 0; gamerunning; framenum++ )
-		RunFrame(window);
+		RunFrame(connection);
 
-	dispd_destroy_window(window);
-	dispd_detach_session(session);
+	display_disconnect(connection);
 
 	return 0;
 }

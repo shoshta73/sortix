@@ -122,6 +122,16 @@ It depends on the
 and
 .Sy local
 daemons.
+.It Sy single-user-gui
+Like
+.Sy single-user ,
+but runs the root shell in
+.Xr terminal 1
+inside the
+.Xr display 8
+graphical user interface environment.
+This operating system mode is insecure because it boots straight to root access
+without a password.
 .It Sy sysinstall
 Starts the operating system installer.
 It starts the
@@ -135,6 +145,16 @@ It depends on the
 and
 .Sy local
 daemons.
+.It Sy sysinstall-gui
+Like
+.Sy sysinstall ,
+but runs it in
+.Xr terminal 1
+inside the
+.Xr display 8
+graphical user interface environment.
+This operating system mode is insecure because it boots straight to root access
+without a password.
 .It Sy sysupgrade
 Starts the operating system upgrader.
 It starts the
@@ -148,6 +168,16 @@ It depends on the
 and
 .Sy local
 daemons.
+.It Sy sysupgrade-gui
+Like
+.Sy sysupgrade ,
+but runs it in
+.Xr terminal 1
+inside the
+.Xr display 8
+graphical user interface environment.
+This operating system mode is insecure because it boots straight to root access
+without a password.
 .El
 .Pp
 The following daemons are provided by the system:

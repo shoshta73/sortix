@@ -194,6 +194,7 @@ fi
 set enable_src=true
 set enable_network_drivers=
 set enable_dhclient=true
+set enable_gui=true
 set enable_sshd=false
 
 export version
@@ -206,6 +207,7 @@ export no_random_seed
 export enable_src
 export enable_network_drivers
 export enable_dhclient
+export enable_gui
 export enable_sshd
 EOF
 
@@ -386,10 +388,11 @@ menuentry() {
   echo
   printf "menuentry \"Sortix (%s)\" {\n" "$1"
   if [ -n "$2" ]; then
-    printf "  load_sortix %s\n" "$2"
-    #printf "  load_sortix '"
-    #printf '%s' "$2" | sed "s,','\\'',g"
-    #printf "'\n"
+    printf "  if \$enable_gui; then\n"
+    printf "    load_sortix %s-gui\n" "$2"
+    printf "  else\n"
+    printf "    load_sortix %s\n" "$2"
+    printf "  fi\n"
   else
     printf "  load_sortix\n"
   fi
@@ -402,7 +405,7 @@ menu_title="\$base_menu_title"
 hook_menu_pre
 EOF
 
-menuentry "live environment" '-- /sbin/init'
+menuentry "live environment" '-- /sbin/init --target=single-user'
 menuentry "new installation" '-- /sbin/init --target=sysinstall'
 menuentry "upgrade existing installation" '-- /sbin/init --target=sysupgrade'
 
@@ -429,6 +432,18 @@ menuentry "Back..." {
 menu_title="\$base_menu_title - Advanced Options"
 
 hook_advanced_menu_pre
+
+if "\$enable_gui"; then
+  menuentry "Disable GUI" {
+    enable_gui=false
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "Enable GUI" {
+    enable_gui=true
+    configfile /boot/grub/advanced.cfg
+  }
+fi
 
 if "\$enable_src"; then
   menuentry "Disable loading source code" {

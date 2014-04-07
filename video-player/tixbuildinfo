@@ -1,0 +1,5 @@
+tix.version=1
+tix.class=srctix
+pkg.name=video-player
+pkg.build-libraries=libav
+pkg.build-system=sortix-usual-makefile

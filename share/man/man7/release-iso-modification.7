@@ -510,6 +510,12 @@ ssh-keygen -t rsa -f liveconfig/root/.ssh/id_rsa -N "" -C "root@$hostname"
 Consider omitting the
 .Fl N
 option and password protect the private key to protect it in the case of a leak.
+.Ss Boot to Console Instead of GUI By Default
+To customize a release so it boots to a console instead of the GUI:
+.Bd -literal
+tix-iso-bootconfig --disable-gui bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
 .Sh SEE ALSO
 .Xr xorriso 1 ,
 .Xr development 7 ,
