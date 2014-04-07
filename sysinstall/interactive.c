@@ -31,6 +31,8 @@
 #include <termios.h>
 #include <wchar.h>
 
+#include <display.h>
+
 #include "execute.h"
 #include "interactive.h"
 
@@ -233,4 +235,16 @@ bool missing_program(const char* program)
 		return false;
 	warnx("%s: Program is absent", program);
 	return true;
+}
+
+void gui_shutdown(int code)
+{
+	if ( getenv("DISPLAY_SOCKET") )
+	{
+		struct display_connection* connection = display_connect_default();
+		if ( connection )
+			display_shutdown(connection, code);
+		else
+			warn("display_connect_default");
+	}
 }

@@ -23,6 +23,7 @@ default=
 directory=
 enable_append_title=true
 enable_dhclient=
+enable_gui=
 enable_network_drivers=
 enable_sshd=
 liveconfig=
@@ -53,10 +54,12 @@ for argument do
   --default) previous_option=default ;;
   --disable-append-title) enable_append_title=false ;;
   --disable-dhclient) enable_dhclient=false ;;
+  --disable-gui) enable_gui=false ;;
   --disable-network-drivers) enable_network_drivers=false ;;
   --disable-sshd) enable_sshd=false ;;
   --enable-append-title) enable_append_title=true ;;
   --enable-dhclient) enable_dhclient=true ;;
+  --enable-gui) enable_gui=true ;;
   --enable-network-drivers) enable_network_drivers=true ;;
   --enable-sshd) enable_sshd=true ;;
   --liveconfig=*) liveconfig=$parameter ;;
@@ -101,6 +104,14 @@ print_enable_default() {
   fi
 }
 
+print_enable_default_bool() {
+  if [ "$1" = true ]; then
+    printf "  enable_%s=true\n" "$2"
+  elif [ "$1" = false ]; then
+    printf "  enable_%s=false\n" "$2"
+  fi
+}
+
 if $random_seed; then
   mkdir -p -- "$directory/boot"
   if which dd >/dev/null 2>/dev/null; then
@@ -131,6 +142,7 @@ mkdir -p -- "$directory/boot/grub"
    printf 'timeout="%s"\n' "$timeout"
  fi
  print_enable_default_bool "$enable_dhclient" dhclient dhclient
+ print_enable_default_bool "$enable_gui" gui
  print_enable_default "$enable_network_drivers" network_drivers network-drivers
  print_enable_default_bool "$enable_sshd" sshd sshd
  if $enable_append_title; then

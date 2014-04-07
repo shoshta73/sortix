@@ -70,43 +70,46 @@ void suggest_unmount(const char* filename)
 void suggest_logout(const char* filename)
 {
 	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	fprintf(stderr, " Exiting your shell normally to logout.\n");
+	if ( getenv("DISPLAY_SOCKET") )
+		fprintf(stderr, " Pressing Ctrl-Alt-Del to exit desktop.\n");
+	else
+		fprintf(stderr, " Exiting your shell normally to logout.\n");
 }
 
 void suggest_poweroff(const char* filename)
 {
 	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
-	{
+	if ( strcmp(tty_name(), "/dev/tty1") != 0 && !getenv("DISPLAY_SOCKET") )
 		fprintf(stderr, " Powering off on /dev/tty1.\n");
-	}
+	else if ( getenv("DISPLAY_SOCKET") && !getenv("LOGIN_PID") )
+		fprintf(stderr, " Pressing Ctrl-Alt-Del to poweroff.\n");
 	else if ( getenv("LOGIN_PID") )
 	{
+		if ( getenv("DISPLAY_SOCKET") )
+			fprintf(stderr, " Pressing Ctrl-Alt-Del to exit desktop.\n");
 		fprintf(stderr, " Exiting your shell normally to logout.\n");
 		fprintf(stderr, " Login as user 'poweroff' to power off computer.\n");
 	}
 	else
-	{
 		fprintf(stderr, " Exiting your shell normally to poweroff.\n");
-	}
 }
 
 void suggest_reboot(const char* filename)
 {
 	fprintf(stderr, "No command '%s' found, did you mean:\n", filename);
-	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
-	{
+	if ( strcmp(tty_name(), "/dev/tty1") != 0 && !getenv("DISPLAY_SOCKET") )
 		fprintf(stderr, " Rebooting on /dev/tty1.\n");
-	}
+	else if ( getenv("DISPLAY_SOCKET") && !getenv("LOGIN_PID") )
+		fprintf(stderr, " Pressing Ctrl-Alt-Del to reboot.\n");
 	else if ( getenv("LOGIN_PID") )
 	{
+		if ( getenv("DISPLAY_SOCKET") )
+			fprintf(stderr, " Pressing Ctrl-Alt-Del to exit desktop.\n");
 		fprintf(stderr, " Exiting your shell normally to logout.\n");
 		fprintf(stderr, " Login as user 'reboot' to reboot computer.\n");
 	}
 	else
-	{
 		fprintf(stderr, " Exiting your shell with 'exit 1' to reboot.\n");
-	}
 }
 
 void suggest_rw(const char* filename)

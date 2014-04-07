@@ -50,13 +50,13 @@ install: all
 	cp sysupgrade.8 $(DESTDIR)$(MANDIR)/man8/sysupgrade.8
 
 sysinstall: $(SYSINSTALL_OBJS)
-	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount
+	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount -ldisplay
 
 sysmerge: $(SYSMERGE_OBJS)
 	$(CC) $(SYSMERGE_OBJS) -o $@ -lmount
 
 sysupgrade: $(SYSUPGRADE_OBJS)
-	$(CC) $(SYSUPGRADE_OBJS) -o $@ -lmount
+	$(CC) $(SYSUPGRADE_OBJS) -o $@ -lmount -ldisplay
 
 %.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -std=gnu11 -c $< -o $@

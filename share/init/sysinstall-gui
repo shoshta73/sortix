@@ -1,0 +1,11 @@
+require base no-await
+require local no-await
+
+tty tty0
+need tty
+
+# TODO:
+#program=sysinstall
+#exec "$program"
+exec display terminal sysinstall
+exit-code-meaning poweroff-reboot
