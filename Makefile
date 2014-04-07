@@ -8,6 +8,7 @@ doc \
 libc \
 libm \
 dispd \
+display \
 libmount \
 bench \
 carray \
