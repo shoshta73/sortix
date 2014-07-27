@@ -72,6 +72,7 @@ void editor_type_raw_character(struct editor* editor, wchar_t c);
 void editor_type_copy(struct editor* editor);
 void editor_type_cut(struct editor* editor);
 void editor_type_paste(struct editor* editor);
+void editor_type_suspend(struct editor* editor);
 void editor_type_character(struct editor* editor, wchar_t c);
 
 #endif

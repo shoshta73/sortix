@@ -814,6 +814,11 @@ void editor_type_paste(struct editor* editor)
 	}
 }
 
+void editor_type_suspend(struct editor* editor)
+{
+	editor->suspend_requested = true;
+}
+
 void editor_type_character(struct editor* editor, wchar_t c)
 {
 	if ( editor->control )
@@ -832,6 +837,7 @@ void editor_type_character(struct editor* editor, wchar_t c)
 		           editor_type_save(editor); break;
 		case L'v': editor_type_paste(editor); break;
 		case L'x': editor_type_cut(editor); break;
+		case L'z': editor_type_suspend(editor); break;
 		}
 		return;
 	}

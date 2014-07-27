@@ -1,4 +1,3 @@
-SOFTWARE_MEANT_FOR_SORTIX=1
 include ../build-aux/platform.mak
 include ../build-aux/compiler.mak
 include ../build-aux/version.mak
@@ -9,6 +8,10 @@ CFLAGS?=$(OPTLEVEL)
 
 CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
 CFLAGS:=$(CFLAGS) -Wall -Wextra
+
+ifeq ($(HOST_IS_SORTIX),0)
+  CPPFLAGS+=-D_GNU_SOURCE
+endif
 
 BINARY=editor
 

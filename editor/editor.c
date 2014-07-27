@@ -297,6 +297,14 @@ int main(int argc, char* argv[])
 
 	while ( editor.mode != MODE_QUIT )
 	{
+		if ( editor.suspend_requested )
+		{
+			editor_input_suspend(&editor_input);
+			editor.suspend_requested = false;
+			reset_terminal_state(stdout, &stdout_state);
+			fflush(stdout);
+		}
+
 		struct terminal_state output_state;
 		make_terminal_state(stdout, &output_state);
 		editor_colorize(&editor);

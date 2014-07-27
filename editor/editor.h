@@ -86,6 +86,7 @@ struct editor
 	bool modal_error;
 	enum language highlight_source;
 	bool line_numbering;
+	bool suspend_requested;
 };
 
 __attribute__((unused))
