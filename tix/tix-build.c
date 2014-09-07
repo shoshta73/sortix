@@ -238,6 +238,29 @@ void emit_pkg_config_wrapper(metainfo_t* minfo)
 
 	on_exit(cleanup_file_or_directory, strdup(bindir));
 
+{
+	// Create a gtkdoc-rebase script for the build system. This is just to work
+	// around that it happily just calls the system pkg-config, but we are
+	// trapping that below.
+	char* gtkdoc_rebase_path = print_string("%s/gtkdoc-rebase", bindir);
+	FILE* gtkdoc_rebase = fopen(gtkdoc_rebase_path, "w");
+	if ( !gtkdoc_rebase )
+		error(1, errno, "`%s'", gtkdoc_rebase_path);
+	fprintf(gtkdoc_rebase, "#!/bin/sh\n");
+	fprint_shell_variable_assignment(gtkdoc_rebase, "PATH", getenv("PATH"));
+	fprint_shell_variable_assignment(gtkdoc_rebase, "PKG_CONFIG", getenv("PKG_CONFIG"));
+	fprint_shell_variable_assignment(gtkdoc_rebase, "PKG_CONFIG_PATH", getenv("PKG_CONFIG_PATH"));
+	fprint_shell_variable_assignment(gtkdoc_rebase, "PKG_CONFIG_SYSROOT_DIR", getenv("PKG_CONFIG_SYSROOT_DIR"));
+	fprint_shell_variable_assignment(gtkdoc_rebase, "PKG_CONFIG_FOR_BUILD", getenv("PKG_CONFIG_FOR_BUILD"));
+	fprint_shell_variable_assignment(gtkdoc_rebase, "PKG_CONFIG_LIBDIR", getenv("PKG_CONFIG_LIBDIR"));
+	fprintf(gtkdoc_rebase, "exec gtkdoc-rebase \"$@\"\n");
+	fflush(gtkdoc_rebase);
+	fchmod_plus_x(fileno(gtkdoc_rebase));
+	fclose(gtkdoc_rebase);
+	free(gtkdoc_rebase_path);
+}
+
+{
 	// Create a pkg-config script for the build system.
 	char* pkg_config_for_build_path = print_string("%s/build-pkg-config", bindir);
 	FILE* pkg_config_for_build = fopen(pkg_config_for_build_path, "w");
@@ -255,9 +278,11 @@ void emit_pkg_config_wrapper(metainfo_t* minfo)
 	fchmod_plus_x(fileno(pkg_config_for_build));
 	fclose(pkg_config_for_build);
 	free(pkg_config_for_build_path);
+}
 
+{
 	// Create a pkg-config script for the host system.
-	char* pkg_config_path = print_string("%s/pkg-config", bindir);
+	char* pkg_config_path = print_string("%s/host-pkg-config", bindir);
 	FILE* pkg_config = fopen(pkg_config_path, "w");
 	if ( !pkg_config )
 		error(1, errno, "`%s'", pkg_config_path);
@@ -269,9 +294,28 @@ void emit_pkg_config_wrapper(metainfo_t* minfo)
 	fchmod_plus_x(fileno(pkg_config));
 	fclose(pkg_config);
 	free(pkg_config_path);
+}
 
+{
+	// Create a pkg-config script for the host system.
+	char* pkg_config_trap_path = print_string("%s/pkg-config", bindir);
+	FILE* pkg_config_trap = fopen(pkg_config_trap_path, "w");
+	if ( !pkg_config_trap )
+		error(1, errno, "`%s'", pkg_config_trap_path);
+	fprintf(pkg_config_trap, "#!/bin/sh\n");
+	fprintf(pkg_config_trap, "echo \"\" > /dev/tty\n");
+	fprintf(pkg_config_trap, "echo \" == [$(pwd)] bad pkg-config invocation (going into infinite loop) ==\" > /dev/tty\n");
+	fprintf(pkg_config_trap, "echo \"\" > /dev/tty\n");
+	fprintf(pkg_config_trap, "(while true; do sleep 10; done)\n");
+	fflush(pkg_config_trap);
+	fchmod_plus_x(fileno(pkg_config_trap));
+	fclose(pkg_config_trap);
+	free(pkg_config_trap_path);
+}
+
+{
 	// Point to the correct pkg-config configuration through the environment.
-	char* var_pkg_config = print_string("%s/pkg-config", bindir);
+	char* var_pkg_config = print_string("%s/host-pkg-config", bindir);
 	char* var_pkg_config_for_build = print_string("%s/build-pkg-config", bindir);
 	char* var_pkg_config_libdir =
 		print_string("%s%s/lib/pkgconfig",
@@ -288,6 +332,7 @@ void emit_pkg_config_wrapper(metainfo_t* minfo)
 	free(var_pkg_config_libdir);
 	free(var_pkg_config_path);
 	free(var_pkg_config_sysroot_dir);
+}
 
 	if ( getenv("TIX_WARNINGS_DIR") )
 	{
