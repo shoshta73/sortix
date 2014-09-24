@@ -39,6 +39,9 @@ struct utimbuf
 	time_t modtime;
 };
 
+#if !defined(__is_sortix_libc) /* not a warning inside libc */
+__attribute__((__warning__("utime() is obsolete, use utimens()")))
+#endif
 int utime(const char* filename, const struct utimbuf* times);
 
 #ifdef __cplusplus
