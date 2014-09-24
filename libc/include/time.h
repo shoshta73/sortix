@@ -120,6 +120,9 @@ char* asctime(const struct tm*);
 __attribute__((__warning__("asctime_r() is obsolete, use strftime()")))
 #endif
 char* asctime_r(const struct tm* __restrict, char* __restrict);
+#if !defined(__is_sortix_libc) /* not a warning inside libc */
+__attribute__((__warning__("clock() is obsolete, use clock_gettime()")))
+#endif
 clock_t clock(void);
 /* TODO: clock_getcpuclockid */
 int clock_getres(clockid_t, struct timespec*);

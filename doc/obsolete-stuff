@@ -53,6 +53,20 @@ similarly poorly named flag O_CREAT that does what you need.
 
 Sortix currently implement this function for compatibility reasons.
 
+clock
+-----
+
+The clock() function suffers from overflow issues where it wraps around and the
+caller has to handle that, meaning it's not suitable for measuring long
+intervals. Converting a clock interval to seconds it also bothersome and
+requires division by CLOCKS_PER_SEC.
+
+You should use clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts) instead as it has no
+overflow issues, provides nanosecond precision if available, and can be combined
+with APIs such as Sortix's <timespec.h> for convenient computing.
+
+Sortix currently implements this function for compatibility reasons.
+
 ctime, ctime_r
 --------------
 
