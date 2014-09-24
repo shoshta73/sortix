@@ -41,6 +41,9 @@ struct tms
 	clock_t tms_cstime;
 };
 
+#if !defined(__is_sortix_libc) /* not a warning inside libc */
+__attribute__((__warning__("times() is obsolete, use clock_gettime() or timens()")))
+#endif
 clock_t times(struct tms*);
 
 #ifdef __cplusplus
