@@ -54,6 +54,7 @@ sleep \
 sort \
 stat \
 tail \
+tcblob \
 time \
 touch \
 tr \
