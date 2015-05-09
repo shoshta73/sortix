@@ -69,6 +69,7 @@ int tcsetattr(int, int, const struct termios*);
 
 /* Functions that are Sortix extensions. */
 #if __USE_SORTIX
+int mkptyline(int*, int*, int);
 ssize_t tcgetblob(int, const char*, void*, size_t);
 ssize_t tcsetblob(int, const char*, const void*, size_t);
 int tcgetwincurpos(int, struct wincurpos*);

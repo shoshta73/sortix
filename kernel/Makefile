@@ -134,6 +134,7 @@ poll.o \
 process.o \
 psctl.o \
 ptable.o \
+pty.o \
 random.o \
 refcount.o \
 registers.o \

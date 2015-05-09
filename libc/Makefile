@@ -602,6 +602,7 @@ sys/uio/writev.o \
 sys/utsname/uname.o \
 sys/wait/wait.o \
 sys/wait/waitpid.o \
+termios/mkptyline.o \
 termios/tcdrain.o \
 termios/tcflow.o \
 termios/tcflush.o \
