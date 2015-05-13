@@ -97,6 +97,12 @@ void libk_abort(void)
 }
 
 extern "C"
+void libk_overlapping_memcpy(void)
+{
+	Sortix::PanicF("Overlapping memcpy detected");
+}
+
+extern "C"
 void libk_random_lock(void)
 {
 	kthread_mutex_lock(&random_mutex);

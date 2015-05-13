@@ -41,6 +41,8 @@ __attribute__((noreturn))
 void libk_stack_chk_fail(void);
 __attribute__((noreturn))
 void libk_abort(void);
+__attribute__((noreturn))
+void libk_overlapping_memcpy(void);
 void libk_random_lock(void);
 void libk_random_unlock(void);
 bool libk_hasentropy(void);
