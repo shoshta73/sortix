@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,14 @@
  * Copy memory between non-overlapping regions.
  */
 
+#include <scram.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
+
+#if defined(__is_sortix_libk)
+#include <libk.h>
+#endif
 
 inline static
 void* memcpy_slow(void* restrict dst_ptr,
@@ -36,6 +42,26 @@ void* memcpy(void* restrict dst_ptr,
              const void* restrict src_ptr,
              size_t size)
 {
+	if ( dst_ptr == src_ptr || !size )
+		return dst_ptr;
+
+	void* dst_end = (char*) dst_ptr + size;
+	const void* src_end = (const const char*) src_ptr + size;
+	if ( (dst_ptr < src_ptr && src_ptr < dst_end) ||
+	     (src_ptr < dst_ptr && dst_ptr < src_end) )
+	{
+#if defined(__is_sortix_libk)
+		libk_overlapping_memcpy();
+#else
+		struct scram_undefined_behavior info;
+		info.filename = __FILE__;
+		info.line = __LINE__;
+		info.column = 0;
+		info.violation = "overlapping memcpy";
+		scram(SCRAM_UNDEFINED_BEHAVIOR, &info);
+#endif
+	}
+
 #if 8 < __SIZEOF_LONG__
 #warning "you should add support for your unexpectedly large unsigned long."
 	return memcpy_slow(dst_ptr, src_ptr, size);
