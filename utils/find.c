@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
+#include <fnmatch.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +42,9 @@
 #define ALL_TYPES (TYPE_BLK | TYPE_CHR | TYPE_DIR | TYPE_FIFO | \
                    TYPE_LNK | TYPE_REG | TYPE_SOCK | TYPE_OTHER)
 
+static const char* names[256];
+static size_t names_count = 0;
+
 char* AddElemToPath(const char* path, const char* elem)
 {
 	size_t pathlen = strlen(path);
@@ -56,8 +60,18 @@ char* AddElemToPath(const char* path, const char* elem)
 	return ret;
 }
 
+bool match(const char* name)
+{
+	for ( size_t i = 0; i <= names_count; i++ )
+		if ( !names[i] || fnmatch(names[i], name, 0) == 0 )
+			return true;
+	return false;
+
+}
+
 bool find(int dirfd, const char* relpath, const char* path, int types)
 {
+	bool matched = match(relpath);
 	bool ret = true;
 	int fd = openat(dirfd, relpath, O_RDONLY | O_SYMLINK_NOFOLLOW);
 	if ( fd < 0 )
@@ -73,17 +87,17 @@ bool find(int dirfd, const char* relpath, const char* path, int types)
 	}
 	if ( S_ISBLK(st.st_mode) )
 	{
-		if ( types & TYPE_BLK )
+		if ( types & TYPE_BLK && matched )
 			printf("%s\n", path);
 	}
 	else if ( S_ISCHR(st.st_mode) )
 	{
-		if ( types & TYPE_CHR )
+		if ( types & TYPE_CHR && matched )
 			printf("%s\n", path);
 	}
 	else if ( S_ISDIR(st.st_mode) )
 	{
-		if ( types & TYPE_DIR )
+		if ( types & TYPE_DIR && matched )
 			printf("%s\n", path);
 		DIR* dir = fdopendir(fd);
 		if ( !dir )
@@ -110,27 +124,27 @@ bool find(int dirfd, const char* relpath, const char* path, int types)
 	}
 	else if ( S_ISFIFO(st.st_mode) )
 	{
-		if ( types & TYPE_FIFO )
+		if ( types & TYPE_FIFO && matched )
 			printf("%s\n", path);
 	}
 	else if ( S_ISLNK(st.st_mode) )
 	{
-		if ( types & TYPE_LNK )
+		if ( types & TYPE_LNK && matched )
 			printf("%s\n", path);
 	}
 	else if ( S_ISREG(st.st_mode) )
 	{
-		if ( types & TYPE_REG )
+		if ( types & TYPE_REG && matched )
 			printf("%s\n", path);
 	}
 	else if ( S_ISSOCK(st.st_mode) )
 	{
-		if ( types & TYPE_SOCK )
+		if ( types & TYPE_SOCK && matched )
 			printf("%s\n", path);
 	}
 	else
 	{
-		if ( types & TYPE_OTHER )
+		if ( types & TYPE_OTHER && matched )
 			printf("%s\n", path);
 	}
 	if ( !S_ISDIR(st.st_mode) )
@@ -178,8 +192,27 @@ int main(int argc, char* argv[])
 			else
 				error(1, 0, "unknown `-type %s'", arg);
 		}
+		else if ( !strcmp(arg, "-print") )
+		{
+		}
+		else if ( !strcmp(arg, "-o") )
+		{
+			names_count++;
+		}
+		else if ( !strcmp(arg, "-name") )
+		{
+			if ( i + 1 == argc )
+				error(1, 0, "-name expects an argument");
+			names[names_count] = argv[++i];
+		}
 		else
+		{
+			fprintf(stderr, "'%s'", argv[0]);
+			for ( int i = 1; i < argc; i++ )
+				fprintf(stderr, " '%s'", argv[i]);
+			fprintf(stderr, "\n");
 			error(1, 0, "unknown option `%s'", arg);
+		}
 	}
 	if ( !path )
 		path = ".";
