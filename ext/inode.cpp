@@ -350,6 +350,7 @@ void Inode::Truncate(uint64_t new_size)
 	if ( partial )
 	{
 		Block* partial_block = GetBlock(new_num_blocks-1);
+		// TODO: This assumes GetBlock doesn't fail!
 		uint8_t* data = partial_block->block_data;
 		partial_block->BeginWrite();
 		memset(data + partial, 0, filesystem->block_size - partial);
@@ -823,6 +824,10 @@ ssize_t Inode::WriteAt(const uint8_t* buf, size_t s_count, off_t o_offset)
 		uint64_t block_id = offset / filesystem->block_size;
 		uint32_t block_offset = offset % filesystem->block_size;
 		uint32_t block_left = filesystem->block_size - block_offset;
+		// TODO: If we're going to rewrite the whole block, invent a new variant
+		//       of GetBlock that doeesn't zero new blocks, but gets an
+		//       uninitialized block that we promise to initialize. This will
+		//       save a zeroing write for every new block allocated here.
 		Block* block = GetBlock(block_id);
 		if ( !block )
 			return sofar ? (ssize_t) sofar : -1;

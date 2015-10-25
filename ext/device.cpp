@@ -48,6 +48,7 @@ Device::Device(int fd, const char* path, uint32_t block_size, bool write)
 	this->dirty_block = NULL;
 	for ( size_t i = 0; i < DEVICE_HASH_LENGTH; i++ )
 		hash_blocks[i] = NULL;
+	this->predicted_block = NULL;
 	struct stat st;
 	fstat(fd, &st);
 	this->device_size = st.st_size;
@@ -154,10 +155,15 @@ Block* Device::GetBlockZeroed(uint32_t block_id)
 
 Block* Device::GetCachedBlock(uint32_t block_id)
 {
+	Block* prediction = predicted_block;
+	// TODO: Need to profile how accurate this is. Should speed up repeated
+	//       big sequential reads.
+	if ( predicted_block && prediction->block_id == block_id )
+		return prediction->Refer(), prediction->Use(), prediction;
 	size_t bin = block_id % DEVICE_HASH_LENGTH;
 	for ( Block* iter = hash_blocks[bin]; iter; iter = iter->next_hashed )
 		if ( iter->block_id == block_id )
-			return iter->Refer(), iter;
+			return iter->Refer(), iter->Use(), iter;
 	return NULL;
 }
 

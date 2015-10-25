@@ -134,12 +134,18 @@ void Block::FinishWrite()
 
 void Block::Use()
 {
+	// The block that was used after this one last time.
+	Block* prediction = prev_block;
 	Unlink();
 	Prelink();
+	if ( prediction )
+		device->predicted_block = prediction;
 }
 
 void Block::Unlink()
 {
+	if ( device->predicted_block == this )
+		device->predicted_block = NULL;
 	(prev_block ? prev_block->next_block : device->mru_block) = next_block;
 	(next_block ? next_block->prev_block : device->lru_block) = prev_block;
 	size_t bin = block_id % DEVICE_HASH_LENGTH;
