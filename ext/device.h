@@ -39,6 +39,7 @@ public:
 	Block* lru_block;
 	Block* dirty_block;
 	Block* hash_blocks[DEVICE_HASH_LENGTH];
+	Block* predicted_block;
 	off_t device_size;
 	const char* path;
 	uint32_t block_size;

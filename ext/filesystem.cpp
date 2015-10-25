@@ -173,7 +173,7 @@ Inode* Filesystem::GetInode(uint32_t inode_id)
 	size_t bin = inode_id % INODE_HASH_LENGTH;
 	for ( Inode* iter = hash_inodes[bin]; iter; iter = iter->next_hashed )
 		if ( iter->inode_id == inode_id )
-			return iter->Refer(), iter;
+			return iter->Refer(), iter->Use(), iter;
 
 	uint32_t group_id = (inode_id-1) / sb->s_inodes_per_group;
 	uint32_t tabel_index = (inode_id-1) % sb->s_inodes_per_group;
