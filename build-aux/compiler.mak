@@ -124,9 +124,9 @@ endif
 DEFAULT_GENERIC_OPTLEVEL_BASE:=-Os -s
 DEFAULT_OPTLEVEL_FOR_BUILD:=$(DEFAULT_GENERIC_OPTLEVEL_BASE)
 ifeq ($(BUILD_IS_SORTIX),1)
-  DEFAULT_OPTLEVEL_FOR_BUILD+=-fsanitize=undefined
+  DEFAULT_OPTLEVEL_FOR_BUILD+=-fsanitize=undefined -fstack-protector-all
 endif
 DEFAULT_OPTLEVEL:=$(DEFAULT_GENERIC_OPTLEVEL_BASE)
 ifeq ($(HOST_IS_SORTIX),1)
-  DEFAULT_OPTLEVEL+=-fsanitize=undefined
+  DEFAULT_OPTLEVEL+=-fsanitize=undefined -fstack-protector-all
 endif
