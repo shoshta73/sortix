@@ -22,22 +22,75 @@
 #include <regex.h>
 #include <stdbool.h>
 
+#include <stdio.h> // TODO: DEBUG
+
+// TODO: DEBUG
+static inline bool verify_current_state(struct re* first, struct re* last, struct re* current)
+{
+	if ( !current )
+	{
+		if ( first || current )
+			return printf("(error 1)\n"), false;
+		return true;
+	}
+	if ( !current->re_is_current )
+		return printf("(error 2)\n"), false;
+	if ( !current->re_current_state_prev && first != current )
+		return printf("(error 3)\n"), false;
+	if ( !current->re_current_state_next && last != current )
+		return printf("(error 4)\n"), false;
+	if ( current->re_current_state_prev )
+	{
+		if ( first == current )
+			return printf("(error 9)\n"), false;
+		if ( current->re_current_state_prev->re_current_state_next != current )
+			return printf("(error 5)\n"), false;
+	}
+	if ( current->re_current_state_next )
+	{
+		if ( last == current )
+			return printf("(error 10)\n"), false;
+		if ( current->re_current_state_next->re_current_state_prev != current )
+			return printf("(error 6)\n"), false;
+		if ( !current->re_is_currently_done && current->re_current_state_next->re_is_currently_done )
+			return printf("(error 7)\n"), false;
+	}
+	for ( struct re* iter = current->re_current_state_next; iter; iter = iter->re_current_state_next )
+	{
+		if ( iter == current )
+			return printf("(error 8)\n"), false;
+	}
+	if ( !current->re_current_state_next )
+		return true;
+	return verify_current_state(first, last, current->re_current_state_next);
+}
+
 #define QUEUE_CURRENT_STATE(new_state) \
 { \
 	if ( !new_state ) \
 	{ \
 		match = true; \
+		assert(verify_current_state(current_states, current_states_last, current_states) && "1"); \
+		assert(verify_current_state(current_states, current_states_last, state) && "10"); \
 		for ( struct re* re = state->re_current_state_next; \
 		      re; \
 		      re = re->re_current_state_next ) \
+		{ \
+			assert(re->re_current_state_next != re); \
+			assert(!re->re_current_state_next || re->re_current_state_next->re_current_state_next != re); \
 			re->re_is_current = 0; \
+		} \
 		state->re_current_state_next = NULL; \
 		current_states_last = state; \
+		assert(verify_current_state(current_states, current_states_last, current_states) && "11"); \
+		assert(verify_current_state(current_states, current_states_last, state) && "12"); \
 	} \
 	else if ( !(new_state->re_is_current && new_state->re_is_currently_done) ) \
 	{ \
+		assert(verify_current_state(current_states, current_states_last, state) && "6"); \
 		if ( new_state->re_is_current ) \
 		{ \
+			assert(verify_current_state(current_states, current_states_last, current_states) && "2"); \
 			if ( new_state->re_current_state_prev ) \
 				new_state->re_current_state_prev->re_current_state_next = \
 					new_state->re_current_state_next; \
@@ -48,7 +101,9 @@
 					new_state->re_current_state_prev; \
 			else \
 				current_states_last = new_state->re_current_state_prev; \
+			assert(verify_current_state(current_states, current_states_last, current_states) && "3"); \
 		} \
+		assert(verify_current_state(current_states, current_states_last, current_states) && "4"); \
 		new_state->re_current_state_prev = state; \
 		new_state->re_current_state_next = state->re_current_state_next; \
 		if ( state->re_current_state_next ) \
@@ -61,6 +116,9 @@
 		new_state->re_is_upcoming = 0; \
 		for ( size_t m = 0; m < nmatch; m++ ) \
 			new_state->re_matches[m] = state->re_matches[m]; \
+		assert(verify_current_state(current_states, current_states_last, current_states) && "5"); \
+		assert(verify_current_state(current_states, current_states_last, state) && "7"); \
+		assert(verify_current_state(current_states, current_states_last, new_state) && "8"); \
 	} \
 } \
 
@@ -70,12 +128,20 @@
 	{ \
 		consumed_char = true; \
 		match = true; \
+		assert(verify_current_state(current_states, current_states_last, current_states) && "1"); \
+		assert(verify_current_state(current_states, current_states_last, state) && "10"); \
 		for ( struct re* re = state->re_current_state_next; \
 		      re; \
 		      re = re->re_current_state_next ) \
+		{ \
+			assert(re->re_current_state_next != re); \
+			assert(!re->re_current_state_next || re->re_current_state_next->re_current_state_next != re); \
 			re->re_is_current = 0; \
+		} \
 		state->re_current_state_next = NULL; \
 		current_states_last = state; \
+		assert(verify_current_state(current_states, current_states_last, current_states) && "11"); \
+		assert(verify_current_state(current_states, current_states_last, state) && "12"); \
 	} \
 	else if ( !new_state->re_is_upcoming ) \
 	{ \
@@ -144,10 +210,13 @@ int regexec(const regex_t* restrict regex_const,
 			}
 		}
 		char c = string[i];
+		assert(verify_current_state(current_states, current_states_last, current_states));
 		for ( struct re* state = current_states;
 		      state;
 		      state = state->re_current_state_next )
 		{
+			assert(verify_current_state(current_states, current_states_last, current_states));
+			assert(verify_current_state(current_states, current_states_last, state));
 			bool match = false;
 			bool consumed_char = false;
 			if ( state->re_type == RE_TYPE_BOL )
@@ -192,8 +261,11 @@ int regexec(const regex_t* restrict regex_const,
 			          state->re_type == RE_TYPE_OPTIONAL ||
 			          state->re_type == RE_TYPE_LOOP )
 			{
+				assert(verify_current_state(current_states, current_states_last, current_states));
 				QUEUE_CURRENT_STATE(state->re_split.re);
+				assert(verify_current_state(current_states, current_states_last, current_states));
 				QUEUE_CURRENT_STATE(state->re_next);
+				assert(verify_current_state(current_states, current_states_last, current_states));
 			}
 			state->re_is_currently_done = 1;
 			if ( match )
@@ -206,6 +278,8 @@ int regexec(const regex_t* restrict regex_const,
 					break;
 			}
 		}
+
+		assert(verify_current_state(current_states, current_states_last, current_states));
 
 		for ( struct re* re = current_states; re; re = re->re_current_state_next )
 			re->re_is_current = 0;
@@ -232,6 +306,8 @@ int regexec(const regex_t* restrict regex_const,
 		}
 		upcoming_states = NULL;
 		upcoming_states_last = NULL;
+
+		assert(verify_current_state(current_states, current_states_last, current_states));
 
 		eflags |= REG_NOTBOL;
 

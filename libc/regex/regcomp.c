@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <stdio.h> // TODO: Debug.
+
 struct re_parse_subexpr
 {
 	struct re_parse_subexpr* next;

@@ -22,7 +22,11 @@
 
 #include <sys/cdefs.h>
 
+#ifdef __linux__
+#include <sys/types.h>
+#else
 #include <sys/__/types.h>
+#endif
 
 #if defined(__is_sortix_libc)
 #include <pthread.h>
