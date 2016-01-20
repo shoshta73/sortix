@@ -248,6 +248,7 @@ void TextTerminal::PutChar(TextBuffer* textbuf, char c)
 	{
 		switch ( c )
 		{
+		case '\a': return;
 		case '\n': Newline(textbuf); return;
 		case '\r': column = 0; return;
 		case '\b': Backspace(textbuf); return;
@@ -302,6 +303,7 @@ void TextTerminal::Newline(TextBuffer* textbuf)
 	}
 }
 
+#if 0
 static TextPos DecrementTextPos(TextBuffer* textbuf, TextPos pos)
 {
 	if ( !pos.x && !pos.y )
@@ -310,9 +312,11 @@ static TextPos DecrementTextPos(TextBuffer* textbuf, TextPos pos)
 		return TextPos(textbuf->Width(), pos.y-1);
 	return TextPos(pos.x-1, pos.y);
 }
+#endif
 
 void TextTerminal::Backspace(TextBuffer* textbuf)
 {
+#if 0
 	TextPos pos(column, line);
 	while ( pos.x || pos.y )
 	{
@@ -331,6 +335,21 @@ void TextTerminal::Backspace(TextBuffer* textbuf)
 	}
 	column = pos.x;
 	line = pos.y;
+#else
+	if ( column )
+	{
+		column--;
+		TextPos pos(column, line);
+		TextChar tc = textbuf->GetChar(pos);
+		next_attr = tc.attr & (ATTR_BOLD | ATTR_UNDERLINE);
+		if ( tc.c == L'_' )
+			next_attr |= ATTR_UNDERLINE;
+		else if ( tc.c == L' ' )
+			next_attr &= ~(ATTR_BOLD | ATTR_CHAR);
+		else
+			next_attr |= ATTR_BOLD;
+	}
+#endif
 }
 
 void TextTerminal::Tab(TextBuffer* textbuf)
@@ -365,8 +384,29 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 	// Check the proper prefixes are used.
 	if ( ansimode == CSI )
 	{
-		if ( c != '[' ) { ansimode = NONE; return; }
-		ansimode = COMMAND;
+		if ( c == '[' )
+			ansimode = COMMAND;
+		else if ( c == '(' || c == ')' || c == '*' || c == '+' ||
+		          c == '-' || c == '.' || c == '/' )
+			ansimode = CHARSET;
+		// TODO: Enter and exit alternatve keypad mode.
+		else if ( c == '=' || c == '>' )
+			ansimode = NONE;
+		else
+		{
+			ansimode = NONE;
+			ansimode = NONE;
+			char buf[64];
+			snprintf(buf, sizeof(buf), "[unhandled(6): %c]", c);
+			for ( size_t i = 0; buf[i]; i++ )
+				PutChar(textbuf, buf[i]);
+		}
+		return;
+	}
+
+	if ( ansimode == CHARSET )
+	{
+		ansimode = NONE;
 		return;
 	}
 
@@ -387,6 +427,10 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 		if ( currentparamindex == ANSI_NUM_PARAMS - 1 )
 		{
 			ansimode = NONE;
+			char buf[64];
+			snprintf(buf, sizeof(buf), "[unhandled(7): %c]", c);
+			for ( size_t i = 0; buf[i]; i++ )
+				PutChar(textbuf, buf[i]);
 			return;
 		}
 		paramundefined = true;
@@ -399,16 +443,49 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 		ignoresequence = true;
 	}
 
+	else if ( c == '>' )
+	{
+		ansimode = GREATERTHAN;
+	}
+
 	// Run a command.
 	else if ( 64 <= c && c <= 126 )
 	{
 		if ( !ignoresequence )
-			RunAnsiCommand(textbuf, c);
+		{
+			if ( ansimode == COMMAND )
+				RunAnsiCommand(textbuf, c);
+			else if ( ansimode == GREATERTHAN )
+			{
+				// Send Device Attributes
+				if ( c == 'c' )
+				{
+					// TODO: Send an appropriate response through the terminal.
+				}
+				else
+				{
+					ansimode = NONE;
+					char buf[64];
+					snprintf(buf, sizeof(buf), "[unhandled(7): %c]", c);
+					for ( size_t i = 0; buf[i]; i++ )
+						PutChar(textbuf, buf[i]);
+					return;
+				}
+				ansimode = NONE;
+			}
+		}
+		else
+			ansimode = NONE;
 	}
 
 	// Something I don't understand, and ignore intentionally.
 	else if ( c == '?' )
 	{
+		//ansimode = NONE;
+		//char buf[64];
+		//snprintf(buf, sizeof(buf), "[unhandled(1): %c]", c);
+		//for ( size_t i = 0; buf[i]; i++ )
+		//	PutChar(textbuf, buf[i]);
 	}
 
 	// TODO: There are some rare things that should be supported here.
@@ -417,6 +494,10 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 	else
 	{
 		ansimode = NONE;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "[unhandled(2): %c]", c);
+		for ( size_t i = 0; buf[i]; i++ )
+			PutChar(textbuf, buf[i]);
 	}
 }
 
@@ -536,6 +617,10 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 
 		textbuf->Fill(from, to, TextChar(' ', vgacolor, 0));
 	} break;
+	// TODO: CSI Ps M  Delete Ps Line(s) (default = 1) (DL).
+	//       (delete those lines and move the rest of the lines upwards).
+	// TODO: CSI Ps P  Delete Ps Character(s) (default = 1) (DCH).
+	//       (delete those characters and move the rest of the line leftward).
 	case 'S': // Scroll a line up and place a new line at the buttom.
 	{
 		textbuf->Scroll(1, TextChar(' ', vgacolor, 0));
@@ -545,6 +630,13 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 	{
 		textbuf->Scroll(-1, TextChar(' ', vgacolor, 0));
 		line = 0;
+	} break;
+	case 'd': // Move the cursor to line N.
+	{
+		unsigned posy = 0 < ansiusedparams ? ansiparams[0]-1 : 0;
+		if ( height <= posy )
+			posy = height-1;
+		line = posy;
 	} break;
 	case 'm': // Change how the text is rendered.
 	{
@@ -568,6 +660,19 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 			if ( cmd == 0 )
 			{
 				vgacolor = DEFAULT_COLOR;
+			}
+			// Boldness.
+			else if ( cmd == 1 )
+			{
+			}
+			// Inverse.
+			else if ( cmd == 7 )
+			{
+				// TODO: This is not correct. This also makes future background
+				//       and foreground changes affect the other.
+				unsigned bg = vgacolor & 0xF0;
+				unsigned fg = vgacolor & 0x0F;
+				vgacolor = bg << 0 | fg << 4;
 			}
 			// Set text color.
 			else if ( 30 <= cmd && cmd <= 37 )
@@ -609,11 +714,24 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 				vgacolor &= 0x0F;
 				vgacolor |= (0x8 | conversion[val]) << 4;
 			}
+			else
+			{
+				ansimode = NONE;
+				char buf[64];
+				snprintf(buf, sizeof(buf), "[unhandled(3): %c cmd=%u]", c, cmd);
+				for ( size_t i = 0; buf[i]; i++ )
+					PutChar(textbuf, buf[i]);
+			}
 			// TODO: There are many other things we don't support.
 		}
 	} break;
 	case 'n': // Request special information from terminal.
 	{
+		ansimode = NONE;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "[unhandled(4): %c]", c);
+		for ( size_t i = 0; buf[i]; i++ )
+			PutChar(textbuf, buf[i]);
 		// TODO: Handle this code.
 	} break;
 	case 's': // Save cursor position.
@@ -635,13 +753,25 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 		// TODO: This is somehow related to the special char '?'.
 		if ( 0 < ansiusedparams && ansiparams[0] == 25 )
 			textbuf->SetCursorEnabled(false);
+		if ( 0 < ansiusedparams && ansiparams[0] == 1049 )
+			{}; // TODO: Save scrollback.
 	} break;
 	case 'h': // Show cursor.
 	{
 		// TODO: This is somehow related to the special char '?'.
 		if ( 0 < ansiusedparams && ansiparams[0] == 25 )
 			textbuf->SetCursorEnabled(true);
+		if ( 0 < ansiusedparams && ansiparams[0] == 1049 )
+			{}; // TODO: Restore scrollback.
 	} break;
+	default:
+	{
+		ansimode = NONE;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "[unhandled(5): %c]", c);
+		for ( size_t i = 0; buf[i]; i++ )
+			PutChar(textbuf, buf[i]);
+	}
 	// TODO: Handle other cases.
 	}
 

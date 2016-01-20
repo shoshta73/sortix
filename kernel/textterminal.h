@@ -70,7 +70,7 @@ private:
 	unsigned line;
 	unsigned ansisavedposx;
 	unsigned ansisavedposy;
-	enum { NONE = 0, CSI, COMMAND, } ansimode;
+	enum { NONE = 0, CSI, CHARSET, COMMAND, GREATERTHAN, } ansimode;
 	static const size_t ANSI_NUM_PARAMS = 16;
 	unsigned ansiusedparams;
 	unsigned ansiparams[ANSI_NUM_PARAMS];
