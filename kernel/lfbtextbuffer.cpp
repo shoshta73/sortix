@@ -107,6 +107,24 @@ LFBTextBuffer* CreateLFBTextBuffer(uint8_t* lfb, uint32_t lfbformat,
 		uint8_t b = i & 0b0001 ? (i & 0b1000 ? 255 : 191) : (i & 0b1000 ? 63 : 0);
 		ret->colors[i] = ColorFromRGB(r, g, b);
 	}
+#if 0
+	ret->colors[0] = ColorFromRGB(/* black  */ 0x00, 0x00, 0x00);
+	ret->colors[1] = ColorFromRGB(/* red    */ 0xcc, 0x00, 0x00);
+	ret->colors[2] = ColorFromRGB(/* green  */ 0x3e, 0x9a, 0x06);
+	ret->colors[3] = ColorFromRGB(/* brown  */ 0xc4, 0xa0, 0x00);
+	ret->colors[4] = ColorFromRGB(/* navy   */ 0x34, 0x65, 0xa4);
+	ret->colors[5] = ColorFromRGB(/* purple */ 0x75, 0x50, 0x7b);
+	ret->colors[6] = ColorFromRGB(/* d cyan */ 0x06, 0x98, 0x9a);
+	ret->colors[7] = ColorFromRGB(/* gray   */ 0xee, 0xee, 0xec);
+	ret->colors[8] = ColorFromRGB(/* d gray */ 0x55, 0x57, 0x53);
+	ret->colors[9] = ColorFromRGB(/* red    */ 0xef, 0x29, 0x29);
+	ret->colors[10] = ColorFromRGB(/* green  */ 0x8a, 0xe2, 0x34);
+	ret->colors[11] = ColorFromRGB(/* yellow */ 0xfc, 0xe9, 0x4f);
+	ret->colors[12] = ColorFromRGB(/* blue   */ 0x72, 0x9f, 0xcf);
+	ret->colors[13] = ColorFromRGB(/* magenta*/ 0xad, 0x7f, 0xa8);
+	ret->colors[14] = ColorFromRGB(/* cyan   */ 0x34, 0xe2, 0xe2);
+	ret->colors[15] = ColorFromRGB(/* white  */ 0xFF, 0xFF, 0xFF);
+#endif
 	ret->cursorenabled = true;
 	ret->cursorpos = TextPos(0, 0);
 	for ( size_t y = 0; y < yres; y++ )

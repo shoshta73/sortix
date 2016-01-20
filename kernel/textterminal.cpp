@@ -649,8 +649,12 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 		// Convert from the ANSI color scheme to the VGA color scheme.
 		const unsigned conversion[8] =
 		{
+#if 0
+			0, 1, 2, 3, 4, 5, 6, 7,
+#else
 			COLOR8_BLACK, COLOR8_RED, COLOR8_GREEN, COLOR8_BROWN,
 			COLOR8_BLUE, COLOR8_MAGENTA, COLOR8_CYAN, COLOR8_LIGHT_GREY,
+#endif
 		};
 
 		for ( size_t i = 0; i < ansiusedparams; i++ )
