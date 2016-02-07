@@ -160,8 +160,11 @@ for PACKAGE in $PACKAGES; do
       "$SORTIX_PORTS_DIR/$PACKAGE"
     strip_tix "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz"
   fi
+  #if [ ! -e "$SYROOT/tix/tixinfo/$PACKAGE" -o
+  #     "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz" -nt "$SYROOT/tix/tixinfo/$PACKAGE" ]; then
   tix-install \
     --collection="$SYSROOT" \
     --reinstall \
     "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz"
+  #fi
 done
