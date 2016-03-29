@@ -21,7 +21,7 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <error.h>
+#include <err.h>
 #include <limits.h>
 #include <locale.h>
 #include <pwd.h>
@@ -91,7 +91,7 @@ void editor_load_config_path(struct editor* editor, const char* path)
 	if ( !fp )
 	{
 		if ( errno != ENOENT )
-			error(0, errno, "%s", path);
+			warn("%s", path);
 		return;
 	}
 	char* line = NULL;
@@ -106,7 +106,7 @@ void editor_load_config_path(struct editor* editor, const char* path)
 		editor_modal_command_config(editor, line);
 	}
 	if ( errno != 0 )
-		error(0, errno, "getline: %s", path);
+		warn("getline: %s", path);
 	fclose(fp);
 }
 
@@ -119,7 +119,7 @@ void editor_load_config(struct editor* editor)
 	char* path;
 	if ( asprintf(&path, "%s/.editor", home) < 0 )
 	{
-		error(0, errno, "malloc");
+		warn("malloc");
 		return;
 	}
 	editor_load_config_path(editor, path);
@@ -275,9 +275,9 @@ int main(int argc, char* argv[])
 	setlocale(LC_ALL, "");
 
 	if ( !isatty(0) )
-		error(1, errno, "standard input");
+		err(1, "standard input");
 	if ( !isatty(1) )
-		error(1, errno, "standard output");
+		err(1, "standard output");
 
 	struct editor editor;
 	initialize_editor(&editor);
@@ -285,7 +285,7 @@ int main(int argc, char* argv[])
 	editor_load_config(&editor);
 
 	if ( 2 <= argc && !editor_load_file(&editor, argv[1]) )
-		error(1, errno, "`%s'", argv[1]);
+		err(1, "`%s'", argv[1]);
 
 	struct editor_input editor_input;
 	editor_input_begin(&editor_input);
