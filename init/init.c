@@ -370,13 +370,13 @@ static void set_hostname(void)
 	if ( !fp )
 		return warning("unable to set hostname: /etc/hostname: %m");
 	char* hostname = read_single_line(fp);
+	fclose(fp);
 	if ( !hostname )
 		return warning("unable to set hostname: /etc/hostname: %m");
-	fclose(fp);
 	int ret = sethostname(hostname, strlen(hostname) + 1);
-	free(hostname);
 	if ( ret < 0 )
-		return warning("unable to set hostname: `%s': %m", hostname);
+		warning("unable to set hostname: `%s': %m", hostname);
+	free(hostname);
 }
 
 static void set_kblayout(void)
@@ -387,9 +387,9 @@ static void set_kblayout(void)
 	if ( !fp )
 		return warning("unable to set keyboard layout: /etc/kblayout: %m");
 	char* kblayout = read_single_line(fp);
+	fclose(fp);
 	if ( !kblayout )
 		return warning("unable to set keyboard layout: /etc/kblayout: %m");
-	fclose(fp);
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
 		return warning("unable to set keyboard layout: fork: %m");
@@ -412,9 +412,9 @@ static void set_videomode(void)
 	if ( !fp )
 		return warning("unable to set video mode: /etc/videomode: %m");
 	char* videomode = read_single_line(fp);
+	fclose(fp);
 	if ( !videomode )
 		return warning("unable to set video mode: /etc/videomode: %m");
-	fclose(fp);
 	unsigned int xres = 0;
 	unsigned int yres = 0;
 	unsigned int bpp = 0;
