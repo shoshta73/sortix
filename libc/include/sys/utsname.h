@@ -39,7 +39,6 @@ struct utsname
 	char processor[_UTSNAME_LENGTH];
 	char hwplatform[_UTSNAME_LENGTH];
 	char opsysname[_UTSNAME_LENGTH];
-	char domainname[_UTSNAME_LENGTH];
 };
 
 int uname(struct utsname*);

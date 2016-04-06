@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -548,7 +548,6 @@ int crypt_newhash(const char*, const char*, char*, size_t);
 int dup3(int, int, int);
 int execvpe(const char*, char* const [], char* const []);
 char* get_current_dir_name(void);
-int getdomainname(char*, size_t);
 int getentropy(void*, size_t);
 int pipe2(int [2], int);
 int sethostname(const char*, size_t);

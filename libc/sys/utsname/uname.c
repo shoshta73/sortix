@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -63,7 +63,5 @@ int uname(struct utsname* name)
 	strlcpy(name->processor, processor, sizeof(name->processor));
 	strlcpy(name->hwplatform, hwplatform, sizeof(name->hwplatform));
 	strlcpy(name->opsysname, opsysname, sizeof(name->opsysname));
-	if ( getdomainname(name->domainname, sizeof(name->domainname)) < 0 )
-		strlcpy(name->domainname, "unknown", sizeof(name->domainname));
 	return 0;
 }

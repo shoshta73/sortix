@@ -672,7 +672,6 @@ unistd/fsync.o \
 unistd/ftruncate.o \
 unistd/get_current_dir_name.o \
 unistd/getcwd.o \
-unistd/getdomainname.o \
 unistd/getegid.o \
 unistd/getentropy.o \
 unistd/geteuid.o \
