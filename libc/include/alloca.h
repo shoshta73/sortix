@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,19 +24,15 @@
 
 #include <sys/__/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef __size_t_defined
 #define __size_t_defined
 #define __need_size_t
 #include <stddef.h>
 #endif
 
-/* If somehow another declaration of alloca happened. This shouldn't happen, but
-   glibc does this and we might as well do it also. */
-#undef alloca
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Declare a function prototype despite that there really is no alloca function
    in Sortix. The compiler will normally be run with -fbuiltin and simply use
