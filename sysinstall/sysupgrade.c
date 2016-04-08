@@ -480,7 +480,11 @@ int main(void)
 	struct release new_release;
 	if ( !os_release_load(&new_release, "/etc/sortix-release",
 	                                    "/etc/sortix-release") )
+	{
+		if ( errno == ENOENT )
+			warn("/etc/sortix-release");
 		exit(2);
+	}
 
 	char mnt[] = "/tmp/fs.XXXXXX";
 	if ( !mkdtemp(mnt) )

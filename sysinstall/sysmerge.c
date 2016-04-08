@@ -20,6 +20,7 @@
 #include <sys/types.h>
 
 #include <err.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -156,14 +157,22 @@ int main(int argc, char* argv[])
 	const char* old_release_path = "/etc/sortix-release";
 	struct release old_release;
 	if ( !os_release_load(&old_release, old_release_path, old_release_path) )
+	{
+		if ( errno == ENOENT )
+			warn("%s", old_release_path);
 		exit(2);
+	}
 
 	char* new_release_path;
 	if ( asprintf(&new_release_path, "%s/etc/sortix-release", source) < 0 )
 		err(2, "asprintf");
 	struct release new_release;
 	if ( !os_release_load(&new_release, new_release_path, new_release_path) )
+	{
+		if ( errno == ENOENT )
+			warn("%s", new_release_path);
 		exit(2);
+	}
 	free(new_release_path);
 
 	// TODO: Check if /etc/machine matches the current architecture.
