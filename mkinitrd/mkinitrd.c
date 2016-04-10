@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,7 +39,6 @@
 
 #define DEFAULT_FORMAT "sortix-initrd-2"
 
-#include "crc32.h"
 #include "rules.h"
 #include "serialize.h"
 
@@ -552,9 +551,8 @@ bool FormatFD(const char* outputname, int fd, uint32_t inodecount,
 	if ( !WriteNodeRecursive(&sb, fd, outputname, root) )
 		return false;
 
-	uint32_t crcsize = sizeof(uint32_t);
-	sb.sumalgorithm = INITRD_ALGO_CRC32;
-	sb.sumsize = crcsize;
+	sb.sumalgorithm = INITRD_ALGO_NONE;
+	sb.sumsize = 0;
 	sb.fssize = (sb.fssize+3)/4*4; // Align upwards.
 	sb.fssize += sb.sumsize;
 
@@ -571,16 +569,6 @@ bool FormatFD(const char* outputname, int fd, uint32_t inodecount,
 		error(0, errno, "truncate: %s", outputname);
 		return false;
 	}
-
-	uint32_t checksize = sb.fssize - sb.sumsize;
-	uint32_t crc;
-	if ( !CRC32File(&crc, outputname, fd, 0, checksize) )
-		return false;
-	crc = htole32(crc);
-	assert((checksize & (alignof(crc) - 1)) == 0);
-	if ( pwriteall(fd, &crc, crcsize, checksize) < crcsize )
-		return false;
-	crc = le32toh(crc);
 
 	return true;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,7 +30,6 @@
 #include <unistd.h>
 #include <sortix/initrd.h>
 
-#include "crc32.h"
 #include "serialize.h"
 
 char* Substring(const char* str, size_t start, size_t length)
@@ -56,22 +55,6 @@ initrd_superblock_t* GetSuperBlock(int fd)
 	if ( !sb ) { return NULL; }
 	if ( !ReadSuperBlock(fd, sb) ) { free(sb); return NULL; }
 	return sb;
-}
-
-bool ReadChecksum(int fd, initrd_superblock_t* sb, uint8_t* dest)
-{
-	uint32_t offset = sb->fssize - sb->sumsize;
-	if ( preadall(fd, dest, sb->sumsize, offset) != sb->sumsize )
-		return false;
-	return true;
-}
-
-uint8_t* GetChecksum(int fd, initrd_superblock_t* sb)
-{
-	uint8_t* checksum = (uint8_t*) malloc(sb->sumsize);
-	if ( !checksum ) { return NULL; }
-	if ( !ReadChecksum(fd, sb, checksum) ) { free(checksum); return NULL; }
-	return checksum;
 }
 
 bool ReadInode(int fd, initrd_superblock_t* sb, uint32_t ino,
@@ -146,33 +129,6 @@ uint32_t Traverse(int fd, initrd_superblock_t* sb, initrd_inode_t* inode,
 	free(direntries);
 	if ( !result ) { errno = ENOENT; }
 	return result;
-}
-
-bool CheckSumCRC32(const char* name, int fd, initrd_superblock_t* sb)
-{
-	uint8_t* checksump = (uint8_t*) GetChecksum(fd, sb);
-	if ( !checksump ) { return false; }
-	uint32_t checksum = (uint32_t) checksump[0] <<  0 |
-	                    (uint32_t) checksump[1] <<  8 |
-	                    (uint32_t) checksump[2] << 16 |
-	                    (uint32_t) checksump[3] << 24;
-	free(checksump);
-	uint32_t amount = sb->fssize - sb->sumsize;
-	uint32_t filesum;
-	if ( !CRC32File(&filesum, name, fd, 0, amount) ) { return false; }
-	if ( checksum != filesum ) { errno = EILSEQ; return false; }
-	return true;
-}
-
-bool CheckSum(const char* name, int fd, initrd_superblock_t* sb)
-{
-	switch ( sb->sumalgorithm )
-	{
-	case INITRD_ALGO_CRC32: return CheckSumCRC32(name, fd, sb);
-	default:
-		fprintf(stderr, "Warning: unsupported checksum algorithm: %s\n", name);
-		return true;
-	}
 }
 
 initrd_inode_t* ResolvePath(int fd, initrd_superblock_t* sb,
@@ -261,7 +217,6 @@ static void version(FILE* fp, const char* argv0)
 int main(int argc, char* argv[])
 {
 	bool all = false;
-	bool check = false;
 	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
@@ -288,8 +243,6 @@ int main(int argc, char* argv[])
 			version(stdout, argv0), exit(0);
 		else if ( !strcmp(arg, "-a") )
 			all = true;
-		else if ( !strcmp(arg, "--check") )
-			check = true;
 		else
 		{
 			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
@@ -315,11 +268,6 @@ int main(int argc, char* argv[])
 
 	initrd_superblock_t* sb = GetSuperBlock(fd);
 	if ( !sb ) { error(1, errno, "read: %s", initrd); }
-
-	if ( check && !CheckSum(initrd, fd, sb) )
-	{
-		error(1, errno, "checksum error: %s", initrd);
-	}
 
 	if ( path[0] != '/' ) { error(1, ENOENT, "%s", path); }
 

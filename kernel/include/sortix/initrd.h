@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@ extern "C" {
 #endif
 
 #define INITRD_ALGO_CRC32 0
+#define INITRD_ALGO_NONE 1
 
 #define INITRD_S_IXOTH 01
 #define INITRD_S_IWOTH 02

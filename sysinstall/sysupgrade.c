@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -555,8 +555,6 @@ int main(void)
 	struct release* target_release = &target->release;
 
 	// TODO: Check if /etc/machine matches the current architecture.
-	// TODO: Some 1.0dev systems don't have /etc/machine, assume it matches if
-	//       absent. Remove this compatibility  after releasing Sortix 1.0.
 
 	if ( downgrading_version(target_release, &new_release) )
 	{
@@ -649,27 +647,6 @@ int main(void)
 		execute((const char*[]) { "chroot", "-d", "sysmerge", "--cancel", NULL }, "e");
 	}
 
-	// TODO: Remove after releasing Sortix 1.0.
-	if ( target_release->version_major == 1 &&
-	     target_release->version_minor == 0 &&
-	     target_release->version_dev &&
-	     access_or_die("etc/upgrade.conf", F_OK) < 0 )
-	{
-		text("1.0dev compatibility: Creating /etc/upgrade.conf\n");
-		FILE* fp = fopen("etc/upgrade.conf", "w");
-		if ( !fp )
-			err(2, "etc/upgrade.conf");
-		if ( access_or_die("src", F_OK) == 0 )
-			fprintf(fp,  "src = yes\n");
-		if ( access_or_die("boot/grub/grub.cfg", F_OK) == 0 )
-			fprintf(fp,  "grub = yes\n");
-		if ( ferror(fp) || fflush(fp) == EOF )
-			err(2, "etc/upgrade.conf");
-		if ( fclose(fp) == EOF )
-			err(2, "etc/upgrade.conf");
-		text("\n");
-	}
-
 	struct conf conf;
 	while ( true )
 	{
@@ -732,16 +709,6 @@ int main(void)
 	if ( upgrade_pid == 0 )
 	{
 		umask(0022);
-		// TODO: Remove after releasing Sortix 1.0.
-		if ( target_release->version_major == 1 &&
-			 target_release->version_minor == 0 &&
-			 target_release->version_dev &&
-			 strcmp(uts.machine, "i686") == 0 )
-		{
-			system("sed -i 's/i486-sortix/i686-sortix/g' tix/collection.conf");
-			if ( access_or_die("tix/tixinfo", F_OK) == 0 )
-				system("sed -i 's/i486-sortix/i686-sortix/g' tix/tixinfo/*");
-		}
 		// TODO: Use an upgrade manifest system that notices files that are now
 		//       untracked or moved from one manifest to another.
 		if ( conf.system )

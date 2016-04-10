@@ -21,8 +21,8 @@ all: $(BINARIES)
 
 .PHONY: all install clean
 
-%: %.c crc32.c rules.c serialize.c zcrc32.c
-	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< crc32.c rules.c serialize.c zcrc32.c -o $@
+%: %.c rules.c serialize.c
+	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< rules.c serialize.c -o $@
 
 clean:
 	rm -f $(BINARIES)

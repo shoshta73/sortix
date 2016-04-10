@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -149,6 +149,9 @@ static void version(FILE* fp, const char* argv0)
 static char* collection = NULL;
 static bool reinstall = false;
 static char* tix_directory_path = NULL;
+static int generation;
+static const char* coll_prefix;
+static const char* coll_platform;
 
 void InstallPackage(const char* tix_path);
 
@@ -214,11 +217,28 @@ int main(int argc, char* argv[])
 	VerifyTixCollection(collection);
 
 	tix_directory_path = join_paths(collection, "tix");
-
 	VerifyTixDirectory(collection, tix_directory_path);
+	VerifyTixDatabase(collection, tix_directory_path);
+
+	char* coll_conf_path = join_paths(tix_directory_path, "collection.conf");
+	string_array_t coll_conf = string_array_make();
+	if ( !dictionary_append_file_path(&coll_conf, coll_conf_path) )
+		error(1, errno, "`%s'", coll_conf_path);
+	VerifyTixCollectionConfiguration(&coll_conf, coll_conf_path);
+	free(coll_conf_path);
+
+	const char* coll_generation = dictionary_get(&coll_conf, "collection.generation");
+	assert(coll_generation);
+	generation = atoi(coll_generation);
+	coll_prefix = dictionary_get(&coll_conf, "collection.prefix");
+	assert(coll_prefix);
+	coll_platform = dictionary_get(&coll_conf, "collection.platform");
+	assert(coll_platform);
 
 	for ( int i = 1; i < argc; i++ )
 		InstallPackage(argv[i]);
+
+	string_array_reset(&coll_conf);
 
 	free(tix_directory_path);
 
@@ -255,38 +275,7 @@ void InstallPackage(const char* tix_path)
 	const char* package_platform = dictionary_get(&tixinfo, "tix.platform");
 	assert(package_platform || !package_platform);
 
-	// TODO: After releasing Sortix 1.0, delete this compatibility.
-	//       Then move this code to main, from here...
-	char* tixdb_path = join_paths(tix_directory_path, package_platform);
-	if ( !IsDirectory(tixdb_path ) )
-	{
-		free(tixdb_path);
-		tixdb_path = strdup(tix_directory_path);
-	}
-
-	VerifyTixDatabase(collection, tixdb_path);
-
-	char* coll_conf_path = join_paths(tixdb_path, "collection.conf");
-	string_array_t coll_conf = string_array_make();
-	if ( !dictionary_append_file_path(&coll_conf, coll_conf_path) )
-		error(1, errno, "`%s'", coll_conf_path);
-	VerifyTixCollectionConfiguration(&coll_conf, coll_conf_path);
-	free(coll_conf_path);
-	// ... to here. (But see allocation cleanup below).
-
-	const char* coll_generation = dictionary_get(&coll_conf, "collection.generation");
-	// TODO: After releasing Sortix 1.0, remove this compatibility.
-	if ( !coll_generation )
-		coll_generation = "1";
-	assert(coll_generation);
-	int generation = atoi(coll_generation);
-	(void) generation;
-	const char* coll_prefix = dictionary_get(&coll_conf, "collection.prefix");
-	assert(coll_prefix);
-	const char* coll_platform = dictionary_get(&coll_conf, "collection.platform");
-	assert(coll_platform);
-
-	bool already_installed = IsPackageInstalled(tixdb_path, package_name);
+	bool already_installed = IsPackageInstalled(tix_directory_path, package_name);
 	if ( already_installed && !reinstall )
 		error(1, 0, "error: package `%s' is already installed. Use --reinstall "
 		            "to force reinstallation.", package_name);
@@ -314,44 +303,40 @@ void InstallPackage(const char* tix_path)
 	                        print_string("data%s", package_prefix) :
 	                        strdup("data");
 
-	// TODO: After releasing Sortix 1.0, do this unconditionally.
-	if ( 2 <= generation )
-	{
-		char* tixinfo_path = print_string("%s/tixinfo/%s", tixdb_path, package_name);
-		int tixinfo_fd = open(tixinfo_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-		if ( tixinfo_fd < 0 )
-			error(1, errno, "%s", tixinfo_path);
-		TarExtractFileToFD(tix_path, "tix/tixinfo", tixinfo_fd);
-		close(tixinfo_fd);
+	char* tixinfo_out_path = print_string("%s/tixinfo/%s", tix_directory_path, package_name);
+	int tixinfo_fd = open(tixinfo_out_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+	if ( tixinfo_fd < 0 )
+		error(1, errno, "%s", tixinfo_out_path);
+	TarExtractFileToFD(tix_path, "tix/tixinfo", tixinfo_fd);
+	close(tixinfo_fd);
 
-		FILE* index_fp = TarOpenIndex(tix_path);
-		string_array_t files = string_array_make();
-		string_array_append_file(&files, index_fp);
-		qsort(files.strings, files.length, sizeof(char*), strcmp_indirect);
-		char* manifest_path = print_string("%s/manifest/%s", tixdb_path, package_name);
-		FILE* manifest_fp = fopen(manifest_path, "w");
-		if ( !manifest_fp )
+	FILE* index_fp = TarOpenIndex(tix_path);
+	string_array_t files = string_array_make();
+	string_array_append_file(&files, index_fp);
+	qsort(files.strings, files.length, sizeof(char*), strcmp_indirect);
+	char* manifest_path = print_string("%s/manifest/%s", tix_directory_path, package_name);
+	FILE* manifest_fp = fopen(manifest_path, "w");
+	if ( !manifest_fp )
+		error(1, errno, "%s", manifest_path);
+	for ( size_t i = 0; i < files.length; i++ )
+	{
+		char* str = files.strings[i];
+		if ( strncmp(str, "data", strlen("data")) != 0 )
+			continue;
+		str += strlen("data");
+		if ( str[0] && str[0] != '/' )
+			continue;
+		size_t len = strlen(str);
+		while ( 2 <= len && str[len-1] == '/' )
+			str[--len] = '\0';
+		if ( fprintf(manifest_fp, "%s\n", str) < 0 )
 			error(1, errno, "%s", manifest_path);
-		for ( size_t i = 0; i < files.length; i++ )
-		{
-			char* str = files.strings[i];
-			if ( strncmp(str, "data", strlen("data")) != 0 )
-				continue;
-			str += strlen("data");
-			if ( str[0] && str[0] != '/' )
-				continue;
-			size_t len = strlen(str);
-			while ( 2 <= len && str[len-1] == '/' )
-				str[--len] = '\0';
-			if ( fprintf(manifest_fp, "%s\n", str) < 0 )
-				error(1, errno, "%s", manifest_path);
-		}
-		if ( ferror(manifest_fp) || fflush(manifest_fp) == EOF )
-			error(1, errno, "%s", manifest_path);
-		fclose(manifest_fp);
-		string_array_reset(&files);
-		fclose(index_fp);
 	}
+	if ( ferror(manifest_fp) || fflush(manifest_fp) == EOF )
+		error(1, errno, "%s", manifest_path);
+	fclose(manifest_fp);
+	string_array_reset(&files);
+	fclose(index_fp);
 
 	if ( fork_and_wait_or_death() )
 	{
@@ -375,11 +360,7 @@ void InstallPackage(const char* tix_path)
 	free(data_and_prefix);
 
 	if ( !already_installed )
-		MarkPackageAsInstalled(tixdb_path, package_name);
+		MarkPackageAsInstalled(tix_directory_path, package_name);
 
 	string_array_reset(&tixinfo);
-
-	// TODO: After releasing Sortix 1.0, and done the above, move this to main.
-	string_array_reset(&coll_conf);
-	free(tixdb_path);
 }

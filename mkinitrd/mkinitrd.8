@@ -19,7 +19,7 @@ for the Sortix
 .Xr kernel 7
 at the
 .Ar destination .
-It is a checksummed achieve in the
+It is an archive in the
 .In sortix/initrd.h
 format of files and directories.
 .Pp
@@ -30,10 +30,7 @@ directories matching the filter. If multiple directories are specified, the
 directories are merged together. In case two files with the same path conflict,
 precedence is given to the file in the root directory specified first.
 .Pp
-The resulting archieve has a crc32 checksum embedded for consistency check
-during
-.Xr kernel 7
-extraction.  Hardlinks are detected and preserved to avoid data duplication.
+Hardlinks are detected and preserved to avoid data duplication.
 Inode times are truncated to second precision due to format limitations.  Inode
 are stored with uid 0 and gid 0 of the root user.  The format is not compressed
 but can be compressed externally if it is decompressed during bootloading.
@@ -51,7 +48,7 @@ rules in the
 in the format specified under
 .Sx FILTER RULES .
 .It Fl \-format Ns "=" Ns Ar format
-Produce the achieve in the specified format.  This is for forward compatibility
+Produce the archive in the specified format.  This is for forward compatibility
 and only
 .Sy sortix-initrd-2
 is supported.

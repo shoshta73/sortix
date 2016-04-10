@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -410,12 +410,10 @@ void Configure(metainfo_t* minfo, const char* subdir)
 		bool with_sysroot =
 			parse_boolean(dictionary_get_def(pkg_info, "pkg.configure.with-sysroot",
 			                                           "false"));
-		// After releasing Sortix 1.0, remove this and hard-code the default to
-		// false. This allows building Sortix 0.9 with its own ports using this
-		// tix-build version.
+		// TODO: I am unclear if this issue still affects gcc, I might have
+		//       forgotten to set pkg.configure.with-sysroot-ld-bug=true there.
 		const char* with_sysroot_ld_bug_default = "false";
-		if ( !strcmp(minfo->package_name, "binutils") ||
-		     !strcmp(minfo->package_name, "gcc") )
+		if ( !strcmp(minfo->package_name, "gcc") )
 			with_sysroot_ld_bug_default = "true";
 		bool with_sysroot_ld_bug =
 			parse_boolean(dictionary_get_def(pkg_info, "pkg.configure.with-sysroot-ld-bug",
@@ -956,15 +954,7 @@ int main(int argc, char* argv[])
 		minfo.target = strdup(minfo.host);
 
 	if ( minfo.prefix && !minfo.exec_prefix )
-	{
-// TODO: After releasing Sortix 1.0, switch to this branch that defaults the
-//       exec-prefix to the prefix.
-#if defined(__sortix__)
 		minfo.exec_prefix = strdup(minfo.prefix);
-#else // Sortix 0.9 compatibility.
-		minfo.exec_prefix = print_string("%s/%s", minfo.prefix, minfo.host);
-#endif
-	}
 
 	if ( !IsDirectory(minfo.package_dir) )
 		error(1, errno, "`%s'", minfo.package_dir);

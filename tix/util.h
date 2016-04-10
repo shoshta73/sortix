@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,13 +20,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-// TODO: After releasing Sortix 1.0, remove this ifdef and default it to the
-//       latest generation.
-#if defined(__sortix__)
 #define DEFAULT_GENERATION "2"
-#else
-#define DEFAULT_GENERATION "1"
-#endif
 
 bool does_path_contain_dotdot(const char* path)
 {

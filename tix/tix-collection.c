@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -53,17 +53,6 @@ int main(int argc, char* argv[])
 	char* collection = NULL;
 	char* platform = NULL;
 	char* prefix = NULL;
-	// TODO: After releasing Sortix 1.0, keep the --disable-multiarch option
-	//       supported (but ignored), delete all uses of --disable-multiarch,
-	//       delete the --enable-multiarch option, delete the use_multiarch=true
-	//       case code. Simplify all of this code, remove the tixdb abstraction.
-	// TODO: After releasing Sortix 1.1, delete the --disable-multiarch option
-	//       compatibility.
-#if defined(__sortix__)
-	bool use_multiarch = false;
-#else
-	bool use_multiarch = true;
-#endif
 	char* generation_string = strdup(DEFAULT_GENERATION);
 
 	const char* argv0 = argv[0];
@@ -94,10 +83,12 @@ int main(int argc, char* argv[])
 		else if ( GET_OPTION_VARIABLE("--platform", &platform) ) { }
 		else if ( GET_OPTION_VARIABLE("--prefix", &prefix) ) { }
 		else if ( GET_OPTION_VARIABLE("--generation", &generation_string) ) { }
-		else if ( !strcmp(arg, "--enable-multiarch") )
-			use_multiarch = true;
 		else if ( !strcmp(arg, "--disable-multiarch") )
-			use_multiarch = false;
+		{
+			// TODO: After releasing Sortix 1.1, delete this compatibility that
+			//       lets Sortix 1.0 build. This option used to disable
+			//       compatibility with Sortix 0.9.
+		}
 		else
 		{
 			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
@@ -119,7 +110,6 @@ int main(int argc, char* argv[])
 
 	int generation = atoi(generation_string);
 	free(generation_string);
-	(void) generation;
 
 	if ( !prefix )
 		prefix = strdup(collection);
@@ -140,31 +130,17 @@ int main(int argc, char* argv[])
 		if ( mkdir_p(tix_path, 0755) != 0 )
 			error(1, errno, "mkdir: `%s'", tix_path);
 
-		char* tixdb_path;
-		if ( use_multiarch )
-		{
-			tixdb_path = join_paths(tix_path, platform);
-			if ( mkdir_p(tixdb_path, 0755) != 0 )
-				error(1, errno, "mkdir: `%s'", tixdb_path);
-		}
-		else
-		{
-			tixdb_path = strdup(tix_path);
-		}
+		char* tixdb_path = strdup(tix_path);
 
-		// TODO: After releasing Sortix 1.0, do this unconditionally.
-		if ( 2 <= generation )
-		{
-			char* tixinfo_path = join_paths(tixdb_path, "tixinfo");
-			if ( mkdir_p(tixinfo_path, 0755) != 0 )
-				error(1, errno, "mkdir: `%s'", tixinfo_path);
-			free(tixinfo_path);
+		char* tixinfo_path = join_paths(tixdb_path, "tixinfo");
+		if ( mkdir_p(tixinfo_path, 0755) != 0 )
+			error(1, errno, "mkdir: `%s'", tixinfo_path);
+		free(tixinfo_path);
 
-			char* manifest_path = join_paths(tixdb_path, "manifest");
-			if ( mkdir_p(manifest_path, 0755) != 0 )
-				error(1, errno, "mkdir: `%s'", manifest_path);
-			free(manifest_path);
-		}
+		char* manifest_path = join_paths(tixdb_path, "manifest");
+		if ( mkdir_p(manifest_path, 0755) != 0 )
+			error(1, errno, "mkdir: `%s'", manifest_path);
+		free(manifest_path);
 
 		char* collection_conf_path = join_paths(tixdb_path, "collection.conf");
 		FILE* conf_fp = fopen(collection_conf_path, "wx");
@@ -174,9 +150,7 @@ int main(int argc, char* argv[])
 		                collection);
 		fprintf(conf_fp, "tix.version=1\n");
 		fprintf(conf_fp, "tix.class=collection\n");
-		// TODO: After releasing Sortix 1.0, do this unconditionally.
-		if ( 2 <= generation )
-			fprintf(conf_fp, "collection.generation=%i\n", generation);
+		fprintf(conf_fp, "collection.generation=%i\n", generation);
 		fprintf(conf_fp, "collection.prefix=%s\n", !strcmp(prefix, "/") ? "" :
 		                                           prefix);
 		fprintf(conf_fp, "collection.platform=%s\n", platform);
