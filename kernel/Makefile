@@ -150,6 +150,7 @@ textterminal.o \
 thread.o \
 time.o \
 timer.o \
+tty.o \
 uart.o \
 user-timer.o \
 vga.o \
