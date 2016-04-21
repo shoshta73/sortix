@@ -81,15 +81,12 @@ static void setup_thread_state(struct pthread* thread, struct tfork* regs)
 		(unsigned long*) ((uint8_t*) thread->uthread.stack_mmap +
 		                             thread->uthread.stack_size);
 
-	*--stack = 0; // rip=0
-	*--stack = 0; // rbp=0
-
-	regs->ebp = (uintptr_t) stack;
-
+	*--stack = 0; // Alignment.
 	*--stack = (unsigned long) thread;
-	*--stack = 0;
+	*--stack = 0; // rip=0
 
 	regs->esp = (uintptr_t) stack;
+	regs->ebp = 0;
 }
 
 #endif
@@ -111,10 +108,9 @@ static void setup_thread_state(struct pthread* thread, struct tfork* regs)
 		                             thread->uthread.stack_size);
 
 	*--stack = 0; // rip=0
-	*--stack = 0; // rbp=0
 
 	regs->rsp = (uintptr_t) stack;
-	regs->rbp = regs->rsp;
+	regs->rbp = 0;
 }
 #endif
 
