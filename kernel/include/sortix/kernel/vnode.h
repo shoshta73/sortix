@@ -26,6 +26,7 @@
 
 #include <sortix/timespec.h>
 
+#include <sortix/kernel/decl.h>
 #include <sortix/kernel/refcount.h>
 
 struct dirent;
@@ -107,6 +108,9 @@ public:
 	pid_t tcgetsid(ioctx_t* ctx);
 	int tcsendbreak(ioctx_t* ctx, int duration);
 	int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	addr_t mmap(ioctx_t* ctx, off_t off);
+	void munmap(ioctx_t* ctx, off_t off);
+	int mprotect(ioctx_t* ctx, int prot);
 
 public /*TODO: private*/:
 	Ref<Inode> inode;

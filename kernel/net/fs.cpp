@@ -259,6 +259,7 @@ ssize_t StreamSocket::recv(ioctx_t* ctx, uint8_t* buf, size_t count,
 	ScopedLock lock(&socket_lock);
 	if ( !is_connected )
 		return errno = ENOTCONN, -1;
+	lock.Reset();
 	return incoming.read(ctx, buf, count);
 }
 
@@ -268,6 +269,7 @@ ssize_t StreamSocket::send(ioctx_t* ctx, const uint8_t* buf, size_t count,
 	ScopedLock lock(&socket_lock);
 	if ( !is_connected )
 		return errno = ENOTCONN, -1;
+	lock.Reset();
 	return outgoing.write(ctx, buf, count);
 }
 

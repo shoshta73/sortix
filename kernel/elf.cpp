@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -276,10 +276,7 @@ uintptr_t Load(const void* file_ptr, size_t file_size, Auxiliary* aux)
 			uintptr_t map_end = Page::AlignUp(pheader->p_vaddr + pheader->p_memsz);
 			size_t map_size = map_end - map_start;
 
-			struct segment segment;
-			segment.addr =  map_start;
-			segment.size = map_size;
-			segment.prot = kprot;
+			Segment segment(map_start, map_size, kprot);
 
 			assert(IsUserspaceSegment(&segment));
 

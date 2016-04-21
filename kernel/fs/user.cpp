@@ -255,6 +255,9 @@ public:
 	virtual pid_t tcgetsid(ioctx_t* ctx);
 	virtual int tcsendbreak(ioctx_t* ctx, int duration);
 	virtual int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	virtual addr_t mmap(ioctx_t* ctx, off_t off);
+	virtual void munmap(ioctx_t* ctx, off_t off);
+	virtual int mprotect(ioctx_t* ctx, int prot);
 
 private:
 	bool SendMessage(Channel* channel, size_t type, void* ptr, size_t size,
@@ -1580,6 +1583,21 @@ int Unode::tcsetattr(ioctx_t* ctx, int actions, const struct termios* user_tio)
 		ret = 0;
 	channel->KernelClose();
 	return ret;
+}
+
+addr_t Unode::mmap(ioctx_t* /*ctx*/, off_t /*off*/)
+{
+	return errno = ENODEV, 0;
+}
+
+void Unode::munmap(ioctx_t* /*ctx*/, off_t /*off*/)
+{
+	errno = ENODEV;
+}
+
+int Unode::mprotect(ioctx_t* /*ctx*/, int /*prot*/)
+{
+	return errno = ENODEV, -1;
 }
 
 bool Bootstrap(Ref<Inode>* out_root,

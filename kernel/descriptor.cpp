@@ -30,6 +30,7 @@
 #include <sortix/mount.h>
 #include <sortix/seek.h>
 #include <sortix/stat.h>
+#include <sortix/mman.h>
 
 #include <sortix/kernel/copy.h>
 #include <sortix/kernel/descriptor.h>
@@ -38,6 +39,7 @@
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/process.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/string.h>
@@ -849,6 +851,30 @@ int Descriptor::tcsendbreak(ioctx_t* ctx, int duration)
 int Descriptor::tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio)
 {
 	return vnode->tcsetattr(ctx, actions, tio);
+}
+
+addr_t Descriptor::mmap(ioctx_t* ctx, off_t off)
+{
+	if ( off & (Page::Size() - 1) )
+		return errno = EINVAL, 0;
+	return vnode->mmap(ctx, off);
+}
+
+void Descriptor::munmap(ioctx_t* ctx, off_t off)
+{
+	assert(!(off & (Page::Size() - 1)));
+	return vnode->munmap(ctx, off);
+}
+
+int Descriptor::mprotect(ioctx_t* ctx, int prot)
+{
+	if ( !(dflags & O_READ) )
+		return errno = EACCES, -1;
+	if ( (prot & (PROT_WRITE | PROT_KWRITE)) && !(dflags & O_WRITE) )
+		return errno = EACCES, -1;
+	if ( (prot & (PROT_WRITE | PROT_KWRITE)) && dflags & O_APPEND )
+		return errno = EACCES, -1;
+	return vnode->mprotect(ctx, prot);
 }
 
 } // namespace Sortix

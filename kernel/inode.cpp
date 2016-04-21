@@ -445,4 +445,19 @@ int AbstractInode::tcsetattr(ioctx_t* /*ctx*/, int /*actions*/, const struct ter
 	return errno = ENOTTY, -1;
 }
 
+addr_t AbstractInode::mmap(ioctx_t* /*ctx*/, off_t /*off*/)
+{
+	return errno = ENODEV, 0;
+}
+
+void AbstractInode::munmap(ioctx_t* /*ctx*/, off_t /*off*/)
+{
+	errno = ENODEV;
+}
+
+int AbstractInode::mprotect(ioctx_t* /*ctx*/, int /*prot*/)
+{
+	return errno = ENODEV, -1;
+}
+
 } // namespace Sortix

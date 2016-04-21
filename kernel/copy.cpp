@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -55,11 +55,11 @@ static bool IsInProcessAddressSpace(Process* process)
 	return current_address_space == process->addrspace;
 }
 
-static struct segment* FindSegment(Process* process, uintptr_t addr)
+static Segment* FindSegment(Process* process, uintptr_t addr)
 {
 	for ( size_t i = 0; i < process->segments_used; i++ )
 	{
-		struct segment* segment = &process->segments[i];
+		Segment* segment = &process->segments[i];
 		if ( addr < segment->addr )
 			continue;
 		if ( segment->addr + segment->size <= addr )
@@ -79,7 +79,7 @@ bool CopyToUser(void* userdst_ptr, const void* ksrc_ptr, size_t count)
 	kthread_mutex_lock(&process->segment_lock);
 	while ( count )
 	{
-		struct segment* segment = FindSegment(process, userdst);
+		Segment* segment = FindSegment(process, userdst);
 		if ( !segment || !(segment->prot & PROT_WRITE) )
 		{
 			errno = EFAULT;
@@ -109,7 +109,7 @@ bool CopyFromUser(void* kdst_ptr, const void* usersrc_ptr, size_t count)
 	kthread_mutex_lock(&process->segment_lock);
 	while ( count )
 	{
-		struct segment* segment = FindSegment(process, usersrc);
+		Segment* segment = FindSegment(process, usersrc);
 		if ( !segment || !(segment->prot & PROT_READ) )
 		{
 			errno = EFAULT;
@@ -157,7 +157,7 @@ bool ZeroUser(void* userdst_ptr, size_t count)
 	kthread_mutex_lock(&process->segment_lock);
 	while ( count )
 	{
-		struct segment* segment = FindSegment(process, userdst);
+		Segment* segment = FindSegment(process, userdst);
 		if ( !segment || !(segment->prot & PROT_WRITE) )
 		{
 			errno = EFAULT;
@@ -191,7 +191,7 @@ char* GetStringFromUser(const char* usersrc_str)
 	while ( !done )
 	{
 		uintptr_t current_at = usersrc + result_length;
-		struct segment* segment = FindSegment(process, current_at);
+		Segment* segment = FindSegment(process, current_at);
 		if ( !segment || !(segment->prot & PROT_READ) )
 		{
 			kthread_mutex_unlock(&process->segment_lock);

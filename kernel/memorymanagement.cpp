@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,17 +25,22 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sortix/fcntl.h>
 #include <sortix/mman.h>
 #include <sortix/seek.h>
 
 #include <sortix/kernel/copy.h>
 #include <sortix/kernel/descriptor.h>
+#include <sortix/kernel/inode.h>
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/process.h>
 #include <sortix/kernel/segment.h>
 #include <sortix/kernel/syscall.h>
+#include <sortix/kernel/vnode.h>
+
+#include "fs/kram.h"
 
 namespace Sortix {
 
@@ -69,54 +74,56 @@ void UnmapMemory(Process* process, uintptr_t addr, size_t size)
 	if ( !size )
 		return;
 
-	struct segment unmap_segment;
-	unmap_segment.addr = addr;
-	unmap_segment.size = size;
-	unmap_segment.prot = 0;
-	while ( struct segment* conflict = FindOverlappingSegment(process,
-	                                                          &unmap_segment) )
+	struct segment_location loc;
+	loc.addr = addr;
+	loc.size = size;
+	while ( Segment* conflict = FindOverlappingSegment(process, &loc) )
 	{
 		// Delete the segment if covered entirely by our request.
 		if ( addr <= conflict->addr && conflict->addr + conflict->size <= addr + size )
 		{
 			uintptr_t conflict_offset = (uintptr_t) conflict - (uintptr_t) process->segments;
-			size_t conflict_index = conflict_offset / sizeof(struct segment);
-			Memory::UnmapRange(conflict->addr, conflict->size, PAGE_USAGE_USER_SPACE);
-			Memory::Flush();
+			size_t conflict_index = conflict_offset / sizeof(Segment);
+			UnmapSegment(conflict);
+			conflict->~Segment();
 			if ( conflict_index + 1 == process->segments_used )
 			{
 				process->segments_used--;
 				continue;
 			}
-			process->segments[conflict_index] = process->segments[--process->segments_used];
+			Segment* old = &process->segments[--process->segments_used];
+			Segment* dst = &process->segments[conflict_index];
+			*dst = *old;
+			old->~Segment();
+			// TODO: It's wrong to qsort the Segment class.
 			qsort(process->segments, process->segments_used,
-			      sizeof(struct segment), segmentcmp);
+			      sizeof(Segment), segmentcmp);
 			continue;
 		}
 
 		// Delete the middle of the segment if covered there by our request.
 		if ( conflict->addr < addr && addr + size - conflict->addr <= conflict->size )
 		{
-			Memory::UnmapRange(addr, size, PAGE_USAGE_USER_SPACE);
-			Memory::Flush();
-			struct segment right_segment;
-			right_segment.addr = addr + size;
-			right_segment.size = conflict->addr + conflict->size - (addr + size);
-			right_segment.prot = conflict->prot;
+			UnmapSegmentRange(conflict, addr - conflict->addr, size);
+			size_t new_addr = addr + size;
+			size_t new_size = conflict->addr + conflict->size - (addr + size);
+			off_t new_offset = conflict->offset + (new_addr - conflict->addr);
+			Segment right_segment(new_addr, new_size, conflict->prot,
+			                      conflict->desc, new_offset);
 			conflict->size = addr - conflict->addr;
 			// TODO: This shouldn't really fail as we free memory above, but
 			//       this code isn't really provably reliable.
 			if ( !AddSegment(process, &right_segment) )
-				PanicF("Unexpectedly unable to split memory mapped segment");
+				Panic("Unexpectedly unable to split memory mapped segment");
 			continue;
 		}
 
 		// Delete the part of the segment covered partially from the left.
 		if ( addr <= conflict->addr )
 		{
-			Memory::UnmapRange(conflict->addr, addr + size - conflict->addr, PAGE_USAGE_USER_SPACE);
-			Memory::Flush();
-			conflict->size = conflict->addr + conflict->size - (addr + size);
+			UnmapSegmentRange(conflict, 0, addr + size - conflict->addr);
+			conflict->size += conflict->addr - (addr + size);
+			conflict->offset += conflict->addr - (addr + size);
 			conflict->addr = addr + size;
 			continue;
 		}
@@ -124,8 +131,8 @@ void UnmapMemory(Process* process, uintptr_t addr, size_t size)
 		// Delete the part of the segment covered partially from the right.
 		if ( conflict->addr <= addr + size )
 		{
-			Memory::UnmapRange(addr, conflict->addr + conflict->size - addr, PAGE_USAGE_USER_SPACE);
-			Memory::Flush();
+			UnmapSegmentRange(conflict, addr - conflict->addr,
+			                  conflict->addr + conflict->size - addr);
 			conflict->size -= conflict->addr + conflict->size - addr;
 			continue;
 		}
@@ -145,24 +152,28 @@ bool ProtectMemory(Process* process, uintptr_t addr, size_t size, int prot)
 	// there are no gaps in that region. This is where the operation can fail as
 	// the AddSegment call can run out of memory. There is no harm in splitting
 	// the segments into smaller chunks.
+	bool any_had_desc = false;
 	for ( size_t offset = 0; offset < size; )
 	{
-		struct segment search_region;
+		struct segment_location search_region;
 		search_region.addr = addr + offset;
 		search_region.size = Page::Size();
-		search_region.prot = prot;
-		struct segment* segment = FindOverlappingSegment(process, &search_region);
+		Segment* segment = FindOverlappingSegment(process, &search_region);
 
 		if ( !segment )
 			return errno = EINVAL, false;
 
+		if ( segment->desc )
+			any_had_desc = true;
+
 		// Split the segment into two if it begins before our search region.
 		if ( segment->addr < search_region.addr )
 		{
-			struct segment new_segment;
-			new_segment.addr = search_region.addr;
-			new_segment.size = segment->addr + segment->size - new_segment.addr;
-			new_segment.prot = segment->prot;
+			size_t new_addr = search_region.addr;
+			size_t new_size = segment->size + segment->addr - new_addr;
+			size_t new_offset = segment->offset + segment->addr - new_addr;
+			Segment new_segment(new_addr, new_size, segment->prot,
+			                    segment->desc, new_offset);
 			segment->size = search_region.addr - segment->addr;
 
 			if ( !AddSegment(process, &new_segment) )
@@ -177,10 +188,11 @@ bool ProtectMemory(Process* process, uintptr_t addr, size_t size, int prot)
 		// Split the segment into two if it ends after addr + size.
 		if ( size < segment->addr + segment->size - addr )
 		{
-			struct segment new_segment;
-			new_segment.addr = addr + size;
-			new_segment.size = segment->addr + segment->size - new_segment.addr;
-			new_segment.prot = segment->prot;
+			size_t new_addr = addr + size;
+			size_t new_size = segment->size + segment->addr - new_addr;
+			size_t new_offset = segment->offset + segment->addr - new_addr;
+			Segment new_segment(new_addr, new_size, segment->prot,
+			                    segment->desc, new_offset);
 			segment->size = addr + size - segment->addr;
 
 			if ( !AddSegment(process, &new_segment) )
@@ -195,15 +207,30 @@ bool ProtectMemory(Process* process, uintptr_t addr, size_t size, int prot)
 		offset += segment->size;
 	}
 
+	// Verify that any backing files allow the new protection.
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	for ( size_t offset = 0; any_had_desc && offset < size; )
+	{
+		struct segment_location search_region;
+		search_region.addr = addr + offset;
+		search_region.size = Page::Size();
+		Segment* segment = FindOverlappingSegment(process, &search_region);
+		assert(segment);
+
+		if ( segment->prot != prot &&
+		     segment->desc &&
+		     segment->desc->mprotect(&ctx, prot) < 0 )
+			return false;
+	}
+
 	// Run through all the segments in the region [addr, addr+size) and change
 	// the permissions and update the permissions of the virtual memory itself.
 	for ( size_t offset = 0; offset < size; )
 	{
-		struct segment search_region;
+		struct segment_location search_region;
 		search_region.addr = addr + offset;
 		search_region.size = Page::Size();
-		search_region.prot = prot;
-		struct segment* segment = FindOverlappingSegment(process, &search_region);
+		Segment* segment = FindOverlappingSegment(process, &search_region);
 		assert(segment);
 
 		if ( segment->prot != prot )
@@ -234,10 +261,7 @@ bool MapMemory(Process* process, uintptr_t addr, size_t size, int prot)
 
 	UnmapMemory(process, addr, size);
 
-	struct segment new_segment;
-	new_segment.addr = addr;
-	new_segment.size = size;
-	new_segment.prot = prot;
+	Segment new_segment(addr, size, prot);
 
 	if ( !MapRange(new_segment.addr, new_segment.size, new_segment.prot, PAGE_USAGE_USER_SPACE) )
 		return false;
@@ -245,8 +269,7 @@ bool MapMemory(Process* process, uintptr_t addr, size_t size, int prot)
 
 	if ( !AddSegment(process, &new_segment) )
 	{
-		UnmapRange(new_segment.addr, new_segment.size, PAGE_USAGE_USER_SPACE);
-		Memory::Flush();
+		UnmapSegment(&new_segment);
 		return false;
 	}
 
@@ -291,9 +314,6 @@ void* sys_mmap(void* addr_ptr, size_t size, int prot, int flags, int fd,
 	// Verify that MAP_PRIVATE and MAP_SHARED are not both set.
 	if ( bool(flags & MAP_PRIVATE) == bool(flags & MAP_SHARED) )
 		return errno = EINVAL, MAP_FAILED;
-	// TODO: MAP_SHARED is not currently supported.
-	if ( flags & MAP_SHARED )
-		return errno = EINVAL, MAP_FAILED;
 	// Verify the fíle descriptor and the offset is suitable set if needed.
 	if ( !(flags & MAP_ANONYMOUS) &&
 	     (fd < 0 || offset < 0 || (offset & (Page::Size()-1))) )
@@ -322,82 +342,174 @@ void* sys_mmap(void* addr_ptr, size_t size, int prot, int flags, int fd,
 	// Verify whether the backing file is usable for memory mapping.
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> desc;
-	if ( !(flags & MAP_ANONYMOUS) )
+	if ( flags & MAP_ANONYMOUS )
+	{
+		// Create an unnamed ramfs file to back this memory mapping.
+		if ( flags & MAP_SHARED )
+		{
+			Ref<Inode> inode(new KRAMFS::File(INODE_TYPE_FILE, S_IFREG, 0, 0,
+			                                  ctx.uid, ctx.gid, 0600));
+			if ( !inode )
+				return MAP_FAILED;
+			Ref<Vnode> vnode(new Vnode(inode, Ref<Vnode>(), 0, 0));
+			inode.Reset();
+			if ( !vnode )
+				return MAP_FAILED;
+			desc = Ref<Descriptor>(new Descriptor(vnode, O_READ | O_WRITE));
+			vnode.Reset();
+			if ( !desc )
+				return MAP_FAILED;
+			if ( (uintmax_t) OFF_MAX < (uintmax_t) size )
+				return errno = EOVERFLOW, MAP_FAILED;
+			if ( desc->truncate(&ctx, size) < 0 )
+				return MAP_FAILED;
+			offset = 0;
+		}
+	}
+	else
 	{
 		if ( !(desc = process->GetDescriptor(fd)) )
 			return MAP_FAILED;
-		// Verify that the file is seekable.
-		if ( desc->lseek(&ctx, 0, SEEK_CUR) < 0 )
-			return errno = ENODEV, MAP_FAILED;
-		// Verify that we have read access to the file.
-		if ( desc->read(&ctx, NULL, 0) != 0 )
-			return errno = EACCES, MAP_FAILED;
-		// Verify that we have write access to the file if needed.
-		if ( (prot & PROT_WRITE) && !(flags & MAP_PRIVATE) &&
-		     desc->write(&ctx, NULL, 0) != 0 )
-			return errno = EACCES, MAP_FAILED;
+		// Verify if going through the inode mmap interface.
+		if ( flags & MAP_SHARED )
+		{
+			if ( desc->mprotect(&ctx, prot) < 0 )
+				return MAP_FAILED;
+		}
+		// Verify if not going through the inode mmap interface.
+		else if ( flags & MAP_PRIVATE )
+		{
+			// Verify that the file is seekable.
+			if ( desc->lseek(&ctx, 0, SEEK_CUR) < 0 )
+				return errno = ENODEV, MAP_FAILED;
+			// Verify that we have read access to the file.
+			if ( desc->read(&ctx, NULL, 0) != 0 )
+				return errno = EACCES, MAP_FAILED;
+			// Verify that we have write access to the file if needed.
+			if ( (prot & PROT_WRITE) && !(flags & MAP_PRIVATE) &&
+				 desc->write(&ctx, NULL, 0) != 0 )
+				return errno = EACCES, MAP_FAILED;
+		}
 	}
+
+	if ( prot & PROT_READ )
+		prot |= PROT_KREAD;
+	if ( prot & PROT_WRITE )
+		prot |= PROT_KWRITE;
+	if ( flags & MAP_PRIVATE )
+		prot |= PROT_FORK;
 
 	ScopedLock lock1(&process->segment_write_lock);
 	ScopedLock lock2(&process->segment_lock);
 
 	// Determine where to put the new segment and its protection.
-	struct segment new_segment;
+	struct segment_location location;
 	if ( flags & MAP_FIXED )
-		new_segment.addr = aligned_addr,
-		new_segment.size = aligned_size;
-	else if ( !PlaceSegment(&new_segment, process, (void*) addr, aligned_size, flags) )
-		return errno = ENOMEM, MAP_FAILED;
-	new_segment.prot = PROT_KWRITE | PROT_FORK;
-
-	// Allocate a memory segment with the desired properties.
-	if ( !Memory::MapMemory(process, new_segment.addr, new_segment.size, new_segment.prot) )
-		return MAP_FAILED;
-
-	// The pread will copy to user-space right requires this lock to be free.
-	lock2.Reset();
-
-	// Read the file contents into the newly allocated memory.
-	if ( !(flags & MAP_ANONYMOUS) )
 	{
-		ioctx_t kctx; SetupKernelIOCtx(&kctx);
-		for ( size_t so_far = 0; so_far < aligned_size; )
+		location.addr = aligned_addr;
+		location.size = aligned_size;
+	}
+	else if ( !PlaceSegment(&location, process, (void*) addr, aligned_size, flags) )
+		return errno = ENOMEM, MAP_FAILED;
+
+	if ( flags & MAP_SHARED )
+	{
+		assert(desc);
+
+		Memory::UnmapMemory(process, location.addr, location.size);
+
+		Segment new_segment(location.addr, 0, prot, desc, offset);
+
+		while ( new_segment.size < location.size )
 		{
-			uint8_t* ptr = (uint8_t*) (new_segment.addr + so_far);
-			size_t left = aligned_size - so_far;
-			off_t pos = offset + so_far;
-			ssize_t num_bytes = desc->pread(&kctx, ptr, left, pos);
-			if ( num_bytes < 0 )
+			off_t offset;
+			if ( __builtin_add_overflow(new_segment.offset, new_segment.size,
+			                            &offset) )
 			{
-				// TODO: How should this situation be handled? For now we'll
-				//       just ignore the error condition.
-				errno = 0;
-				break;
+				errno = EOVERFLOW;
+				Memory::Flush();
+				UnmapSegment(&new_segment);
+				return MAP_FAILED;
 			}
-			if ( !num_bytes )
+			assert(!(offset & (Page::Size() - 1)));
+
+			addr_t addr = desc->mmap(&ctx, offset);
+			if ( !addr )
 			{
-				// We got an unexpected early end-of-file condition, but that's
-				// alright as the MapMemory call zero'd the new memory and we
-				// are expected to zero the remainder.
-				break;
+				Memory::Flush();
+				UnmapSegment(&new_segment);
+				return MAP_FAILED;
 			}
-			so_far += num_bytes;
+			uintptr_t virt = location.addr + new_segment.size;
+
+			if ( !Memory::Map(addr, virt, prot) )
+			{
+				desc->munmap(&ctx, offset);
+				Memory::Flush();
+				UnmapSegment(&new_segment);
+				return MAP_FAILED;
+			}
+
+			new_segment.size += Page::Size();
+		}
+		Memory::Flush();
+
+		if ( !AddSegment(process, &new_segment) )
+		{
+			UnmapSegment(&new_segment);
+			return MAP_FAILED;
+		}
+	}
+	else
+	{
+		int first_prot = flags & MAP_ANONYMOUS ? prot : PROT_KWRITE | PROT_FORK;
+		Segment new_segment(location.addr, location.size, first_prot);
+
+		// Allocate a memory segment with the desired properties.
+		if ( !Memory::MapMemory(process, new_segment.addr, new_segment.size,
+		                        new_segment.prot) )
+			return MAP_FAILED;
+
+		// Read the file contents into the newly allocated memory.
+		if ( !(flags & MAP_ANONYMOUS) )
+		{
+			// The pread will copy to user-space right requires this lock to be
+			// free.
+			lock2.Reset();
+
+			ioctx_t kctx; SetupKernelIOCtx(&kctx);
+			for ( size_t so_far = 0; so_far < aligned_size; )
+			{
+				uint8_t* ptr = (uint8_t*) (new_segment.addr + so_far);
+				size_t left = aligned_size - so_far;
+				off_t pos = offset + so_far;
+				ssize_t num_bytes = desc->pread(&kctx, ptr, left, pos);
+				if ( num_bytes < 0 )
+				{
+					// TODO: How should this situation be handled? For now we'll
+					//       just ignore the error condition.
+					errno = 0;
+					break;
+				}
+				if ( !num_bytes )
+				{
+					// We got an unexpected early end-of-file condition, but
+					// that's alright as the MapMemory call zero'd the new
+					// memory and we are expected to zero the remainder.
+					break;
+				}
+				so_far += num_bytes;
+			}
+
+			// Finally switch to the desired page protections.
+			kthread_mutex_lock(&process->segment_lock);
+			Memory::ProtectMemory(CurrentProcess(), new_segment.addr,
+				                  new_segment.size, prot);
+			kthread_mutex_unlock(&process->segment_lock);
 		}
 	}
 
-	// Finally switch to the desired page protections.
-	kthread_mutex_lock(&process->segment_lock);
-	if ( prot & PROT_READ )
-		prot |= PROT_KREAD;
-	if ( prot & PROT_WRITE )
-		prot |= PROT_KWRITE;
-	prot |= PROT_FORK;
-	Memory::ProtectMemory(CurrentProcess(), new_segment.addr, new_segment.size, prot);
-	kthread_mutex_unlock(&process->segment_lock);
-
-	lock1.Reset();
-
-	return (void*) new_segment.addr;
+	return (void*) location.addr;
 }
 
 int sys_mprotect(const void* addr_ptr, size_t size, int prot)

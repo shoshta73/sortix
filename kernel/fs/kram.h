@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,9 @@ public:
 	virtual ssize_t tcgetblob(ioctx_t* ctx, const char* name, void* buffer,
 	                          size_t count);
 	virtual int statvfs(ioctx_t* ctx, struct statvfs* stvfs);
+	virtual addr_t mmap(ioctx_t* ctx, off_t off);
+	virtual void munmap(ioctx_t* ctx, off_t off);
+	virtual int mprotect(ioctx_t* ctx, int prot);
 
 private:
 	FileCache fcache;

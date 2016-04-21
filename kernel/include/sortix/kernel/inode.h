@@ -27,6 +27,7 @@
 
 #include <sortix/timespec.h>
 
+#include <sortix/kernel/decl.h>
 #include <sortix/kernel/refcount.h>
 
 struct dirent;
@@ -114,6 +115,9 @@ public:
 	virtual pid_t tcgetsid(ioctx_t* ctx) = 0;
 	virtual int tcsendbreak(ioctx_t* ctx, int duration) = 0;
 	virtual int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio) = 0;
+	virtual addr_t mmap(ioctx_t* ctx, off_t off) = 0;
+	virtual void munmap(ioctx_t* ctx, off_t off) = 0;
+	virtual int mprotect(ioctx_t* ctx, int prot) = 0;
 
 };
 
@@ -207,6 +211,9 @@ public:
 	virtual pid_t tcgetsid(ioctx_t* ctx);
 	virtual int tcsendbreak(ioctx_t* ctx, int duration);
 	virtual int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	virtual addr_t mmap(ioctx_t* ctx, off_t off);
+	virtual void munmap(ioctx_t* ctx, off_t off);
+	virtual int mprotect(ioctx_t* ctx, int prot);
 
 };
 

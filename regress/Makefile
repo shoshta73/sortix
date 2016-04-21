@@ -16,6 +16,7 @@ regress \
 
 TESTS:=\
 test-fmemopen \
+test-mmap-anon-shared \
 test-pthread-argv \
 test-pthread-basic \
 test-pthread-main-join \

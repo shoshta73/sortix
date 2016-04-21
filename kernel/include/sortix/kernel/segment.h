@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,21 +23,35 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <sortix/kernel/descriptor.h>
+
 namespace Sortix {
 
 class Process;
 
-struct segment
+struct segment_location
 {
 	uintptr_t addr;
 	size_t size;
+};
+
+class Segment : public segment_location
+{
+public:
+	Segment() { } // For operator new[].
+	Segment(uintptr_t addr, size_t size, int prot) :
+		segment_location({addr, size}), prot(prot), desc(NULL), offset(0) { }
+	Segment(uintptr_t addr, size_t size, int prot, Ref<Descriptor> desc, off_t offset) :
+		segment_location({addr, size}), prot(prot), desc(desc), offset(offset) { }
 	int prot;
+	Ref<Descriptor> desc;
+	off_t offset;
 };
 
 static inline int segmentcmp(const void* a_ptr, const void* b_ptr)
 {
-	const struct segment* a = (const struct segment*) a_ptr;
-	const struct segment* b = (const struct segment*) b_ptr;
+	const Segment* a = (const Segment*) a_ptr;
+	const Segment* b = (const Segment*) b_ptr;
 	return a->addr < b->addr ? -1 :
 	       b->addr < a->addr ?  1 :
 	       a->size < b->size ? -1 :
@@ -45,13 +59,17 @@ static inline int segmentcmp(const void* a_ptr, const void* b_ptr)
 	                            0 ;
 }
 
-bool AreSegmentsOverlapping(const struct segment* a, const struct segment* b);
-bool IsUserspaceSegment(const struct segment* segment);
-struct segment* FindOverlappingSegment(Process* process, const struct segment* new_segment);
-bool IsSegmentOverlapping(Process* process, const struct segment* new_segment);
-bool AddSegment(Process* process, const struct segment* new_segment);
-bool PlaceSegment(struct segment* solution, Process* process, void* addr_ptr,
-                  size_t size, int flags);
+bool AreSegmentsOverlapping(const struct segment_location* a,
+                            const struct segment_location* b);
+bool IsUserspaceSegment(const Segment* segment);
+Segment* FindOverlappingSegment(Process* process,
+                                const struct segment_location* location);
+bool IsSegmentOverlapping(Process* process, const segment_location* location);
+bool AddSegment(Process* process, const Segment* new_segment);
+bool PlaceSegment(struct segment_location* solution, Process* process,
+                  void* addr_ptr, size_t size, int flags);
+void UnmapSegment(Segment* segment);
+void UnmapSegmentRange(Segment* segment, size_t offset, size_t size);
 
 } // namespace Sortix
 

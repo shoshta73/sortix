@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -40,9 +40,10 @@ struct BlockCacheBlock;
 class FileCache;
 //class FileCacheBackend;
 
-const uintptr_t BCACHE_PRESENT = 1 << 0;
-const uintptr_t BCACHE_USED = 1 << 1;
-const uintptr_t BCACHE_MODIFIED = 1 << 2;
+static const uintptr_t BCACHE_PRESENT = 1 << 0;
+static const uintptr_t BCACHE_USED = 1 << 1;
+static const uintptr_t BCACHE_MODIFIED = 1 << 2;
+static const uintptr_t BCACHE_MMAP = 1 << 3;
 
 class BlockCache
 {
@@ -106,6 +107,9 @@ public:
 	ssize_t pwrite(ioctx_t* ctx, const uint8_t* buf, size_t count, off_t off);
 	int truncate(ioctx_t* ctx, off_t length);
 	off_t lseek(ioctx_t* ctx, off_t offset, int whence);
+	addr_t mmap(ioctx_t* ctx, off_t off);
+	void munmap(ioctx_t* ctx, off_t off);
+	int mprotect(ioctx_t* ctx, int prot);
 	//bool ChangeBackend(FileCacheBackend* backend, bool sync_old);
 	off_t GetFileSize();
 

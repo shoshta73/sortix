@@ -26,6 +26,7 @@
 
 #include <sortix/timespec.h>
 
+#include <sortix/kernel/decl.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/refcount.h>
 
@@ -110,6 +111,9 @@ public:
 	pid_t tcgetsid(ioctx_t* ctx);
 	int tcsendbreak(ioctx_t* ctx, int duration);
 	int tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio);
+	addr_t mmap(ioctx_t* ctx, off_t off);
+	void munmap(ioctx_t* ctx, off_t off);
+	int mprotect(ioctx_t* ctx, int prot);
 
 private:
 	Ref<Descriptor> open_elem(ioctx_t* ctx, const char* filename, int flags,

@@ -366,12 +366,14 @@ void Process::ResetAddressSpace()
 	assert(Memory::GetAddressSpace() == addrspace);
 
 	for ( size_t i = 0; i < segments_used; i++ )
-		Memory::UnmapRange(segments[i].addr, segments[i].size, PAGE_USAGE_USER_SPACE);
-
-	Memory::Flush();
+	{
+		UnmapSegment(&segments[i]);
+		//segments[i].~Segment();
+		segments[i].desc.Reset();
+	}
 
 	segments_used = segments_length = 0;
-	free(segments);
+	delete[] segments;
 	segments = NULL;
 }
 
@@ -624,25 +626,68 @@ Process* Process::Fork()
 		return NULL;
 	}
 
-	struct segment* clone_segments = NULL;
+	Segment* clone_segments = NULL;
 
 	// Fork the segment list.
+	kthread_mutex_lock(&segment_lock);
+	bool segment_failure = false;
+	size_t segment_failure_i = 0;
+	size_t segment_failure_o = 0;
 	if ( segments )
 	{
-		size_t segments_size = sizeof(struct segment) * segments_used;
-		if ( !(clone_segments = (struct segment*) malloc(segments_size)) )
+		clone_segments = new Segment[segments_used];
+		if ( !clone_segments )
 		{
+			kthread_mutex_unlock(&segment_lock);
 			delete clone;
 			return NULL;
 		}
-		memcpy(clone_segments, segments, segments_size);
+
+		for ( size_t i = 0; i < segments_used; i++ )
+			clone_segments[i] = segments[i];
+
+		ioctx_t ctx; SetupUserIOCtx(&ctx);
+		for ( size_t i = 0; i < segments_used; i++ )
+		{
+			for ( size_t o = 0;
+			      clone_segments[i].desc && o < clone_segments[i].size;
+			      o += Page::Size() )
+			{
+				off_t offset = clone_segments[i].offset + o;
+				if ( !clone_segments[i].desc->mmap(&ctx, offset) )
+				{
+					segment_failure = true;
+					segment_failure_i = i;
+					segment_failure_o = o;
+					break;
+				}
+			}
+			if ( segment_failure )
+				break;
+		}
 	}
 
 	// Fork address-space here and copy memory.
-	clone->addrspace = Memory::Fork();
+	clone->addrspace = !segment_failure? Memory::Fork() : 0;
+	kthread_mutex_unlock(&segment_lock);
 	if ( !clone->addrspace )
 	{
-		free(clone_segments);
+		ioctx_t ctx; SetupUserIOCtx(&ctx);
+		for ( size_t i = 0; i < segments_used; i++ )
+		{
+			if ( segment_failure && i <= segment_failure_i )
+				break;
+			for ( size_t o = 0;
+			      clone_segments[i].desc && o < clone_segments[i].size;
+			      o += Page::Size() )
+			{
+				if ( segment_failure && o <= segment_failure_o )
+					break;
+				off_t offset = clone_segments[i].offset + o;
+				clone_segments[i].desc->munmap(&ctx, offset);
+			}
+		}
+		delete[] clone_segments;
 		delete clone;
 		return NULL;
 	}
@@ -744,8 +789,8 @@ void Process::ResetForExecute()
 	ResetAddressSpace();
 }
 
-bool Process::MapSegment(struct segment* result, void* hint, size_t size,
-                         int flags, int prot)
+bool Process::MapSegment(struct segment_location* result, void* hint,
+                         size_t size, int flags, int prot)
 {
 	// process->segment_write_lock is held at this point.
 	// process->segment_lock is held at this point.
@@ -755,7 +800,7 @@ bool Process::MapSegment(struct segment* result, void* hint, size_t size,
 
 	if ( !PlaceSegment(result, this, hint, size, flags) )
 		return false;
-	if ( !Memory::MapMemory(this, result->addr, result->size, result->prot = prot) )
+	if ( !Memory::MapMemory(this, result->addr, result->size, prot) )
 	{
 		// The caller is expected to self-destruct in this case, so the
 		// segment just created is not removed.
@@ -849,11 +894,11 @@ int Process::Execute(const char* programname, const uint8_t* program,
 	for ( int i = 0; i < envc; i++ )
 		arg_size += strlen(envp[i]) + 1;
 
-	struct segment arg_segment;
-	struct segment stack_segment;
-	struct segment raw_tls_segment;
-	struct segment tls_segment;
-	struct segment auxcode_segment;
+	struct segment_location arg_segment;
+	struct segment_location stack_segment;
+	struct segment_location raw_tls_segment;
+	struct segment_location tls_segment;
+	struct segment_location auxcode_segment;
 
 	kthread_mutex_lock(&segment_write_lock);
 	kthread_mutex_lock(&segment_lock);

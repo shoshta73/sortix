@@ -452,4 +452,19 @@ int Vnode::tcsetattr(ioctx_t* ctx, int actions, const struct termios* tio)
 	return inode->tcsetattr(ctx, actions, tio);
 }
 
+addr_t Vnode::mmap(ioctx_t* ctx, off_t off)
+{
+	return inode->mmap(ctx, off);
+}
+
+void Vnode::munmap(ioctx_t* ctx, off_t off)
+{
+	return inode->munmap(ctx, off);
+}
+
+int Vnode::mprotect(ioctx_t* ctx, int prot)
+{
+	return inode->mprotect(ctx, prot);
+}
+
 } // namespace Sortix

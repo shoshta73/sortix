@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <sortix/mman.h>
 
 #include <sortix/kernel/decl.h>
+#include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/process.h>
@@ -35,12 +36,13 @@
 
 namespace Sortix {
 
-bool AreSegmentsOverlapping(const struct segment* a, const struct segment* b)
+bool AreSegmentsOverlapping(const struct segment_location* a,
+                            const struct segment_location* b)
 {
 	return a->addr < b->addr + b->size && b->addr < a->addr + a->size;
 }
 
-bool IsUserspaceSegment(const struct segment* segment)
+bool IsUserspaceSegment(const Segment* segment)
 {
 	uintptr_t userspace_addr;
 	size_t userspace_size;
@@ -53,29 +55,31 @@ bool IsUserspaceSegment(const struct segment* segment)
 	return true;
 }
 
-struct segment* FindOverlappingSegment(Process* process, const struct segment* new_segment)
+Segment* FindOverlappingSegment(Process* process,
+                                const struct segment_location* location)
 {
 	// process->segment_lock is held at this point.
 
 	// TODO: Speed up using binary search.
 	for ( size_t i = 0; i < process->segments_used; i++ )
 	{
-		struct segment* segment = &process->segments[i];
-		if ( AreSegmentsOverlapping(segment, new_segment) )
+		Segment* segment = &process->segments[i];
+		if ( AreSegmentsOverlapping(segment, location) )
 			return segment;
 	}
 
 	return NULL;
 }
 
-bool IsSegmentOverlapping(Process* process, const struct segment* new_segment)
+bool IsSegmentOverlapping(Process* process,
+                          const struct segment_location* location)
 {
 	// process->segment_lock is held at this point.
 
-	return FindOverlappingSegment(process, new_segment) != NULL;
+	return FindOverlappingSegment(process, location) != NULL;
 }
 
-bool AddSegment(Process* process, const struct segment* new_segment)
+bool AddSegment(Process* process, const Segment* new_segment)
 {
 	// process->segment_lock is held at this point.
 
@@ -86,11 +90,12 @@ bool AddSegment(Process* process, const struct segment* new_segment)
 	{
 		size_t new_length = process->segments_length ?
 		                    process->segments_length * 2 : 8;
-		size_t new_size = new_length * sizeof(struct segment);
-		struct segment* new_segments =
-			(struct segment*) realloc(process->segments, new_size);
+		Segment* new_segments = new Segment[new_length];
 		if ( !new_segments )
 			return false;
+		for ( size_t i = 0; i < process->segments_used; i++ )
+			new_segments[i] = process->segments[i];
+		delete[] process->segments;
 		process->segments = new_segments;
 		process->segments_length = new_length;
 	}
@@ -99,7 +104,8 @@ bool AddSegment(Process* process, const struct segment* new_segment)
 	process->segments[process->segments_used++] = *new_segment;
 
 	// Sort the segment list after address.
-	qsort(process->segments, process->segments_used, sizeof(struct segment),
+	// TODO: It's wrong to qsort the Segment class.
+	qsort(process->segments, process->segments_used, sizeof(Segment),
 	      segmentcmp);
 
 	return true;
@@ -107,7 +113,7 @@ bool AddSegment(Process* process, const struct segment* new_segment)
 
 class segment_gaps
 {
-	typedef yielder_iterator<segment_gaps, struct segment> my_iterator;
+	typedef yielder_iterator<segment_gaps, Segment> my_iterator;
 
 public:
 	segment_gaps(finished_yielder) : process(0) { }
@@ -121,7 +127,7 @@ public:
 		Memory::GetUserVirtualArea(&userspace_addr, &userspace_size);
 	}
 
-	bool yield(struct segment* result)
+	bool yield(Segment* result)
 	{
 		// process->segment_lock is held at this point.
 
@@ -200,8 +206,8 @@ private:
 
 };
 
-bool PlaceSegment(struct segment* solution, Process* process, void* addr_ptr,
-                  size_t size, int flags)
+bool PlaceSegment(struct segment_location* solution, Process* process,
+                  void* addr_ptr, size_t size, int flags)
 {
 	// process->segment_lock is held at this point.
 
@@ -212,9 +218,9 @@ bool PlaceSegment(struct segment* solution, Process* process, void* addr_ptr,
 	size = Page::AlignUp(size);
 	bool found_any = false;
 	size_t best_distance = 0;
-	struct segment best;
+	struct segment_location best;
 
-	for ( struct segment gap : segment_gaps(process) )
+	for ( Segment gap : segment_gaps(process) )
 	{
 		if ( gap.size < size )
 			continue;
@@ -222,26 +228,50 @@ bool PlaceSegment(struct segment* solution, Process* process, void* addr_ptr,
 		{
 			solution->addr = addr;
 			solution->size = size;
-			solution->prot = 0;
 			return true;
 		}
-		struct segment attempt;
+		struct segment_location attempt;
 		size_t distance;
 		attempt.addr = gap.addr;
 		attempt.size = size;
-		attempt.prot = 0;
 		distance = addr < attempt.addr ? attempt.addr - addr : addr - attempt.addr;
 		if ( !found_any|| distance < best_distance )
 			found_any = true, best_distance = distance, best = attempt;
 		attempt.addr = gap.addr + gap.size - size;
 		attempt.size = size;
-		attempt.prot = 0;
 		distance = addr < attempt.addr ? attempt.addr - addr : addr - attempt.addr;
 		if ( !found_any|| distance < best_distance )
 			found_any = true, best_distance = distance, best = attempt;
 	}
 
 	return *solution = best, found_any;
+}
+
+void UnmapSegment(Segment* segment)
+{
+	UnmapSegmentRange(segment, 0, segment->size);
+}
+
+void UnmapSegmentRange(Segment* segment, size_t offset, size_t size)
+{
+	assert(offset <= segment->size);
+	assert(size <= segment->size - offset);
+	if ( !size )
+		return;
+	if ( segment->desc )
+	{
+		for ( size_t i = 0; i < size; i += Page::Size() )
+			Memory::Unmap(segment->addr + offset + i);
+		Memory::Flush();
+		ioctx_t ctx; SetupUserIOCtx(&ctx);
+		for ( size_t i = 0; i < size; i += Page::Size() )
+			segment->desc->munmap(&ctx, segment->offset + i);
+	}
+	else
+	{
+		Memory::UnmapRange(segment->addr, segment->size, PAGE_USAGE_USER_SPACE);
+		Memory::Flush();
+	}
 }
 
 } // namespace Sortix

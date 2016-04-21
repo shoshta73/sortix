@@ -55,7 +55,7 @@ public:
 	Ref(const Ref<T>& r) : obj(r.Get()) { if ( obj ) obj->Refer_Renamed(); }
 	template <class U>
 	Ref(const Ref<U>& r) : obj(r.Get()) { if ( obj ) obj->Refer_Renamed(); }
-	~Ref() { if ( obj ) obj->Unref_Renamed(); }
+	~Ref() { if ( obj ) obj->Unref_Renamed(); obj = NULL; }
 
 	Ref& operator=(const Ref r)
 	{

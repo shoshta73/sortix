@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -46,11 +46,9 @@ class Descriptor;
 class DescriptorTable;
 class MountTable;
 class ProcessTable;
-struct ProcessSegment;
 struct ProcessTimer;
 struct ioctx_struct;
 typedef struct ioctx_struct ioctx_t;
-struct segment;
 
 class Process
 {
@@ -139,7 +137,7 @@ public:
 	bool threads_exiting;
 
 public:
-	struct segment* segments;
+	Segment* segments;
 	size_t segments_used;
 	size_t segments_length;
 	kthread_mutex_t segment_write_lock;
@@ -170,8 +168,8 @@ public:
 	void AddChildProcess(Process* child);
 	void ScheduleDeath();
 	void AbortConstruction();
-	bool MapSegment(struct segment* result, void* hint, size_t size, int flags,
-	                int prot);
+	bool MapSegment(struct segment_location* result, void* hint, size_t size,
+	                int flags, int prot);
 
 public:
 	Process* Fork();

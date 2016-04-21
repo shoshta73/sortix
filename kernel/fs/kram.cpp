@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -181,6 +181,21 @@ ssize_t File::tcgetblob(ioctx_t* ctx, const char* name, void* buffer, size_t cou
 int File::statvfs(ioctx_t* ctx, struct statvfs* stvfs)
 {
 	return common_statvfs(ctx, stvfs, dev);
+}
+
+addr_t File::mmap(ioctx_t* ctx, off_t off)
+{
+	return fcache.mmap(ctx, off);
+}
+
+void File::munmap(ioctx_t* ctx, off_t off)
+{
+	return fcache.munmap(ctx, off);
+}
+
+int File::mprotect(ioctx_t* ctx, int prot)
+{
+	return fcache.mprotect(ctx, prot);
 }
 
 Dir::Dir(dev_t dev, ino_t ino, uid_t owner, gid_t group, mode_t mode)

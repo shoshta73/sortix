@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -127,7 +127,7 @@ void BlockCache::ReleaseBlock(BlockCacheBlock* block)
 		// put this block into a list of non-present blocks so we can reuse it
 		// later and reallocate a physical frame for it - then we will just
 		// reuse the block's meta information.
-		block->information &= ~(BCACHE_USED | BCACHE_PRESENT);
+		block->information = 0;
 		return;
 	}
 	UnlinkBlock(block);
@@ -136,7 +136,7 @@ void BlockCache::ReleaseBlock(BlockCacheBlock* block)
 		unused_block->prev_block = block;
 	block->next_block = unused_block;
 	block->prev_block = NULL;
-	block->information &= ~BCACHE_USED;
+	block->information = BCACHE_PRESENT;
 	unused_block = block;
 }
 
@@ -491,6 +491,35 @@ bool FileCache::ChangeNumBlocks(size_t new_numblocks, bool exact)
 	}
 
 	return true;
+}
+
+addr_t FileCache::mmap(ioctx_t* /*ctx*/, off_t off)
+{
+	uintmax_t block_num = off / Page::Size();
+	// TODO: Technically this violates POSIX that requires that you can make
+	if ( blocks_used <= block_num )
+		return errno = EINVAL, 0;
+	BlockCacheBlock* block = blocks[block_num];
+	assert(block); // TODO: Remove.
+	if ( !block )
+		return errno = EINVAL, 0;
+	block->information |= BCACHE_MMAP;
+	uint8_t* block_data = kernel_block_cache->BlockData(block);
+	addr_t virt = 0;
+	int prot;
+	Memory::LookUp((uintptr_t) block_data, &virt, &prot);
+	assert(virt);
+	// TODO: Prevent truncate() from deallocating this memory!
+	return virt;
+}
+
+void FileCache::munmap(ioctx_t* /*ctx*/, off_t /*off*/)
+{
+}
+
+int FileCache::mprotect(ioctx_t* /*ctx*/, int /*prot*/)
+{
+	return 0;
 }
 
 } // namespace Sortix
