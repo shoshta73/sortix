@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,9 +17,7 @@
  * Terminal handling.
  */
 
-#if !defined(__sortix__)
 #include <sys/ioctl.h>
-#endif
 
 #include <assert.h>
 #include <stdbool.h>
@@ -123,11 +121,7 @@ void make_terminal_state(FILE* fp, struct terminal_state* state)
 	memset(state, 0, sizeof(*state));
 
 	struct winsize terminal_size;
-#if defined(__sortix__)
-	tcgetwinsize(fileno(fp), &terminal_size);
-#else
 	ioctl(fileno(fp), TIOCGWINSZ, &terminal_size);
-#endif
 	state->width = (int) terminal_size.ws_col;
 	state->height = (int) terminal_size.ws_row;
 	size_t data_length = state->width * state->height;

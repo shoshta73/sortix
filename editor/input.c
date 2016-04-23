@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,7 +17,6 @@
 
 #if defined(__sortix__)
 #include <sys/keycodes.h>
-#include <sys/termmode.h>
 #endif
 
 #include <errno.h>
@@ -28,9 +27,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#if !defined(__sortix__)
 #include <termios.h>
-#endif
 #include <unistd.h>
 #include <wchar.h>
 
@@ -39,7 +36,6 @@
 #include "input.h"
 #include "modal.h"
 
-#if !defined(__sortix__)
 struct terminal_sequence
 {
 	const char* sequence;
@@ -102,8 +98,6 @@ struct terminal_sequence terminal_sequences[] =
 	{ "\eOH", KBKEY_HOME, false, false },
 	{ "\x7F", KBKEY_BKSPC, false, false },
 };
-
-#endif
 
 void editor_codepoint(struct editor* editor, uint32_t codepoint)
 {
@@ -205,35 +199,12 @@ void editor_modal_kbkey(struct editor* editor, int kbkey)
 
 void editor_kbkey(struct editor* editor, int kbkey)
 {
-#if defined(__sortix__)
-	int abskbkey = kbkey < 0 ? -kbkey : kbkey;
-
-	if ( abskbkey == KBKEY_LCTRL )
-	{
-		editor->control = 0 <= kbkey;
-		return;
-	}
-	if ( abskbkey == KBKEY_LSHIFT )
-	{
-		editor->lshift = 0 <= kbkey;
-		editor->shift = editor->lshift || editor->rshift;
-		return;
-	}
-	if ( abskbkey == KBKEY_RSHIFT )
-	{
-		editor->rshift = 0 <= kbkey;
-		editor->shift = editor->lshift || editor->rshift;
-		return;
-	}
-#endif
-
 	if ( editor->mode == MODE_EDIT )
 		editor_type_kbkey(editor, kbkey);
 	else
 		editor_modal_kbkey(editor, kbkey);
 }
 
-#if !defined(__sortix__)
 void editor_emulate_kbkey(struct editor* editor,
                           int kbkey,
                           bool control,
@@ -266,46 +237,29 @@ void editor_emulate_control_letter(struct editor* editor, uint32_t c)
 	editor_codepoint(editor, c);
 	editor->control = false;
 }
-#endif
 
 void editor_input_begin(struct editor_input* editor_input)
 {
 	memset(editor_input, 0, sizeof(*editor_input));
 
-#if defined(__sortix__)
-	gettermmode(0, &editor_input->saved_termmode);
-#else
 	tcgetattr(0, &editor_input->saved_termios);
-#endif
-#if defined(__sortix__)
-	settermmode(0, TERMMODE_KBKEY | TERMMODE_UNICODE);
-#else
 	struct termios tcattr;
 	memcpy(&tcattr, &editor_input->saved_termios, sizeof(struct termios));
-	cfmakeraw(&tcattr);
+	tcattr.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN);
 	tcattr.c_iflag |= ICRNL;
 	tcattr.c_cc[VMIN] = 1;
 	tcattr.c_cc[VTIME] = 0;
 	tcsetattr(0, TCSADRAIN, &tcattr);
-	printf("\e[?1049h");
-	fflush(stdout);
-#endif
+	if ( getenv("TERM") && strcmp(getenv("TERM"), "sortix") != 0 )
+	{
+		printf("\e[?1049h");
+		fflush(stdout);
+	}
 }
 
 void editor_input_process(struct editor_input* editor_input,
                           struct editor* editor)
 {
-#if defined(__sortix__)
-	(void) editor_input;
-	uint32_t input;
-	if ( read(0, &input, sizeof(input)) != sizeof(input) )
-		return;
-	int kbkey;
-	if ( (kbkey = KBKEY_DECODE(input)) )
-		editor_kbkey(editor, kbkey);
-	else
-		editor_codepoint(editor, input);
-#else
 	bool was_ambiguous_escape = editor_input->ambiguous_escape;
 	editor_input->ambiguous_escape = false;
 
@@ -436,18 +390,16 @@ void editor_input_process(struct editor_input* editor_input,
 		editor_input->termseq_used--;
 		editor_input->termseq_seen = 0;
 	}
-#endif
 }
 
 void editor_input_end(struct editor_input* editor_input)
 {
-#if defined(__sortix__)
-	settermmode(0, editor_input->saved_termmode);
-#else
-	printf("\e[?1049l");
-	fflush(stdout);
+	if ( getenv("TERM") && strcmp(getenv("TERM"), "sortix") != 0 )
+	{
+		printf("\e[?1049l");
+		fflush(stdout);
+	}
 	tcsetattr(0, TCSADRAIN, &editor_input->saved_termios);
-#endif
 }
 
 void editor_input_suspend(struct editor_input* editor_input)
@@ -457,8 +409,11 @@ void editor_input_suspend(struct editor_input* editor_input)
 #if !defined(__sortix__)
 	struct termios current_termios;
 
-	printf("\e[?1049l");
-	fflush(stdout);
+	if ( getenv("TERM") && strcmp(getenv("TERM"), "sortix") != 0 )
+	{
+		printf("\e[?1049l");
+		fflush(stdout);
+	}
 
 	tcgetattr(0, &current_termios);
 
@@ -466,7 +421,10 @@ void editor_input_suspend(struct editor_input* editor_input)
 
 	tcsetattr(0, TCSADRAIN, &current_termios);
 
-	printf("\e[?1049h");
-	fflush(stdout);
+	if ( getenv("TERM") && strcmp(getenv("TERM"), "sortix") != 0 )
+	{
+		printf("\e[?1049h");
+		fflush(stdout);
+	}
 #endif
 }

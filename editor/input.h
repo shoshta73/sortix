@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,10 +20,8 @@
 #ifndef EDITOR_INPUT_H
 #define EDITOR_INPUT_H
 
-#if !defined(__sortix__)
 #include <termios.h>
 #include <wchar.h>
-#endif
 
 #if !defined(__sortix__)
 #define KBKEY_ESC 0x01
@@ -45,16 +43,12 @@ struct editor;
 
 struct editor_input
 {
-#if defined(__sortix__)
-	unsigned int saved_termmode;
-#else
 	struct termios saved_termios;
 	mbstate_t ps;
 	char termseq[MAX_TERMSEQ_SIZE];
 	size_t termseq_used;
 	size_t termseq_seen;
 	bool ambiguous_escape;
-#endif
 };
 
 void editor_input_begin(struct editor_input* editor_input);
