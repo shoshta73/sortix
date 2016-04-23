@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,21 +17,21 @@
  * Read a line from the terminal.
  */
 
-#include <sys/keycodes.h>
-#include <sys/termmode.h>
-
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
 #include <wchar.h>
 #include <wctype.h>
 
 #include "editline.h"
 #include "showline.h"
+
+#define CONTROL(x) (((x) - 64) & 127)
 
 void edit_line_show(struct edit_line* edit_state)
 {
@@ -270,31 +270,31 @@ void edit_line_type_codepoint(struct edit_line* edit_state, wchar_t wc)
 	assert(edit_state->line_used <= edit_state->line_length);
 }
 
-void line_edit_type_home(struct edit_line* edit_state)
+void edit_line_type_home(struct edit_line* edit_state)
 {
 	edit_state->line_offset = 0;
 }
 
-void line_edit_type_left(struct edit_line* edit_state)
+void edit_line_type_left(struct edit_line* edit_state)
 {
 	if ( edit_state->line_offset == 0 )
 		return;
 	edit_state->line_offset--;
 }
 
-void line_edit_type_right(struct edit_line* edit_state)
+void edit_line_type_right(struct edit_line* edit_state)
 {
 	if ( edit_state->line_offset == edit_state->line_used )
 		return;
 	edit_state->line_offset++;
 }
 
-void line_edit_type_end(struct edit_line* edit_state)
+void edit_line_type_end(struct edit_line* edit_state)
 {
 	edit_state->line_offset = edit_state->line_used;
 }
 
-void line_edit_type_backspace(struct edit_line* edit_state)
+void edit_line_type_backspace(struct edit_line* edit_state)
 {
 	if ( edit_state->line_offset == 0 )
 		return;
@@ -304,7 +304,7 @@ void line_edit_type_backspace(struct edit_line* edit_state)
 		edit_state->line[i] = edit_state->line[i+1];
 }
 
-void line_edit_type_previous_word(struct edit_line* edit_state)
+void edit_line_type_previous_word(struct edit_line* edit_state)
 {
 	while ( edit_state->line_offset &&
 	        iswspace(edit_state->line[edit_state->line_offset-1]) )
@@ -314,7 +314,7 @@ void line_edit_type_previous_word(struct edit_line* edit_state)
 		edit_state->line_offset--;
 }
 
-void line_edit_type_next_word(struct edit_line* edit_state)
+void edit_line_type_next_word(struct edit_line* edit_state)
 {
 	while ( edit_state->line_offset != edit_state->line_used &&
 	        iswspace(edit_state->line[edit_state->line_offset]) )
@@ -324,7 +324,7 @@ void line_edit_type_next_word(struct edit_line* edit_state)
 		edit_state->line_offset++;
 }
 
-void line_edit_type_delete(struct edit_line* edit_state)
+void edit_line_type_delete(struct edit_line* edit_state)
 {
 	if ( edit_state->line_offset == edit_state->line_used )
 		return;
@@ -333,10 +333,10 @@ void line_edit_type_delete(struct edit_line* edit_state)
 		edit_state->line[i] = edit_state->line[i+1];
 }
 
-void line_edit_type_eof_or_delete(struct edit_line* edit_state)
+void edit_line_type_eof_or_delete(struct edit_line* edit_state)
 {
 	if ( edit_state->line_used )
-		return line_edit_type_delete(edit_state);
+		return edit_line_type_delete(edit_state);
 	edit_state->editing = false;
 	edit_state->eof_condition = true;
 	if ( edit_state->trap_eof_opportunity )
@@ -353,13 +353,13 @@ void edit_line_type_interrupt(struct edit_line* edit_state)
 void edit_line_type_kill_after(struct edit_line* edit_state)
 {
 	while ( edit_state->line_offset < edit_state->line_used )
-		line_edit_type_delete(edit_state);
+		edit_line_type_delete(edit_state);
 }
 
 void edit_line_type_kill_before(struct edit_line* edit_state)
 {
 	while ( edit_state->line_offset )
-		line_edit_type_backspace(edit_state);
+		edit_line_type_backspace(edit_state);
 }
 
 void edit_line_type_clear(struct edit_line* edit_state)
@@ -371,10 +371,10 @@ void edit_line_type_delete_word_before(struct edit_line* edit_state)
 {
 	while ( edit_state->line_offset &&
 	        iswspace(edit_state->line[edit_state->line_offset-1]) )
-		line_edit_type_backspace(edit_state);
+		edit_line_type_backspace(edit_state);
 	while ( edit_state->line_offset &&
 	        !iswspace(edit_state->line[edit_state->line_offset-1]) )
-		line_edit_type_backspace(edit_state);
+		edit_line_type_backspace(edit_state);
 }
 
 int edit_line_completion_sort(const void* a_ptr, const void* b_ptr)
@@ -495,74 +495,6 @@ void edit_line_type_complete(struct edit_line* edit_state)
 	free(partial);
 }
 
-void edit_line_kbkey(struct edit_line* edit_state, int kbkey)
-{
-	if ( kbkey != KBKEY_TAB && kbkey != -KBKEY_TAB )
-		edit_state->double_tab = false;
-
-	if ( edit_state->left_control || edit_state->right_control )
-	{
-		switch ( kbkey )
-		{
-		case KBKEY_LEFT: line_edit_type_previous_word(edit_state); return;
-		case KBKEY_RIGHT: line_edit_type_next_word(edit_state); return;
-		};
-	}
-
-	switch ( kbkey )
-	{
-	case KBKEY_HOME: line_edit_type_home(edit_state); return;
-	case KBKEY_LEFT: line_edit_type_left(edit_state); return;
-	case KBKEY_RIGHT: line_edit_type_right(edit_state); return;
-	case KBKEY_UP: edit_line_type_history_prev(edit_state); return;
-	case KBKEY_DOWN: edit_line_type_history_next(edit_state); return;
-	case KBKEY_END: line_edit_type_end(edit_state); return;
-	case KBKEY_BKSPC: line_edit_type_backspace(edit_state); return;
-	case KBKEY_DELETE: line_edit_type_delete(edit_state); return;
-	case KBKEY_TAB: edit_line_type_complete(edit_state); return;
-	case -KBKEY_LCTRL: edit_state->left_control = false; return;
-	case +KBKEY_LCTRL: edit_state->left_control = true; return;
-	case -KBKEY_RCTRL: edit_state->right_control = false; return;
-	case +KBKEY_RCTRL: edit_state->right_control = true; return;
-	};
-}
-
-void edit_line_codepoint(struct edit_line* edit_state, wchar_t wc)
-{
-	if ( (edit_state->left_control || edit_state->right_control) &&
-	     ((L'a' <= wc && wc <= L'z') || (L'A' <= wc && wc <= L'Z')) )
-	{
-		if ( wc == L'a' || wc == L'A' )
-			line_edit_type_home(edit_state);
-		if ( wc == L'b' || wc == L'B' )
-			line_edit_type_left(edit_state);
-		if ( wc == L'c' || wc == L'C' )
-			edit_line_type_interrupt(edit_state);
-		if ( wc == L'd' || wc == L'D' )
-			line_edit_type_eof_or_delete(edit_state);
-		if ( wc == L'e' || wc == L'E' )
-			line_edit_type_end(edit_state);
-		if ( wc == L'f' || wc == L'F' )
-			line_edit_type_right(edit_state);
-		if ( wc == L'k' || wc == L'K' )
-			edit_line_type_kill_after(edit_state);
-		if ( wc == L'l' || wc == L'L' )
-			show_line_clear(&edit_state->show_state);
-		if ( wc == L'u' || wc == L'U' )
-			edit_line_type_kill_before(edit_state);
-		if ( wc == L'w' || wc == L'W' )
-			edit_line_type_delete_word_before(edit_state);
-		return;
-	}
-
-	if ( wc == L'\b' || wc == 127 )
-		return;
-	if ( wc == L'\t' )
-		return;
-
-	edit_line_type_codepoint(edit_state, wc);
-}
-
 void edit_line(struct edit_line* edit_state)
 {
 	edit_state->editing = true;
@@ -578,27 +510,140 @@ void edit_line(struct edit_line* edit_state)
 	edit_state->history_offset = edit_state->history_used;
 	edit_state->history_target = edit_state->history_used;
 
-	settermmode(edit_state->in_fd, TERMMODE_KBKEY | TERMMODE_UNICODE);
+	struct termios old_tio, tio;
+	tcgetattr(edit_state->in_fd, &old_tio);
+
+	memcpy(&tio, &old_tio, sizeof(tio));
+	tio.c_lflag &= ~(ISIG | ICANON | ECHO);
+#if defined(__sortix__)
+	tio.c_lflag &= ~(ISORTIX_KBKEY | ISORTIX_CHARS_DISABLE |
+	                 ISORTIX_32BIT | ISORTIX_NONBLOCK | ISORTIX_TERMMODE);
+#endif
+
+	tcsetattr(edit_state->in_fd, TCSANOW, &tio);
 
 	show_line_begin(&edit_state->show_state, edit_state->out_fd);
 
+	int escape = 0;
+	unsigned int params[16];
+	size_t param_index = 0;
+
+	mbstate_t ps = { 0 };
 	while ( edit_state->editing )
 	{
 		edit_line_show(edit_state);
 
-		uint32_t codepoint;
-		if ( read(0, &codepoint, sizeof(codepoint)) != sizeof(codepoint) )
+		char c;
+		if ( read(0, &c, sizeof(c)) != sizeof(c) )
 		{
 			edit_state->eof_condition = true;
 			edit_state->abort_editing = true;
 			break;
 		}
 
-		int kbkey;
-		if ( (kbkey = KBKEY_DECODE(codepoint)) )
-			edit_line_kbkey(edit_state, kbkey);
+		if ( c != '\t' )
+			edit_state->double_tab = false;
+
+		if ( escape )
+		{
+			if ( c == '[' )
+			{
+				escape = 2;
+			}
+			else if ( escape == 1 && c == 'O' )
+			{
+				escape = 3;
+			}
+			else if ( '0' <= c && c <= '9' )
+			{
+				params[param_index] *= 10;
+				params[param_index] += c - '0';
+			}
+			else if ( c == ';' )
+			{
+				if ( param_index < 16 )
+					++param_index;
+			}
+			else if ( 64 <= c && c <= 126 )
+			{
+				for ( size_t i = 0; i < 16; i++ )
+					if ( params[i] == 0 )
+						params[i] = 1;
+				switch ( c )
+				{
+				case 'A': edit_line_type_history_prev(edit_state); break;
+				case 'B': edit_line_type_history_next(edit_state); break;
+				case 'C':
+					if ( (params[1] - 1) & (1 << 2) ) /* control */
+						edit_line_type_next_word(edit_state);
+					else
+						edit_line_type_right(edit_state);
+					break;
+				case 'D':
+					if ( (params[1] - 1) & (1 << 2) ) /* control */
+						edit_line_type_previous_word(edit_state);
+					else
+						edit_line_type_left(edit_state);
+					break;
+				case 'F': edit_line_type_end(edit_state); break;
+				case 'H': edit_line_type_home(edit_state); break;
+				case 'R':
+				{
+					unsigned int r = params[0] - 1;
+					unsigned int c = params[1] - 1;
+					show_line_wincurpos(&edit_state->show_state, r, c);
+					edit_line_show(edit_state);
+				} break;
+				case '~':
+					if ( params[0] == 3 )
+						edit_line_type_delete(edit_state);
+					break;
+				}
+				escape = 0;
+			}
+		}
+		else if ( c == CONTROL('A') )
+			edit_line_type_home(edit_state);
+		else if ( c == CONTROL('B') )
+			edit_line_type_left(edit_state);
+		else if ( c == CONTROL('C') )
+			edit_line_type_interrupt(edit_state);
+		else if ( c == CONTROL('D') )
+			edit_line_type_eof_or_delete(edit_state);
+		else if ( c == CONTROL('E') )
+			edit_line_type_end(edit_state);
+		else if ( c == CONTROL('F') )
+			edit_line_type_right(edit_state);
+		else if ( c == CONTROL('I') )
+			edit_line_type_complete(edit_state);
+		else if ( c == CONTROL('K') )
+			edit_line_type_kill_after(edit_state);
+		else if ( c == CONTROL('L') )
+			show_line_clear(&edit_state->show_state);
+		else if ( c == CONTROL('U') )
+			edit_line_type_kill_before(edit_state);
+		else if ( c == CONTROL('W') )
+			edit_line_type_delete_word_before(edit_state);
+		else if ( c == CONTROL('[') )
+		{
+			param_index = 0;
+			memset(params, 0, sizeof(params));
+			escape = 1;
+		}
+		else if ( c == 127 )
+			edit_line_type_backspace(edit_state);
 		else
-			edit_line_codepoint(edit_state, (wchar_t) codepoint);
+		{
+			wchar_t wc;
+			size_t amount = mbrtowc(&wc, &c, 1, &ps);
+			if ( amount == (size_t) -2 )
+				continue;
+			if ( amount == (size_t) -1 )
+				wc = 0xFFFD; /* REPLACEMENT CHARACTER */
+			if ( amount == 0 )
+				continue;
+			edit_line_type_codepoint(edit_state, wc);
+		}
 	}
 
 	if ( edit_state->abort_editing )
@@ -609,5 +654,5 @@ void edit_line(struct edit_line* edit_state)
 		show_line_finish(&edit_state->show_state);
 	}
 
-	settermmode(edit_state->in_fd, TERMMODE_NORMAL);
+	tcsetattr(edit_state->in_fd, TCSANOW, &old_tio);
 }

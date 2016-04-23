@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,6 +38,7 @@ struct show_line
 	char* current_line;
 	size_t current_cursor;
 	bool invalidated;
+	bool wcp_pending;
 };
 
 struct wincurpos predict_cursor(struct cursor_predict* cursor_predict,
@@ -49,6 +50,9 @@ bool predict_will_scroll(struct cursor_predict cursor_predict,
                          struct winsize ws,
                          wchar_t c);
 void show_line_begin(struct show_line* show_state, int out_fd);
+void show_line_wincurpos(struct show_line* show_state,
+                         unsigned int r,
+                         unsigned int c);
 bool show_line_is_weird(const char* line);
 void show_line_change_cursor(struct show_line* show_state, struct wincurpos wcp);
 bool show_line_optimized(struct show_line* show_state, const char* line, size_t cursor);

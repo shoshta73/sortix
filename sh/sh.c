@@ -17,6 +17,7 @@
  * Command language interpreter.
  */
 
+#include <sys/stat.h>
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -1005,9 +1006,9 @@ struct execute_result execute(char** tokens,
 			if ( !strcmp(type, "<") )
 				fd = open(target, O_RDONLY | O_CLOEXEC);
 			else if ( !strcmp(type, ">") )
-				fd = open(target, O_WRONLY | O_CREATE | O_TRUNC | O_CLOEXEC, 0666);
+				fd = open(target, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0666);
 			else if ( !strcmp(type, ">>") )
-				fd = open(target, O_WRONLY | O_CREATE | O_APPEND | O_CLOEXEC, 0666);
+				fd = open(target, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0666);
 
 			if ( fd < 0 )
 			{

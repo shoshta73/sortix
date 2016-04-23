@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,9 +82,26 @@ void show_line_begin(struct show_line* show_state, int out_fd)
 	show_state->out_fd = out_fd;
 	show_state->current_line = NULL;
 	show_state->current_cursor = 0;
-	tcgetwincurpos(out_fd, &show_state->wcp_start);
-	show_state->wcp_current = show_state->wcp_start;
 	tcgetwinsize(show_state->out_fd, &show_state->ws);
+	if ( tcgetwincurpos(out_fd, &show_state->wcp_start) == 0 )
+		show_state->wcp_current = show_state->wcp_start;
+	else
+	{
+		dprintf(show_state->out_fd, "\e[6n");
+		show_state->wcp_pending = true;
+	}
+}
+
+void show_line_wincurpos(struct show_line* show_state,
+                         unsigned int r,
+                         unsigned int c)
+{
+	if ( !show_state->wcp_pending )
+		return;
+	show_state->wcp_start.wcp_row = r;
+	show_state->wcp_start.wcp_col = c;
+	show_state->wcp_current = show_state->wcp_start;
+	show_state->wcp_pending = false;
 }
 
 bool show_line_is_weird(const char* line)
@@ -270,6 +287,9 @@ bool show_line_optimized(struct show_line* show_state, const char* line, size_t 
 
 void show_line(struct show_line* show_state, const char* line, size_t cursor)
 {
+	if ( show_state->wcp_pending )
+		return;
+
 	// TODO: We don't currently invalidate on SIGWINCH.
 	struct winsize ws;
 	tcgetwinsize(show_state->out_fd, &ws);

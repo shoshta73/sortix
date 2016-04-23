@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,15 +65,15 @@ void edit_line_type_history_save_current(struct edit_line* edit_state);
 void edit_line_type_history_prev(struct edit_line* edit_state);
 void edit_line_type_history_next(struct edit_line* edit_state);
 void edit_line_type_codepoint(struct edit_line* edit_state, wchar_t wc);
-void line_edit_type_home(struct edit_line* edit_state);
-void line_edit_type_left(struct edit_line* edit_state);
-void line_edit_type_right(struct edit_line* edit_state);
-void line_edit_type_end(struct edit_line* edit_state);
-void line_edit_type_backspace(struct edit_line* edit_state);
-void line_edit_type_previous_word(struct edit_line* edit_state);
-void line_edit_type_next_word(struct edit_line* edit_state);
-void line_edit_type_delete(struct edit_line* edit_state);
-void line_edit_type_eof_or_delete(struct edit_line* edit_state);
+void edit_line_type_home(struct edit_line* edit_state);
+void edit_line_type_left(struct edit_line* edit_state);
+void edit_line_type_right(struct edit_line* edit_state);
+void edit_line_type_end(struct edit_line* edit_state);
+void edit_line_type_backspace(struct edit_line* edit_state);
+void edit_line_type_previous_word(struct edit_line* edit_state);
+void edit_line_type_next_word(struct edit_line* edit_state);
+void edit_line_type_delete(struct edit_line* edit_state);
+void edit_line_type_eof_or_delete(struct edit_line* edit_state);
 void edit_line_type_interrupt(struct edit_line* edit_state);
 void edit_line_type_kill_after(struct edit_line* edit_state);
 void edit_line_type_kill_before(struct edit_line* edit_state);
@@ -81,8 +81,6 @@ void edit_line_type_clear(struct edit_line* edit_state);
 void edit_line_type_delete_word_before(struct edit_line* edit_state);
 int edit_line_completion_sort(const void* a_ptr, const void* b_ptr);
 void edit_line_type_complete(struct edit_line* edit_state);
-void edit_line_kbkey(struct edit_line* edit_state, int kbkey);
-void edit_line_codepoint(struct edit_line* edit_state, wchar_t wc);
 void edit_line(struct edit_line* edit_state);
 
 #endif
