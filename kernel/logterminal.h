@@ -35,9 +35,14 @@ public:
 	virtual int sync(ioctx_t* ctx);
 	virtual ssize_t tcgetblob(ioctx_t* ctx, const char* name, void* buffer, size_t count);
 	virtual ssize_t tcsetblob(ioctx_t* ctx, const char* name, const void* buffer, size_t count);
+	virtual int tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp);
+	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 
 public:
 	virtual void OnKeystroke(Keyboard* keyboard, void* user);
+
+protected:
+	virtual void tty_output(const unsigned char* buffer, size_t length);
 
 private:
 	void ProcessKeystroke(int kbkey);

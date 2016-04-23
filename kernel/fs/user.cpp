@@ -30,6 +30,7 @@
 
 #include <sortix/dirent.h>
 #include <sortix/fcntl.h>
+#include <sortix/ioctl.h>
 #include <sortix/stat.h>
 #include <sortix/timespec.h>
 #include <sortix/winsize.h>
@@ -225,7 +226,7 @@ public:
 	                    const char* filename);
 	virtual ssize_t readlink(ioctx_t* ctx, char* buf, size_t bufsiz);
 	virtual int tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp);
-	virtual int tcgetwinsize(ioctx_t* ctx, struct winsize* ws);
+	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	virtual pid_t tcgetpgrp(ioctx_t* ctx);
 	virtual int settermmode(ioctx_t* ctx, unsigned mode);
@@ -1222,23 +1223,27 @@ int Unode::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
 	return ret;
 }
 
-int Unode::tcgetwinsize(ioctx_t* ctx, struct winsize* ws)
+int Unode::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 {
-	Channel* channel = server->Connect(ctx);
-	if ( !channel )
-		return -1;
-	int ret = -1;
-	struct fsm_req_tcgetwinsize msg;
-	struct fsm_resp_tcgetwinsize resp;
-	msg.ino = ino;
-	if ( SendMessage(channel, FSM_REQ_TCGETWINSIZE, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_TCGETWINSIZE, &resp, sizeof(resp)) &&
-	     ctx->copy_to_dest(ws, &resp.size, sizeof(*ws)) )
-		ret = 0;
-	channel->KernelClose();
-	return ret;
+	if ( cmd == TIOCGWINSZ )
+	{
+		struct winsize* ws = (struct winsize*) arg;
+		Channel* channel = server->Connect(ctx);
+		if ( !channel )
+			return -1;
+		int ret = -1;
+		struct fsm_req_tcgetwinsize msg;
+		struct fsm_resp_tcgetwinsize resp;
+		msg.ino = ino;
+		if ( SendMessage(channel, FSM_REQ_TCGETWINSIZE, &msg, sizeof(msg)) &&
+			 RecvMessage(channel, FSM_RESP_TCGETWINSIZE, &resp, sizeof(resp)) &&
+			 ctx->copy_to_dest(ws, &resp.size, sizeof(*ws)) )
+			ret = 0;
+		channel->KernelClose();
+		return ret;
+	}
+	return errno = ENOTTY, -1;
 }
-
 int Unode::tcsetpgrp(ioctx_t* ctx, pid_t pgid)
 {
 	Channel* channel = server->Connect(ctx);

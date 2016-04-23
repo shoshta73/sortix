@@ -85,7 +85,7 @@ public:
 	                    const char* filename) = 0;
 	virtual ssize_t readlink(ioctx_t* ctx, char* buf, size_t bufsiz) = 0;
 	virtual int tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp) = 0;
-	virtual int tcgetwinsize(ioctx_t* ctx, struct winsize* ws) = 0;
+	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg) = 0;
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid) = 0;
 	virtual pid_t tcgetpgrp(ioctx_t* ctx) = 0;
 	virtual int settermmode(ioctx_t* ctx, unsigned mode) = 0;
@@ -181,7 +181,7 @@ public:
 	                    const char* filename);
 	virtual ssize_t readlink(ioctx_t* ctx, char* buf, size_t bufsiz);
 	virtual int tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp);
-	virtual int tcgetwinsize(ioctx_t* ctx, struct winsize* ws);
+	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	virtual pid_t tcgetpgrp(ioctx_t* ctx);
 	virtual int settermmode(ioctx_t* ctx, unsigned mode);

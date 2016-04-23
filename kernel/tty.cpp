@@ -201,30 +201,9 @@ int TTY::gettermmode(ioctx_t* ctx, unsigned int* mode)
 	return 0;
 }
 
-int TTY::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
+int TTY::tcgetwincurpos(ioctx_t* /*ctx*/, struct wincurpos* /*wcp*/)
 {
-	ScopedLock lock(&termlock);
-	struct wincurpos retwcp;
-	memset(&retwcp, 0, sizeof(retwcp));
-	size_t cursor_column, cursor_row;
-	Log::GetCursor(&cursor_column, &cursor_row);
-	retwcp.wcp_col = cursor_column;
-	retwcp.wcp_row = cursor_row;
-	if ( !ctx->copy_to_dest(wcp, &retwcp, sizeof(retwcp)) )
-		return -1;
-	return 0;
-}
-
-int TTY::tcgetwinsize(ioctx_t* ctx, struct winsize* ws)
-{
-	ScopedLock lock(&termlock);
-	struct winsize retws;
-	memset(&retws, 0, sizeof(retws));
-	retws.ws_col = Log::Width();
-	retws.ws_row = Log::Height();
-	if ( !ctx->copy_to_dest(ws, &retws, sizeof(retws)) )
-		return -1;
-	return 0;
+	return errno = ENOTSUP, -1;
 }
 
 int TTY::tcsetpgrp(ioctx_t* /*ctx*/, pid_t pgid)
@@ -335,9 +314,9 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 			{
 				// TODO: Handle tab specially. (Is that even possible without
 				//       knowing cursor position?).
-				Log::Print("\b \b");
+				tty_output("\b \b");
 				if ( !IsByteUnescaped(delchar) )
-					Log::Print("\b \b");
+					tty_output("\b \b");
 			}
 			break;
 		}
@@ -364,9 +343,9 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 			linebuffer.Backspace();
 			if ( tio.c_lflag & ECHOE )
 			{
-				Log::Print("\b \b");
+				tty_output("\b \b");
 				if ( !IsByteUnescaped(delchar) )
-					Log::Print("\b \b");
+					tty_output("\b \b");
 			}
 		}
 		return;
@@ -383,9 +362,9 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 				continue;
 			if ( tio.c_lflag & ECHOE )
 			{
-				Log::Print("\b \b");
+				tty_output("\b \b");
 				if ( !IsByteUnescaped(delchar) )
-					Log::Print("\b \b");
+					tty_output("\b \b");
 			}
 		}
 		return;
@@ -398,7 +377,7 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 		ProcessUnicode(KBKEY_ENCODE(KBKEY_ENTER));
 		ProcessByte('\n');
 		ProcessUnicode(KBKEY_ENCODE(-KBKEY_ENTER));
-		Log::PrintF("\e[H\e[2J");
+		tty_output("\e[H\e[2J");
 		return;
 	}
 
@@ -419,9 +398,12 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 	if ( tio.c_lflag & ECHO )
 	{
 		if ( IsByteUnescaped(byte) )
-			Log::PrintData(&byte, 1);
+			tty_output(&byte, 1);
 		else
-			Log::PrintF("^%c", CONTROL(byte));
+		{
+			unsigned char cs[2] = { '^', (unsigned char) CONTROL(byte) };
+			tty_output(cs, sizeof(cs));
+		}
 	}
 
 	if ( !(tio.c_lflag & ICANON) || byte == '\n' )
@@ -523,7 +505,7 @@ ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 		return errno = EINTR, -1;
 	// TODO: Add support for ioctx to the kernel log.
 	const size_t BUFFER_SIZE = 64UL;
-	char buffer[BUFFER_SIZE];
+	unsigned char buffer[BUFFER_SIZE];
 	size_t sofar = 0;
 	while ( sofar < count )
 	{
@@ -532,7 +514,7 @@ ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 			amount = BUFFER_SIZE;
 		if ( !ctx->copy_from_src(buffer, io_buffer + sofar, amount) )
 			return -1;
-		Log::PrintData(buffer, amount);
+		tty_output(buffer, amount);
 		sofar += amount;
 		if ( sofar < count )
 		{

@@ -368,13 +368,11 @@ int sys_fcntl(int fd, int cmd, uintptr_t arg)
 
 int sys_ioctl(int fd, int cmd, uintptr_t arg)
 {
-	switch ( cmd )
-	{
-	case TIOCGWINSZ:
-		return sys_tcgetwinsize(fd, (struct winsize*) arg);
-	default:
-		return errno = EINVAL, -1;
-	}
+	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
+	if ( !desc )
+		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->ioctl(&ctx, cmd, arg);
 }
 
 ssize_t sys_readdirents(int fd, struct dirent* dirent, size_t size)
@@ -645,14 +643,9 @@ int sys_tcgetwincurpos(int fd, struct wincurpos* wcp)
 	return desc->tcgetwincurpos(&ctx, wcp);
 }
 
-
 int sys_tcgetwinsize(int fd, struct winsize* ws)
 {
-	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
-	if ( !desc )
-		return -1;
-	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	return desc->tcgetwinsize(&ctx, ws);
+	return sys_ioctl(fd, TIOCGWINSZ, (uintptr_t) ws);
 }
 
 int sys_tcsetpgrp(int fd, pid_t pgid)

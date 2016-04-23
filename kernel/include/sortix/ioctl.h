@@ -32,5 +32,6 @@
 #define __IOCTL_TYPE(value) ((value) & __IOCTL_TYPE_MASK)
 
 #define TIOCGWINSZ __IOCTL(1, __IOCTL_TYPE_PTR)
+#define TIOCSWINSZ __IOCTL(2, __IOCTL_TYPE_PTR)
 
 #endif

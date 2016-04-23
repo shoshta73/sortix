@@ -78,7 +78,7 @@ public:
 	ssize_t readlink(ioctx_t* ctx, char* buf, size_t bufsiz);
 	int fsbind(ioctx_t* ctx, Vnode* node, int flags);
 	int tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp);
-	int tcgetwinsize(ioctx_t* ctx, struct winsize* ws);
+	int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 	int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	pid_t tcgetpgrp(ioctx_t* ctx);
 	int settermmode(ioctx_t* ctx, unsigned mode);

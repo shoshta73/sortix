@@ -290,10 +290,8 @@ int AbstractInode::tcgetwincurpos(ioctx_t* /*ctx*/, struct wincurpos* /*wcp*/)
 	return errno = ENOTTY, -1;
 }
 
-int AbstractInode::tcgetwinsize(ioctx_t* /*ctx*/, struct winsize* /*ws*/)
+int AbstractInode::ioctl(ioctx_t* /*ctx*/, int /*cmd*/, uintptr_t /*arg*/)
 {
-	if ( inode_type == INODE_TYPE_TTY )
-		return errno = EBADF, -1;
 	return errno = ENOTTY, -1;
 }
 

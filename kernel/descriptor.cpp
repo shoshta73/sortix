@@ -667,9 +667,9 @@ int Descriptor::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
 	return vnode->tcgetwincurpos(ctx, wcp);
 }
 
-int Descriptor::tcgetwinsize(ioctx_t* ctx, struct winsize* ws)
+int Descriptor::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 {
-	return vnode->tcgetwinsize(ctx, ws);
+	return vnode->ioctl(ctx, cmd, arg);
 }
 
 int Descriptor::tcsetpgrp(ioctx_t* ctx, pid_t pgid)

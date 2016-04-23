@@ -332,9 +332,9 @@ int Vnode::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
 	return inode->tcgetwincurpos(ctx, wcp);
 }
 
-int Vnode::tcgetwinsize(ioctx_t* ctx, struct winsize* ws)
+int Vnode::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 {
-	return inode->tcgetwinsize(ctx, ws);
+	return inode->ioctl(ctx, cmd, arg);
 }
 
 int Vnode::tcsetpgrp(ioctx_t* ctx, pid_t pgid)

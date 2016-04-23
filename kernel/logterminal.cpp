@@ -27,6 +27,7 @@
 #include <wchar.h>
 
 #include <sortix/fcntl.h>
+#include <sortix/ioctl.h>
 #include <sortix/keycodes.h>
 #include <sortix/poll.h>
 #include <sortix/signal.h>
@@ -120,6 +121,11 @@ LogTerminal::~LogTerminal()
 {
 	delete keyboard;
 	delete kblayout;
+}
+
+void LogTerminal::tty_output(const unsigned char* buffer, size_t length)
+{
+	Log::PrintData(buffer, length);
 }
 
 int LogTerminal::sync(ioctx_t* /*ctx*/)
@@ -279,6 +285,37 @@ ssize_t LogTerminal::tcsetblob(ioctx_t* ctx, const char* name, const void* buffe
 	}
 	else
 		return errno = ENOENT, -1;
+}
+
+int LogTerminal::tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp)
+{
+	ScopedLock lock(&termlock);
+	struct wincurpos retwcp;
+	memset(&retwcp, 0, sizeof(retwcp));
+	size_t cursor_column, cursor_row;
+	Log::GetCursor(&cursor_column, &cursor_row);
+	retwcp.wcp_col = cursor_column;
+	retwcp.wcp_row = cursor_row;
+	if ( !ctx->copy_to_dest(wcp, &retwcp, sizeof(retwcp)) )
+		return -1;
+	return 0;
+}
+
+int LogTerminal::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
+{
+	if ( cmd == TIOCGWINSZ )
+	{
+		struct winsize* ws = (struct winsize*) arg;
+		ScopedLock lock(&termlock);
+		struct winsize retws;
+		memset(&retws, 0, sizeof(retws));
+		retws.ws_col = Log::Width();
+		retws.ws_row = Log::Height();
+		if ( !ctx->copy_to_dest(ws, &retws, sizeof(retws)) )
+			return -1;
+		return 0;
+	}
+	return TTY::ioctl(ctx, cmd, arg);
 }
 
 } // namespace Sortix
