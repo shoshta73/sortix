@@ -514,7 +514,7 @@ void edit_line(struct edit_line* edit_state)
 	tcgetattr(edit_state->in_fd, &old_tio);
 
 	memcpy(&tio, &old_tio, sizeof(tio));
-	tio.c_lflag &= ~(ISIG | ICANON | ECHO);
+	tio.c_lflag &= ~(ISIG | ICANON | ECHO | IEXTEN);
 #if defined(__sortix__)
 	tio.c_lflag &= ~(ISORTIX_KBKEY | ISORTIX_CHARS_DISABLE |
 	                 ISORTIX_32BIT | ISORTIX_NONBLOCK | ISORTIX_TERMMODE);
