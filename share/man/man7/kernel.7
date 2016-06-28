@@ -6,6 +6,8 @@
 .Nd operating system kernel
 .Sh SYNOPSIS
 .Pa /boot/sortix.bin
+.Op Fl \-disable-em
+.Op Fl \-enable-em
 .Op Fl \-disable-network-drivers
 .Op Fl \-enable-network-drivers
 .Op Fl \-no-random-seed
@@ -48,9 +50,17 @@ otherwise.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
+.It Fl \-disable-em
+Don't initialize the
+.Xr em 4
+driver.
 .It Fl \-disable-networking-drivers
 Don't initialize any networking drivers.
 This option ensures the booted system is not networked.
+.It Fl \-enable-em
+Do initialize the
+.Xr em 4
+driver.
 .It Fl \-enable-networking-drivers
 Do initialize network drivers.
 This is the default behavior.

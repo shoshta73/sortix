@@ -126,6 +126,7 @@ memorymanagement.o \
 mouse/ps2.o \
 mtable.o \
 net/arp.o \
+net/em/em.o \
 net/ether.o \
 net/fs.o \
 net/if.o \
