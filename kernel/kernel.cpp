@@ -83,6 +83,7 @@
 #include "logterminal.h"
 #include "mouse/ps2.h"
 #include "multiboot.h"
+#include "net/em/em.h"
 #include "net/fs.h"
 #include "net/lo/lo.h"
 #include "net/ping.h"
@@ -115,6 +116,7 @@ static void SystemIdleThread(void* user);
 static int argc;
 static char** argv;
 static multiboot_info_t* bootinfo;
+static bool enable_em = true;
 static bool enable_network_drivers = true;
 
 static char* cmdline_tokenize(char** saved)
@@ -296,6 +298,10 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 				HaltKernel();
 			}
 		}
+		else if ( !strcmp(arg, "--disable-em") )
+			enable_em = false;
+		else if ( !strcmp(arg, "--enable-em") )
+			enable_em = true;
 		else if ( !strcmp(arg, "--disable-network-drivers") )
 			enable_network_drivers = false;
 		else if ( !strcmp(arg, "--enable-network-drivers") )
@@ -634,6 +640,9 @@ static void BootThread(void* /*user*/)
 	// Initialize the network drivers.
 	if ( enable_network_drivers )
 	{
+		// Initialize the EM driver.
+		if ( enable_em )
+			EM::Init("/dev", slashdev);
 	}
 
 	//
