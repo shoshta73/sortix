@@ -17,6 +17,7 @@ dnsconfig \
 editor \
 ext \
 games \
+host \
 hostname \
 ifconfig \
 init \
