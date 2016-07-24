@@ -11,6 +11,7 @@ dispd \
 libmount \
 bench \
 carray \
+dhclient \
 disked \
 editor \
 ext \

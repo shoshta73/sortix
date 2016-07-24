@@ -1,0 +1,4 @@
+per if
+#program=dhclient
+#exec $program $if
+exec dhclient

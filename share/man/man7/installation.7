@@ -82,7 +82,8 @@ needs per the instructions in
 The release modification procedure lets you customize aspects such as the
 default bootloader menu option and timeout, the default hostname, the default
 keyboard layout, the default graphics resolution, adding files of your choice to
-the live environment, control which drivers are loaded by default, and so on.
+the live environment, control which drivers are loaded by default, control which
+live environment daemons are started by default, and so on.
 .Pp
 Warning: The live environment does not come with any random entropy and entropy
 gathering is not yet implemented.
@@ -154,6 +155,16 @@ It can be useful to disable the network drivers if it's undesirable to put the
 system on the network for security reasons.
 You can disable network drivers by default by editing the bootloader
 configuration as described below after completing the installation.
+.Pp
+By default
+.Xr dhclient 8
+will automatically configure
+.Xr ether 4
+network interfaces with DHCP and bring up network connectivity.
+The DHCP client can be disabled by navigating to the advanced menu and selecting
+.Sy Disable DHCP client ,
+which is useful if you want to manually configure the network or not expose the
+system until you are ready.
 .Ss Installer
 This guide assumes you selected the operating system installation option in the
 bootloader.

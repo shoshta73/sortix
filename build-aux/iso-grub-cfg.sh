@@ -118,6 +118,12 @@ system_initrd=$(maybe_compressed boot/system.initrd)
 ports=$(ls repository | sed 's/\.tix\.tar\.xz//')
 
 mkdir -p boot/grub
+mkdir -p boot/grub/init
+
+echo "furthermore" > boot/grub/init/furthermore
+# TODO: Possibly use a 'try' feature to not warn in case it was already unset.
+echo "unset require dhclient" > boot/grub/init/network-no-dhclient
+
 exec > boot/grub/grub.cfg
 
 for hook in \
@@ -183,6 +189,7 @@ else
   no_random_seed=--no-random-seed
 fi
 set enable_network_drivers=
+set enable_dhclient=true
 
 export version
 export machine
@@ -192,6 +199,7 @@ export timeout
 export default
 export no_random_seed
 export enable_network_drivers
+export enable_dhclient
 EOF
 
 if [ -n "$ports" ]; then
@@ -281,6 +289,12 @@ cat << EOF
   multiboot /$kernel \$no_random_seed \$enable_network_drivers "\$@"
   echo done
   hook_kernel_post
+  if ! \$enable_dhclient; then
+    echo -n "Disabling dhclient ... "
+    module /boot/grub/init/furthermore --create-to /etc/init/network
+    module /boot/grub/init/network-no-dhclient --append-to /etc/init/network
+    echo done
+  fi
   if [ \$no_random_seed != --no-random-seed ]; then
     echo -n "Loading /boot/random.seed (256) ... "
     module /boot/random.seed --random-seed
@@ -403,6 +417,18 @@ if [ "\$enable_network_drivers" = --disable-network-drivers ]; then
 else
   menuentry "Disable networking drivers" {
     enable_network_drivers=--disable-network-drivers
+    configfile /boot/grub/advanced.cfg
+  }
+fi
+
+if \$enable_dhclient; then
+  menuentry "Disable DHCP client" {
+    enable_dhclient=false
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "Enable DHCP client" {
+    enable_dhclient=true
     configfile /boot/grub/advanced.cfg
   }
 fi
