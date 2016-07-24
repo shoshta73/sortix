@@ -22,6 +22,7 @@ append_title="modified by $(id -un)@$(hostname)"
 default=
 directory=
 enable_append_title=true
+enable_dhclient=
 enable_network_drivers=
 enable_src=
 liveconfig=
@@ -52,9 +53,11 @@ for argument do
   --default=*) default=$parameter ;;
   --default) previous_option=default ;;
   --disable-append-title) enable_append_title=false ;;
+  --disable-dhclient) enable_dhclient=false ;;
   --disable-network-drivers) enable_network_drivers=false ;;
   --disable-src) enable_src=false ;;
   --enable-append-title) enable_append_title=true ;;
+  --enable-dhclient) enable_dhclient=true ;;
   --enable-network-drivers) enable_network_drivers=true ;;
   --enable-src) enable_src=true ;;
   --liveconfig=*) liveconfig=$parameter ;;
@@ -136,6 +139,7 @@ mkdir -p -- "$directory/boot/grub"
  if [ -n "$timeout" ]; then
    printf 'timeout="%s"\n' "$timeout"
  fi
+ print_enable_default_bool "$enable_dhclient" dhclient dhclient
  print_enable_default "$enable_network_drivers" network_drivers network-drivers
  print_enable_default_bool "$enable_src" src src
  if $enable_append_title; then

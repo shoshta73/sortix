@@ -76,7 +76,8 @@ Delete a resolver:
 .Sh SEE ALSO
 .Xr getdnsconfig 2 ,
 .Xr setdnsconfig 2 ,
-.Xr inet 4
+.Xr inet 4 ,
+.Xr dhclient 8
 .Sh HISTORY
 .Nm
 originally appeared in Sortix 1.1.
@@ -85,3 +86,6 @@ The kernel DNS resolver list is global state.
 Changes made with
 .Nm
 may be overwritten by other programs.
+In particular
+.Xr dhclient 8
+sets the resolver list automatically unless otherwise configured.

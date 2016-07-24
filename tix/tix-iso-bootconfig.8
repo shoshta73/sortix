@@ -9,9 +9,11 @@
 .Op Fl \-append-title Ns = Ns Ar text
 .Op Fl \-default Ns = Ns Ar default-boot-menu-option
 .Op Fl \-disable-append-title
+.Op Fl \-disable-dhclient
 .Op Fl \-disable-network-drivers
 .Op Fl \-disable-src
 .Op Fl \-enable-append-title
+.Op Fl \-enable-dhclient
 .Op Fl \-enable-network-drivers
 .Op Fl \-enable-src
 .Op Fl \-liveconfig Ns = Ns Ar liveconfig-directory
@@ -90,6 +92,14 @@ GRUB variable.
 Don't append anything to the bootloader menu title by appending to the
 .Sy base_menu_title
 GRUB variable.
+.It Fl \-disable-dhclient
+Disable automatic DHCP configuration by setting the
+.Sy enable_dhclient
+GRUB variable to
+.Sy false ,
+causing the bootloader to load additional configuration that turns off the
+.Xr dhclient 8
+daemon on boot.
 .It Fl \-disable-network-drivers
 Disable network drivers by setting the
 .Sy enable_network_drivers
@@ -113,6 +123,14 @@ to the bootloader menu title by appending to the
 GRUB variable.
 This option is on by default and can be disabled with
 .Fl \-disable-append-title .
+.It Fl \-enable-dhclient
+Enable automatic DHCP configuration by setting the
+.Sy enable_dhclient
+GRUB variable to
+.Sy true ,
+selecting the default behavior of starting the
+.Xr dhclient 8
+daemon.
 .It Fl \-enable-network-drivers
 Enable network drivers by setting the
 .Sy enable_network_drivers
@@ -254,10 +272,21 @@ security reasons or to work around driver issues:
 tix-iso-bootconfig --disable-network-drivers bootconfig
 tix-iso-add sortix.iso bootconfig
 .Ed
+.Ss Disable DHCP Auto-Configuration By Default
+To customize a release so
+.Xr dhclient 8
+doesn't automatically configure network interfaces using DHCP, useful if one
+wants to manually configure network interfaces with
+.Xr ifconfig 8 .
+.Bd -literal
+tix-iso-bootconfig --disable-dhclient bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
 .Sh SEE ALSO
 .Xr xorriso 1 ,
 .Xr kernel 7 ,
 .Xr release-iso-bootconfig 7 ,
 .Xr release-iso-modification 7 ,
+.Xr init 8 ,
 .Xr tix-iso-add 8 ,
 .Xr tix-iso-liveconfig 8

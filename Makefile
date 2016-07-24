@@ -11,6 +11,7 @@ libmount \
 bench \
 carray \
 checksum \
+dhclient \
 disked \
 dnsconfig \
 editor \
