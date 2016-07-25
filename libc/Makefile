@@ -412,6 +412,10 @@ netdb/getservent.o \
 netdb/setnetent.o \
 netdb/setprotoent.o \
 netdb/setservent.o \
+net/if/if_freenameindex.o \
+net/if/if_indextoname.o \
+net/if/if_nameindex.o \
+net/if/if_nametoindex.o \
 poll/poll.o \
 poll/ppoll.o \
 psctl/psctl.o \

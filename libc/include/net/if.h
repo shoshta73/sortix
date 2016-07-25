@@ -74,4 +74,23 @@ struct if_config
 };
 #endif
 
+struct if_nameindex
+{
+	unsigned int if_index;
+	char* if_name;
+};
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void if_freenameindex(struct if_nameindex*);
+char* if_indextoname(unsigned int, char*);
+struct if_nameindex* if_nameindex(void);
+unsigned int if_nametoindex(const char*);
+
+#ifdef __cplusplus
+} /* extern "C" */
+#endif
+
 #endif
