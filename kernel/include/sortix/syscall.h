@@ -186,6 +186,8 @@
 #define SYSCALL_GETSID 163
 #define SYSCALL_SETSID 164
 #define SYSCALL_SOCKET 165
-#define SYSCALL_MAX_NUM 166 /* index of highest constant + 1 */
+#define SYSCALL_GETDNSCONFIG 166
+#define SYSCALL_SETDNSCONFIG 167
+#define SYSCALL_MAX_NUM 168 /* index of highest constant + 1 */
 
 #endif

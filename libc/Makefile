@@ -551,6 +551,8 @@ stdlib/system.o \
 stdlib/unlockpt.o \
 stdlib/unsetenv.o \
 sys/display/dispmsg_issue.o \
+sys/dnsconfig/getdnsconfig.o \
+sys/dnsconfig/setdnsconfig.o \
 sys/ioctl/ioctl.o \
 sys/kernelinfo/kernelinfo.o \
 syslog/closelog.o \

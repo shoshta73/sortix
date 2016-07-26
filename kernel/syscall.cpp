@@ -200,6 +200,8 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_GETSID] = (void*) sys_getsid,
 	[SYSCALL_SETSID] = (void*) sys_setsid,
 	[SYSCALL_SOCKET] = (void*) sys_socket,
+	[SYSCALL_GETDNSCONFIG] = (void*) sys_getdnsconfig,
+	[SYSCALL_SETDNSCONFIG] = (void*) sys_setdnsconfig,
 	[SYSCALL_MAX_NUM] = (void*) sys_bad_syscall,
 };
 } /* extern "C" */

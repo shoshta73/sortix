@@ -20,6 +20,7 @@
 #ifndef INCLUDE_SORTIX_KERNEL_SYSCALL_H
 #define INCLUDE_SORTIX_KERNEL_SYSCALL_H
 
+#include <sys/dnsconfig.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 
@@ -89,6 +90,7 @@ int sys_fstatvfsat(int, const char*, struct statvfs*, int);
 int sys_fsync(int);
 int sys_ftruncate(int, off_t);
 int sys_futimens(int, const struct timespec*);
+int sys_getdnsconfig(struct dnsconfig*);
 gid_t sys_getegid(void);
 int sys_getentropy(void*, size_t);
 uid_t sys_geteuid(void);
@@ -142,6 +144,7 @@ void sys_scram(int, const void*);
 int sys_sched_yield(void);
 ssize_t sys_send(int, const void*, size_t, int);
 ssize_t sys_sendmsg(int, const struct msghdr*, int);
+int sys_setdnsconfig(const struct dnsconfig*);
 int sys_setegid(gid_t);
 int sys_seteuid(uid_t);
 int sys_setgid(gid_t);

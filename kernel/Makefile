@@ -92,6 +92,7 @@ disk/ata/ata.o \
 disk/ata/hba.o \
 disk/ata/port.o \
 disk/node.o \
+dnsconfig.o \
 dtable.o \
 elf.o \
 fcache.o \
