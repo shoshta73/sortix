@@ -30,6 +30,7 @@ env \
 expr \
 false \
 find \
+getaddrinfo \
 head \
 help \
 id \

@@ -19,6 +19,7 @@ env
 expr
 false
 find
+getaddrinfo
 head
 id
 help
