@@ -21,6 +21,7 @@ host \
 hostname \
 ifconfig \
 init \
+irc \
 kblayout \
 kblayout-compiler \
 login \

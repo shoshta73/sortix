@@ -1,0 +1,4 @@
+irc
+*.o
+config.h
+tests
