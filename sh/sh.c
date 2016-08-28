@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1087,6 +1087,7 @@ struct execute_result execute(char** tokens,
 	}
 
 	// TODO: Builtins should be run in a child process if & or |.
+	childpid = getpid();
 	int internal_status = status;
 	if ( failure )
 	{
@@ -1202,12 +1203,29 @@ struct execute_result execute(char** tokens,
 		clearenv();
 		internal_status = 0;
 	}
+	else if ( strcmp(argv[0], "exec") == 0 )
+	{
+		internal = true;
+		if ( argc == 1 )
+		{
+			if ( pipein != 0 )
+				dup2(pipein, 0);
+
+			if ( pipeout != 1 )
+				dup2(pipeout, 1);
+		}
+		else
+		{
+			childpid = 0;
+			argv++;
+		}
+	}
 	else
 	{
 		internal = false;
 	}
 
-	if ( (childpid = internal ? getpid() : fork()) < 0 )
+	if ( !internal && (childpid = fork()) < 0 )
 	{
 		error(0, errno, "fork");
 		internal_status = 1;
