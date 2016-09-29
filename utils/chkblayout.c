@@ -19,11 +19,13 @@
 
 #include <sys/stat.h>
 
+#include <err.h>
 #include <errno.h>
 #include <error.h>
 #include <fcntl.h>
 #include <ioleast.h>
 #include <locale.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,23 +45,10 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION...] [LAYOUT-NAME]\n", argv0);
-	fprintf(fp, "Changes the current keyboard layout.\n");
-	fprintf(fp, "\n");
-	fprintf(fp, "Options supported by %s:\n", argv0);
-	fprintf(fp, "  --help             Display this help and exit\n");
-	fprintf(fp, "  --version          Output version information and exit\n");
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
+	bool list = false;
+
 	setlocale(LC_ALL, "");
 
 	const char* argv0 = argv[0];
@@ -76,25 +65,30 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'l': list = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
 				exit(1);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
+		else if ( !strcmp(arg, "--list") )
+			list = true;
 		else
 		{
 			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
 			exit(1);
 		}
 	}
 
 	compact_arguments(&argc, &argv);
+
+	if ( list )
+	{
+		if ( 2 <= argc )
+			errx(1, "unexpected extra operand");
+		execlp("ls", "ls", "/share/kblayout", (const char*) NULL);
+		err(127, "ls");
+	}
 
 	const char* tty_path = "/dev/tty";
 	int tty_fd = open(tty_path, O_WRONLY);
@@ -104,7 +98,7 @@ int main(int argc, char* argv[])
 		error(1, errno, "`%s'", tty_path);
 
 	if ( argc == 1 )
-		error(1, 0, "expected path to new keyboard layout");
+		error(1, 0, "expected new keyboard layout");
 
 	const char* kblayout_path = argv[1];
 	if ( !strchr(kblayout_path, '/') )
