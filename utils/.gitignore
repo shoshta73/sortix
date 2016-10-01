@@ -35,6 +35,7 @@ passwd
 ps
 pstree
 pwd
+readlink
 realpath
 rm
 rmdir

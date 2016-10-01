@@ -395,7 +395,7 @@ static void set_kblayout(void)
 		return warning("unable to set keyboard layout: fork: %m");
 	if ( !child_pid )
 	{
-		execlp("chkblayout", "chkblayout", "--", kblayout, (char*) NULL);
+		execlp("chkblayout", "chkblayout", "--", kblayout, (const char*) NULL);
 		warning("setting keyboard layout: chkblayout: %m");
 		_exit(127);
 	}

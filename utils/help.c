@@ -52,8 +52,8 @@ int main(void)
 			dup2(pipe_fds[0], 0);
 			close(pipe_fds[0]);
 			close(pipe_fds[1]);
-			execlp("column", "column", NULL);
-			execlp("cat", "cat", NULL);
+			execlp("column", "column", (const char*) NULL);
+			execlp("cat", "cat", (const char*) NULL);
 			int ic;
 			while ( (ic = fgetc(stdin)) != EOF )
 				fputc(ic, stdout);

@@ -91,13 +91,13 @@ bool dispd_session_setup_game_rgba(struct dispd_session* session)
 		const char* chvideomode = "chvideomode";
 #if 1
 		// TODO chvideomode currently launches --bpp 32 as a program...
-		execlp(chvideomode, chvideomode, NULL);
+		execlp(chvideomode, chvideomode, (const char*) NULL);
 #else
 		execlp(chvideomode, chvideomode,
 		       "--bpp", "32",
 		       "--show-graphics", "true",
 		       "--show-text", "false",
-		       NULL);
+		       (const char*) NULL);
 #endif
 		perror(chvideomode);
 		exit(127);

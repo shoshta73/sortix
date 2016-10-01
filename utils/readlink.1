@@ -1,0 +1,36 @@
+.Dd September 29, 2016
+.Dt READLINK 1
+.Os
+.Sh NAME
+.Nm readlink
+.Nd print symbolic link target
+.Sh SYNOPSIS
+.Nm
+.Op Fl fn
+.Ar path
+.Sh DESCRIPTION
+.Nm
+prints the target of the symbolic link specified by
+.Ar path .
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl f , Fl \-canonicalize
+Print the absolute path of
+.Ar path
+(which need not be a symbolic link) with all symbolic links expanded,
+and no
+.Pa \&.
+and
+.Pa ..
+path components.
+.It Fl n , Fl \-no-newline
+Do not append a newline.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit with 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr readlink 1 ,
+.Xr readlink 3 ,
+.Xr realpath 3

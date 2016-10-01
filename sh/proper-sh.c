@@ -46,7 +46,7 @@ bool is_existing_shell(const char* candidate)
 		open("/dev/null", O_RDONLY);
 		open("/dev/null", O_WRONLY);
 		open("/dev/null", O_WRONLY);
-		execlp("which", "which", "--", candidate, (char*) NULL);
+		execlp("which", "which", "--", candidate, (const char*) NULL);
 		exit(127);
 	}
 	int status;

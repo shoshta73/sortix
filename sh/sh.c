@@ -1299,7 +1299,7 @@ struct execute_result execute(char** tokens,
 	if ( interactive && errno == ENOENT )
 	{
 		int errno_saved = errno;
-		execlp("command-not-found", "command-not-found", argv[0], NULL);
+		execlp("command-not-found", "command-not-found", argv[0], (const char*) NULL);
 		errno = errno_saved;
 	}
 

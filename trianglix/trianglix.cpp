@@ -193,7 +193,7 @@ static void ExecuteFile(const char* path, int curdirfd)
 	if ( ForkAndWait() )
 	{
 		fchdir(curdirfd);
-		execl(path, path, (char*) NULL);
+		execl(path, path, (const char*) NULL);
 		_exit(127);
 	}
 }
@@ -204,7 +204,7 @@ static void DisplayFile(const char* path, int curdirfd)
 	if ( ForkAndWait() )
 	{
 		fchdir(curdirfd);
-		execlp("editor", "editor", path, (char*) NULL);
+		execlp("editor", "editor", path, (const char*) NULL);
 		_exit(127);
 	}
 }
@@ -215,7 +215,7 @@ static void ExecutePath(const char* path, int curdirfd)
 	if ( ForkAndWait() )
 	{
 		fchdir(curdirfd);
-		execlp(path, path, (char*) NULL);
+		execlp(path, path, (const char*) NULL);
 		_exit(127);
 	}
 }
@@ -229,7 +229,7 @@ void ExecuteShellCommand(const char* command, int curdirfd)
 	if ( ForkAndWait() )
 	{
 		fchdir(curdirfd);
-		execlp("sh", "sh", "-c", command, (char*) NULL);
+		execlp("sh", "sh", "-c", command, (const char*) NULL);
 		error(127, errno, "`%s'", "sh");
 	}
 	unsigned int cur_termmode;
@@ -505,7 +505,7 @@ private:
 
 void exec_program::invoke()
 {
-	execlp(program, program, (char*) NULL);
+	execlp(program, program, (const char*) NULL);
 }
 
 class development : public object

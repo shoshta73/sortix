@@ -39,6 +39,6 @@ int system(const char* command)
 			return ret_error;
 		return status;
 	}
-	execlp("sh", "sh", "-c", command, NULL);
+	execlp("sh", "sh", "-c", command, (const char*) NULL);
 	_exit(exit_error);
 }

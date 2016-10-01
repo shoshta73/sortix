@@ -131,7 +131,7 @@ FILE* popen(const char* command, const char* type)
         close(pipefds[unused_end]) )
 		_exit(127);
 
-	execlp("sh", "sh", "-c", command, NULL);
+	execlp("sh", "sh", "-c", command, (const char*) NULL);
 	_exit(127);
 
 cleanup_pipes:

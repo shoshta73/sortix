@@ -47,6 +47,7 @@ passwd \
 ps \
 pstree \
 pwd \
+readlink \
 realpath \
 rm \
 rmdir \
@@ -73,7 +74,8 @@ $(BINARIES_EXCEPT_INSTALL) \
 xinstall
 
 MANPAGES=\
-chkblayout.1
+chkblayout.1 \
+readlink.1 \
 
 all: $(BINARIES)
 
