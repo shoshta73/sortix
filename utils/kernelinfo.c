@@ -18,30 +18,16 @@
  */
 
 #include <sys/kernelinfo.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
+
+#include <err.h>
 #include <errno.h>
 #include <error.h>
-
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... REQUEST...\n", argv0);
-	fprintf(fp, "Prints a kernel information string.\n");
-	fprintf(fp, "example: %s name\n", argv0);
-	fprintf(fp, "example: %s version\n", argv0);
-	fprintf(fp, "example: %s builddate\n", argv0);
-	fprintf(fp, "example: %s buildtime\n", argv0);
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int main(int argc, char* argv[])
 {
-	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -56,21 +42,11 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
+				errx(1, "unknown option -- '%c'\n", c);
 			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
 		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
-		}
+			errx(1, "unknown option: %s\n", arg);
 	}
 	size_t bufsize = 32;
 	char* buf = (char*) malloc(bufsize);

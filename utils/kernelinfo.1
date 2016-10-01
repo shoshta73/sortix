@@ -1,0 +1,36 @@
+.Dd October 01, 2016
+.Dt KERNELINFO 1
+.Os
+.Sh NAME
+.Nm kernelinfo
+.Nd print kernel information
+.Sh SYNOPSIS
+.Nm
+.Op Ar variable ...
+.Sh DESCRIPTION
+.Nm
+prints the specified kernel information.
+.Pp
+Possible values for
+.Ar variable
+are:
+.Bl -tag -width builddate
+.It Sy name
+The name of the current kernel.
+.It Sy version
+The version of the current kernel.
+.It Sy tagline
+The tagline (slogan) of the release.
+.It Sy builddate
+The date on which the current kernel was built.
+.It Sy buildtime
+The time at which the current kernel was built.
+.It Sy firmware
+The firmware of the system (e.g. "bios" or "uefi")
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr kernelinfo 2
