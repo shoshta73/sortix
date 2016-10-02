@@ -1,0 +1,37 @@
+.Dd October 02, 2016
+.Dt PASSWD 1
+.Os
+.Sh NAME
+.Nm passwd
+.Nd change user password
+.Sh SYNOPSIS
+.Nm
+.Op Fl c Ar cipher
+.Op Ar username
+.Sh DESCRIPTION
+.Nm
+changes the password for a user.  If no username is specified,
+.Nm
+will change the password for the current user.  A cipher other than the
+default can be chosen using the
+.Fl c
+option.
+.Pp
+Possible values for
+.Ar cipher
+are:
+.Bl -tag -width blowfish
+.It Sy blowfish
+Use the blowfish cipher.
+.It Sy bcrypt
+Use the bcrypt cipher.
+.El
+.Pp
+If no
+.Ar cipher
+is specified, the blowfish cipher will be used.
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr passwd 5

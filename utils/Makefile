@@ -76,6 +76,7 @@ xinstall
 MANPAGES=\
 chkblayout.1 \
 kernelinfo.1 \
+passwd.1 \
 readlink.1 \
 
 all: $(BINARIES)
