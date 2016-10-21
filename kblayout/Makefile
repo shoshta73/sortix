@@ -8,6 +8,7 @@ KBLAYOUTDIR?=$(DATAROOTDIR)/kblayout
 KBLAYOUT_COMPILER?=kblayout-compiler
 
 LAYOUTS=\
+de \
 dk \
 us \
 

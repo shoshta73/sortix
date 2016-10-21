@@ -1,0 +1,160 @@
+name "German (Germany)"
+
+modifier shift
+modifier caps
+modifier altgr
+modifier numlock
+
+KLSHIFT: modify shift
+KRSHIFT: modify shift
+KCAPSLOCK: toggle caps
+KRALT: modify altgr
+KNUMLOCK: toggle numlock
+
+KBKSPC: "\b"
+KTAB: "\t"
+KENTER: "\n"
+KSPACE: " "
+KPADENTER: "\n"
+
+KSYM12: "*"
+KSYM13: "-"
+KSYM14: "+"
+KSYM16: "/"
+
+shift = caps & -altgr:
+	K1: "1"
+	K2: "2"
+	K3: "3"
+	K4: "4"
+	K5: "5"
+	K6: "6"
+	K7: "7"
+	K8: "8"
+	K9: "9"
+	K0: "0"
+	KSYM1: "ß"
+	KSYM3: "ü"
+	KSYM4: "+"
+	KSYM5: "ö"
+	KSYM6: "ä"
+	KSYM8: "#"
+	KSYM9: ","
+	KSYM10: "."
+
+-shift & -altgr:
+	KSYM2: dead ´
+	KSYM7: dead ^
+	KSYM11: "-"
+	KNO_STANDARD_MEANING_2: "<"
+
+shift ^ caps & -altgr:
+	K1: "!"
+	K2: "\""
+	K3: "§"
+	K4: "$"
+	K5: "%"
+	K6: "&"
+	K7: "/"
+	K8: "("
+	K9: ")"
+	K0: "="
+	KSYM1: "?"
+	KSYM3: "Ü"
+	KSYM4: "*"
+	KSYM5: "Ö"
+	KSYM6: "Ä"
+	KSYM8: "'"
+	KSYM9: ";"
+	KSYM10: ":"
+
++shift & -altgr:
+	KSYM2: dead `
+	KSYM7: "°"
+	KSYM11: "_"
+	KNO_STANDARD_MEANING_2: ">"
+
+-shift & +altgr:
+	K2: "²"
+	K3: "³"
+	K7: "{"
+	K8: "["
+	K9: "]"
+	K0: "}"
+	KSYM1: "\\"
+	KSYM4: "~"
+	KNO_STANDARD_MEANING_2: "|"
+
+shift = caps & -altgr:
+	KQ: "q"
+	KW: "w"
+	KE: "e"
+	KR: "r"
+	KT: "t"
+	KY: "z"
+	KU: "u"
+	KI: "i"
+	KO: "o"
+	KP: "p"
+	KA: "a"
+	KS: "s"
+	KD: "d"
+	KF: "f"
+	KG: "g"
+	KH: "h"
+	KJ: "j"
+	KK: "k"
+	KL: "l"
+	KZ: "y"
+	KX: "x"
+	KC: "c"
+	KV: "v"
+	KB: "b"
+	KN: "n"
+	KM: "m"
+
+shift ^ caps & -altgr:
+	KQ: "Q"
+	KW: "W"
+	KE: "E"
+	KR: "R"
+	KT: "T"
+	KY: "Z"
+	KU: "U"
+	KI: "I"
+	KO: "O"
+	KP: "P"
+	KA: "A"
+	KS: "S"
+	KD: "D"
+	KF: "F"
+	KG: "G"
+	KH: "H"
+	KJ: "J"
+	KK: "K"
+	KL: "L"
+	KZ: "Y"
+	KX: "X"
+	KC: "C"
+	KV: "V"
+	KB: "B"
+	KN: "N"
+	KM: "M"
+
+-shift & +altgr:
+	KQ: "@"
+	KE: "€"
+	KM: "µ"
+
++numlock:
+	KPAD7: "7"
+	KPAD8: "8"
+	KPAD9: "9"
+	KPAD4: "4"
+	KPAD5: "5"
+	KPAD6: "6"
+	KPAD1: "1"
+	KPAD2: "2"
+	KPAD3: "3"
+	KPAD0: "0"
+	KSYM15: ","
