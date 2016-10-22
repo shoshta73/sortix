@@ -42,6 +42,7 @@ passwd
 poweroff
 ps
 pstree
+pty
 pwd
 readlink
 realpath
