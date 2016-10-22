@@ -51,6 +51,7 @@ pager \
 passwd \
 ps \
 pstree \
+pty \
 pwd \
 readlink \
 realpath \
