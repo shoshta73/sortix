@@ -815,7 +815,8 @@ static int ls_directory(int parentfd, const char* relpath, const char* path)
 	if ( errno != 0 && errno != ENOTDIR )
 		err(1, "%s", path);
 
-	if ( option_recursive )
+	if ( option_recursive && strcmp(relpath, ".") != 0 &&
+		 strcmp(relpath, "..") != 0 )
 		show_recursive(dirfd(dir), path, records, records_used);
 	else
 		show(records, records_used);
