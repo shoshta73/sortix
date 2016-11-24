@@ -64,6 +64,7 @@ private:
 	void RunAnsiCommand(TextBuffer* textbuf, char c);
 	void AnsiReset();
 	void Reset();
+	void UnhandledDebug(TextBuffer* textbuf, const char* str);
 
 private:
 	mbstate_t ps;

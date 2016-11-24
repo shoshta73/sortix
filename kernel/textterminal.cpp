@@ -29,6 +29,7 @@
 
 #include "palette.h"
 #include "textterminal.h"
+#include "uart.h"
 
 namespace Sortix {
 
@@ -39,6 +40,24 @@ static const unsigned int DEFAULT_BACKGROUND = 0;
 static uint32_t ColorFromRGB(uint8_t r, uint8_t g, uint8_t b)
 {
 	return (uint32_t) b << 0 | (uint32_t) g << 8 | (uint32_t) r << 16;
+}
+
+void TextTerminal::UnhandledDebug(TextBuffer* textbuf, const char* str)
+{
+#if 0
+#if 0
+	for ( size_t i = 0; str[i]; i++ )
+		PutChar(textbuf, str[i]);
+#else
+	(void) textbuf;
+	for ( size_t i = 0; str[i]; i++ )
+		UART::WriteChar(str[i]);
+	UART::WriteChar('\n');
+#endif
+#else
+	(void) textbuf;
+	(void) str;
+#endif
 }
 
 TextTerminal::TextTerminal(TextBufferHandle* textbufhandle)
@@ -457,6 +476,9 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 		{
 			ansimode = NONE;
 			ansimode = NONE;
+			char buf[64];
+			snprintf(buf, sizeof(buf), "[unhandled(6): %c]", c);
+			UnhandledDebug(textbuf, buf);
 		}
 		return;
 	}
@@ -483,6 +505,9 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 		if ( ansiusedparams == ANSI_NUM_PARAMS )
 		{
 			ansimode = NONE;
+			char buf[64];
+			snprintf(buf, sizeof(buf), "[unhandled(7): %c]", c);
+			UnhandledDebug(textbuf, buf);
 			return;
 		}
 		ansiparams[ansiusedparams++] = 0;
@@ -516,6 +541,9 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 				else
 				{
 					ansimode = NONE;
+					char buf[64];
+					snprintf(buf, sizeof(buf), "[unhandled(7): %c]", c);
+					UnhandledDebug(textbuf, buf);
 					return;
 				}
 				ansimode = NONE;
@@ -528,6 +556,10 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 	// Something I don't understand, and ignore intentionally.
 	else if ( c == '?' )
 	{
+		//ansimode = NONE;
+		//char buf[64];
+		//snprintf(buf, sizeof(buf), "[unhandled(1): %c]", c);
+		//UnhandledDebug(textbuf, buf);
 	}
 
 	// TODO: There are some rare things that should be supported here.
@@ -536,6 +568,9 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 	else
 	{
 		ansimode = NONE;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "[unhandled(2): %c]", c);
+		UnhandledDebug(textbuf, buf);
 	}
 }
 
@@ -830,12 +865,18 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 			else
 			{
 				ansimode = NONE;
+				char buf[64];
+				snprintf(buf, sizeof(buf), "[unhandled(3): %c cmd=%u]", c, cmd);
+				UnhandledDebug(textbuf, buf);
 			}
 		}
 	} break;
 	case 'n': // Request special information from terminal.
 	{
 		ansimode = NONE;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "[unhandled(4): %c]", c);
+		UnhandledDebug(textbuf, buf);
 		// TODO: Handle this code.
 	} break;
 	case 's': // Save cursor position.
@@ -871,6 +912,9 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 	default:
 	{
 		ansimode = NONE;
+		char buf[64];
+		snprintf(buf, sizeof(buf), "[unhandled(5): %c]", c);
+		UnhandledDebug(textbuf, buf);
 	}
 	// TODO: Handle other cases.
 	}
