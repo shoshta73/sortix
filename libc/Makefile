@@ -378,6 +378,8 @@ grp/getgrnam.o \
 grp/getgrnam_r.o \
 grp/opengr.o \
 grp/setgrent.o \
+ifaddrs/freeifaddrs.o \
+ifaddrs/getifaddrs.o \
 init/init.o \
 ioleast/preadall.o \
 ioleast/preadleast.o \
