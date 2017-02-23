@@ -1,0 +1,35 @@
+.Dd June 4, 2017
+.Dt ICMP 4
+.Os
+.Sh NAME
+.Nm icmp
+.Nd internet control message protocol
+.Sh SYNOPSIS
+.In sys/socket.h
+.In netinet/in.h
+.Sh DESCRIPTION
+The Internet Control Message Protocol (ICMP) is a control and error reporting
+layer for the Internet Protocol version 4
+.Xr ip 4 .
+ICMP is commonly used to diagnose network problems, such as the destination
+being unreachable, network congestion, packets exceeding their time to live, and
+so on.
+.Sh SEE ALSO
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr ping 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A J. Postel (ed.)
+.%D September 1981
+.%R STD 5
+.%R RFC 792
+.%T Internet Control Message Protocol - DARPA Internet Program Protocol Specification
+.%Q USC/Information Sciences Institute
+.Re
+.Sh BUGS
+ICMP is not implemented yet, except automatically replying to the Echo Request
+message (ping) and the existence of
+.Xr ping 4
+sockets for sending Echo Request messages and receiving Echo Reply messages.

@@ -165,7 +165,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	 echo 'ID=sortix' && \
 	 echo 'VERSION_ID="$(VERSION)"' && \
 	 echo 'PRETTY_NAME="Sortix $(VERSION)"' && \
-	 echo 'SORTIX_ABI=1.0' && \
+	 echo 'SORTIX_ABI=1.1' && \
 	 true) > "$(SYSROOT)/etc/sortix-release"
 	echo /etc/sortix-release >> "$(SYSROOT)/tix/manifest/system"
 	ln -sf sortix-release "$(SYSROOT)/etc/os-release"

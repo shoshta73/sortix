@@ -182,6 +182,7 @@ if [ -e /boot/random.seed ]; then
 else
   no_random_seed=--no-random-seed
 fi
+set enable_network_drivers=
 
 export version
 export machine
@@ -190,6 +191,7 @@ export menu_title
 export timeout
 export default
 export no_random_seed
+export enable_network_drivers
 EOF
 
 if [ -n "$ports" ]; then
@@ -276,7 +278,7 @@ esac
 cat << EOF
   hook_kernel_pre
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot /$kernel \$no_random_seed "\$@"
+  multiboot /$kernel \$no_random_seed \$enable_network_drivers "\$@"
   echo done
   hook_kernel_post
   if [ \$no_random_seed != --no-random-seed ]; then
@@ -392,6 +394,18 @@ menuentry "Back..." {
 menu_title="\$base_menu_title - Advanced Options"
 
 hook_advanced_menu_pre
+
+if [ "\$enable_network_drivers" = --disable-network-drivers ]; then
+  menuentry "Enable networking drivers" {
+    enable_network_drivers=
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "Disable networking drivers" {
+    enable_network_drivers=--disable-network-drivers
+    configfile /boot/grub/advanced.cfg
+  }
+fi
 
 menuentry "Select binary packages..." {
   configfile /boot/grub/tix.cfg

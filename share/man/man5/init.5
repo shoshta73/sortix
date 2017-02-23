@@ -139,8 +139,10 @@ The following daemons are provided by the system:
 .It Sy base
 Virtual daemon that depends on the core operating system daemons.
 It depends on the
+.Sy network
+and
 .Sy time
-daemon.
+daemons.
 .It Sy local
 Virtual daemon that starts daemons pertinent to the local system.
 The system provides a default implementation that does nothing.
@@ -148,6 +150,12 @@ The system administrator is meant to override the daemon in
 .Pa /etc/init/local
 by depending on daemons outside of the base system that should run on the local
 system.
+.It Sy network
+.\" TODO: The daemon becomes ready when an attempt has been made, rather than
+.\"       when it succeeded.
+Virtual daemon that becomes ready when the network has been configured.
+Daemons can depend on this daemon if they need the network to have been
+established before they start.
 .It Sy time
 Virtual daemon that becomes ready when the current date and time has been
 established.
@@ -230,6 +238,21 @@ daemon readiness protocol.
 Upon exit, the original terminal settings are restored and
 .Xr init 8
 regains ownership of the terminal.
+.It Sy per if
+Specifies that an instance of the daemon should run for each network interface.
+The daemon becomes a virtual daemon that depends on on the instantiated daemons
+for each network interface.
+The name of each instantiated daemon is the name of the virtual daemon plus
+.Sq .
+plus the name of the network interface (e.g.
+.Sy exampled
+running on the loopback interface
+.Sy lo0
+would be
+.Sy example.lo0 ) .
+.\" TODO: Do this with a variable.
+The name of the network interface is appended as a command line argument on the
+command line of each instantiated daemon.
 .It Sy require Ar dependency Oo Ar flag ... Oc
 .\" TODO: 'suggest dependency' which doesn't fail if it can't be provided,
 .\"       and is just best-effort.

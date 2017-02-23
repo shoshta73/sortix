@@ -57,6 +57,7 @@ malloc/heap_init.o \
 malloc/__heap_lock.o \
 malloc/__heap_unlock.o \
 malloc/__heap_verify.o \
+netinet/if_ether/etheraddr_broadcast.o \
 netinet/in/in6addr_any.o \
 netinet/in/in6addr_loopback.o \
 regex/regcomp.o \

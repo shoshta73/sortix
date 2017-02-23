@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,7 @@
 #include <sortix/kernel/vnode.h>
 
 #include "fs.h"
+#include "ipv4.h"
 
 namespace Sortix {
 
@@ -37,6 +38,7 @@ static Ref<Inode> CreateSocket(int domain, int type, int protocol)
 {
 	switch ( domain )
 	{
+	case AF_INET: return IPv4::Socket(type, protocol);
 	case AF_UNIX: return NetFS::Socket(type, protocol);
 	default: return errno = EAFNOSUPPORT, Ref<Inode>(NULL);
 	}

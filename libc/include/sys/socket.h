@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,11 +24,9 @@
 
 #include <sys/__/types.h>
 
-#include <sortix/socket.h>
+#include <__/stdint.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <sortix/socket.h>
 
 #ifndef __socklen_t_defined
 #define __socklen_t_defined
@@ -48,18 +46,10 @@ typedef __ssize_t ssize_t;
 
 #ifndef __sa_family_t_defined
 #define __sa_family_t_defined
-typedef unsigned short int sa_family_t;
-#endif
-
-#ifdef __cplusplus
-} /* extern "C" */
+typedef __uint16_t sa_family_t;
 #endif
 
 #include <sortix/uio.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 struct sockaddr
 {
@@ -127,6 +117,12 @@ struct linger
 #define SO_SNDLOWAT 14
 #define SO_SNDTIMEO 15
 #define SO_TYPE 16
+#if __USE_SORTIX
+#define SO_BINDTOINDEX 17
+#define SO_BINDTODEVICE 18
+#define SO_DOMAIN 19
+#define SO_PROTOCOL 20
+#endif
 
 #define SOMAXCONN 5
 
@@ -160,6 +156,10 @@ struct linger
 #define SHUT_RD (1 << 0)
 #define SHUT_WR (1 << 1)
 #define SHUT_RDWR (SHUT_RD | SHUT_WR)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int accept4(int, struct sockaddr* __restrict, socklen_t* __restrict, int);
 int accept(int, struct sockaddr* __restrict, socklen_t* __restrict);

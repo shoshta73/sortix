@@ -1130,6 +1130,8 @@ int main(void)
 	}
 	text("\n");
 
+	// TODO: Ask if networking should be disabled / enabled.
+
 	text("It's time to boot into the newly installed system.\n\n");
 
 	if ( strcasecmp(accept_grub, "no") == 0 )

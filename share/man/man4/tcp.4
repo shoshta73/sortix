@@ -1,0 +1,158 @@
+.Dd June 3, 2017
+.Dt TCP 4
+.Os
+.Sh NAME
+.Nm tcp
+.Nd transmission control protocol
+.Sh SYNOPSIS
+.In sys/socket.h
+.In netinet/in.h
+.In netinet/tcp.h
+.Ft int
+.Fn socket AF_INET SOCK_STREAM IPPROTO_TCP
+.Sh DESCRIPTION
+The Transmission Control Protocol (TCP) is a connection-oriented transport layer
+for the Internet Protocol
+.Xr ip 4
+that provides a reliable byte stream connection between two hosts.
+It is designed for packet-switched networks and provides sequenced data,
+retransmissions on packet loss, handling of duplicated packets, flow control,
+basic data integrity checks, multiplexing with a 16-bit port number, support for
+out-of-band urgent data, and detection of lost connection.
+TCP provides the
+.Dv SOCK_STREAM
+abstraction for the
+.Xr inet 4
+protocol family.
+.Pp
+TCP sockets are made with
+.Xr socket 2
+by passing an appropriate
+.Fa domain
+.Dv ( AF_INET ) ,
+.Dv SOCK_STREAM
+as the
+.Fa type ,
+and 0 or
+.Dv IPPROTO_TCP
+as the
+.Fa protocol .
+Newly created TCP sockets are not bound to a local address nor connected to a
+remote socket.
+They can be bound to a local address with
+.Xr bind 2 ,
+or a local address will be assigned on
+.Xr connect 2
+or
+.Xr listen 2 .
+.Pp
+A connection to a remote TCP socket can be established with
+.Xr connect 2 .
+Connections can be established when both sides calls
+.Xr connect 2
+on each other.
+.Pp
+Incoming connections can be listened for using
+.Xr listen 2
+and accepted with
+.Xr accept 2 .
+.Pp
+Bytes can be received form the remote TCP socket with
+.Xr recv 2 ,
+.Xr recvmsg 2 ,
+.Xr recvfrom 2 ,
+.Xr read 2 ,
+or
+.Xr readv 2 .
+Bytes can be transmitted to the remote TCP socket with
+.Xr send 2 ,
+.Xr sendmsg 2 ,
+.Xr sendto 2 ,
+.Xr write 2 ,
+or
+.Xr writev 2 .
+Transmitting when the connection has broken will result in the process being
+sent the
+.Dv SIGPIPE
+signal and fail with
+.Er EPIPE .
+.Pp
+The receiving socket will acknowledge any received data.
+If no acknowledgement is received in a timely manner, the transmitting socket
+will transmit the data again.
+If a acknowledgement still isn't received after a while, the connection is
+considered to be broken and no further receipt or transmission is possible.
+.Pp
+The connection can be shut down with
+.Xr shutdown 2
+in either the reading direction (discarding further received data) or the
+writing direction (sending the finish control flag).
+The connection is closed when both sockets have sent and acknowledged the finish
+control flag.
+Upon the
+.Xr close 2
+of the last file descriptor for a connected socket, the socket is shut down in
+both directions.
+.Sh SEE ALSO
+.Xr accept 2 ,
+.Xr bind 2 ,
+.Xr connect 2 ,
+.Xr getsockopt 2 ,
+.Xr recv 2 ,
+.Xr send 2 ,
+.Xr setsockopt 2 ,
+.Xr shutdown 2 ,
+.Xr socket 2 ,
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A J. Postel (ed.)
+.%D September 1981
+.%R STD 7
+.%R RFC 793
+.%T Transmission Control Protocol
+.%Q USC/Information Sciences Institute
+.Re
+.Pp
+.Rs
+.%A Internet Engineering Task Force
+.%A R. Braden (ed.)
+.%D October 1989
+.%R STD 3
+.%R RFC 1122
+.%T Requirements for Internet Hosts -- Communication Layers
+.%Q USC/Information Sciences Institute
+.Re
+.Pp
+.St -p1003.1-2008 specifies the TCP socket programming interface.
+.Sh BUGS
+The implementation is incomplete and has known bugs.
+.Pp
+Out-of-band data is not yet supported and is ignored on receipt.
+.Pp
+The round trip time is not estimated which prevents efficient retransmission
+when data is lost
+Retransmissions happen after a second, which means unnecessary retransmissions
+happen if the round trip time is more than a second.
+.Pp
+Options are not supported and are ignored on receipt.
+.Pp
+No extensions are implemented yet that improve efficiency for long fat networks
+with large bandwidth * delay products.
+.Pp
+There is not yet any support for sending keep-alive packets.
+.Pp
+There is not yet any support for respecting
+.Xr icmp 4
+condition such as destination unreachable or source quench.
+.Pp
+Half-open connections use memory, but until the handshake is complete, it is not
+confirmed whether the remote is actually able to transmit from the source
+qaddress.
+An attacker may be able to transmit many packets from forged addresses,
+exhausting the available memory for TCP sockets and thus deny service to further
+legitimate connections.
+A SYN queue or SYN cookies would mitigate this problem, but neither is yet
+implemented.

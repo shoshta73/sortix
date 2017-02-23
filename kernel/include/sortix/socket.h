@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,23 +22,14 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* TODO: Nicely wrap this in an enum, as in glibc's header? */
 #define SOCK_TYPE_MASK ((1<<20)-1)
-#define SOCK_RAW 0 /* Will Sortix support this? */
 #define SOCK_DGRAM 1
 #define SOCK_SEQPACKET 2
 #define SOCK_STREAM 3
+#define SOCK_RAW 4
 
 #define SOCK_NONBLOCK (1<<20)
 #define SOCK_CLOEXEC (1<<21)
 #define SOCK_CLOFORK (1<<22)
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif

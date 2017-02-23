@@ -1,0 +1,173 @@
+.Dd June 6, 2017
+.Dt ETHER 4
+.Os
+.Sh NAME
+.Nm ether
+.Nd ethernet
+.Sh SYNOPSIS
+.In netinet/if_ether.h
+.Bd -literal
+struct ether_addr {
+        uint8_t ether_addr_octet[ETHER_ADDR_LEN /* 6 */];
+};
+
+struct ether_header {
+        uint8_t ether_dhost[ETHER_ADDR_LEN /* 6 */];
+        uint8_t ether_shost[ETHER_ADDR_LEN /* 6 */];
+        uint16_t ether_type;
+};
+
+struct ether_footer {
+        uint32_t ether_crc;
+};
+.Ed
+.Sh DESCRIPTION
+The Ethernet is a physical and link layer protocol for datagram exchange on a
+local area network.
+An Ethernet packet contains an Ethernet frame that contains a datagram of a
+higher level protocol.
+Ethernet 2.0 framing is implemented.
+IEEE Std 802.3 Ethernet framing is intentionally not implemented.
+.Pp
+Ethernet hosts are addressed with a globally unique six byte address assigned to
+the network interface controller.
+An Ethernet address can be stored in the
+.Vt struct ether_addr
+type.
+Ethernet addresses are notated in hexadecimal form interspaced with colons,
+e.g. 00:00:5e:00:53:ff.
+The Ethernet addresses in the range from 00:00:5e:00:53:00 (inclusive) to
+00:00:5e:00:53:ff (inclusive) are reserved for documentation.
+The address with all bits set
+.Pq ff:ff:ff:ff:ff:ff
+is the broadcast address and can be conveniently accessed using the
+.Xr etheraddr_broadcast 3
+which is initialized to
+.Dv ETHERADDR_BROADCAST_INIT .
+.Pp
+Ethernet packets are transmitted starting with an eight-byte start-of-frame
+preamble, followed by the Ethernet frame itself, ending with a twelve-byte
+interpacket gap.
+Ethernet 2.0 frames consist of a header, a datagram payload, and a frame check
+sequence.
+Frames are at least 64 bytes and are at most 1518 bytes.
+With 18 bytes of Ethernet frame overhead, the minimum transmission unit of the
+payload datagram is 46 bytes and the maximum transmission unit is 1500 bytes.
+The size of the frame is implicitly determined by the interpacket gap.
+The header has the format of
+.Vt struct ether_header ,
+starting with the destination host address
+.Pq Va ether_dhost ,
+followed by the source host address
+.Pq Va ether_shost ,
+ending with a big-endian 16-bit EtherType value denoting the protocol associated
+with the payload datagram
+.Pq Va ether_type .
+The frame check sequence has the format of
+.Vt struct ether_footer ,
+being a 32-bit cyclic redundancy checksum of the frame except the checksum
+itself
+.Pq Va ether_crc .
+.Pp
+Frames are discarded on receipt if the destination address is neither the local
+address nor the broadcast address, if the source address is the broadcast
+address, or if the checksum is invalid.
+.Pp
+Network layer addresses can be resolved to Ethernet addresses using the
+Address Resolution Protocol
+.Xr arp 4 .
+.Pp
+The
+.Va ether_type
+field denotes the payload datagram protocol and the following values are
+supported:
+.Bl -tag -width "12345678"
+.It Dv ETHERTYPE_IP Pq Li 0x0800
+The Internet Protocol version 4
+.Xr ip 4 .
+.It Dv ETHERTYPE_ARP Pq Li 0x0806
+The Address Resolution Protocol
+.Xr arp 4 .
+.El
+.Pp
+The following constants are defined in
+.In netinet/if_ether.h :
+.Bl -tag -width "12345678"
+.It Dv ETHER_ADDR_LEN Li 6
+The size of an Ethernet address in bytes.
+.It Dv ETHER_TYPE_LEN Li 2
+The size of the type field in the Ethernet header in bytes.
+.It Dv ETHER_HDR_LEN Li 14
+The size of the Ethernet header in bytes.
+.It Dv ETHER_CRC_LEN Li 4
+The size of the Ethernet frame check sequence in bytes.
+.It Dv ETHER_LEN Li 18
+The total size of the Ethernet header and the frame check sequence in bytes.
+.It Dv ETHER_MIN_LEN Li 64
+The minimum size of Ethernet frames.
+.It Dv ETHER_MAX_LEN Li 1518
+The maximum size of Ethernet frames.
+.It Dv ETHERMTU Li 1500
+The maximum transmission unit for Ethernet payloads.
+.It Dv ETHERMIN Li 46
+The minimum transmission unit for Ethernet payloads.
+.It Dv ETHERADDR_BROADCAST_INIT Li {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}}
+An initializer list for
+.Vt struct ether_addr
+that initializes it to the broadcast address ff:ff:ff:ff:ff:ff.
+.El
+.Sh ERRORS
+Socket operations can fail these error conditions, in addition to the error
+conditions of the invoked function.
+.Bl -tag -width [EADDRNOTAVAIL]
+.It Bq Er EMSGSIZE
+The datagram was too large to be sent because it exceeded the maximum
+transmission unit (MTU) (1500 bytes) of the Ethernet protocol.
+.It Bq Er ENOBUFS
+There was not enough memory available for network packets.
+.El
+.Sh SEE ALSO
+.Xr etheraddr_broadcast 3 ,
+.Xr arp 4 ,
+.Xr if 4 ,
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A Digital Equipment Corporation
+.%A Intel Corporation
+.%A Xerox Corporation
+.%D November 1982
+.%R Version 2.0
+.%T The Ethernet - A Local Area Network
+.Re
+.Pp
+.Rs
+.%A C. Hornig
+.%D April 1984
+.%R STD 41
+.%R RFC 894
+.%T A Standard for the Transmission of IP Datagrams over Ethernet Networks
+.%Q Symbolics Cambridge Research Center
+.Re
+.Pp
+.Rs
+.%A Internet Engineering Task Force
+.%A R. Braden (ed.)
+.%D October 1989
+.%R STD 3
+.%R RFC 1122
+.%T Requirements for Internet Hosts -- Communication Layers
+.%Q USC/Information Sciences Institute
+.Re
+.Rs
+.%A Internet Engineering Task Force
+.%A D. Eastlake 3rd
+.%A J. Abley
+.%D October 2013
+.%R RFC 7042
+.%T IANA Considerations and IETF Protocol and Documentation Usage for IEEE 802 Parameters
+.%Q Huawei
+.%Q Dyn, Inc.
+.Re

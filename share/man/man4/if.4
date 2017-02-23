@@ -1,0 +1,372 @@
+.Dd June 11, 2017
+.Dt IF 4
+.Os
+.Sh NAME
+.Nm if
+.Nd network interface
+.Sh SYNOPSIS
+.In sys/ioctl.h
+.In net/if.h
+.Sh DESCRIPTION
+Network interfaces are devices that provide transmission and receipt of network
+packets.
+The name of a network interface is the name of the device driver followed by the
+driver instance number, and each network interface have an unique index number
+distinct from the driver instance number.
+The name length is restricted to
+.Dv IF_NAMESIZE
+bytes including the trailing nul byte.
+Network interfaces are exposed in the filesystem as
+.Pa /dev/ Ns Ar name Ns Ar X
+devices, where
+.Ar name
+is the driver name, and the
+.Ar X
+number denotes which device using that driver.
+Each driver is documented with a manual page with the driver's name in section
+4 of the manual.
+.Sh LINK LAYER
+Network interfaces abstracts a hardware device or a software device as a link
+layer protocol:
+.Bl -tag -width "12345678"
+.It Ethernet Controller Pq Dv IF_TYPE_ETHERNET
+Packets are received and transmitted with the Ethernet
+.Xr ether 4
+link layer protocol.
+The
+.Va type
+field of
+.Vt struct if_info
+is set to
+.Dv IF_TYPE_ETHERNET
+and the
+.Va addr
+field contains the 6-byte Ethernet address assigned to the Ethernet controller.
+.It Loopback Device Pq Dv IF_TYPE_LOOPBACK
+The software loopback device
+.Xr lo 4
+on the local host receives any packets transmitted on it.
+The
+.Va type
+field of
+.Vt struct if_info
+is set to
+.Dv IF_TYPE_LOOPBACK
+and the
+.Va addr
+field is unused.
+.El
+.Sh NETWORK LAYER
+Network layer protocols are layered on top of the link layer:
+.Bl -tag -width "12345678"
+.It Internet Protocol version 4 Pq Dv AF_INET
+The Internet Protocol version 4
+.Xr ip 4
+provides the network layer of the Internet Protocol version 4 protocol family
+.Xr inet 4 ,
+containing transport protocols such as the Transmission Control Protocol
+.Xr tcp 4 ,
+and the User Datagram Protocol
+.Xr udp 4 .
+When combined with the Ethernet link layer, the Address Resolution Protocol
+.Xr arp 4
+is used to resolve network layer addresses into link layer addresses.
+.El
+.Sh CONFIGURATION
+The static information about a network interface is stored in
+.Vt struct if_info :
+.Bd -literal
+struct if_info {
+        unsigned int linkid;
+        int type;
+        int features;
+        size_t addrlen;
+        char name[IF_NAMESIZE];
+        unsigned char addr[IF_HWADDR_MAXSIZE];
+};
+.Ed
+.Pp
+.Va linkid
+is the network interface's index number.
+.Va type
+is the link layer protocol.
+.Va features
+is a bit mask of the features provided by the network interface:
+.Bl -tag -width "12345678"
+.It IF_FEATURE_ETHERNET_CRC_OFFLOAD
+The Ethernet CRC32 checksum is computed in hardware.
+.El
+.Pp
+.Va addrlen
+is the size of the interface's assigned hardware address stored in the
+.Va addr
+field.
+.Va name
+is the nul-terminated string name of the network interface.
+.Pp
+The status information about a network interface is stored in
+.Vt struct if_status :
+.Bd -literal
+struct if_status {
+        int flags;
+        size_t mtu;
+};
+.Ed
+.Pp
+.Va flags
+is a bit mask of network interface status conditions:
+.Bl -tag -width "12345678"
+.It IF_STATUS_FLAGS_UP
+The network interface link is up and packets can be received and transmitted.
+.El
+.Pp
+.Va mtu
+is the maximum transmission unit of the network layer datagram that can be
+sent or transmitted on the link layer.
+.Pp
+The configuration of the network interface is stored in
+.Vt if_config :
+.Bd -literal
+struct if_config_ether {
+       struct ether_addr address;
+};
+
+struct if_config_inet {
+       struct in_addr address;
+       struct in_addr router;
+       struct in_addr subnet;
+};
+
+struct if_config {
+       struct if_config_ether ether;
+       struct if_config_inet inet;
+};
+.Ed
+.Pp
+.Va ether
+is the configuration of the
+.Xr ether 4
+link layer protocol where
+.Va address
+is the Ethernet address that received packets must have as the destination
+address and the address used as the source address in transmitted packets.
+.Va address
+defaults on network interface creation to the value of the
+.Va addr
+field of the the network interface's
+.Va struct if_info .
+.Pp
+.Va inet
+is the configuration of the
+.Xr ip 4
+network layer protocol where
+.Va address
+is the local address,
+.Va router
+is the default route, and
+.Va subnet
+is the subnet mask.
+The protocol is disabled if
+.Va address
+is set to the any address
+.Pq 0.0.0.0 .
+.Pp
+Configuration changes to the local addresses or routing information will cause
+the remote side of existing sockets to become unreachable where paths are no
+longer configured.
+Currently outgoing packets are unaffected by configuration changes when they
+have left the appropriate network layers.
+Outgoing packets may be queued for a short period in queues such as
+the data link layer address resolution queue or in the transmission queue.
+.Sh IOCTLS
+Network interfaces provide the following
+.Xr ioctl 2
+requests defined in
+.In sys/ioctl.h :
+.Bl -tag -width "12345678"
+.It Dv IOCGETTYPE Fa "void"
+Return the device
+.Fa type
+that as a parameter to the
+.Dv IOC_TYPE(int type)
+macro returns
+.Dv IOC_TYPE_NETWORK_INTERFACE
+if the device is a network interface.
+.It Dv NIOC_GETCONFIG Fa "struct if_config *"
+Retrieve the network interface configuration for all protocols atomically.
+.It Dv NIOC_GETCONFIG_ETHER Fa "struct if_config_ether *"
+Retrieve the Ethernet configuration.
+.It Dv NIOC_GETCONFIG_INET Fa "struct if_config_inet *"
+Retrieve Internet Protocol version 4 configuration.
+.It Dv NIOC_GETINFO Fa "struct if_info *"
+Retrieve the network interface static information.
+.It Dv NIOC_GETSTATUS Fa "struct if_status *"
+Retrieve the network interface status.
+.It Dv NIOC_SETCONFIG Fa "const struct if_config *"
+Set the network interface configuration for all protocols atomically.
+.It Dv NIOC_SETCONFIG_ETHER Fa "const struct if_config_ether *"
+Set the Ethernet configuration.
+.It Dv NIOC_SETCONFIG_INET Fa "const struct if_config_inet *"
+Set the Internet Protocol version 4 configuration.
+.It Dv NIOC_WAITLINKSTATUS Fa "int"
+If the parameter is 0, wait indefinitely until the network interface link is
+down, otherwise wait until the link is up.
+If the link is already in the specified condition, return immediately.
+.El
+.Sh SOCKET OPTIONS
+Sockets are made with
+.Xr socket 2
+by requesting the desired network layer protocol and the desired transport layer
+protocol.
+These
+.Xr setsockopt 2 /
+.Xr getsockopt 2
+options of level
+.Dv SOL_SOCKET
+control aspects related to the network interface and are defined in
+.In sys/socket.h :
+.Bl -tag -width "12345678"
+.It Dv SO_BINDTODEVICE Fa "char[]"
+Set the network interface the socket is bound to by looking up the string value
+(which need not be nul-terminated) as an network interface name, and then
+binding the socket to that network interface index number; or failing with
+.Er ENODEV
+if no such device exists.
+Gets the name of the network interface the socket is bound to, by looking up the
+network interface index number the socket is bound to, and copying out the name
+of that network interface; or copying out the empty string if so no such device
+exists.
+If bound to a network interface, a socket will only receive from and transmit on
+that network interface.
+(Initially the empty string)
+.It Dv SO_BINDTOINDEX Fa "unsigned int"
+Sets the network interface the socket is bound to by the network interface index
+number, not verifying such an network interface exists, returning with the error
+.Er EINVAL
+if the requested index number exceeds
+.Dv UINT_MAX .
+Gets the index number of the network interface the socket is bound to.
+Index 0 means no network interface.
+If bound to a network interface, a socket will only receive from and transmit on
+that network interface.
+(Initially 0)
+.It Dv SO_BROADCAST Fa "int"
+Sending to a broadcast address is allowed when set to 1, sending to a broadcast
+address will fail with
+.Ev EACCESS
+when set to 0.
+This option is boolean, setting it to non-zero is the same as setting it to 1.
+This option only pertains to datagram sockets.
+(Initially 0)
+.It Dv SO_DEBUG Fa "int"
+Whether the socket is in debug mode.
+This option is not implemented.
+This option is boolean, setting it to non-zero is the same as setting it to 1.
+Attempting to set it to non-zero will fail with
+.Ev EPERM .
+(Initially 0)
+.It Dv SO_DOMAIN Fa "sa_family_t"
+The socket domain (the address family).
+This option can only be read.
+The initial value is set when making the socket.
+.It Dv SO_DONTROUTE Fa "int"
+Whether to bypass the routing table and only send on the local network.
+This option is not implemented.
+This option is boolean, setting it to non-zero is the same as setting it to 1.
+Attempting to set it to non-zero will fail with
+.Ev EPERM .
+(Initially 0)
+.It Dv SO_ERROR Fa "int"
+The asynchronous pending error
+(an
+.Xr errno 3
+value).
+Cleared to 0 when read.
+This option can only be read.
+(Initially 0)
+.It Dv SO_PROTOCOL Fa "int"
+The socket protocol.
+This option can only be read.
+The initial value is set when making the socket.
+.It Dv SO_RCVBUF Fa "int"
+How many bytes the receive queue can use.
+Setting this option to a value beyond the socket's hard limit will instead set
+this option to the hard limit.
+The initial value depends on the socket protocol.
+.It Dv SO_REUSEADDR Fa "int"
+Don't fail to
+.Xr bind 2
+the second socket with
+.Ev EADDRINUSE
+when one socket is bound to the any address and a port and the other socket is
+bound to another address and that port, whenever this option is set to 1.
+This option is boolean, setting it to non-zero is the same as setting it to 1.
+(Initially 0)
+.It Dv SO_SNDBUF Fa "int"
+How many bytes the send queue can use.
+Setting this option to a value beyond the socket's hard limit will instead set
+this option to the hard limit.
+The initial value depends on the socket protocol.
+.It Dv SO_TYPE Fa "int"
+The socket type.
+This option can only be read.
+The initial value is set when making the socket.
+.El
+.Sh IMPLEMENTATION NOTES
+Network packets waiting to be transmitted or received have 384 dedicated pages
+of backing memory (allocated on first use).
+If more packets are needed, available system memory is used up to a limit of
+1/16 of the total system memory.
+If no memory is available for another network packet or the limit is hit,
+received packets may be dropped and transmitted packets may be dropped or
+temporarily fail with
+.Er ENOBUFS .
+.Sh SEE ALSO
+.Xr getsockopt 2 ,
+.Xr ioctl 2 ,
+.Xr setsockopt 2 ,
+.Xr arp 4 ,
+.Xr ether 4 ,
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr lo 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.St -p1003.1-2008
+only specifies a minimal
+.In net/if.h
+with
+.Dv IF_NAMESIZE ,
+.Vt struct if_nameindex
+and the
+.Xr if_nameindex 3
+family of functions.
+.Pp
+.St -p1003.1-2008
+specifies the socket options
+.Dv SO_ACCEPTCONN ,
+.Dv SO_BROADCAST ,
+.Dv SO_DEBUG ,
+.Dv SO_DONTROUTE ,
+.Dv SO_ERROR ,
+.Dv SO_KEEPALIVE ,
+.Dv SO_LINGER ,
+.Dv SO_OOBINLINE ,
+.Dv SO_RCVBUF ,
+.Dv SO_RCVLOWAT ,
+.Dv SO_RCVTIMEO ,
+.Dv SO_REUSEADDR ,
+.Dv SO_SNDBUF ,
+.Dv SO_SNDLOWAT ,
+.Dv SO_SNDTIMEO ,
+and
+.Dv SO_TYPE
+in
+.In sys/socket.h
+.Sh HISTORY
+Network interfaces as described here originally appeared in Sortix 1.1, except
+when noted otherwise.
+.Pp
+The
+.Dv SO_BINDTODEVICE
+socket option is also found on Linux.
