@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -333,23 +333,24 @@ static char* sort_file_cmd(const char* file)
 	return cmd;
 }
 
-void install_ports(const char* from_prefix, const char* to_prefix)
+void iterate_ports(const char* prefix,
+                   void (*callback)(void* ctx,
+                                    const char* prefix,
+                                    const char* port),
+                   void* ctx)
 {
-	char* inst_in_path;
-	char* inst_out_path;
-	if ( asprintf(&inst_in_path, "%s/tix/installed.list", from_prefix) < 0 ||
-	     asprintf(&inst_out_path, "%s/tix/installed.list", to_prefix) < 0 )
+	char* path;
+	if ( asprintf(&path, "%s/tix/installed.list", prefix) < 0 )
 	{
 		warn("asprintf");
 		_exit(2);
 	}
-	if ( access_or_die(inst_in_path, F_OK) < 0 )
+	if ( access_or_die(path, F_OK) < 0 )
 	{
-		free(inst_in_path);
-		free(inst_out_path);
+		free(path);
 		return;
 	}
-	char* cmd = sort_file_cmd(inst_in_path);
+	char* cmd = sort_file_cmd(path);
 	if ( !cmd )
 	{
 		warn("sort_file_cmd");
@@ -368,32 +369,7 @@ void install_ports(const char* from_prefix, const char* to_prefix)
 	{
 		if ( line[line_length-1] == '\n' )
 			line[--line_length] = '\0';
-		if ( !check_installed(inst_out_path, line) )
-		{
-			FILE* inst_out_fp = fopen(inst_out_path, "a");
-			if ( !inst_out_fp ||
-				 fprintf(inst_out_fp, "%s\n", line) < 0 ||
-				 fflush(inst_out_fp) == EOF )
-			{
-				warn("%s", inst_out_path);
-				pclose(fp);
-				_exit(2);
-			}
-			fclose(inst_out_fp);
-		}
-		char* tixinfo_in;
-		char* tixinfo_out;
-		if ( asprintf(&tixinfo_in, "%s/tix/tixinfo/%s", from_prefix, line) < 0 ||
-		     asprintf(&tixinfo_out, "%s/tix/tixinfo/%s", to_prefix, line) < 0 )
-		{
-			warn("asprintf");
-			pclose(fp);
-			_exit(2);
-		}
-		execute((const char*[]) { "cp", "--", tixinfo_in, tixinfo_out, NULL }, "_e");
-		free(tixinfo_in);
-		free(tixinfo_out);
-		install_manifest(line, from_prefix, to_prefix);
+		callback(ctx, prefix, line);
 	}
 	free(line);
 	if ( ferror(fp) )
@@ -404,6 +380,89 @@ void install_ports(const char* from_prefix, const char* to_prefix)
 	}
 	pclose(fp);
 	free(cmd);
-	free(inst_in_path);
+	free(path);
+}
+
+static void install_meta(const char* from_prefix,
+                         const char* to_prefix,
+                         const char* metakind,
+                         const char* port)
+{
+	char* in;
+	char* out;
+	if ( asprintf(&in, "%s/tix/%s/%s", from_prefix, metakind, port) < 0 ||
+	     asprintf(&out, "%s/tix/%s/%s", to_prefix, metakind, port) < 0 )
+	{
+		warn("asprintf");
+		_exit(2);
+	}
+	if ( access_or_die(in, F_OK) == 0 )
+		execute((const char*[]) { "cp", "--", in, out, NULL }, "_e");
+	free(in);
+	free(out);
+}
+
+static void install_port(void* ctx,
+                         const char* from_prefix,
+                         const char* port)
+{
+	const char* to_prefix = (const char*) ctx;
+	char* inst_out_path;
+	if ( asprintf(&inst_out_path, "%s/tix/installed.list", to_prefix) < 0 )
+	{
+		warn("asprintf");
+		_exit(2);
+	}
+	if ( !check_installed(inst_out_path, port) )
+	{
+		FILE* inst_out_fp = fopen(inst_out_path, "a");
+		if ( !inst_out_fp ||
+			 fprintf(inst_out_fp, "%s\n", port) < 0 ||
+			 fflush(inst_out_fp) == EOF )
+		{
+			warn("%s", inst_out_path);
+			_exit(2);
+		}
+		fclose(inst_out_fp);
+	}
+	install_meta(from_prefix, to_prefix, "tixinfo", port);
+	install_manifest(port, from_prefix, to_prefix);
+	install_meta(from_prefix, to_prefix, "post-install", port);
 	free(inst_out_path);
+}
+
+void install_ports(const char* from_prefix, const char* to_prefix)
+{
+	iterate_ports(from_prefix, install_port, (void*) to_prefix);
+}
+
+static void post_install_port(void* ctx,
+                              const char* from_prefix,
+                              const char* port)
+{
+	(void) ctx;
+	char* post_install_path;
+	if ( asprintf(&post_install_path, "%s/tix/post-install/%s",
+	              from_prefix, port) < 0 )
+	{
+		warn("asprintf");
+		_exit(2);
+	}
+	if ( access_or_die(post_install_path, F_OK) < 0 )
+	{
+		free(post_install_path);
+		return;
+	}
+	printf(" - Configuring %s...\n", port);
+	if ( !strcmp(from_prefix, "/") )
+		execute((const char*[]) { post_install_path, NULL }, "_eq");
+	else
+		execute((const char*[]) { "chroot", "-d", from_prefix,
+		                          post_install_path, NULL }, "_eq");
+	free(post_install_path);
+}
+
+void post_install_ports(const char* prefix)
+{
+	iterate_ports(prefix, post_install_port, NULL);
 }

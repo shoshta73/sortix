@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,12 @@ void install_manifest(const char* manifest,
                       const char* from_prefix,
                       const char* to_prefix);
 bool check_installed(const char* path, const char* package);
+void iterate_ports(const char* prefix,
+                   void (*callback)(void* ctx,
+                                    const char* prefix,
+                                    const char* port),
+                   void* ctx);
 void install_ports(const char* from_prefix, const char* to_prefix);
+void post_install_ports(const char* prefix);
 
 #endif

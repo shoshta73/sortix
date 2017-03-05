@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -768,6 +768,57 @@ static void TixInfo(struct metainfo* minfo)
 
 	if ( ferror(tixinfo_fp) || fflush(tixinfo_fp) == EOF )
 		err(1, "write: `%s'", tixinfo_rel);
+
+	const char* post_install_value = dictionary_get(pinfo, "tix.post-install");
+	if ( post_install_value )
+	{
+		const char* subdir = dictionary_get(pinfo, "pkg.subdir");
+		char* in_post_install_rel;
+		if ( subdir )
+			in_post_install_rel = join_paths(subdir, post_install_value);
+		else
+			in_post_install_rel = strdup(post_install_value);
+		if ( !in_post_install_rel )
+			err(1, "malloc");
+		char* in_post_install =
+			join_paths(minfo->build_dir, in_post_install_rel);
+		if ( !in_post_install )
+			err(1, "malloc");
+		// Search for the tix post-install script in the build directory and
+		// then the source directory.
+		FILE* in_fp = fopen(in_post_install, "r");
+		if ( !in_fp && errno == ENOENT )
+		{
+			free(in_post_install);
+			in_post_install =
+				join_paths(minfo->package_dir, in_post_install);
+			if ( !in_post_install )
+				err(1, "malloc");
+		}
+		if ( !in_fp )
+			err(1, "%s", in_post_install);
+		free(in_post_install_rel);
+		char* out_post_install = join_paths(tardir_rel, "tix/post-install");
+		if ( !out_post_install )
+			err(1, "malloc");
+		FILE* out_fp = fopen(out_post_install, "w");
+		if ( !out_fp )
+			err(1, "%s", out_post_install);
+		char buffer[16384];
+		size_t amount;
+		while ( (amount = fread(buffer, 1, sizeof(buffer), in_fp)) )
+			fwrite(buffer, 1, amount, out_fp);
+		if ( ferror(in_fp) )
+			err(1, "%s", in_post_install);
+		if ( ferror(out_fp) || fflush(out_fp) == EOF )
+			err(1, "%s", out_post_install);
+		if ( fchmod_plus_x(fileno(out_fp)) < 0 )
+			err(1, "fchmod: +x: %s", out_post_install);
+		fclose(out_fp);
+		fclose(in_fp);
+		free(out_post_install);
+		free(in_post_install);
+	}
 
 	fclose(tixinfo_fp);
 	free(tardir_rel);

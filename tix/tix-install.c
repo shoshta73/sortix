@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -149,6 +149,7 @@ static void version(FILE* fp, const char* argv0)
 }
 
 static char* collection = NULL;
+static bool enable_post_install = true;
 static bool reinstall = false;
 static bool quiet = false;
 static char* tix_directory_path = NULL;
@@ -188,6 +189,10 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--version") )
 			version(stdout, argv0), exit(0);
 		else if ( GET_OPTION_VARIABLE("--collection", &collection) ) { }
+		else if ( !strcmp(arg, "--disable-post-install") )
+			enable_post_install = false;
+		else if ( !strcmp(arg, "--enable-post-install") )
+			enable_post_install = true;
 		else if ( !strcmp(arg, "--reinstall") )
 			reinstall = true;
 		else if ( !strcmp(arg, "--quiet") )
@@ -323,6 +328,16 @@ void InstallPackage(const char* tix_path)
 	TarExtractFileToFD(tix_path, "tix/tixinfo", tixinfo_fd);
 	close(tixinfo_fd);
 
+	struct meta_script
+	{
+		const char* path;
+		bool found;
+	} meta_scripts[] =
+	{
+		{ "tix/post-install", false },
+		{ NULL, false },
+	};
+
 	FILE* index_fp = TarOpenIndex(tix_path);
 	string_array_t files = string_array_make();
 	string_array_append_file(&files, index_fp);
@@ -334,6 +349,18 @@ void InstallPackage(const char* tix_path)
 	for ( size_t i = 0; i < files.length; i++ )
 	{
 		char* str = files.strings[i];
+		if ( !strncmp(str, "tix/", strlen("tix/")) )
+		{
+			for ( size_t n = 0; meta_scripts[n].path; n++ )
+			{
+				if ( !strcmp(str, meta_scripts[n].path) )
+				{
+					meta_scripts[n].found = true;
+					break;
+				}
+			}
+			continue;
+		}
 		if ( strncmp(str, "data", strlen("data")) != 0 )
 			continue;
 		str += strlen("data");
@@ -371,6 +398,56 @@ void InstallPackage(const char* tix_path)
 		err(127, "%s", cmd_argv[0]);
 	}
 	free(data_and_prefix);
+
+	for ( size_t n = 0; meta_scripts[n].path; n++ )
+	{
+		if ( !meta_scripts[n].found )
+			continue;
+		const char* path = meta_scripts[n].path;
+		const char* name = path + strlen("tix/");
+		FILE* in_fp = TarOpenFile(tix_path, path);
+		if ( !in_fp )
+			err(1, "%s: %s", tix_path, path);
+		char* out_path =
+			print_string("%s/%s/%s", tix_directory_path, name, package_name);
+		if ( !out_path )
+			err(1, "malloc");
+		FILE* out_fp = fopen(out_path, "w");
+		if ( !out_fp )
+			err(1, "%s", out_path);
+		char buffer[16384];
+		size_t amount;
+		while ( (amount = fread(buffer, 1, sizeof(buffer), in_fp)) )
+			fwrite(buffer, 1, amount, out_fp);
+		if ( ferror(in_fp) )
+			err(1, "%s", path);
+		if ( ferror(out_fp) || fflush(out_fp) == EOF )
+			err(1, "%s", out_path);
+		if ( fchmod_plus_x(fileno(out_fp)) < 0 )
+			err(1, "fchmod: +x: %s", out_path);
+		fclose(out_fp);
+		fclose(in_fp);
+		if ( !strcmp(name, "post-install") && enable_post_install )
+		{
+			pid_t pid = fork();
+			if ( pid < 0 )
+				err(1, "fork");
+			if ( !pid )
+			{
+				setenv("TIX_COLLECTION", collection, 1);
+				setenv("TIX_PREFIX", coll_prefix, 1);
+				setenv("TIX_PLATFORM", coll_platform, 1);
+				execlp(out_path, out_path, (char*) NULL);
+				warn("%s", out_path);
+				_exit(127);
+			}
+			int exit_status;
+			waitpid(pid, &exit_status, 0);
+			if ( !WIFEXITED(exit_status) || WEXITSTATUS(exit_status) != 0 )
+				errx(1, "%s: Post-installation failed, aborting.", out_path);
+		}
+		free(out_path);
+	}
 
 	if ( !already_installed )
 		MarkPackageAsInstalled(tix_directory_path, package_name);

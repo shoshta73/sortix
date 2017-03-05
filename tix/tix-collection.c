@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -142,6 +142,11 @@ int main(int argc, char* argv[])
 		if ( mkdir_p(manifest_path, 0755) != 0 )
 			err(1, "mkdir: `%s'", manifest_path);
 		free(manifest_path);
+
+		char* post_install_path = join_paths(tixdb_path, "post-install");
+		if ( mkdir_p(post_install_path, 0755) != 0 )
+			err(1, "mkdir: `%s'", post_install_path);
+		free(post_install_path);
 
 		char* collection_conf_path = join_paths(tixdb_path, "collection.conf");
 		FILE* conf_fp = fopen(collection_conf_path, "wx");

@@ -17,9 +17,11 @@
  * Upgrade compatibility hooks.
  */
 
+#include <sys/stat.h>
 #include <sys/types.h>
 
 #include <err.h>
+#include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -74,7 +76,8 @@ void upgrade_prepare(const struct release* old_release,
 	if ( hook_needs_to_be_run(target_prefix, "sortix-1.1-random-seed") )
 	{
 		char* random_seed_path;
-		if ( asprintf(&random_seed_path, "%sboot/random.seed", target_prefix) < 0 )
+		if ( asprintf(&random_seed_path, "%sboot/random.seed",
+		              target_prefix) < 0 )
 		{
 			warn("asprintf");
 			_exit(1);
@@ -137,6 +140,25 @@ void upgrade_prepare(const struct release* old_release,
 		}
 		free(init_target_path);
 		free(init_default_path);
+	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(target_prefix, "sortix-1.1-tix-post-install") )
+	{
+		char* post_install_path;
+		if ( asprintf(&post_install_path, "%stix/post-install",
+		              target_prefix) < 0 )
+		{
+			warn("asprintf");
+			_exit(1);
+		}
+		if ( access_or_die(post_install_path, F_OK) < 0 )
+		{
+			printf(" - Creating tix post-install directory...\n");
+			if ( mkdir(post_install_path, 0755) < 0 && errno != EEXIST )
+				warn("mkdir: %s", post_install_path);
+		}
+		free(post_install_path);
 	}
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -337,6 +337,7 @@ int main(int argc, char* argv[])
 		if ( my_finalize )
 		{
 			upgrade_finalize(&old_release, &new_release, source, "/");
+			post_install_ports("/");
 		}
 		else
 		{

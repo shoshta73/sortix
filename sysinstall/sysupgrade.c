@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -848,6 +848,8 @@ int main(void)
 			install_ports("", ".");
 		if ( conf.system )
 			upgrade_finalize(target_release, &new_release, "/", "");
+		if ( conf.ports )
+			post_install_ports(".");
 		if ( conf.system )
 		{
 			printf(" - Creating initrd...\n");

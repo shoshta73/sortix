@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -908,6 +908,21 @@ int main(void)
 		mkdir_or_chmod_or_die("var/log", 0555);
 		mkdir_or_chmod_or_die("var/run", 0555);
 		umask(0022);
+		// Create a fake /etc/passwd in case any programs need to know the user.
+		bool fake_passwd = access_or_die("etc/passwd", F_OK) < 0;
+		if ( fake_passwd )
+		{
+			FILE* fp;
+			if ( !(fp = fopen("etc/passwd", "w")) ||
+			     fputs("root::0:0:root:/root:sh\n", fp) < 0 ||
+			     ferror(fp) ||
+			     fflush(fp) == EOF ||
+			     fclose(fp) == EOF )
+			{
+				warn("/etc/passwd");
+				_exit(1);
+			}
+		}
 		if ( access("tix/collection.conf", F_OK) < 0 )
 			execute((const char*[]) { "tix-collection", ".", "create",
 			                          "--prefix=", NULL }, "_e");
@@ -921,6 +936,7 @@ int main(void)
 		// TODO: Auto detect appropriate bcrypt rounds and set up etc/login.conf
 		//       and use those below instead of blowfish,a.
 		install_ports("", ".");
+		post_install_ports(".");
 		if ( access_or_die("boot/random.seed", F_OK) < 0 )
 		{
 			printf(" - Creating random seed...\n");
@@ -945,6 +961,8 @@ int main(void)
 			execute((const char*[]) { "chroot", "-d", ".",
 			                          "/etc/grub.d/10_sortix", NULL }, "_eq");
 		}
+		if ( fake_passwd )
+			unlink("etc/passwd");
 		printf(" - Finishing installation...\n");
 		_exit(0);
 	}

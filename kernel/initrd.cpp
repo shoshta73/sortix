@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -589,21 +589,40 @@ static void ExtractTix(Ref<Descriptor> desc, struct initrd_context* ctx)
 		tixinfo_lookup((const char*) TAR.data, TAR.size, "pkg.name");
 	if ( !pkg_name )
 		Panic("initrd tixinfo lacked pkg.name");
+	CloseTar(&TAR);
 	if ( desc->mkdir(&ctx->ioctx, "/tix", 0755) < 0 && errno != EEXIST )
 		PanicF("/tix: %m");
-	if ( desc->mkdir(&ctx->ioctx, "/tix/tixinfo", 0755) < 0 && errno != EEXIST )
-		PanicF("/tix/tixinfo: %m");
-	if ( desc->mkdir(&ctx->ioctx, "/tix/manifest", 0755) < 0 && errno != EEXIST )
-		PanicF("/tix/manifest: %m");
-	char* tixinfo_path;
-	if ( asprintf(&tixinfo_path, "/tix/tixinfo/%s", pkg_name) < 0 )
-		Panic("initrd tar malloc failure");
-	char* TAR_oldname = TAR.name;
-	TAR.name = tixinfo_path;
-	ExtractTarObject(desc, ctx, &TAR);
-	TAR.name = TAR_oldname;
-	free(tixinfo_path);
+	const char* tix_metafiles[] =
+	{
+		"tixinfo",
+		"post-install",
+		NULL,
+	};
+	for ( size_t i = 0; tix_metafiles[i]; i++ )
+	{
+		char* metadir;
+		if ( asprintf(&metadir, "/tix/%s", tix_metafiles[i]) < 0 )
+			Panic("initrd tar malloc failure");
+		if ( desc->mkdir(&ctx->ioctx, metadir, 0755) < 0 && errno != EEXIST )
+			PanicF("%s: %m", metadir);
+		if ( SearchTar(ctx, &TAR, metadir + 1) )
+		{
+		char* path;
+			if ( asprintf(&path, "/tix/%s/%s", tix_metafiles[i], pkg_name) < 0 )
+				Panic("initrd tar malloc failure");
+			char* TAR_oldname = TAR.name;
+			TAR.name = path;
+			ExtractTarObject(desc, ctx, &TAR);
+			TAR.name = TAR_oldname;
+			CloseTar(&TAR);
+			free(path);
+		}
+		free(metadir);
+	}
 	CloseTar(&TAR);
+	if ( desc->mkdir(&ctx->ioctx, "/tix/manifest", 0755) < 0 &&
+	     errno != EEXIST )
+		PanicF("/tix/manifest: %m");
 	Ref<Descriptor> installed_list =
 		desc->open(&ctx->ioctx, "/tix/installed.list",
 		           O_CREATE | O_WRITE | O_APPEND, 0644);

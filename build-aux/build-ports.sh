@@ -165,6 +165,7 @@ for PACKAGE in $PACKAGES; do
   fi
   tix-install \
     --collection="$SYSROOT" \
+    --disable-post-install \
     --reinstall \
     "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz"
 done
