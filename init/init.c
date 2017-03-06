@@ -561,9 +561,8 @@ struct clean_tmp
 	int current_entry;
 };
 
-static void clean_tmp(void)
+static void clean_tmp(const char* tmp_path)
 {
-	const char* tmp_path = "/tmp";
 	struct clean_tmp* state = calloc(1, sizeof(struct clean_tmp));
 	if ( !state )
 	{
@@ -680,7 +679,13 @@ static void init_early(void)
 	// Make sure that we have a /tmp directory.
 	umask(0000);
 	mkdir("/tmp", 01777);
-	clean_tmp();
+	clean_tmp("/tmp");
+
+	// Make sure that we have a /var/run directory.
+	umask(0000);
+	mkdir("/var", 0755);
+	mkdir("/var/run", 0755);
+	clean_tmp("/var/run");
 
 	// Set the default file creation mask.
 	umask(0022);

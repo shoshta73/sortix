@@ -903,7 +903,10 @@ int main(void)
 		mkdir_or_chmod_or_die("tix/manifest", 7555);
 		mkdir_or_chmod_or_die("tmp", 01777);
 		mkdir_or_chmod_or_die("var", 0755);
+		mkdir_or_chmod_or_die("var/cache", 0755);
 		mkdir_or_chmod_or_die("var/empty", 0555);
+		mkdir_or_chmod_or_die("var/log", 0555);
+		mkdir_or_chmod_or_die("var/run", 0555);
 		umask(0022);
 		if ( access("tix/collection.conf", F_OK) < 0 )
 			execute((const char*[]) { "tix-collection", ".", "create",

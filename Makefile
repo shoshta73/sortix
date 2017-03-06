@@ -121,7 +121,10 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/tix/manifest"
 	mkdir -p "$(SYSROOT)/tmp"
 	mkdir -p "$(SYSROOT)/var"
+	mkdir -p "$(SYSROOT)/var/cache"
 	mkdir -p "$(SYSROOT)/var/empty"
+	mkdir -p "$(SYSROOT)/var/log"
+	mkdir -p "$(SYSROOT)/var/run"
 	ln -sfT . "$(SYSROOT)/usr"
 
 .PHONY: sysroot-base-headers
@@ -151,7 +154,10 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /tmp >> "$(SYSROOT)/tix/manifest/system"
 	echo /usr >> "$(SYSROOT)/tix/manifest/system"
 	echo /var >> "$(SYSROOT)/tix/manifest/system"
+	echo /var/cache >> "$(SYSROOT)/tix/manifest/system"
 	echo /var/empty >> "$(SYSROOT)/tix/manifest/system"
+	echo /var/log >> "$(SYSROOT)/tix/manifest/system"
+	echo /var/run >> "$(SYSROOT)/tix/manifest/system"
 	echo "$(HOST_MACHINE)" > "$(SYSROOT)/etc/machine"
 	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
 	(echo 'NAME="Sortix"' && \

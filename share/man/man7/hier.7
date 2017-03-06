@@ -45,11 +45,19 @@ delayed upgrades.
 .It Pa /tix
 Package management.
 .It Pa /tmp
-Temporary files.
+Temporary files that is on boot.
 .It Pa /usr
 Symlink to the current directory.
 .It Pa /var
-Various files.
+Variable data files.
+.It Pa /var/cache
+Cached application data that can be removed without data loss.
+.It Pa /var/empty
+Empty directory.
+.It Pa /var/log
+Log files.
+.It Pa /var/run
+Runtime program data that is cleaned on boot.
 .El
 .Sh SEE ALSO
 .Xr user-guide 7
