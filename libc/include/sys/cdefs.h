@@ -99,4 +99,37 @@
          is updated to not rely on this macro. */
 #undef __SORTIX_HAS_RESTARTABLE_SYSCALLS__
 
+/* TODO: Define when general user security is implemented. Remove when ssh is
+         updated to not rely on this macro. */
+#undef __SORTIX_HAS_UID_SECURITY__
+
+/* TODO: Define when mmap MAP_SHARED works properly. Remove when ssh is updated
+         to not rely on this macro. */
+#undef __SORTIX_HAS_WORKING_MAP_SHARED__
+
+/* TODO: Define when shared memory, file descriptor passing, and general user
+         security are implemented. Remove when ssh is updated to not rely on
+         this macro. */
+#undef __SORTIX_HAS_WORKING_PRIVSEP__
+
+/* TODO: Define when initgroups(2) is implemented. Remove when ssh is updated to
+         not rely on this macro. */
+#undef __SORTIX_HAS_INITGROUPS__
+
+/* TODO: Define when setgroups(2) is implemented. Remove when ssh is updated to
+         not rely on this macro. */
+#undef __SORTIX_HAS_SETGROUPS__
+
+/* TODO: Define when getgroups(2) is implemented. Remove when ssh is updated to
+         not rely on this macro. */
+#undef __SORTIX_HAS_GETGROUPS__
+
+/* TODO: Define when scanf is standards compliant. Remove when ssh is updated to
+         not rely on this macro. */
+#undef __SORTIX_HAS_WORKING_SCANF__
+
+/* TODO: Define when getservbyname(3) is implemented and works. Remove when ssh
+         is updated to not rely on this macro. */
+#undef __SORTIX_HAS_GETSERVBYNAME__
+
 #endif

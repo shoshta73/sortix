@@ -1055,6 +1055,53 @@ int main(void)
 		textf("Group '%s' added to /etc/group.\n", "root");
 		break;
 	}
+	struct ssh_file
+	{
+		const char* path;
+		const char* pub;
+	};
+	const struct ssh_file ssh_files[] =
+	{
+		{"/root/.ssh/authorized_keys", NULL},
+		{"/root/.ssh/config", NULL},
+		{"/root/.ssh/id_dsa", "/root/.ssh/id_dsa.pub"},
+		{"/root/.ssh/id_rsa", "/root/.ssh/id_rsa.pub"},
+		{"/root/.ssh/known_hosts", NULL},
+	};
+	size_t ssh_files_count = sizeof(ssh_files) / sizeof(ssh_files[0]);
+	for ( size_t i = 0; i < ssh_files_count; i++ )
+	{
+		const struct ssh_file* file = &ssh_files[i];
+		if ( access_or_die(file->path, F_OK) < 0 )
+			continue;
+		text("\n");
+		textf("Found %s\n", file->path);
+		if ( file->pub && !access_or_die(file->pub, F_OK) < 0 )
+			textf("Found %s\n", file->pub);
+		while ( true )
+		{
+			char question[256];
+			snprintf(question, sizeof(question),
+			          "Copy %s from installer environment?", file->path);
+			prompt(input, sizeof(input), question, "no");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			mkdir_or_chmod_or_die("root/.ssh", 0700);
+			// TODO: The right way to copy a file here?
+			textf("Copying %s -> %s\n", file->path, file->path + 1);
+			execute((const char*[])
+				{"cp", file->path, file->path+ 1, NULL }, "f");
+			if ( file->pub )
+			{
+				textf("Copying %s -> %s\n", file->pub, file->pub + 1);
+				execute((const char*[])
+					{"cp", file->pub, file->pub + 1, NULL }, "f");
+			}
+			break;
+		}
+	}
 	text("\n");
 
 	install_configurationf("etc/init/default", "w",
@@ -1149,6 +1196,91 @@ int main(void)
 	text("\n");
 
 	// TODO: Ask if networking should be disabled / enabled.
+
+	if ( !access_or_die("/tix/tixinfo/ssh", F_OK) )
+	{
+		text("A ssh server has been installed. You have the option of starting "
+		     "it on boot to allow remote login over a cryptographically secure "
+		     "channel.\n\n");
+		text("Warning: " BRAND_DISTRIBUTION_NAME " does not yet collect "
+		     "entropy for secure random numbers. Unless you type '!' and "
+		     "escape to a shell and put 256 bytes of actual randomness into "
+		     "boot/random.seed, the first boot will use the randomness of this "
+		     "installer environment to generate ssh keys. This initial "
+		     "randomness may be as weak as the wall time when you booted the "
+		     "installer, which is easily guessed by an attacker. The same "
+		     "warning applies to outgoing secure connections as well.\n\n");
+		while ( true )
+		{
+			prompt(input, sizeof(input),
+				   "Enable ssh server?", "no");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			if ( !install_configurationf("etc/init/local", "a",
+			                             "require sshd optional") )
+			{
+				warn("etc/init/local");
+				continue;
+			}
+			text("Added 'require sshd optional' to /etc/init/local\n");
+			text("The ssh server will be started when the system boots.\n");
+			break;
+		}
+		text("\n");
+	}
+
+	struct sshd_key_file
+	{
+		const char* pri;
+		const char* pub;
+	};
+	const struct sshd_key_file sshd_key_files[] =
+	{
+		{"/etc/ssh_host_dsa_key", "/etc/ssh_host_dsa_key.pub"},
+		{"/etc/ssh_host_ecdsa_key", "/etc/ssh_host_ecdsa_key.pub"},
+		{"/etc/ssh_host_ed25519_key", "/etc/ssh_host_ed25519_key.pub"},
+		{"/etc/ssh_host_rsa_key", "/etc/ssh_host_rsa_key.pub"},
+	};
+	size_t sshd_key_files_count
+		= sizeof(sshd_key_files) / sizeof(sshd_key_files[0]);
+	bool any_sshd_keys = false;
+	for ( size_t i = 0; i < sshd_key_files_count; i++ )
+	{
+		if ( !access_or_die(sshd_key_files[i].pri, F_OK) )
+		{
+			textf("Found %s\n", sshd_key_files[i].pri);
+			any_sshd_keys = true;
+		}
+	}
+	if ( any_sshd_keys )
+	{
+		while ( true )
+		{
+			prompt(input, sizeof(input),
+			       "Copy sshd private keys from installer environment?", "no");
+			if ( strcasecmp(input, "no") == 0 )
+				break;
+			if ( strcasecmp(input, "yes") != 0 )
+				continue;
+			for ( size_t i = 0; i < sshd_key_files_count; i++ )
+			{
+				const struct sshd_key_file* file = &sshd_key_files[i];
+				if ( access_or_die(file->pri, F_OK) < 0 )
+					continue;
+				// TODO: The right way to copy a file here?
+				textf("Copying %s -> %s\n", file->pri, file->pri + 1);
+				execute((const char*[])
+					{"cp", file->pri, file->pri + 1, NULL }, "f");
+				textf("Copying %s -> %s\n", file->pub, file->pub + 1);
+				execute((const char*[])
+					{"cp", file->pub, file->pub + 1, NULL }, "f");
+			}
+			break;
+		}
+		text("\n");
+	}
 
 	text("It's time to boot into the newly installed system.\n\n");
 
