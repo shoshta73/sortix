@@ -24,6 +24,7 @@ kblayout \
 kblayout-compiler \
 login \
 mkinitrd \
+ping \
 regress \
 rw \
 sf \
