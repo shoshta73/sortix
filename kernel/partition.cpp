@@ -64,9 +64,12 @@ off_t Partition::lseek(ioctx_t* /*ctx*/, off_t offset, int whence)
 {
 	if ( whence == SEEK_SET )
 		return offset;
-	if ( whence == SEEK_END )
-		// TODO: Avoid underflow and overflow!
-		return length + offset;
+	if ( whence == SEEK_END ) {
+		off_t ret;
+		if ( __builtin_add_overflow(length, offset, &ret) )
+			return errno = EOVERFLOW, -1;
+		return ret;
+	}
 	return errno = EINVAL, -1;
 }
 

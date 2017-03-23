@@ -47,8 +47,9 @@ static ssize_t memstream_write(void* ms_ptr, const void* src, size_t count)
 	size_t required_size = ms->offset + count;
 	if ( ms->size < required_size )
 	{
-		// TODO: Multiplication overflow.
-		size_t new_size = 2 * ms->size;
+		size_t new_size;
+		if ( __builtin_mul_overflow(2, ms->size, &new_size) )
+			return errno = EOVERFLOW, -1;
 		if ( new_size < 16 )
 			new_size = 16;
 		if ( new_size < required_size )

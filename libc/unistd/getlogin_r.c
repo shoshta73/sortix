@@ -33,8 +33,13 @@ int getlogin_r(char* buf, size_t size)
 	size_t pwdbuflen = 0;
 	do
 	{
-		// TODO: Potential overflow.
-		size_t new_pwdbuflen = pwdbuflen ? 2 * pwdbuflen : 64;
+		size_t new_pwdbuflen;
+		if ( pwdbuflen ) {
+			if (__builtin_mul_overflow(2, pwdbuflen, &new_pwdbuflen) )
+				return free(pwdbuf), errno = EOVERFLOW, -1;
+		}
+		else
+			new_pwdbuflen = 64;
 		char* new_pwdbuf = (char*) realloc(pwdbuf, new_pwdbuflen);
 		if ( !new_pwdbuf )
 			return free(pwdbuf), -1;

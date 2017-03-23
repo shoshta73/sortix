@@ -70,10 +70,14 @@ bool KeyboardLayoutExecutor::Upload(const uint8_t* input_data, size_t input_size
 		return errno = EINVAL, false;
 	// TODO: Limit num_scancodes and max_actions.
 	size_t remaining_size = data_size - sizeof(new_header);
-	// TODO: Check for overflow.
-	size_t table_length = (size_t) (1 << new_header.num_modifiers) *
-	                      (size_t) new_header.num_scancodes;
-	size_t table_size = sizeof(struct kblayout_action) * table_length;
+	size_t table_length;
+	if ( __builtin_mul_overflow((1 << new_header.num_modifiers),
+	                            new_header.num_scancodes, &table_length) )
+		return delete[] data, errno = EOVERFLOW, false;
+	size_t table_size;
+	if ( __builtin_mul_overflow(sizeof(struct kblayout_action), table_length,
+	                            &table_size) )
+		return delete[] data, errno = EOVERFLOW, false;
 	if ( remaining_size < table_size )
 		return delete[] data, errno = EINVAL, false;
 	struct kblayout_action* new_actions = new struct kblayout_action[table_length];

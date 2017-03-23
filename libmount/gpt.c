@@ -132,8 +132,13 @@ char* gpt_decode_utf16(uint16_t* string, size_t length)
 		{
 			if ( result_used == result_length )
 			{
-				// TODO: Potential overflow.
-				size_t new_length = result_length ? 2 * result_length : length;
+				size_t new_length;
+				if ( result_length ) {
+					if ( __builtin_add_overflow(2, result_length, &new_length) )
+						return free(result), errno = EOVERFLOW, (char*) NULL;
+				}
+				else
+					new_length = length;
 				char* new_result = (char*) realloc(result, new_length);
 				if ( !new_result )
 					return free(result), (char*) NULL;
@@ -238,17 +243,27 @@ blockdevice_get_partition_table_gpt(struct partition_table** pt_ptr,
 	if ( gpt.last_usable_lba < gpt.first_usable_lba )
 		return PARTITION_ERROR_INVALID;
 
-	// TODO: Potential overflow.
-	pt->usable_start = (off_t) gpt.first_usable_lba * (off_t) logical_block_size;
-	pt->usable_end = ((off_t) gpt.last_usable_lba + 1) * (off_t) logical_block_size;
+	if ( __builtin_mul_overflow((off_t) gpt.first_usable_lba,
+	                            (off_t) logical_block_size, &pt->usable_start) )
+		return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+	if ( __builtin_mul_overflow((off_t) gpt.last_usable_lba + 1,
+	                            (off_t) logical_block_size, &pt->usable_end) )
+		return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 	if ( device_size < pt->usable_end )
 		return PARTITION_ERROR_INVALID;
 
-	// TODO: Potential overflow.
-	size_t rpt_size = (size_t) gpt.size_of_partition_entry *
-	                  (size_t) gpt.number_of_partition_entries;
-	off_t rpt_off = (off_t) gpt.partition_entry_lba * (off_t) logical_block_size;
-	off_t rpt_end = rpt_off + rpt_off;
+	size_t rpt_size;
+	if ( __builtin_mul_overflow((size_t) gpt.size_of_partition_entry,
+	                            (size_t) gpt.number_of_partition_entries,
+	                            &rpt_size) )
+		return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+	off_t rpt_off;
+	if ( __builtin_mul_overflow((off_t) gpt.partition_entry_lba,
+	                            (off_t) logical_block_size, &rpt_off) )
+		return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+	off_t rpt_end;
+	if ( __builtin_add_overflow(rpt_off, rpt_off, &rpt_end) )
+		return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 	if ( pt->usable_start < rpt_end )
 		return PARTITION_ERROR_INVALID;
 	if ( !(gptpt->rpt = (unsigned char*) malloc(rpt_size)) )
@@ -269,12 +284,22 @@ blockdevice_get_partition_table_gpt(struct partition_table** pt_ptr,
 			continue;
 		if ( pentry.ending_lba < pentry.starting_lba )
 			return PARTITION_ERROR_END_BEFORE_START;
-		// TODO: Potential overflow.
-		uint64_t lba_count = (pentry.ending_lba - pentry.starting_lba) + 1;
-		off_t start = (off_t) pentry.starting_lba * (off_t) logical_block_size;
+		uint64_t lba_count;
+		if ( __builtin_sub_overflow(pentry.ending_lba, pentry.starting_lba,
+		                            &lba_count) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+		if ( __builtin_add_overflow(1, lba_count, &lba_count) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+		off_t start;
+		if ( __builtin_mul_overflow((off_t) pentry.starting_lba,
+		                            (off_t) logical_block_size, &start) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 		if ( start < pt->usable_start )
 			return PARTITION_ERROR_BEFORE_USABLE;
-		off_t length = (off_t) lba_count * (off_t) logical_block_size;
+		off_t length;
+		if ( __builtin_mul_overflow((off_t) lba_count,
+		                            (off_t) logical_block_size, &length) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 		if ( pt->usable_end < start || pt->usable_end - start < length )
 			return PARTITION_ERROR_BEYOND_USABLE;
 		struct partition* p = CALLOC_TYPE(struct partition);

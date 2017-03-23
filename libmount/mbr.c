@@ -138,11 +138,16 @@ blockdevice_get_partition_table_mbr(struct partition_table** pt_ptr,
 		mbr_partition_decode(&pmbr);
 		if ( !mbr_is_partition_used(&pmbr) )
 			continue;
-		// TODO: Potential overflow.
 		if ( pmbr.start_sector == 0 )
 			return PARTITION_ERROR_BEFORE_USABLE;
-		off_t start = (off_t) pmbr.start_sector * (off_t) logical_block_size;
-		off_t length = (off_t) pmbr.total_sectors * (off_t) logical_block_size;
+		off_t start;
+		if ( __builtin_mul_overflow((off_t) pmbr.start_sector,
+		                            (off_t) logical_block_size, &start) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+		off_t length;
+		if ( __builtin_mul_overflow((off_t) pmbr.total_sectors,
+		                            (off_t) logical_block_size, &length) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 		if ( device_size < start || device_size - start < length )
 			return PARTITION_ERROR_BEYOND_DEVICE;
 		for ( size_t j = 0; j < pt->partitions_count; j++ )
@@ -185,9 +190,14 @@ blockdevice_get_partition_table_mbr(struct partition_table** pt_ptr,
 			continue;
 		if ( !mbr_is_extended_partition(&pextmbr) )
 			continue;
-		// TODO: Potential overflow.
-		off_t pext_start = (off_t) pextmbr.start_sector * (off_t) logical_block_size;
-		off_t pext_length = (off_t) pextmbr.total_sectors * (off_t) logical_block_size;
+		off_t pext_start;
+		if ( __builtin_mul_overflow((off_t)pextmbr.start_sector,
+		                            (off_t) logical_block_size, &pext_start) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+		off_t pext_length;
+		if ( __builtin_mul_overflow((off_t) pextmbr.total_sectors,
+		                            (off_t) logical_block_size, &pext_length) )
+			return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 		off_t ebr_rel = 0;
 		unsigned int j = 0;
 		while ( true )
@@ -215,9 +225,16 @@ blockdevice_get_partition_table_mbr(struct partition_table** pt_ptr,
 			mbr_partition_decode(&pmbr);
 			if ( mbr_is_partition_used(&pmbr) )
 			{
-				// TODO: Potential overflow.
-				off_t start = (off_t) pmbr.start_sector * (off_t) logical_block_size;
-				off_t length = (off_t) pmbr.total_sectors * (off_t) logical_block_size;
+				off_t start;
+				if ( __builtin_mul_overflow((off_t) pmbr.start_sector,
+				                            (off_t) logical_block_size,
+				                            &start) )
+					return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
+				off_t length;
+				if ( __builtin_mul_overflow((off_t) pmbr.total_sectors,
+				                            (off_t) logical_block_size,
+				                            &length) )
+					return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 				if ( pext_length - ebr_rel < start )
 					return PARTITION_ERROR_BEYOND_EXTENDED;
 				off_t max_length = (pext_length - ebr_rel) - start;
@@ -248,8 +265,10 @@ blockdevice_get_partition_table_mbr(struct partition_table** pt_ptr,
 			struct mbr_partition next;
 			memcpy(&next, ebr.partitions[1], sizeof(next));
 			mbr_partition_decode(&next);
-			// TODO: Potential overflow.
-			off_t next_rel = (off_t) next.start_sector * (off_t) logical_block_size;
+			off_t next_rel;
+			if ( __builtin_mul_overflow((off_t) next.start_sector,
+			                            (off_t) logical_block_size, &next_rel) )
+				return errno = EOVERFLOW, PARTITION_ERROR_ERRNO;
 			if ( !next_rel )
 				break;
 			if ( next_rel <= ebr_rel ) // Violates assumptions.

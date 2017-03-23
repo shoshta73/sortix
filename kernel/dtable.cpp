@@ -89,10 +89,18 @@ bool DescriptorTable::Enlargen(int atleast)
 {
 	if ( numentries == INT_MAX )
 		return errno = EMFILE, false; // Cannot enlargen any more.
-	// TODO: Modern overflow checks.
-	int newnumentries = INT_MAX - numentries < numentries ?
-	                    INT_MAX :
-                        numentries ? 2 * numentries : 8;
+	int newnumentries;
+	int numentriesoverflowdummy;
+	if ( __builtin_sub_overflow(INT_MAX, numentries, &numentriesoverflowdummy) )
+		newnumentries = INT_MAX;
+	else {
+		if ( numentries ) {
+			if ( __builtin_mul_overflow(2, numentries, &newnumentries) )
+				return errno = EOVERFLOW, false;
+		}
+		else
+			newnumentries = 8;
+	}
 	if ( newnumentries < atleast )
 		newnumentries = atleast;
 	dtableent_t* newentries = new dtableent_t[newnumentries];

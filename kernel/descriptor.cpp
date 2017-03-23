@@ -652,8 +652,11 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 
 			// Either filename is the empty string or starts with a slash.
 			size_t filename_length = strlen(filename);
-			// TODO: Avoid overflow here.
-			size_t new_filename_length = linkpath_length + filename_length;
+			size_t new_filename_length;
+			if ( __builtin_add_overflow(linkpath_length, filename_length,
+			                            &new_filename_length) )
+				return delete[] linkpath, delete[] filename_mine,
+					errno = EOVERFLOW, Ref<Descriptor>();
 			char* new_filename = new char[new_filename_length + 1];
 			if ( !new_filename )
 				return delete[] linkpath, delete[] filename_mine,

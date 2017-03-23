@@ -225,8 +225,13 @@ static bool prepare_block_device(void* ctx, const char* path)
 	}
 	if ( hds_used == hds_length )
 	{
-		// TODO: Potential overflow.
-		size_t new_length = hds_length ? 2 * hds_length : 16;
+		size_t new_length;
+		if ( hds_length ) {
+			if ( __builtin_mul_overflow(2, hds_length, &new_length) )
+				fatal("prepare_block_device: %m");
+		}
+		else
+			new_length = 16;
 		struct harddisk** new_hds = (struct harddisk**)
 			reallocarray(hds, new_length, sizeof(struct harddisk*));
 		if ( !new_hds )

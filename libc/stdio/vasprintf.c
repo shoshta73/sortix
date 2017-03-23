@@ -35,8 +35,12 @@ static size_t vasprintf_callback(void* ctx, const char* string, size_t length)
 	size_t needed_size = state->used + length + 1;
 	if ( state->size < needed_size )
 	{
-		// TODO: Overflow check.
-		size_t new_size = 2 * state->size;
+		size_t new_size;
+		if ( __builtin_mul_overflow(2, state->size, &new_size) ) {
+			free(state->buffer);
+			state->buffer = NULL;
+			return 0;
+		}
 		if ( new_size < needed_size )
 			new_size = needed_size;
 		char* new_buffer = (char*) realloc(state->buffer, new_size);

@@ -98,8 +98,10 @@ ssize_t UtilMemoryBuffer::pwrite(ioctx_t* ctx, const uint8_t* src, size_t count,
 {
 	ScopedLock lock(&filelock);
 	if ( !write ) { errno = EBADF; return -1; }
-	// TODO: Avoid having off + count overflow!
-	if ( bufsize < off + count )
+	size_t total_off;
+	if ( __builtin_add_overflow(off, count, &total_off) )
+		return errno = EOVERFLOW, -1;
+	if ( bufsize < total_off )
 		return 0;
 	if ( (uintmax_t) bufsize <= (uintmax_t) off )
 		return -1;

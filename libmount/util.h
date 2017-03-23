@@ -47,13 +47,15 @@ static bool array_add(void*** array_ptr,
 
 	if ( *used_ptr == *length_ptr )
 	{
-		// TODO: Avoid overflow.
-		size_t new_length = 2 * *length_ptr;
+		size_t new_length;
+		if ( __builtin_mul_overflow(2, *length_ptr, &new_length) )
+			return false;
 		if ( !new_length )
 			new_length = 16;
-		// TODO: Avoid overflow and use reallocarray.
-		size_t new_size = new_length * sizeof(void*);
-		void** new_array = (void**) realloc(array, new_size);
+		size_t new_size;
+		if ( __builtin_mul_overflow(new_length, sizeof(void*), &new_size) )
+			return false;
+		void** new_array = (void**) reallocarray(array, sizeof(void*), new_size);
 		if ( !new_array )
 			return false;
 		array = new_array;

@@ -803,9 +803,9 @@ ssize_t Inode::WriteAt(const uint8_t* buf, size_t s_count, off_t o_offset)
 	uint64_t count = (uint64_t) s_count;
 	uint64_t offset = (uint64_t) o_offset;
 	uint64_t file_size = Size();
-	uint64_t end_at = offset + count;
-	if ( offset < end_at )
-		/* TODO: Overflow! off_t overflow? */{};
+	uint64_t end_at;
+	if ( __builtin_add_overflow(offset, count, &end_at) )
+		return errno = EOVERFLOW, -1;
 	if ( file_size < end_at )
 		Truncate(end_at);
 	if ( 0 < end_at && end_at <= 60 && !data->i_blocks )
