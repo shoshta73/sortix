@@ -1,0 +1,424 @@
+#!/bin/sh
+# Copyright (c) 2017, 2021 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-fetch
+# Download operating system files.
+
+set -e
+
+boot=false
+collection=""
+continue=""
+execpatch=false
+initrd=false
+insecure_downgrade_to_http=false
+insecure_no_check_certificate=false
+input_release_file=
+input_release_sig_file=
+input_sha256sum=
+normalize=false
+output=""
+outputdir=""
+output_release_file= # TODO: A better term for this?
+output_release_sig_file= # TODO: A better term for this?
+output_sha256sum=
+patch=false
+port=false
+porttix=false
+release=false
+sha256=false
+sha256sum=false
+source=false
+source_full=false
+srctix=false
+sysroot=""
+toolchain=false
+url=false
+url_master=false
+url_master_release=false
+url_mirror=false
+url_mirror_release=false
+url_release_sig=false
+url_sha256sum=false
+# TODO: Option to select this default:
+# TODO: This hides errors. Fix wget so it has a quiet, but errors, mode.
+wget_options="-q --show-progress"
+
+# TODO: Ability to get source code easily for gcc/binutils/libstdc++.
+
+dashdash=
+previous_option=
+for argument do
+  if test -n "$previous_option"; then
+    eval $previous_option=\$argument
+    previous_option=
+    shift
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  -c) continue="-c" ;;
+  # TODO: Support -ofoo
+  -o) previous_option=output ;;
+  -O) previous_option=outputdir ;;
+  -q) wget_options="-q" ;;
+  -v) wget_options="-v" ;;
+  --boot) boot=true ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --continue) continue="--continue" ;;
+  --download-non-verbose) previous_option="-nv" ;;
+  --download-non-verbose) previous_option="-v" ;;
+  --download-quiet) previous_option="-q" ;;
+  --download-verbose) previous_option="-v" ;;
+  --execpatch) execpatch=true ;;
+  --initrd) initrd=true ;;
+  --input-release-file=*) input_release_file=$parameter ;;
+  --insecure-downgrade-to-http) insecure_downgrade_to_http=true ;;
+  --insecure-no-check-certificate) insecure_no_check_certificate=true ;;
+  --input-release-file) previous_option=input_release_file ;;
+  --input-release-sig-file=*) input_release_sig_file=$parameter ;;
+  --input-release-sig-file) previous_option=input_release_sig_file ;;
+  --input-sha256sum=*) input_sha256sum=$parameter ;;
+  --input-sha256sum) previous_option=input_sha256sum ;;
+  --normalize) normalize=true ;;
+  --nv) wget_options="-nv" ;;
+  --outputdir=*) outputdir=$parameter ;;
+  --outputdir) previous_option=outputdir ;;
+  --output=*) output=$parameter ;;
+  --output) previous_option=output ;;
+  --output-release-file=*) output_release_file=$parameter ;;
+  --output-release-file) previous_option=output_release_file ;;
+  --output-release-sig-file=*) output_release_sig_file=$parameter ;;
+  --output-release-sig-file) previous_option=output_release_sig_file ;;
+  --output-sha256sum=*) output_sha256sum=$parameter ;;
+  --output-sha256sum) previous_option=output_sha256sum ;;
+  --patch) patch=true ;;
+  --port) port=true ;;
+  --porttix) porttix=true ;;
+  --release) release=true ;;
+  --sha256) sha256=true ;;
+  --sha256sum) sha256sum=true ;;
+  --source-full) source_full=true ;;
+  --source) source=true ;;
+  --srctix) srctix=true ;;
+  --sysroot) previous_option=sysroot ;;
+  --sysroot=*) sysroot=$parameter ;;
+  --toolchain) toolchain=true ;;
+  --url) url=true ;;
+  --url-master) url_master=true ;;
+  --url-mirror) url_mirror=true ;;
+  --url-master-release) url_master_release=true ;;
+  --url-mirror-release) url_mirror_release=true ;;
+  --url-release-sig) url_release_sig=true ;;
+  --url-sha256sum) url_sha256sum=true ;;
+  --wget-options) previous_option=wget_options ;;
+  --wget-options=*) wget_options=$parameter ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *) break ;;
+  esac
+
+  shift
+done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+# TODO: Mutually incompatible options.
+
+conf() {
+  grep -E "^$1[[:space:]]*=" -- "$collection/etc/upgrade.conf" |
+  tail -n 1 |
+  sed -E 's/^[^=]*=[[:space:]]*(|.*[^[:space:]])[[:space:]]*/\1/'
+}
+
+tmpdir=$(mktemp -dt tix-fetch-port.XXXXXX)
+trap 'rm -rf -- "$tmpdir"' EXIT HUP INT QUIT TERM
+
+RELEASE_KEY=$(conf release_key)
+RELEASE_SIG_URL=$(conf release_sig_url)
+PREFERRED_MIRROR=$(conf mirror)
+FORCE_MIRROR=$(conf force_mirror)
+USER_AGENT="$(uname -s)/$(uname -r) ($(uname -m); $(uname -v))"
+
+if $insecure_no_check_certificate; then
+  echo "$0: warning: insecurely not checking https certificates" >&2
+  wget_options="$wget_options --no-check-certificate"
+fi
+
+if $insecure_downgrade_to_http; then
+  echo "$0: warning: insecurely downloading without https" >&2
+  RELEASE_SIG_URL="$(echo "$RELEASE_SIG_URL" | sed -E 's,^https:,http:,')"
+fi
+
+if $url_release_sig; then
+  printf "%s\n" "$RELEASE_SIG_URL"
+  exit
+fi
+
+# HACK: Provide more useful errors when wget is silent:
+do_wget() {
+  (set +e
+   wget "$@"
+   status=$?
+   set -e
+   what=
+   case $status in
+   0) exit 0 ;;
+   1) what="Generic error" ;;
+   2) what="Parse error" ;;
+   3) what="File I/O error" ;;
+   4) what="Network I/O error" ;;
+   5) what="Transport Layer Security verification failure" ;;
+   6) what="Username/password failure" ;;
+   7) what="Protocol error" ;;
+   8) what="Error response" ;;
+   *) what="Exit code $status" ;;
+   esac
+   echo "$0: $what when running: wget $@" >&2
+   exit $status)
+}
+
+# Fetch signed release description.
+if [ -z "$input_release_file" ]; then
+  if [ -z "$input_release_sig_file" ]; then
+    (cd "$tmpdir" &&
+     do_wget -U "$USER_AGENT" $wget_options -O release.sh.sig \
+             -- "$RELEASE_SIG_URL")
+  else
+    cp -T -- "$input_release_sig_file" "$tmpdir/release.sh.sig"
+  fi
+  signify -Vq -p "$RELEASE_KEY" -em "$tmpdir/release.sh"
+else
+  cp -T -- "$input_release_file" "$tmpdir/release.sh"
+fi
+
+# Store the signed release file if requested.
+if [ -n "$output_release_sig_file" ]; then
+  cp -T -- "$tmpdir/release.sh.sig" "$output_release_sig_file"
+fi
+
+# Store the release file (without signature) if requested.
+if [ -n "$output_release_file" ]; then
+  cp -T -- "$tmpdir/release.sh" "$output_release_file"
+fi
+
+# Load the release description.
+# TODO: SECURITY: REMOTE CODE EXECUTION OF SIGNED REMOTE CODE.
+# TODO: SECURITY: Protect against responding with older release.sh.
+. "`realpath -- "$tmpdir/release.sh"`" # Avoid PATH search with absolute path.
+
+if $url_master; then
+  printf "%s\n" "$MASTER"
+  exit
+elif $url_master_release; then
+  printf "%s\n" "$MASTER/$RELEASE"
+  exit
+fi
+
+# Default to the master mirror but switch to the preferred mirror if the release
+# description knows about the mirror and believes it to be trustworthy.
+MIRROR="$MASTER"
+for POTENTIAL_MIRROR in $MIRRORS; do
+  if [ "$POTENTIAL_MIRROR" = "$PREFERRED_MIRROR" ]; then
+    MIRROR="$PREFERRED_MIRROR"
+  fi
+done
+if [ -n "$PREFERRED_MIRROR" ] && [ "$MIRROR" != "$PREFERRED_MIRROR" ]; then
+  if [ "$FORCE_MIRROR" = yes ]; then
+    MIRROR="$PREFERRED_MIRROR"
+  else
+    echo "$0: warning: ignoring unsupported mirror $PREFERRED_MIRROR" >&2
+  fi
+fi
+
+if $insecure_downgrade_to_http; then
+  MIRROR="$(echo "$MIRROR" | sed -E 's,^https:,http:,')"
+fi
+
+if $url_mirror; then
+  printf "%s\n" "$MIRROR"
+  exit
+elif $url_mirror_release; then
+  printf "%s\n" "$MIRROR/$RELEASE"
+  exit
+fi
+
+RELEASE_URL="$MIRROR/$RELEASE"
+
+# Fetch sha256sum file and check its SHA256 hash with the release description.
+if $url_sha256sum; then
+  printf "%s\n" "$RELEASE_URL/$SHA256SUM_FILE"
+  exit
+fi
+if [ -z "$input_sha256sum" ]; then
+  # TODO: If the mirror doesn't work, try the master.
+  (cd "$tmpdir" &&
+   do_wget -U "$USER_AGENT" $wget_options -O sha256sum \
+           -- "$RELEASE_URL/$SHA256SUM_FILE")
+else
+  cp -T -- "$input_sha256sum" "$tmpdir/sha256sum"
+fi
+# TODO: Check if upstream release description changed, if so, start over.
+echo "$SHA256SUM_SHA256SUM  $tmpdir/sha256sum" | sha256sum -cq
+
+# Store the sha256sum file if requested.
+if [ -n "$output_sha256sum" ]; then
+  cp -T -- "$tmpdir/sha256sum" "$output_sha256sum"
+fi
+
+escape_extended_regex() {
+  printf "%s\n" "$1" | sed -E -e 's/[[$()*?\+.^{|}]/\\\0/g'
+}
+
+# TODO: Remove:
+#escape_extended_regex_test_self() {
+#  printf "%s\n" "$1" | grep -E "^$(escape_extended_regex "$1")\$"
+#}
+
+request() {
+  REQUEST="$1"
+  REQUESTDIR="$2"
+  REQUESTFINAL="${3-$1}"
+  FULLREQUEST="$REQUESTDIR$REQUEST"
+
+  if $url; then
+    printf '%s\n' "$RELEASE_URL/$FULLREQUEST"
+    return
+  fi
+
+  if $sha256 || $sha256sum; then
+    set +e # Don't fail if grep exits 1 (no match).
+    # TODO: Should this be a checksum(1) feature to look up a hash?
+    grep -E "^[0-9a-fA-F]{64}  $(escape_extended_regex "$FULLREQUEST")$" \
+            "$tmpdir/sha256sum" > "$tmpdir/match"
+    EXITCODE=$?
+    set -e
+    if [ 2 -le "$EXITCODE" ]; then (exit $EXITCODE); fi
+    if $sha256 && [ -s "$tmpdir/match" ]; then
+      grep -Eo '^[0-9a-fA-F]{64}' "$tmpdir/match"
+    fi
+    if $sha256sum && [ -s "$tmpdir/match" ]; then
+      cat "$tmpdir/match"
+    fi
+    return
+  fi
+
+  # Decide the final location the file will end up.
+  if [ -n "$output" ]; then
+    FINAL="$output"
+    OUTPUTDIR=$(dirname -- "$output")
+  elif [ -n "$outputdir" ]; then
+    FINAL="$outputdir/$REQUESTFINAL"
+    OUTPUTDIR="$outputdir"
+  else
+    FINAL="$REQUESTFINAL"
+    OUTPUTDIR=.
+  fi
+
+  # If a resumable download, store the file directly to the destination path.
+  # Otherwise download to a temporary directory and move only to the final
+  # location if the cryptographic check is passed.
+  if [ -n "$continue" ]; then
+    DOWNLOADDIR="$OUTPUTDIR"
+    OUTPUT="$FINAL"
+  else
+    DOWNLOADDIR="$tmpdir/download"
+    OUTPUT="$DOWNLOADDIR/$REQUEST"
+    mkdir -p -- "$DOWNLOADDIR"
+  fi
+
+  # Fetch the file.
+  # TODO: If the mirror doesn't work, try the master.
+  (cd "$DOWNLOADDIR" &&
+   mkdir -p -- "$(dirname -- "$REQUEST")" &&
+   do_wget -U "$USER_AGENT" $wget_options $continue -O "$REQUEST" \
+           -- "$RELEASE_URL/$FULLREQUEST")
+
+  # Verify the cryptographic integrity of the fetched file.
+  ABSOLUTE_OUTPUT=$(realpath -- "$OUTPUT")
+  mkdir -p -- "$tmpdir/check"
+  (cd "$tmpdir/check" &&
+   mkdir -p -- "$(dirname -- "$FULLREQUEST")"
+   ln -s -- "$ABSOLUTE_OUTPUT" "$FULLREQUEST"
+   if ! sha256sum -q -C "$tmpdir/sha256sum" -- "$FULLREQUEST"; then
+    # Don't leave behind a file that didn't pass a cryptographic check.
+    if [ -n "$continue" ]; then
+      # TODO: Check if upstream release description changed, if so, start over.
+      echo "error: Deleting corrupted output file: $OUTPUT" 2>&1
+      rm -f -- "$OUTPUT"
+    fi
+    exit 1
+   fi)
+  rm -rf -- "$tmpdir/check"
+
+  # Move the file to the final destination if not already.
+  if [ -z "$continue" ]; then
+    if [ -z "$output" ]; then
+      (cd "$OUTPUTDIR" && mkdir -p -- "$(dirname -- "$REQUESTFINAL")")
+    fi
+    cp -T -- "$OUTPUT" "$FINAL"
+    rm -rf -- "$tmpdir/download"
+  fi
+}
+
+if $release; then
+  request "$BUILD_FILE" "" "$(basename -- "$BUILD_FILE")"
+fi
+
+# TODO: --source, --source-full
+# TODO: --binutils, --gcc, --libstdc++
+
+# Fetch each of the specified signed files from the mirror.
+for REQUEST; do
+  # If --port then fetch the port by the requested name.
+  if $port; then
+    REQUEST="$REQUEST.tix.tar.xz"
+    REQUESTDIR="repository/$MACHINE-sortix/"
+  elif $boot; then
+    REQUEST="$REQUEST"
+    REQUESTDIR="$MACHINE/boot/"
+  elif $initrd; then
+    REQUEST="$REQUEST.initrd.xz"
+    REQUESTDIR="$MACHINE/boot/"
+  elif $patch; then
+    REQUEST="$REQUEST.patch"
+    REQUESTDIR="patches/"
+  elif $normalize; then
+    REQUEST="$REQUEST.normalize"
+    REQUESTDIR="patches/"
+  elif $srctix; then
+    REQUEST="$REQUEST.srctix.tar.xz"
+    REQUESTDIR="srctix/"
+  elif $porttix; then
+    REQUEST="$REQUEST.porttix.tar.xz"
+    REQUESTDIR="porttix/"
+  elif $toolchain; then
+    REQUESTDIR="toolchain/"
+  else
+    REQUESTDIR=""
+  fi
+  request "$REQUEST" "$REQUESTDIR"
+done

@@ -26,11 +26,14 @@ tix-vars \
 
 PROGRAMS:=\
 $(BINARIES) \
+tix-clean \
 tix-eradicate-libtool-la \
+tix-fetch \
 tix-iso-add \
 tix-iso-bootconfig \
 tix-iso-liveconfig \
 tix-port \
+tix-upgrade \
 
 MANPAGES8=\
 tix-build.8 \

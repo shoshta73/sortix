@@ -37,6 +37,10 @@ void conf_init(struct conf* conf)
 
 void conf_free(struct conf* conf)
 {
+	free(conf->channel);
+	free(conf->mirror);
+	free(conf->release_key);
+	free(conf->release_sig_url);
 	conf_init(conf);
 }
 
@@ -60,12 +64,43 @@ static bool conf_assign(struct conf* conf,
                         const char* path,
                         off_t line_number)
 {
-	if ( !strcmp(name, "grub") )
+	char* new_value;
+	if ( !strcmp(name, "channel") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->channel);
+		conf->channel = new_value;
+	}
+	else if ( !strcmp(name, "force_mirror") )
+		conf->force_mirror = conf_boolean(name, value, path, line_number);
+	else if ( !strcmp(name, "grub") )
 		conf->grub = conf_boolean(name, value, path, line_number);
+	else if ( !strcmp(name, "mirror") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->mirror);
+		conf->mirror = new_value;
+	}
 	else if ( !strcmp(name, "newsrc") )
 		conf->newsrc = conf_boolean(name, value, path, line_number);
 	else if ( !strcmp(name, "ports") )
 		conf->ports = conf_boolean(name, value, path, line_number);
+	else if ( !strcmp(name, "release_key") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->release_key);
+		conf->release_key = new_value;
+	}
+	else if ( !strcmp(name, "release_sig_url") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->release_sig_url);
+		conf->release_sig_url = new_value;
+	}
 	else if ( !strcmp(name, "src") )
 		conf->src = conf_boolean(name, value, path, line_number);
 	else if ( !strcmp(name, "system") )

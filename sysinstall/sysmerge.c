@@ -330,6 +330,10 @@ int main(int argc, char* argv[])
 
 	if ( copy_files )
 	{
+		// TODO: Update /etc/upgrade.conf with new release values.
+		// TODO: What about native upgrades using make sysmerge? Should those
+		//       values be updated then? Should there be an option to control
+		//       this behavior?
 		const char* target = "";
 		if ( wait )
 		{

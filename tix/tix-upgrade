@@ -1,0 +1,230 @@
+#!/bin/sh
+# Copyright (c) 2017, 2021 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-upgrade
+# Upgrade operating system and ports.
+
+set -e
+
+cachedir=""
+clean=false
+collection=""
+download_only=false
+fetch_options=
+ports_only=false
+sysroot=""
+upgrade_ports=false
+upgrade_system=false
+wait=""
+
+dashdash=
+previous_option=
+for argument do
+  if test -n "$previous_option"; then
+    eval $previous_option=\$argument
+    previous_option=
+    shift
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  -w) wait=-w ;;
+  --cachedir=*) cachedir=$parameter ;;
+  --cachedir) previous_option=cachedir ;;
+  --clean) clean=true ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --download-only) download_only=true ;;
+  --insecure-downgrade-to-http) fetch_options="$fetch_options $argument" ;;
+  --insecure-no-check-certificate) fetch_options="$fetch_options $argument" ;;
+  --ports) upgrade_ports=true ;;
+  --system) upgrade_system=true ;;
+  --sysroot) previous_option=sysroot ;;
+  --sysroot=*) sysroot=$parameter ;;
+  --wait) wait=--wait ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *) break ;;
+  esac
+
+  shift
+done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+# TODO: Reject additional operands.
+
+if [ -z "$collection" ]; then
+  collection="$sysroot"
+fi
+
+if [ -n "$collection" ]; then
+  collection=$(cd "$collection" && pwd)
+fi
+
+if ! $upgrade_ports && ! $upgrade_system; then
+  upgrade_ports=true
+  upgrade_system=true
+fi
+
+# Update only ports if this isn't a whole system installation.
+if [ ! -e "$collection/tix/manifest/system" ]; then
+  ports_only=true
+fi
+
+if [ -z "$cachedir" ]; then
+  cachedir="$collection/var/cache/tix"
+fi
+
+if $clean; then
+  echo "Removing cache directory: $cachedir"
+  rm -rf -- "$cachedir"
+fi
+
+mkdir -p -- "$cachedir"
+mkdir -p -- "$cachedir/new"
+
+# Fetch latest release.sig.sh from the master and its matching sha256sum file.
+tix-fetch $fetch_options \
+          --output-release-sig-file="$cachedir/new/release.sh.sig" \
+          --output-sha256sum="$cachedir/new/sha256sum"
+
+# If release.sig.sh or sha256sum changed, clean the cache directory of downloads
+# that were currently in progress as they might not have the right checksums.
+# TODO: This requires diff(1) in the base system! Avoid that. Get a cmp(1)!
+if ! diff -- "$cachedir/release.sh.sig" \
+             "$cachedir/new/release.sh.sig" 1>/dev/null 2>/dev/null ||
+   ! diff -- "$cachedir/sha256sum" \
+             "$cachedir/new/sha256sum" 1>/dev/null 2>/dev/null; then
+  rm -rf -- "$cachedir/boot"
+  rm -rf -- "$cachedir/repository"
+  rm -rf -- "$cachedir/sysroot"
+fi
+
+# Store the new release.sig.sh and sha256sum files so we can resume the download
+# if cancelled and these files still match.
+mv -- "$cachedir/new/release.sh.sig" "$cachedir/release.sh.sig"
+mv -- "$cachedir/new/sha256sum" "$cachedir/sha256sum"
+rm -rf -- "$cachedir/new"
+
+mkdir -p "$cachedir/boot"
+mkdir -p "$cachedir/repository"
+
+if $upgrade_system; then
+  # Fetch the base system initrds from the mirror.
+  # TODO: What about the system source code in /src?
+  # TODO: Get the overlay initrd if it exists.
+  tix-fetch $fetch_options \
+            --input-release-sig-file="$cachedir/release.sh.sig" \
+            --input-sha256sum="$cachedir/sha256sum" \
+            -c --initrd -O "$cachedir/boot" -- system
+fi
+
+if $upgrade_ports; then
+  # Fetch each port from the mirror.
+  ports=$(LC_ALL=C sort -- "$collection/tix/installed.list")
+  # TODO: This fails if the port does not exist upstream.
+  mkdir -p "$cachedir/repository"
+  for port in $ports; do
+    # The port has a hash if if it exists upstream.
+    sha256=$(tix-fetch $fetch_options \
+                       --input-release-sig-file="$cachedir/release.sh.sig" \
+                       --input-sha256sum="$cachedir/sha256sum" \
+                       --sha256 --port -- $port)
+    # If the port exists upstream, get the latest version.
+    if [ -n "$sha256" ]; then
+      tix-fetch $fetch_options \
+                --input-release-sig-file="$cachedir/release.sh.sig" \
+                --input-sha256sum="$cachedir/sha256sum" \
+                -c --port -O "$cachedir/repository" -- $port
+    fi
+  done
+fi
+
+# Stop if only downloading.
+if $download_only; then
+  exit
+fi
+
+rm -rf -- "$cachedir/sysroot"
+mkdir -p -- "$cachedir/sysroot"
+
+if $upgrade_system; then
+  # Extract the base system into the sysroot.
+  rm -rf -- "$cachedir/sysroot"
+    mkdir -p -- "$cachedir/sysroot"
+  for initrd in system overlay; do
+    initrd_path="$cachedir/boot/$initrd.initrd"
+    if [ -e "$initrd_path.xz" ]; then
+      echo "Extracting $initrd.initrd.xz..."
+      unxz -k "$initrd_path.xz"
+      initrdfs "$initrd_path" extract -C "$cachedir/sysroot" /
+      rm -f "$initrd_path.xz"
+    fi
+  done
+fi
+
+# TODO: These install all the ports in "$cachedir/repository" but the directory
+#       might not have been cleared, it could contain unverified ports.
+if $upgrade_system; then
+  # Do a full system upgrade using the sysroot and the new ports.
+  # TODO: If sysmerge -w, such as on ABI upgrades, the e2fsprogs package is not
+  #       installed in the system root and the new initrd might not contain a
+  #       /sbin/fsck.ext2 and the system can become bricked if it needs a fsck
+  #       on boot.
+  # TODO: There's no support here for doing a sysmerge on a given sysroot.
+  if $upgrade_ports; then
+    # TODO: Get the architecture from somewhere else than /etc/machine?
+    tix-collection "$cachedir/sysroot" create \
+      --platform="$(cat -- "$sysroot/etc/machine")-sortix" \
+      --prefix= --generation=2
+    tix-install --collection="$cachedir/sysroot" -- "$cachedir/repository/"*
+    full=--full
+  else
+    # TODO: Is this case supported?
+    full=
+  fi
+  sysmerge $full $wait "$cachedir/sysroot"
+elif $upgrade_ports; then
+  # Upgrade to each of the new ports.
+  # TODO: tix-install --reinstall is unsupported due to lack of support for
+  #       files moving between manifests or being deleted.
+  tix-install --reinstall -- "$cachedir/repository/"*
+fi
+
+rm -rf -- "$cachedir/boot"
+rm -rf -- "$cachedir/repository"
+rm -rf -- "$cachedir/sysroot"
+
+#tmp=
+#trap '[ -n "$tmp" ] && rm -rf "$tmp"' EXIT HUP INT QUIT TERM
+#tmp=$(mktemp -dt upgrade.XXXXXX)
+#mkdir -p "$tmp/tmp"
+#export TMPDIR="$tmp/tmp"
+#(cd "$tmp" && tix-fetch --release -o sortix.iso)
+#mkdir -p "$tmp/sortix.iso.d"
+#echo "Extracting sortix.iso..."
+#xorriso -osirrox on -indev "$tmp/sortix.iso" -extract / "$tmp/sortix.iso.d" > /dev/null 2> /dev/null
+#rm -f "$tmp/sortix.iso"

@@ -22,9 +22,14 @@
 
 struct conf
 {
+	char* channel;
+	bool force_mirror;
 	bool grub;
+	char* mirror;
 	bool newsrc;
 	bool ports;
+	char* release_key;
+	char* release_sig_url;
 	bool src;
 	bool system;
 };

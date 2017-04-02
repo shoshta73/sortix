@@ -243,6 +243,8 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /etc/sortix-release >> "$(SYSROOT)/tix/manifest/system"
 	ln -sf sortix-release "$(SYSROOT)/etc/os-release"
 	echo /etc/os-release >> "$(SYSROOT)/tix/manifest/system"
+	find etc | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
+	cp -RT etc "$(SYSROOT)/etc"
 	find share | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
 	cp -RT share "$(SYSROOT)/share"
 	export SYSROOT="$(SYSROOT)" && \
@@ -279,6 +281,7 @@ else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
 	cp Makefile -t "$(SYSROOT)/src"
 	cp README -t "$(SYSROOT)/src"
 	cp -RT build-aux "$(SYSROOT)/src/build-aux"
+	cp -RT etc "$(SYSROOT)/src/etc"
 	cp -RT share "$(SYSROOT)/src/share"
 	(for D in $(MODULES); do (cp -R $$D -t "$(SYSROOT)/src" && $(MAKE) -C "$(SYSROOT)/src/$$D" clean) || exit $$?; done)
 endif
@@ -464,6 +467,9 @@ $(LIVE_INITRD): sysroot
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
 	echo "www::1:www" >> $(LIVE_INITRD).d/etc/group
 	echo "_ntp::2:_ntp" >> $(LIVE_INITRD).d/etc/group
+	(echo 'channel = $(CHANNEL)' && \
+	 echo 'release_key = $(RELEASE_KEY)' && \
+	 echo 'release_sig_url = $(RELEASE_SIG_URL)') > $(LIVE_INITRD).d/etc/upgrade.conf
 	mkdir -p $(LIVE_INITRD).d/home
 	mkdir -p $(LIVE_INITRD).d/root -m 700
 	cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root

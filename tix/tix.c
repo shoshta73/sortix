@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -170,6 +170,8 @@ static void version(FILE* fp, const char* argv0)
 
 int main(int argc, char* argv[])
 {
+	const char* tmp = getenv_def("TMPDIR", "/tmp");
+
 	params_t params;
 	memset(&params, 0, sizeof(params));
 	params.collection = NULL;
@@ -245,7 +247,7 @@ int main(int argc, char* argv[])
 		errx(1, "error: no command specified.");
 
 	const char* cmd = argv[1];
-	if ( !strcmp(cmd, "install") )
+	if ( !strcmp(cmd, "old-install") )
 	{
 		if ( argc == 2 )
 			errx(1, "expected list of packages to install after `install'");
@@ -275,6 +277,45 @@ int main(int argc, char* argv[])
 		string_array_reset(&work);
 
 		return 0;
+	}
+	else if ( !strcmp(cmd, "install") )
+	{
+		initialize_tmp(tmp, "tix-install");
+		if ( chdir(tmp_root) < 0 )
+			err(1, "%s", tmp_root);
+
+		if ( fork_and_wait_or_death() )
+		{
+			char** fetch_argv = malloc(sizeof(char*) * (5 + (argc-2) + 1));
+			fetch_argv[0] = (char*) "tix-fetch";
+			fetch_argv[1] = (char*) "--collection";
+			fetch_argv[2] = params.collection;
+			fetch_argv[3] = (char*) "--port";
+			fetch_argv[4] = (char*) "--";
+			int offset = 5;
+			for ( int i = 0; i < argc-2; i++ )
+				fetch_argv[offset + i] = argv[2 + i];
+			fetch_argv[offset + argc-2] = NULL;
+			execvp(fetch_argv[0], (char* const*) fetch_argv);
+			err(127, "`%s'", fetch_argv[0]);
+		}
+		for ( int i = 2; i < argc; i++ )
+		{
+			const char* pkg_name = argv[i];
+			char* pkg_path = print_string("%s%s", pkg_name, ".tix.tar.xz");
+			if ( fork_and_wait_or_death() )
+			{
+				const char* install_argv[] =
+				{
+					"tix-install",
+					"--collection", params.collection,
+					"--", pkg_path,
+					NULL
+				};
+				execvp(install_argv[0], (char* const*) install_argv);
+				err(127, "`%s'", install_argv[0]);
+			}
+		}
 	}
 	else
 	{

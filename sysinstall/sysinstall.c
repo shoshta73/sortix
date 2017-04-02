@@ -478,6 +478,21 @@ int main(void)
 	// TODO: You can leave this program by pressing ^C but it can leave your
 	//       system in an inconsistent state.
 
+	if ( conf.channel )
+		install_configurationf("upgrade.conf", "a", "channel = %s\n",
+		                       conf.channel);
+	if ( conf.force_mirror != false )
+		install_configurationf("upgrade.conf", "a", "force_mirror = %s\n",
+		                       conf.force_mirror ? "yes" : "no");
+	if ( conf.mirror )
+		install_configurationf("upgrade.conf", "a", "mirror = %s\n",
+		                       conf.mirror);
+	if ( conf.release_key )
+		install_configurationf("upgrade.conf", "a", "release_key = %s\n",
+		                       conf.release_key);
+	if ( conf.release_sig_url )
+		install_configurationf("upgrade.conf", "a", "release_sig_url = %s\n",
+		                       conf.release_sig_url);
 	install_configurationf("upgrade.conf", "a", "src = yes\n");
 
 	// TODO: GUI support.
