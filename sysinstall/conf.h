@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,13 +22,20 @@
 
 struct conf
 {
+	char* channel;
+	bool force_mirror;
 	bool grub;
+	char* mirror;
 	bool newsrc;
 	bool ports;
+	char* release_key;
+	char* release_sig_url;
 	bool src;
 	bool system;
 };
 
-void load_upgrade_conf(struct conf* conf, const char* path);
+void conf_init(struct conf* conf);
+void conf_free(struct conf* conf);
+bool conf_load(struct conf* conf, const char* path);
 
 #endif

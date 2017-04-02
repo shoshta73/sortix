@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,22 @@
 
 #include "conf.h"
 
+void conf_init(struct conf* conf)
+{
+	memset(conf, 0, sizeof(*conf));
+	conf->ports = true;
+	conf->system = true;
+}
+
+void conf_free(struct conf* conf)
+{
+	free(conf->channel);
+	free(conf->mirror);
+	free(conf->release_key);
+	free(conf->release_sig_url);
+	conf_init(conf);
+}
+
 static bool conf_boolean(const char* name, const char* value, const char* path)
 {
 	if ( !strcmp(value, "yes") )
@@ -39,41 +55,66 @@ static bool conf_boolean(const char* name, const char* value, const char* path)
 	return false;
 }
 
-static void conf_assign(struct conf* conf,
+static bool conf_assign(struct conf* conf,
                         const char* name,
                         const char* value,
                         const char* path)
 {
-	if ( !strcmp(name, "grub") )
+	char* new_value;
+	if ( !strcmp(name, "channel") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->channel);
+		conf->channel = new_value;
+	}
+	else if ( !strcmp(name, "force_mirror") )
+		conf->force_mirror = conf_boolean(name, value, path);
+	else if ( !strcmp(name, "grub") )
 		conf->grub = conf_boolean(name, value, path);
+	else if ( !strcmp(name, "mirror") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->mirror);
+		conf->mirror = new_value;
+	}
 	else if ( !strcmp(name, "newsrc") )
 		conf->newsrc = conf_boolean(name, value, path);
 	else if ( !strcmp(name, "ports") )
 		conf->ports = conf_boolean(name, value, path);
+	else if ( !strcmp(name, "release_key") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->release_key);
+		conf->release_key = new_value;
+	}
+	else if ( !strcmp(name, "release_sig_url") )
+	{
+		if ( !(new_value = strdup(value)) )
+			return false;
+		free(conf->release_sig_url);
+		conf->release_sig_url = new_value;
+	}
 	else if ( !strcmp(name, "src") )
 		conf->src = conf_boolean(name, value, path);
 	else if ( !strcmp(name, "system") )
 		conf->system = conf_boolean(name, value, path);
 	else
-		printf("%s: %s: Unsupported variable\n", path, name);
+		printf("%s: Unsupported variable: %s\n", path, name);
+	return true;
 }
 
-void load_upgrade_conf(struct conf* conf, const char* path)
+bool conf_load(struct conf* conf, const char* path)
 {
-	memset(conf, 0, sizeof(*conf));
-	conf->ports = true;
-	conf->system = true;
-
 	FILE* fp = fopen(path, "r");
 	if ( !fp )
-	{
-		if ( errno == ENOENT )
-			return;
-		err(2, "%s", path);
-	}
+		return false;
 	char* line = NULL;
 	size_t line_size = 0;
 	ssize_t line_length;
+	bool success = true;
 	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		if ( line[line_length - 1] == '\n' )
@@ -103,10 +144,15 @@ void load_upgrade_conf(struct conf* conf, const char* path)
 		while ( *value && isblank((unsigned char) *value) )
 			value++;
 		name[name_length] = '\0';
-		conf_assign(conf, name, value, path);
+		if ( !conf_assign(conf, name, value, path) )
+		{
+			success = false;
+			break;
+		}
 	}
 	if ( ferror(fp) )
-		err(2, "%s", path);
+		success = false;
 	free(line);
 	fclose(fp);
+	return success;
 }

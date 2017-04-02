@@ -228,7 +228,9 @@ int main(int argc, char* argv[])
 	// TODO: Check for version (skipping, downgrading).
 
 	struct conf conf;
-	load_upgrade_conf(&conf, "/etc/upgrade.conf");
+	conf_init(&conf);
+	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno == ENOENT )
+		err(2, "/etc/upgrade.conf");
 
 	bool can_run_new_abi =
 		abi_compatible(new_release.abi_major, new_release.abi_minor,
@@ -317,6 +319,10 @@ int main(int argc, char* argv[])
 
 	if ( copy_files )
 	{
+		// TODO: Update /etc/upgrade.conf with new release values.
+		// TODO: What about native upgrades using make sysmerge? Should those
+		//       values be updated then? Should there be an option to control
+		//       this behavior?
 		const char* target = "";
 		if ( wait )
 		{

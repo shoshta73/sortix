@@ -141,27 +141,16 @@ static bool should_install_bootloader_path(const char* mnt,
 		warn("malloc");
 		return false;
 	}
-	// TODO: The load_upgrade_conf function might exit the process on failure,
-	//       but we don't want that. Redesign the mountpoint code so the caller
-	//       controls this.
-	pid_t pid = fork();
-	if ( pid < 0 )
-	{
-		warn("fork");
-		free(conf_path);
-		return false;
-	}
-	if ( !pid )
-	{
-		struct conf conf;
-		load_upgrade_conf(&conf, conf_path);
-		bool should = conf.grub;
-		_exit(should ? 0 : 1);
-	}
-	int status;
-	if ( waitpid(pid, &status, 0) < 0 )
-		return false;
-	return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+	struct conf conf;
+	conf_init(&conf);
+	bool result = false;
+	if ( conf_load(&conf, conf_path) )
+		result = conf.grub;
+	else if ( errno != ENOENT )
+		warn("%s: /etc/upgrade.conf", path_of_blockdevice(bdev));
+	conf_free(&conf);
+	free(conf_path);
+	return result;
 }
 
 static bool should_install_bootloader_bdev(struct blockdevice* bdev)
@@ -409,6 +398,11 @@ int main(void)
 	struct utsname uts;
 	uname(&uts);
 
+	struct conf conf;
+	conf_init(&conf);
+	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno != ENOENT )
+		warn("/etc/upgrade.conf");
+
 	static char input[256];
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
@@ -472,6 +466,21 @@ int main(void)
 	// TODO: You can leave this program by pressing ^C but it can leave your
 	//       system in an inconsistent state.
 
+	if ( conf.channel )
+		install_configurationf("upgrade.conf", "a", "channel = %s\n",
+		                       conf.channel);
+	if ( conf.force_mirror != false )
+		install_configurationf("upgrade.conf", "a", "force_mirror = %s\n",
+		                       conf.force_mirror ? "yes" : "no");
+	if ( conf.mirror )
+		install_configurationf("upgrade.conf", "a", "mirror = %s\n",
+		                       conf.mirror);
+	if ( conf.release_key )
+		install_configurationf("upgrade.conf", "a", "release_key = %s\n",
+		                       conf.release_key);
+	if ( conf.release_sig_url )
+		install_configurationf("upgrade.conf", "a", "release_sig_url = %s\n",
+		                       conf.release_sig_url);
 	install_configurationf("upgrade.conf", "a", "src = yes\n");
 
 	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);

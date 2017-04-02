@@ -26,10 +26,13 @@ tix-rmpatch \
 
 PROGRAMS:=\
 $(BINARIES) \
+tix-clean \
 tix-eradicate-libtool-la \
+tix-fetch \
 tix-iso-add \
 tix-iso-bootconfig \
 tix-iso-liveconfig \
+tix-upgrade \
 
 MANPAGES8=\
 tix-iso-add.8 \
