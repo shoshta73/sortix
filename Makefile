@@ -11,6 +11,7 @@ dispd \
 libmount \
 bench \
 carray \
+checksum \
 dhclient \
 disked \
 editor \
