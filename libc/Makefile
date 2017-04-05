@@ -64,6 +64,16 @@ regex/regcomp.o \
 regex/regerror.o \
 regex/regexec.o \
 regex/regfree.o \
+sha2/sha224hl.o \
+sha2/sha224.o \
+sha2/sha256hl.o \
+sha2/sha256.o \
+sha2/sha384hl.o \
+sha2/sha384.o \
+sha2/sha512_256hl.o \
+sha2/sha512_256.o \
+sha2/sha512hl.o \
+sha2/sha512.o \
 signal/sigaddset.o \
 signal/sigandset.o \
 signal/sigdelset.o \
@@ -822,7 +832,23 @@ $(OBJS) $(LIBK_OBJS): $(HEADERS)
 
 headers:
 
-# standard library
+# Generated code.
+sha2/sha224hl.c: sha2/helper.c
+	sed -e 's/hashinc/sha2.h/g' -e 's/HASH/SHA224/g' -e 's/SHA[0-9][0-9][0-9]_CTX/SHA2_CTX/g' sha2/helper.c > $@
+
+sha2/sha256hl.c: sha2/helper.c
+	sed -e 's/hashinc/sha2.h/g' -e 's/HASH/SHA256/g' -e 's/SHA[0-9][0-9][0-9]_CTX/SHA2_CTX/g' sha2/helper.c > $@
+
+sha2/sha384hl.c: sha2/helper.c
+	sed -e 's/hashinc/sha2.h/g' -e 's/HASH/SHA384/g' -e 's/SHA[0-9][0-9][0-9]_CTX/SHA2_CTX/g' sha2/helper.c > $@
+
+sha2/sha512hl.c: sha2/helper.c
+	sed -e 's/hashinc/sha2.h/g' -e 's/HASH/SHA512/g' -e 's/SHA[0-9][0-9][0-9]_CTX/SHA2_CTX/g' sha2/helper.c > $@
+
+sha2/sha512_256hl.c: sha2/helper.c
+	sed -e 's/hashinc/sha2.h/g' -e 's/HASH/SHA512_256/g' -e 's/SHA512_256_CTX/SHA2_CTX/g' sha2/helper.c > $@
+
+# libc
 %.o: %.c
 	$(CC) -c $< -o $@ $(CPPFLAGS) $(FLAGS) $(CFLAGS)
 
@@ -843,7 +869,7 @@ headers:
 	$(CC) -c $< -o $@ $(LIBK_CPPFLAGS) $(LIBK_FLAGS) $(LIBK_CFLAGS)
 
 clean:
-	rm -f *.o */*.o */*/*.o *.a
+	rm -f *.o */*.o */*/*.o *.a sha2/*hl.c
 
 # Installation into sysroot
 install: install-headers install-libs install-libs-kernel install-man
