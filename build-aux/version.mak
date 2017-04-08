@@ -1,5 +1,5 @@
 VERSION=1.1dev
-CHANNEL?=nightly
+CHANNEL?=volatile
 ifeq ($(CHANNEL),stable)
 RELEASE?=$(VERSION)
 endif
