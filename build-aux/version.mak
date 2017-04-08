@@ -1,5 +1,5 @@
 VERSION=1.1dev
-CHANNEL?=nightly
+CHANNEL?=volatile
 RELEASE?=$(VERSION)
 RELEASE_MASTER?=https://sortix.org/release
 RELEASE_KEY=/etc/signify/sortix-$(VERSION).pub
