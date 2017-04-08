@@ -1,5 +1,5 @@
 VERSION=1.1.0-dev
-CHANNEL?=nightly
+CHANNEL?=volatile
 RELEASE?=$(VERSION)
 RELEASE_AUTHORITATIVE?=https://pub.sortix.org/sortix
 RELEASE_URL?=$(RELEASE_AUTHORITATIVE)/channel/$(CHANNEL)/$(VERSION)
