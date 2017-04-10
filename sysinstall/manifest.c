@@ -19,9 +19,11 @@
 
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include <err.h>
 #include <errno.h>
+#include <dirent.h>
 #include <fcntl.h>
 #include <ioleast.h>
 #include <stdbool.h>
@@ -292,6 +294,25 @@ bool check_installed(const char* path, const char* package)
 	return false;
 }
 
+static char* installed_list_path(const char* prefix)
+{
+	char* path;
+	if ( asprintf(&path, "%s/tix/installed.list", prefix) < 0 )
+	{
+		warn("asprintf");
+		_exit(2);
+	}
+	return path;
+}
+
+bool check_installed_prefix(const char* prefix, const char* package)
+{
+	char* path = installed_list_path(prefix);
+	bool result = check_installed(path, package);
+	free(path);
+	return result;
+}
+
 static char* shell_single_quote(const char* string)
 {
 	char* result;
@@ -407,12 +428,7 @@ static void install_port(void* ctx,
                          const char* port)
 {
 	const char* to_prefix = (const char*) ctx;
-	char* inst_out_path;
-	if ( asprintf(&inst_out_path, "%s/tix/installed.list", to_prefix) < 0 )
-	{
-		warn("asprintf");
-		_exit(2);
-	}
+	char* inst_out_path = installed_list_path(to_prefix);
 	if ( !check_installed(inst_out_path, port) )
 	{
 		FILE* inst_out_fp = fopen(inst_out_path, "a");
@@ -431,9 +447,119 @@ static void install_port(void* ctx,
 	free(inst_out_path);
 }
 
-void install_ports(const char* from_prefix, const char* to_prefix)
+static int tix_only(const struct dirent* entry)
+{
+	const char* suffix = ".tix.tar.xz";
+	size_t suffix_length = strlen(suffix);
+	const char* name = entry->d_name;
+	size_t name_length = strlen(name);
+	if ( name_length < suffix_length )
+		return 0;
+	return !strcmp(name + name_length - suffix_length, suffix) ? 1 : 0;
+}
+
+static void install_repository(const char* from_repository,
+                               const char* to_prefix,
+                               const char* final_prefix,
+                               bool wait)
+{
+	char* to_repository = NULL;
+	if ( wait )
+	{
+		to_repository = join_paths(to_prefix, "repository");
+		if ( !to_repository )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		if ( mkdir(to_repository, 0666) < 0 )
+		{
+			warn("%s", to_repository);
+			_exit(2);
+		}
+	}
+	struct dirent** entries;
+	int num_entries = scandir(from_repository, &entries, tix_only, alphasort);
+	if ( num_entries < 0 )
+	{
+		warn("scandir: %s", from_repository);
+		_exit(2);
+	}
+	for ( int i = 0; i < num_entries; i++ )
+	{
+		struct dirent* entry = entries[i];
+		const char* suffix = ".tix.tar.xz";
+		size_t suffix_length = strlen(suffix);
+		char* name = entry->d_name;
+		size_t name_length = strlen(name);
+		name[name_length - suffix_length] = '\0';
+		if ( !check_installed_prefix(final_prefix, name) )
+			continue;
+		name[name_length - suffix_length] = '.';
+		char* tix_path = join_paths(from_repository, entry->d_name);
+		name[name_length - suffix_length] = '\0';
+		if ( !tix_path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		printf(" - Installing %s...\n", name);
+		pid_t pid = fork();
+		if ( pid < 0 )
+		{
+			warn("fork");
+			_exit(2);
+		}
+		char** argv;
+		if ( wait )
+			argv = (char**) (const char*[])
+				{ "cp", "-t", to_repository, "--", tix_path, NULL };
+		else
+			argv = (char**) (const char*[])
+			{
+				"tix-install",
+				"--collection", to_prefix,
+				"--reinstall",
+				//"-q", // TODO: Until -q hits the volatile build.
+				"--",
+				tix_path,
+				NULL
+			};
+		if ( pid == 0 )
+		{
+			// TODO: Until -q hits the volatile build.
+			dup2(open("/dev/null", O_RDONLY | O_CLOEXEC), 1);
+			execvp(argv[0], (char**) argv);
+			warn("%s", argv[0]);
+			_exit(127);
+		}
+		int code;
+		waitpid(pid, &code, 0);
+		if ( !WIFEXITED(code) || WEXITSTATUS(code) != 0 )
+		{
+			if ( wait )
+				warnx("Failed to copy: %s -> %s", tix_path, to_repository);
+			else
+				warnx("Failed to install: %s", tix_path);
+			_exit(2);
+		}
+		free(tix_path);
+	}
+	for ( int i = 0; i < num_entries; i++ )
+		free(entries[i]);
+	free(entries);
+	free(to_repository);
+}
+
+void install_ports(const char* from_prefix,
+                   const char* to_prefix,
+                   const char* final_prefix,
+                   const char* from_repository,
+                   bool wait)
 {
 	iterate_ports(from_prefix, install_port, (void*) to_prefix);
+	if ( from_repository )
+		install_repository(from_repository, to_prefix, final_prefix, wait);
 }
 
 static void post_install_port(void* ctx,

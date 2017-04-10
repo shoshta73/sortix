@@ -75,6 +75,7 @@ int main(int argc, char* argv[])
 	bool cancel = false;
 	bool hook_finalize = false;
 	bool hook_prepare = false;
+	const char* repository = NULL;
 	bool wait = false;
 
 	const char* argv0 = argv[0];
@@ -96,7 +97,7 @@ int main(int argc, char* argv[])
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
-				exit(1);
+				exit(2);
 			}
 		}
 		else if ( !strcmp(arg, "--help") )
@@ -111,13 +112,22 @@ int main(int argc, char* argv[])
 			hook_finalize = true;
 		else if ( !strcmp(arg, "--hook-prepare") )
 			hook_prepare = true;
+		else if ( !strncmp(arg, "--repository=", strlen("--repository=")) )
+			repository = arg + strlen("--repository=");
+		else if ( !strcmp(arg, "--repository") )
+		{
+			if ( i + 1 == argc )
+				errx(2, "option '--repository' requires an argument");
+			repository = argv[i+1];
+			argv[++i] = NULL;
+		}
 		else if ( !strcmp(arg, "--wait") )
 			wait = true;
 		else
 		{
 			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
 			help(stderr, argv0);
-			exit(1);
+			exit(2);
 		}
 	}
 
@@ -142,6 +152,13 @@ int main(int argc, char* argv[])
 		source = "/sysmerge";
 		if ( 1 < argc )
 			errx(2, "Unexpected extra operand `%s'", argv[1]);
+		if ( !repository )
+		{
+			if ( access("/sysmerge/repository", R_OK) == 0 )
+				repository = "/sysmerge/repository";
+			else if ( errno != ENOENT )
+				warn("%s", "/sysmerge/repository");
+		}
 	}
 	else
 	{
@@ -310,7 +327,7 @@ int main(int argc, char* argv[])
 				                      NULL }, "e");
 		}
 		install_manifest("system", source, target);
-		install_ports(source, target);
+		install_ports(source, target, "", repository, wait);
 	}
 
 	if ( wait )

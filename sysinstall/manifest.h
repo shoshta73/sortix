@@ -30,7 +30,11 @@ void iterate_ports(const char* prefix,
                                     const char* prefix,
                                     const char* port),
                    void* ctx);
-void install_ports(const char* from_prefix, const char* to_prefix);
+void install_ports(const char* from_prefix,
+                   const char* to_prefix,
+                   const char* final_prefix,
+                   const char* from_repository,
+                   bool wait);
 void post_install_ports(const char* prefix);
 
 #endif

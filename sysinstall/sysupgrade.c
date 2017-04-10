@@ -845,7 +845,7 @@ int main(void)
 			}
 		}
 		if ( conf.ports )
-			install_ports("", ".");
+			install_ports("", ".", "", NULL, false);
 		if ( conf.system )
 			upgrade_finalize(target_release, &new_release, "/", "");
 		if ( conf.ports )

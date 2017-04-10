@@ -935,7 +935,7 @@ int main(void)
 		execute((const char*[]) { "cp", "-RTP", etc, "etc", NULL }, "_e");
 		// TODO: Auto detect appropriate bcrypt rounds and set up etc/login.conf
 		//       and use those below instead of blowfish,a.
-		install_ports("", ".");
+		install_ports("", ".", "", NULL, false);
 		post_install_ports(".");
 		if ( access_or_die("boot/random.seed", F_OK) < 0 )
 		{
