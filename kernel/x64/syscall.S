@@ -30,7 +30,17 @@ syscall_handler:
 	pushq %rbp
 	movq %rsp, %rbp
 
+	pushq %rax
+	sub $8, %rsp
+
+	pushf
+	pop %r10
+	mov $0x200, %r11
+	test %r10, %r11
+	jz 5f
+
 	# Make sure the requested system call is valid, if not, then fix it.
+	mov %rax, %r10
 	cmp $SYSCALL_MAX_NUM, %rax
 	jae 3f
 
@@ -43,6 +53,13 @@ syscall_handler:
 
 	# Call the system call.
 	callq *%rax
+
+	pushf
+	pop %rsi
+	mov $0x200, %r8
+	test %rsi, %r8
+	jz 6f
+	addq $16, %rsp
 
 	# Return to user-space, system call result in %rax:%rdx, errno in %ecx.
 	popq %rbp
@@ -91,4 +108,25 @@ syscall_handler:
 	xor %r8, %r8
 	jmp 2b
 
+5:
+	mov $syscall_interrupt_string_before, %rdi
+	jmp 7f
+6:
+	mov $syscall_interrupt_string_after, %rdi
+	jmp 7f
+7:
+	add $8, %rsp
+	pop %rsi
+	call PanicF
+
 .size syscall_handler, .-syscall_handler
+
+	.section	.rodata
+	.type	syscall_interrupt_string_before, @object
+	.size	syscall_interrupt_string_before, 56
+syscall_interrupt_string_before:
+	.string	"System call %u exited without interrupts enabled before"
+	.type	syscall_interrupt_string_after, @object
+	.size	syscall_interrupt_string_after, 55
+syscall_interrupt_string_after:
+	.string	"System call %u exited without interrupts enabled after"

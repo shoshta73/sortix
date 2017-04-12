@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 
+#include <assert.h>
 #include <errno.h>
 #include <limits.h>
 #include <timespec.h>
@@ -261,25 +262,43 @@ int sys_clock_nanosleep(clockid_t clockid,
                         const struct timespec* user_duration,
                         struct timespec* user_remainder)
 {
+	assert(Interrupt::IsEnabled());
+
 	struct timespec time;
 
+	assert(Interrupt::IsEnabled());
 	Clock* clock = Time::GetClock(clockid);
+	assert(Interrupt::IsEnabled());
 	if ( !clock )
+	{
+		assert(Interrupt::IsEnabled());
 		return -1;
+	}
 
 	if ( !CopyFromUser(&time, user_duration, sizeof(time)) )
+	{
+		assert(Interrupt::IsEnabled());
 		return -1;
+	}
 
 	if ( !timespec_is_canonical(time) )
 		return errno = EINVAL, -1;
 
+	assert(Interrupt::IsEnabled());
 	time = flags & TIMER_ABSTIME ? clock->SleepUntil(time) :
 	                               clock->SleepDelay(time);
+	assert(Interrupt::IsEnabled());
 
 	if ( user_remainder && !CopyToUser(user_remainder, &time, sizeof(time)) )
+	{
+		assert(Interrupt::IsEnabled());
 		return -1;
+	}
 
-	return timespec_eq(time, timespec_nul()) ? 0 : (errno = EINTR, -1);
+	assert(Interrupt::IsEnabled());
+	int result = timespec_eq(time, timespec_nul()) ? 0 : (errno = EINTR, -1);
+	assert(Interrupt::IsEnabled());
+	return result;
 }
 
 int sys_timens(struct tmns* user_tmns)
