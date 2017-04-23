@@ -55,6 +55,7 @@ public: /* These must never change after construction and is read-only. */
 public:
 	Vnode(Ref<Inode> inode, Ref<Vnode> mountedat, ino_t rootino, dev_t rootdev);
 	virtual ~Vnode();
+	size_t file_pass_capability();
 	int sync(ioctx_t* ctx);
 	int stat(ioctx_t* ctx, struct stat* st);
 	int statvfs(ioctx_t* ctx, struct statvfs* stvfs);

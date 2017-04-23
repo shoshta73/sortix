@@ -43,6 +43,7 @@ public:
 	bool SetSIGPIPEDelivery(bool deliver_sigpipe);
 	size_t Size();
 	bool Resize(size_t new_size);
+	size_t file_pass_capability();
 	ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
 	ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);

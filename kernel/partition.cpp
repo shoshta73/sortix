@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,6 +39,7 @@ Partition::Partition(Ref<Inode> inner_inode, off_t start, off_t length)
 	assert(0 <= start);
 	assert(0 <= length);
 	assert(length <= OFF_MAX - start);
+	assert(!(inner_inode->type & S_IFNEVERWRAP));
 	assert(S_ISBLK(inner_inode->type) || S_ISREG(inner_inode->type));
 	this->dev = (dev_t) this;
 	this->ino = (ino_t) this;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -123,6 +123,21 @@ public:
 	operator bool() const { return obj != NULL; }
 	size_t Refcount() const { return obj ? obj->Refcount : 0; }
 	bool IsUnique() const { return obj->IsUnique(); }
+
+	// Leak a reference and allow recreating it later from an integer.
+	uintptr_t Export()
+	{
+		if ( obj )
+			obj->Refer_Renamed();
+		return (uintptr_t) obj;
+	}
+
+	// Restore a leaked reference from an integer.
+	void Import(uintptr_t ptr)
+	{
+		Reset();
+		obj = (T*) ptr;
+	}
 
 private:
 	T* obj;

@@ -232,6 +232,11 @@ bool Descriptor::IsSeekable()
 	return seekable;
 }
 
+size_t Descriptor::file_pass_capability()
+{
+	return vnode->file_pass_capability();
+}
+
 int Descriptor::sync(ioctx_t* ctx)
 {
 	// TODO: Possible denial-of-service attack if someone opens the file without

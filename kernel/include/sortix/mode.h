@@ -61,6 +61,8 @@
 #define S_IFFACTORY 0x10000
 /* Don't run the factory method if simply stat'ing the inode. */
 #define S_IFFACTORY_NOSTAT 0x20000
+/* The file object must never be wrapped in another file object. */
+#define S_IFNEVERWRAP 0x40000
 #endif
 
 #endif

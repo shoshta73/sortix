@@ -87,9 +87,21 @@ struct cmsghdr
 
 #define SCM_RIGHTS 1
 
-/* TODO: CMSG_DATA(cmsg) */
-/* TODO: CMSG_NXTHDR(cmsg) */
-/* TODO: CMSH_FIRSTHDR(cmsg) */
+#define CMSG_ALIGN(value) \
+	(-(-(size_t)(value) & ~(__alignof__(struct cmsghdr) - 1)))
+#define CMSG_SPACE(size) (sizeof(struct cmsghdr) + CMSG_ALIGN(size))
+#define CMSG_LEN(size) (sizeof(struct cmsghdr) + (size))
+#define CMSG_DATA(cmsg) ((unsigned char*) ((struct cmsghdr*) (cmsg) + 1))
+#define CMSG_FIRSTHDR(mhdr) \
+	((mhdr)->msg_controllen < sizeof(struct cmsghdr) ? \
+	 (struct cmsghdr*) 0 : \
+	 (struct cmsghdr*) (mhdr)->msg_control)
+#define CMSG_NXTHDR(mhdr, cmsg) \
+	((cmsg)->cmsg_len < sizeof(struct cmsghdr) || \
+	 (char*) (mhdr)->msg_control + (mhdr)->msg_controllen - (char*) (cmsg) <= \
+	 CMSG_ALIGN((cmsg)->cmsg_len) ? \
+	(struct cmsghdr*) 0 : \
+	(struct cmsghdr*) (((char*) (cmsg)) + CMSG_ALIGN((cmsg)->cmsg_len)))
 
 struct linger
 {
@@ -136,6 +148,7 @@ struct linger
 #define MSG_WAITALL (1<<7)
 #define MSG_DONTWAIT (1<<8)
 #define MSG_CMSG_CLOEXEC (1<<9)
+#define MSG_CMSG_CLOFORK (1<<10)
 
 #define AF_UNSPEC 0
 #define AF_INET 1

@@ -25,6 +25,7 @@ test-pthread-once \
 test-pthread-self \
 test-pthread-tls \
 test-signal-raise \
+test-unix-socket-fd-passing \
 test-unix-socket-name \
 test-unix-socket-shutdown \
 

@@ -69,6 +69,7 @@ bool RemoveRecursively(int dirfd, const char* full, const char* rel,
 		error(0, errno, "cannot remove: %s", full);
 		return false;
 	}
+	// TODO, fix this code, ensure symlinks aren't followed.
 	int targetfd = openat(dirfd, rel, O_RDONLY | O_DIRECTORY);
 	if ( targetfd < 0 )
 	{

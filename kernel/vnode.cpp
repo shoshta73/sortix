@@ -216,6 +216,11 @@ int Vnode::unmount(ioctx_t* ctx, const char* filename, int flags)
 	return 0;
 }
 
+size_t Vnode::file_pass_capability()
+{
+	return inode->file_pass_capability();
+}
+
 int Vnode::sync(ioctx_t* ctx)
 {
 	return inode->sync(ctx);

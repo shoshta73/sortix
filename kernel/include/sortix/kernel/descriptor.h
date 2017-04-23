@@ -58,6 +58,7 @@ public:
 	Ref<Descriptor> Fork();
 	bool SetFlags(int new_dflags);
 	int GetFlags();
+	size_t file_pass_capability();
 	int sync(ioctx_t* ctx);
 	int stat(ioctx_t* ctx, struct stat* st);
 	int statvfs(ioctx_t* ctx, struct statvfs* stvfs);

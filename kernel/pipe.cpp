@@ -51,10 +51,18 @@
 
 namespace Sortix {
 
+static kthread_mutex_t passing_lock = KTHREAD_MUTEX_INITIALIZER;
+
+struct segment_header
+{
+	size_t ancillary;
+	size_t normal;
+};
+
 class PipeChannel
 {
 public:
-	PipeChannel(uint8_t* buffer, size_t buffersize);
+	PipeChannel(uint8_t* buffer, size_t buffer_size);
 	~PipeChannel();
 	void CloseReading();
 	void CloseWriting();
@@ -64,6 +72,15 @@ public:
 	size_t WriteSize();
 	bool ReadResize(size_t new_size);
 	bool WriteResize(size_t new_size);
+	bool Enqueue(bool (*copy_from_src)(void* dest, const void* src, size_t n),
+	             const void* src,
+	             size_t amount);
+	bool Dequeue(bool (*copy_to_dest)(void* dest, const void* src, size_t n),
+	             void* dest,
+	             size_t amount,
+	             bool peek = false,
+	             size_t peek_offset = 0);
+	size_t file_pass_capability();
 	ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	ssize_t recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags);
 	ssize_t recvmsg(ioctx_t* ctx, struct msghdr* msg, int flags);
@@ -85,15 +102,22 @@ private:
 	kthread_mutex_t pipelock;
 	kthread_cond_t readcond;
 	kthread_cond_t writecond;
+	struct segment_header first_header;
+	struct segment_header last_header;
+	dev_t from_dev;
+	dev_t to_dev;
+	ino_t from_ino;
+	ino_t to_ino;
 	uint8_t* buffer;
 	uintptr_t sender_system_tid;
 	uintptr_t receiver_system_tid;
-	size_t bufferoffset;
-	size_t bufferused;
-	size_t buffersize;
+	size_t buffer_offset;
+	size_t buffer_used;
+	size_t buffer_size;
 	size_t pretended_read_buffer_size;
 	size_t pledged_read;
 	size_t pledged_write;
+	size_t enqueued_descriptors_count;
 	unsigned long closers;
 	bool anyreading;
 	bool anywriting;
@@ -101,25 +125,38 @@ private:
 
 };
 
-PipeChannel::PipeChannel(uint8_t* buffer, size_t buffersize)
+PipeChannel::PipeChannel(uint8_t* buffer, size_t buffer_size)
 {
 	pipelock = KTHREAD_MUTEX_INITIALIZER;
 	readcond = KTHREAD_COND_INITIALIZER;
 	writecond = KTHREAD_COND_INITIALIZER;
+	first_header.ancillary = 0;
+	first_header.normal = 0;
+	last_header.ancillary = 0;
+	last_header.normal = 0;
+	// TODO: from_dev.
+	// TODO: to_dev.
+	// TODO: from_ino.
+	// TODO: to_ino.
 	this->buffer = buffer;
-	this->buffersize = buffersize;
-	bufferoffset = bufferused = 0;
-	anyreading = anywriting = true;
-	is_sigpipe_enabled = true;
 	sender_system_tid = 0;
 	receiver_system_tid = 0;
+	buffer_offset = 0;
+	buffer_used = 0;
+	this->buffer_size = buffer_size;
+	pretended_read_buffer_size = buffer_size;
 	pledged_read = 0;
 	pledged_write = 0;
+	enqueued_descriptors_count = 0;
 	closers = 0;
+	anyreading = true;
+	anywriting = true;
+	is_sigpipe_enabled = true;
 }
 
 PipeChannel::~PipeChannel()
 {
+	// TODO: Dereference all file descriptors in the queue.
 	delete[] buffer;
 }
 
@@ -147,6 +184,62 @@ void PipeChannel::CloseWriting()
 	unsigned long count = InterlockedIncrement(&closers).n;
 	if ( count == 2 )
 		delete this;
+}
+
+bool PipeChannel::Enqueue(bool (*copy_from_src)(void*, const void*, size_t),
+                          const void* src_ptr,
+                          size_t amount)
+{
+	size_t write_offset = (buffer_offset + buffer_used) % buffer_size;
+	size_t linear = buffer_size - write_offset;
+	size_t first = linear < amount ? linear : amount;
+	const unsigned char* src = (const unsigned char*) src_ptr;
+	if ( !copy_from_src(buffer + write_offset, src, first) )
+		return false;
+	if ( first < amount &&
+	     !copy_from_src(buffer, src + first, amount - first) )
+		return false;
+	buffer_used += amount;
+	kthread_cond_broadcast(&readcond);
+	read_poll_channel.Signal(ReadPollEventStatus());
+	write_poll_channel.Signal(WritePollEventStatus());
+	return true;
+}
+
+bool PipeChannel::Dequeue(bool (*copy_to_dest)(void*, const void*, size_t),
+                          void* dest_ptr,
+                          size_t amount,
+                          bool peek,
+                          size_t peek_offset)
+{
+	size_t offset = buffer_offset;
+	if ( peek_offset )
+		offset = (buffer_offset + peek_offset) % buffer_size;
+	size_t linear = buffer_size - offset;
+	size_t first = linear < amount ? linear : amount;
+	unsigned char* dest = (unsigned char*) dest_ptr;
+	if ( !copy_to_dest(dest, buffer + offset, first) )
+		return false;
+	if ( first < amount &&
+	     !copy_to_dest(dest + first, buffer, amount - first) )
+		return false;
+	if ( !peek )
+	{
+		buffer_offset = (offset + amount) % buffer_size;
+		buffer_used -= peek_offset + amount;
+		kthread_cond_broadcast(&writecond);
+		read_poll_channel.Signal(ReadPollEventStatus());
+		write_poll_channel.Signal(WritePollEventStatus());
+	}
+	return true;
+}
+
+// Returns 0 if incapable of file description passing, 1 if capable but not
+// currently passing any file descriptions, and 2 or higher if any passes are
+// in progress.
+size_t PipeChannel::file_pass_capability() // passing_lock locked.
+{
+	return 1 + (0 < enqueued_descriptors_count ? 1 : 0);
 }
 
 ssize_t PipeChannel::recv(ioctx_t* ctx, uint8_t* buf, size_t count,
@@ -193,10 +286,15 @@ ssize_t PipeChannel::recvmsg(ioctx_t* ctx, struct msghdr* msg_ptr, int flags)
 	return result;
 }
 
-ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx, struct msghdr* msg,
+ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx,
+                                      struct msghdr* msg,
                                       int flags)
 {
-	if ( flags & ~(MSG_PEEK | MSG_WAITALL) )
+	msg->msg_flags = 0;
+	// TODO: Maybe a flag for more useful control data, so it doesn't get
+	//       truncated?
+	if ( flags & ~(MSG_PEEK | MSG_WAITALL | MSG_CMSG_CLOEXEC |
+	               MSG_CMSG_CLOFORK) )
 		return errno = EINVAL, -1;
 	Thread* this_thread = CurrentThread();
 	this_thread->yield_to_tid = sender_system_tid;
@@ -205,6 +303,143 @@ ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx, struct msghdr* msg,
 		return errno = EINTR, -1;
 	ssize_t so_far = 0;
 	size_t peeked = 0;
+	// TODO: This is code duplication.
+	receiver_system_tid = this_thread->system_tid;
+	while ( anywriting && first_header.normal <= peeked )
+	{
+		if ( first_header.ancillary )
+			break;
+		if ( first_header.normal < buffer_used )
+			break;
+		if ( (flags & MSG_PEEK) && so_far )
+			return so_far;
+		this_thread->yield_to_tid = sender_system_tid;
+		if ( pledged_read )
+		{
+			pledged_write++;
+			kthread_mutex_unlock(&pipelock);
+			kthread_yield();
+			kthread_mutex_lock(&pipelock);
+			pledged_write--;
+			continue;
+		}
+		// TODO: Return immediately if ancillary data was read.
+		if ( !(flags & MSG_WAITALL) && so_far )
+			return so_far;
+		if ( ctx->dflags & O_NONBLOCK )
+			return errno = EWOULDBLOCK, -1;
+		pledged_write++;
+		bool interrupted = !kthread_cond_wait_signal(&readcond, &pipelock);
+		pledged_write--;
+		if ( interrupted )
+			return so_far ? so_far : (errno = EINTR, -1);
+	}
+	unsigned char* control = (unsigned char*) msg->msg_control;
+	size_t control_length = msg->msg_controllen;
+	bool failed = false;
+	// TODO: MSG_PEEK?
+	// TODO: Proper error handling.
+	while ( 0 < first_header.ancillary )
+	{
+		struct cmsghdr cmsg;
+		assert(sizeof(cmsg) <= first_header.ancillary);
+		Dequeue(CopyToKernel, &cmsg, sizeof(cmsg));
+		first_header.ancillary -= sizeof(cmsg);
+		size_t data = cmsg.cmsg_len - sizeof(struct cmsghdr);
+		if ( sizeof(cmsg) <= control_length &&
+		     ctx->copy_to_dest(control, &cmsg, sizeof(cmsg)) )
+		{
+			control += sizeof(cmsg);
+			control_length -= sizeof(cmsg);
+		}
+		else
+			failed = true;
+		if ( cmsg.cmsg_level == SOL_SOCKET && cmsg.cmsg_type == SCM_RIGHTS )
+		{
+			int fdflags = 0;
+			if ( flags & MSG_CMSG_CLOEXEC )
+				fdflags |= FD_CLOEXEC;
+			if ( flags & MSG_CMSG_CLOFORK )
+				fdflags |= FD_CLOFORK;
+			Process* process = CurrentProcess();
+			Ref<DescriptorTable> dtable = process->GetDTable();
+			size_t fds = data / sizeof(int);
+			// TODO: Properly discard the message if any of these failed.
+			// TODO: Preallocate the right number of file descriptors to avoid
+			//       error cases. It's OK for fds to get lost, I guess, if the
+			//       caller gives us bad buffers. It's also OK if the buffer is
+			//       too small and we have to truncate.
+			for ( size_t i = 0; i < fds; i++ )
+			{
+				uintptr_t ptr;
+				Dequeue(CopyToKernel, &ptr, sizeof(ptr));
+				first_header.ancillary -= sizeof(ptr);
+				Ref<Descriptor> desc;
+				desc.Import(ptr);
+				// TODO: If desc has capacity to pass file descriptors, count
+				// down of how many of such we can do.
+				if ( failed )
+					continue;
+				int fd;
+				if ( control_length < sizeof(int) )
+				{
+					failed = true;
+					continue;
+				}
+				if ( (fd = dtable->Allocate(desc, fdflags)) < 0 )
+				{
+					// TODO: This is what OpenBSD does. But should we use
+					//       EMSGSIZE to mean the caller should provide more
+					//       control data?
+					errno = EMSGSIZE;
+					failed = true;
+					continue;
+				}
+				if ( !ctx->copy_to_dest(control, &fd, sizeof(fd)) )
+				{
+					failed = true;
+					continue;
+				}
+				control += sizeof(fd);
+				control_length -= sizeof(fd);
+			}
+		}
+		else
+		{
+			for ( size_t i = 0; i < data; i++ )
+			{
+				unsigned char byte;
+				Dequeue(CopyToKernel, &byte, 1);
+				first_header.ancillary--;
+				if ( (failed = failed || control_length < 1) )
+					continue;
+				control++;
+				control_length--;
+			}
+		}
+		if ( !failed )
+		{
+			// TODO: Any need to force padding after the last message?
+			size_t misaligned = CMSG_ALIGN(data) - data;
+			if ( control_length <= misaligned &&
+			     ctx->zero_dest(control, misaligned) )
+			{
+				control += misaligned;
+				control_length -= misaligned;
+			}
+			else
+				failed = true;
+		}
+		if ( failed )
+		{
+			// TODO: Unwind file descriptors copied so far. Complicated, other
+			//       threads may already have accessed them, needs a lock. Hmm.
+		}
+	}
+	msg->msg_controllen -= control_length;
+	// TODO: If failed where errno is set, return -1?
+	if ( failed )
+		msg->msg_flags |= MSG_CTRUNC;
 	if ( SSIZE_MAX < TruncateIOVec(msg->msg_iov, msg->msg_iovlen, SSIZE_MAX) )
 		return errno = EINVAL, -1;
 	int iov_i = 0;
@@ -224,8 +459,12 @@ ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx, struct msghdr* msg,
 			continue;
 		}
 		receiver_system_tid = this_thread->system_tid;
-		while ( anywriting && bufferused <= peeked )
+		while ( anywriting && first_header.normal <= peeked )
 		{
+			if ( first_header.ancillary )
+				break;
+			if ( first_header.normal < buffer_used )
+				break;
 			if ( (flags & MSG_PEEK) && so_far )
 				return so_far;
 			this_thread->yield_to_tid = sender_system_tid;
@@ -238,6 +477,7 @@ ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx, struct msghdr* msg,
 				pledged_write--;
 				continue;
 			}
+			// TODO: Return immediately if ancillary data was read.
 			if ( !(flags & MSG_WAITALL) && so_far )
 				return so_far;
 			if ( ctx->dflags & O_NONBLOCK )
@@ -248,33 +488,36 @@ ssize_t PipeChannel::recvmsg_internal(ioctx_t* ctx, struct msghdr* msg,
 			if ( interrupted )
 				return so_far ? so_far : (errno = EINTR, -1);
 		}
-		size_t used = bufferused - peeked;
+		if ( first_header.ancillary )
+			return so_far;
+		size_t used = first_header.normal - peeked;
 		if ( !used && !anywriting )
 			return so_far;
 		size_t amount = count;
 		if ( used < amount )
 			amount = used;
-		size_t offset = bufferoffset;
-		if ( peeked )
-			offset = (bufferoffset + peeked) % buffersize;
-		size_t linear = buffersize - offset;
-		if ( linear < amount )
-			amount = linear;
-		assert(amount);
-		if ( !ctx->copy_to_dest(buf, buffer + offset, amount) )
+		if ( !Dequeue(ctx->copy_to_dest, buf, amount, flags & MSG_PEEK,
+		              peeked) )
 			return so_far ? so_far : -1;
 		so_far += amount;
 		if ( flags & MSG_PEEK )
 			peeked += amount;
-		else
-		{
-			bufferoffset = (bufferoffset + amount) % buffersize;
-			bufferused -= amount;
-			kthread_cond_broadcast(&writecond);
-			read_poll_channel.Signal(ReadPollEventStatus());
-			write_poll_channel.Signal(WritePollEventStatus());
-		}
 		iov_offset += amount;
+		first_header.normal -= amount;
+		if ( first_header.normal == 0 && buffer_used )
+		{
+			if ( buffer_used == last_header.ancillary + last_header.normal )
+			{
+				first_header = last_header;
+				last_header.ancillary = 0;
+				last_header.normal = 0;
+			}
+			else
+			{
+				assert(sizeof(first_header) <= buffer_used);
+				Dequeue(CopyToKernel, &first_header, sizeof(first_header));
+			}
+		}
 		if ( iov_offset == iov->iov_len )
 		{
 			iov_i++;
@@ -307,7 +550,8 @@ ssize_t PipeChannel::writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 	return sendmsg_internal(ctx, &msg, 0);
 }
 
-ssize_t PipeChannel::sendmsg(ioctx_t* ctx, const struct msghdr* msg_ptr,
+ssize_t PipeChannel::sendmsg(ioctx_t* ctx,
+                             const struct msghdr* msg_ptr,
                              int flags)
 {
 	struct msghdr msg;
@@ -327,7 +571,8 @@ ssize_t PipeChannel::sendmsg(ioctx_t* ctx, const struct msghdr* msg_ptr,
 	return result;
 }
 
-ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg,
+ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx,
+                                      const struct msghdr* msg,
                                       int flags)
 {
 	if ( flags & ~(MSG_WAITALL | MSG_NOSIGNAL) )
@@ -338,6 +583,109 @@ ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg,
 	if ( !lock.IsAcquired() )
 		return errno = EINTR, -1;
 	sender_system_tid = this_thread->system_tid;
+	unsigned char* control_ptr = (unsigned char*) msg->msg_control;
+	size_t control_offset = 0;
+	// TODO: Undo control stuff queued so far on failure?
+	// TODO: Overflows.
+	while ( control_offset < msg->msg_controllen )
+	{
+		size_t control_left = msg->msg_controllen - control_offset;
+		struct cmsghdr cmsg;
+		if ( control_left < sizeof(cmsg) )
+			return errno = EINVAL, -1;
+		unsigned char* cmsg_ptr = control_ptr + control_offset;
+		if ( !ctx->copy_from_src(&cmsg, cmsg_ptr, sizeof(cmsg)) )
+			return -1;
+		if ( cmsg.cmsg_len < sizeof(struct cmsghdr) ||
+		     control_left < cmsg.cmsg_len )
+			return errno = EINVAL, -1;
+		if ( !(cmsg.cmsg_level == SOL_SOCKET && cmsg.cmsg_type == SCM_RIGHTS) )
+			return errno = EINVAL, -1;
+		size_t data_size = cmsg.cmsg_len - sizeof(struct cmsghdr);
+		size_t needed = sizeof(struct cmsghdr) + data_size;
+		if ( cmsg.cmsg_level == SOL_SOCKET && cmsg.cmsg_type == SCM_RIGHTS )
+		{
+			if ( data_size % sizeof(int) )
+				return errno = EINVAL, -1;
+			needed = sizeof(struct cmsghdr) +
+			         data_size / sizeof(int) * sizeof(uintptr_t);
+		}
+		// TODO: And segment_header?
+		while ( true )
+		{
+			size_t available = buffer_size - buffer_used;
+			size_t actually_needed = needed;
+			// TODO: Overflow?
+			if ( first_header.normal && last_header.normal )
+				actually_needed += sizeof(segment_header);
+			if ( actually_needed <= available )
+				break;
+			// TODO: If the needed size exceeds the pipe capacity, EMSGSIZE.
+			// TODO: It will not be possible to know how much ancillary was
+			//       transmitted.
+			if ( ctx->dflags & O_NONBLOCK )
+				return errno = EWOULDBLOCK, -1;
+			// TODO: This might interleave ancillary messages. Allow others to
+			//       read, but don't allow any more writers right now?
+			if ( !kthread_cond_wait_signal(&writecond, &pipelock) )
+				return errno = EINTR, -1;
+		}
+		if ( first_header.normal && last_header.normal )
+		{
+			size_t available = buffer_size - buffer_used;
+			assert(sizeof(last_header) <= available);
+			Enqueue(CopyFromKernel, &last_header, sizeof(last_header));
+			last_header.ancillary = 0;
+			last_header.normal = 0;
+		}
+		Enqueue(CopyFromKernel, &cmsg, sizeof(cmsg));
+		unsigned char* data_ptr = control_ptr + control_offset + sizeof(cmsg);
+		if ( cmsg.cmsg_level == SOL_SOCKET && cmsg.cmsg_type == SCM_RIGHTS )
+		{
+			Process* process = CurrentProcess();
+			Ref<DescriptorTable> dtable = process->GetDTable();
+			assert(dtable);
+			size_t fds = data_size / sizeof(int);
+			for ( size_t i = 0; i < fds; i++ )
+			{
+				unsigned char* buf = data_ptr + sizeof(int) * i;
+				int fd;
+				if ( !ctx->copy_from_src(&fd, buf, sizeof(fd)) )
+				{
+					// TODO: Bail out.
+					return -1;
+				}
+				Ref<Descriptor> desc = dtable->Get(fd);
+				if ( !desc )
+				{
+					// TODO: Bail out.
+					return -1;
+				}
+				// TODO: Validate desc isn't a unix socket containing another.
+				uintptr_t ptr = desc.Export();
+				Enqueue(CopyFromKernel, &ptr, sizeof(ptr));
+			}
+			size_t increment = sizeof(cmsg) + sizeof(uintptr_t) * fds;
+			if ( first_header.normal )
+				last_header.ancillary += increment;
+			else
+				first_header.ancillary += increment;
+		}
+		else
+		{
+			if ( !Enqueue(ctx->copy_from_src, data_ptr, data_size) )
+			{
+				// TODO: Bail out.
+				return -1;
+			}
+			size_t increment = sizeof(cmsg) + data_size;
+			if ( first_header.normal )
+				last_header.ancillary += increment;
+			else
+				first_header.ancillary += increment;
+		}
+		control_offset += CMSG_ALIGN(cmsg.cmsg_len);
+	}
 	if ( SSIZE_MAX < TruncateIOVec(msg->msg_iov, msg->msg_iovlen, SSIZE_MAX) )
 		return errno = EINVAL, -1;
 	ssize_t so_far = 0;
@@ -358,7 +706,7 @@ ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg,
 			continue;
 		}
 		sender_system_tid = this_thread->system_tid;
-		while ( anyreading && bufferused == buffersize )
+		while ( anyreading && buffer_used == buffer_size )
 		{
 			this_thread->yield_to_tid = receiver_system_tid;
 			if ( pledged_write )
@@ -389,20 +737,17 @@ ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg,
 			return errno = EPIPE, -1;
 		}
 		size_t amount = count;
-		if ( buffersize - bufferused < amount )
-			amount = buffersize - bufferused;
-		size_t writeoffset = (bufferoffset + bufferused) % buffersize;
-		size_t linear = buffersize - writeoffset;
-		if ( linear < amount )
-			amount = linear;
-		assert(amount);
-		if ( !ctx->copy_from_src(buffer + writeoffset, buf, amount) )
+		if ( buffer_size - buffer_used < amount )
+			amount = buffer_size - buffer_used;
+		bool use_first_header =
+			first_header.ancillary + first_header.normal == buffer_used;
+		if ( !Enqueue(ctx->copy_from_src, buf, amount) )
 			return so_far ? so_far : -1;
-		bufferused += amount;
+		if ( use_first_header )
+			first_header.normal += amount;
+		else
+			last_header.normal += amount;
 		so_far += amount;
-		kthread_cond_broadcast(&readcond);
-		read_poll_channel.Signal(ReadPollEventStatus());
-		write_poll_channel.Signal(WritePollEventStatus());
 		iov_offset += amount;
 		if ( iov_offset == iov->iov_len )
 		{
@@ -416,9 +761,9 @@ ssize_t PipeChannel::sendmsg_internal(ioctx_t* ctx, const struct msghdr* msg,
 short PipeChannel::ReadPollEventStatus()
 {
 	short status = 0;
-	if ( !anywriting && !bufferused )
+	if ( !anywriting && !buffer_used )
 		status |= POLLHUP;
-	if ( bufferused )
+	if ( buffer_used )
 		status |= POLLIN | POLLRDNORM;
 	return status;
 }
@@ -428,7 +773,7 @@ short PipeChannel::WritePollEventStatus()
 	short status = 0;
 	if ( !anyreading )
 		status |= POLLERR;
-	if ( anyreading && bufferused != buffersize )
+	if ( anyreading && buffer_used != buffer_size )
 		status |= POLLOUT | POLLWRNORM;
 	return status;
 }
@@ -474,7 +819,7 @@ size_t PipeChannel::ReadSize()
 size_t PipeChannel::WriteSize()
 {
 	ScopedLockSignal lock(&pipelock);
-	return buffersize;
+	return buffer_size;
 }
 
 bool PipeChannel::ReadResize(size_t new_size)
@@ -499,18 +844,18 @@ bool PipeChannel::WriteResize(size_t new_size)
 		new_size = MAX_PIPE_SIZE;
 
 	// Refuse to lose data if the the new size would cause truncation.
-	if ( new_size < bufferused )
-		new_size = bufferused;
+	if ( new_size < buffer_used )
+		new_size = buffer_used;
 
 	uint8_t* new_buffer = new uint8_t[new_size];
 	if ( !new_buffer )
 		return false;
 
-	for ( size_t i = 0; i < bufferused; i++ )
-		new_buffer[i] = buffer[(bufferoffset + i) % buffersize];
+	for ( size_t i = 0; i < buffer_used; i++ )
+		new_buffer[i] = buffer[(buffer_offset + i) % buffer_size];
 	delete[] buffer;
 	buffer = new_buffer;
-	buffersize = new_size;
+	buffer_size = new_size;
 
 	return true;
 }
@@ -537,6 +882,7 @@ bool PipeEndpoint::Connect(PipeEndpoint* destination)
 	if ( !buffer )
 		return false;
 	destination->reading = !(reading = false);
+	ScopedLock lock(&passing_lock);
 	if ( !(destination->channel = channel = new PipeChannel(buffer, size)) )
 	{
 		delete[] buffer;
@@ -553,7 +899,13 @@ void PipeEndpoint::Disconnect()
 		channel->CloseReading();
 	else
 		channel->CloseWriting();
+	ScopedLock lock(&passing_lock);
 	channel = NULL;
+}
+
+size_t PipeEndpoint::file_pass_capability() // passing_lock locked.
+{
+	return channel ? channel->file_pass_capability() : false;
 }
 
 ssize_t PipeEndpoint::recv(ioctx_t* ctx, uint8_t* buf, size_t count, int flags)
@@ -687,9 +1039,14 @@ class PipeNode : public AbstractInode
 public:
 	PipeNode(dev_t dev, uid_t owner, gid_t group, mode_t mode);
 	virtual ~PipeNode();
+	virtual size_t file_pass_capability();
 	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	virtual int poll(ioctx_t* ctx, PollNode* node);
+	// Pipes must not provide sendmsg/recvmsg that can do file descriptor
+	// passing. S_IFNEVERWRAP in type must be set if this was to be supported,
+	// and the kernel would need to be audited for the assumption that only
+	// filesystem sockets can do file descriptor passing.
 
 public:
 	bool Connect(PipeNode* destination);
@@ -718,6 +1075,11 @@ PipeNode::PipeNode(dev_t dev, uid_t owner, gid_t group, mode_t mode)
 
 PipeNode::~PipeNode()
 {
+}
+
+size_t PipeNode::file_pass_capability() // passing_lock locked.
+{
+	return endpoint.file_pass_capability();
 }
 
 ssize_t PipeNode::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)

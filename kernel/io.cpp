@@ -834,6 +834,8 @@ int sys_mkpartition(int fd, off_t start, off_t length, int flags)
 	Ref<Inode> inner_inode = desc->vnode->inode;
 	desc.Reset();
 
+	if ( inner_inode->type & S_IFNEVERWRAP )
+		return errno = EPERM, -1;
 	if ( !S_ISBLK(inner_inode->type) && !S_ISREG(inner_inode->type) )
 		return errno = EPERM, -1;
 	if ( start < 0 || length < 0 )

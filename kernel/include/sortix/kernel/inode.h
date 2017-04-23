@@ -54,6 +54,7 @@ public: /* These must never change after construction and is read-only. */
 
 public:
 	virtual ~Inode() { }
+	virtual size_t file_pass_capability() = 0;
 	virtual void linked() = 0;
 	virtual void unlinked() = 0;
 	virtual int sync(ioctx_t* ctx) = 0;
@@ -165,6 +166,7 @@ protected:
 public:
 	AbstractInode();
 	virtual ~AbstractInode();
+	virtual size_t file_pass_capability();
 	virtual void linked();
 	virtual void unlinked();
 	virtual int sync(ioctx_t* ctx);

@@ -60,6 +60,11 @@ AbstractInode::~AbstractInode()
 {
 }
 
+size_t AbstractInode::file_pass_capability()
+{
+	return 0;
+}
+
 void AbstractInode::linked()
 {
 	InterlockedIncrement(&stat_nlink);
