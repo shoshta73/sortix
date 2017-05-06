@@ -22,6 +22,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <poll.h>
 #include <string.h>
 
 #include <sortix/clock.h>
@@ -34,6 +35,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/memorymanagement.h>
+#include <sortix/kernel/poll.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/time.h>
 
@@ -493,9 +495,9 @@ int AbstractInode::gettermmode(ioctx_t* /*ctx*/, unsigned* /*mode*/)
 	return errno = ENOTTY, -1;
 }
 
-int AbstractInode::poll(ioctx_t* /*ctx*/, PollNode* /*node*/)
+int AbstractInode::poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-#if 0 // TODO: Support poll on regular files as per POSIX.
+#if 1 // TODO: Support poll on regular files as per POSIX.
 	if ( inode_type == INODE_TYPE_FILE )
 	{
 		// TODO: Correct bits?
