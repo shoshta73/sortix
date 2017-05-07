@@ -112,6 +112,10 @@
          this macro. */
 #undef __SORTIX_HAS_WORKING_PRIVSEP__
 
+/* TODO: Define when the main stack will automatically grow. Remove when httpd
+         is updated to not rely on this macro. */
+#undef __SORTIX_HAS_GROWING_STACK__
+
 /* TODO: Define when initgroups(2) is implemented. Remove when ssh is updated to
          not rely on this macro. */
 #undef __SORTIX_HAS_INITGROUPS__
