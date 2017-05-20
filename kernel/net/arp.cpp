@@ -191,6 +191,24 @@ struct arp_table
 	struct arp_entry entries[ARP_TABLE_LENGTH];
 };
 
+// TODO: Remove this debug code.
+#if 0
+static void PrintEther(const struct ether_addr* addr)
+{
+	unsigned char ether[6];
+	memcpy(ether, addr, 6);
+	Log::PrintF("%02X:%02X:%02X:%02X:%02X:%02X",
+	            ether[0], ether[1], ether[2], ether[3], ether[4], ether[5]);
+}
+
+static void PrintIP(const struct in_addr* addr)
+{
+	unsigned char ip[4];
+	memcpy(ip, addr, 4);
+	Log::PrintF("%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+}
+#endif
+
 static void OnDeadline(Clock* clock, Timer* timer, void* context);
 static void OnExpiration(Clock* clock, Timer* timer, void* context);
 
@@ -412,6 +430,15 @@ static bool Resolve(NetworkInterface* netif, struct arp_entry* entry)
 		return errno = EMSGSIZE, false;
 	pkt->length = sizeof(arp);
 	memcpy(pkt->from, &arp, sizeof(arp));
+#if 0
+	Log::PrintF("arp: Request %u of ", entry->attempts + 1);
+	PrintIP(&entry->addr);
+	Log::PrintF(" from ");
+	PrintEther(&src_ether_addr);
+	Log::PrintF(" to ");
+	PrintEther(&etheraddr_broadcast);
+	Log::PrintF("\n");
+#endif
 	if ( !Ether::Send(pkt, &src_ether_addr, &etheraddr_broadcast, ETHERTYPE_ARP,
 	                  netif) )
 		return false;
@@ -454,6 +481,11 @@ static void OnDeadline(Clock* clock, Timer* timer, void* /*context*/)
 			return;
 		}
 		struct arp_table* table = entry->table;
+#if 0
+		Log::PrintF("arp: Deadline met for ");
+		PrintIP(&entry->addr);
+		Log::PrintF("\n");
+#endif
 		// Remove from the deadline linked list.
 		entry->status &= ~ARP_STATUS_RESOLVING;
 		first_by_deadline = entry->next_by_timer;
@@ -490,6 +522,13 @@ static void OnExpiration(Clock* clock, Timer* timer, void* /*context*/)
 			return;
 		}
 		struct arp_table* table = entry->table;
+#if 0
+		Log::PrintF("arp: Expiration of ");
+		PrintIP(&entry->addr);
+		Log::PrintF(" as ");
+		PrintEther(&entry->ether);
+		Log::PrintF("\n");
+#endif
 		// Remove the entry from the expiration linked list.
 		entry->status &= ~ARP_STATUS_EXPIRING;
 		first_by_expiration = entry->next_by_timer;
@@ -549,6 +588,13 @@ bool RouteIPv4Ethernet(NetworkInterface* netif,
 	}
 	if ( entry->status & ARP_STATUS_RESOLVED )
 	{
+#if 0
+		Log::PrintF("arp: Already resolved ");
+		PrintIP(&entry->addr);
+		Log::PrintF(" as ");
+		PrintEther(&entry->ether);
+		Log::PrintF("\n");
+#endif
 		struct ether_addr dst_ether = entry->ether;
 		lock.Reset();
 		return Ether::Send(pkt, &local_ether, &dst_ether, ETHERTYPE_IP, netif);
@@ -556,6 +602,11 @@ bool RouteIPv4Ethernet(NetworkInterface* netif,
 	assert(!pkt->next);
 	if ( !(entry->status & ARP_STATUS_RESOLVING) && !Resolve(netif, entry) )
 		return false;
+#if 0
+	Log::PrintF("arp: Already resolving ");
+	PrintIP(&entry->addr);
+	Log::PrintF("\n");
+#endif
 	// Drop the packet if the transmission queue is full.
 	if ( ARP_MAX_PENDING <= entry->pending )
 		return true;
@@ -634,6 +685,14 @@ void Handle(Ref<Packet> pkt,
 
 	if ( entry )
 	{
+#if 0
+		Log::PrintF("arp: Learned of ");
+		PrintIP(&src);
+		Log::PrintF(" as ");
+		PrintEther(&src_ether);
+		Log::PrintF("\n");
+#endif
+
 		// Remove from pending request linked list.
 		if ( entry->status & ARP_STATUS_RESOLVING )
 		{
