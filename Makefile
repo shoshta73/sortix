@@ -17,6 +17,7 @@ editor \
 ext \
 games \
 hostname \
+ifconfig \
 init \
 kblayout \
 kblayout-compiler \

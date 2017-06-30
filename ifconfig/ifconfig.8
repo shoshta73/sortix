@@ -1,0 +1,198 @@
+.Dd July 1, 2017
+.Dt IFCONFIG 8
+.Os
+.Sh NAME
+.Nm ifconfig
+.Nd configure network interface
+.Sh SYNOPSIS
+.Nm
+.Op Ar interface
+.Nm
+.Ar interface
+.Oo
+.Ar protocol
+.Op Ar configuration Ar new-value ...
+.Ar ...
+.Oc
+.Nm
+.Fl l
+.Oo Ar interface Oo Ar protocol Oo Ar configuration Oc Oc Oc
+.Nm
+.Fl l
+.Ar interface
+.Ar protocol
+.Op Ar configuration ...
+.Ar ...
+.Sh DESCRIPTION
+.Nm
+can both write the current configuration of
+.Xr if 4
+network interface devices as well as update the configuration of a network
+interface.
+By default the configuration of every network interface is written.
+If the
+.Ar interface
+argument is given, only the the configuration of the network interface by that
+name is written.
+.Pp
+If an
+.Ar interface
+is specified along with further operands, the configuration of the network
+interface is updated by iterating over the remaining operands:
+Naming a
+.Ar protocol
+makes it the current protocol, naming a
+.Ar configuration
+sets it within the current protocol to the subsequent
+.Ar new-value
+operand.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl l
+Write the current value of each specified
+.Ar configuration
+rather than setting a new value.
+The
+.Ar new-value
+argument is no longer passed.
+.Pp
+If only an
+.Ar interface,
+and a
+.Ar protocol
+is specified, list the names of each configuration of that protocol on the
+network interface.
+.Pp
+If only an
+.Ar interface
+is specified, list the names of each protocol on the network interface.
+.Pp
+If no
+.Ar interface
+is specified, list the names of each network interface.
+.El
+.Pp
+The
+.Cm link
+.Ar protocol
+provides information about the network interface.
+The following configurations are supported:
+.Pp
+.Bl -tag -width "12345678" -compact
+.It Cm up
+.Sy yes
+if the link is up and
+.Sy no
+otherwise.
+(read-only)
+.It Cm type
+The type of the network interface, either
+.Sy ether
+or
+.Sy loopback .
+(read-only)
+.It Cm id
+The network interface integer index.
+(read-only)
+.El
+.Pp
+The
+.Cm loopback
+.Ar protocol
+.Pq Xr lo 4
+has no configuration.
+.Pp
+The
+.Cm ether
+.Ar protocol
+.Pq Ethernet , Xr ether 4
+has the following configurations:
+.Pp
+.Bl -tag -width "12345678" -compact
+.It Cm address
+The local address in
+.Xr ether 4
+address notation.
+.El
+.Pp
+The
+.Cm inet
+.Ar protocol
+.Pq  Internet Protocol version 4 , Xr inet 4
+has the following configurations:
+.Pp
+.Bl -tag -width "12345678" -compact
+.It Cm address
+The local address in
+.Xr inet 4
+address notation.
+.It Cm router
+The default route in
+.Xr inet 4
+address notation.
+.It Cm subnet
+The subnet mask in
+.Xr inet 4
+address notation.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+.Bd -literal
+$ ifconfig
+if0:
+	link up yes type ether id 2
+	ether address 00:00:5e:00:53:ff
+	inet address 192.0.2.2 router 192.0.2.1 subnet 255.255.255.0
+lo0:
+	link up yes type loopback id 1
+	loopback
+	inet address 127.0.0.1 router 0.0.0.0 subnet 255.0.0.0
+$ ifconfig if0
+if0:
+	link up yes type ether id 2
+	ether address 00:00:5e:00:53:ff
+	inet address 192.0.2.2 router 192.0.2.1 subnet 255.255.255.0
+$ ifconfig if0 inet address 198.51.100.2 router 198.51.100.1
+$ ifconfig if0 ether address 00:00:5e:00:53:42 inet address 198.51.100.3
+$ ifconfig -l
+if0
+lo0
+$ ifconfig -l if0
+link
+ether
+inet
+$ ifconfig -l if0 inet
+address
+router
+subnet
+$ ifconfig -l if0 inet address
+198.51.100.3
+$ ifconfig -l if0 inet address subnet ether address link id
+198.51.100.3
+255.255.255.0
+00:00:5e:00:53:42
+42
+.Ed
+.Sh SEE ALSO
+.Xr ether 4 ,
+.Xr if 4 ,
+.Xr inet 4 ,
+.Xr lo 4 ,
+.Xr dhclient 8
+.Sh CAVEATS
+.Xr ether 4
+network interfaces with the
+.Xr inet 4
+protocol are commonly automatically configured by
+.Xr dhclient 8 .
+Disable
+.Xr dhclient 8
+before manually configuring
+.Xr inet 4
+on such interfaces to avoid the manual configuration being overwritten, or
+configure
+.Xr dhclient 8
+to set your desired network interface configuration in the first place.
