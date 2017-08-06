@@ -134,6 +134,7 @@ TTY::TTY(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group,
 	this->stat_mode = (mode & S_SETABLE) | this->type;
 	this->stat_uid = owner;
 	this->stat_gid = group;
+	// Keep this in sync with utils/stty.c.
 	memset(&tio, 0, sizeof(tio));
 	tio.c_iflag = BRKINT | ICRNL | IXANY | IXON;
 	tio.c_oflag = OPOST | ONLCR;
