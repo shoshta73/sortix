@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2021 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "execute.h"
@@ -34,6 +35,7 @@ int execute(const char* const* argv, const char* flags, ...)
 	bool exit_on_failure = false;
 	bool foreground = false;
 	bool gid_set = false;
+	const char* input = NULL;
 	bool raw_exit_code = false;
 	bool uid_set = false;
 	bool quiet = false;
@@ -50,6 +52,7 @@ int execute(const char* const* argv, const char* flags, ...)
 		case 'e': exit_on_failure = true; break;
 		case 'f': foreground = true; break;
 		case 'g': gid_set = true; gid = va_arg(ap, gid_t); break;
+		case 'i': input = va_arg(ap, const char*); break;
 		case 'r': raw_exit_code = true; break;
 		case 'u': uid_set = true; uid = va_arg(ap, uid_t); break;
 		case 'q': quiet = true; break;
@@ -90,15 +93,56 @@ int execute(const char* const* argv, const char* flags, ...)
 			tcsetpgrp(0, getpgid(0));
 			sigprocmask(SIG_SETMASK, &oldset, NULL);
 		}
+		if ( input )
+		{
+			int pipes[2];
+			if ( pipe(pipes) < 0 )
+			{
+				if ( !quiet_stderr )
+					warn("pipe: %s", argv[0]);
+				_exit(2);
+			}
+			pid_t input_pid = fork();
+			if ( input_pid < 0 )
+			{
+				if ( !quiet_stderr )
+					warn("fork: %s", argv[0]);
+				_exit(2);
+			}
+			else if ( input_pid == 0 )
+			{
+				close(pipes[0]);
+				size_t left = strlen(input);
+				while ( *input )
+				{
+					ssize_t written = write(pipes[1], input, left);
+					if ( written <= 0 )
+						break;
+					input += written;
+					left -= written;
+				}
+				_exit(0);
+			}
+			close(pipes[1]);
+			close(0);
+			dup2(pipes[0], 0);
+			close(pipes[0]);
+		}
 		if ( quiet )
 		{
 			close(1);
-			open("/dev/null", O_WRONLY);
+			if ( open("/dev/null", O_WRONLY) < 0 )
+			{
+				if ( !quiet_stderr )
+					warn("/dev/null");
+				_exit(2);
+			}
 		}
 		if ( quiet_stderr )
 		{
 			close(2);
-			open("/dev/null", O_WRONLY);
+			if ( open("/dev/null", O_WRONLY) < 0 )
+				_exit(2);
 		}
 		execvp(argv[0], (char* const*) argv);
 		warn("%s", argv[0]);

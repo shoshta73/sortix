@@ -18,6 +18,8 @@
 
 set -e
 
+autoinstall=
+autoupgrade=
 daemons=
 directory=
 hostname=
@@ -51,6 +53,10 @@ for argument do
 
   case $dashdash$argument in
   --) dashdash=yes ;;
+  --autoinstall=*) autoinstall=$parameter ;;
+  --autoinstall) previous_option=autoinstall ;;
+  --autoupgrade=*) autoupgrade=$parameter ;;
+  --autoupgrade) previous_option=autoupgrade ;;
   --daemons=*) daemons=$parameter ;;
   --daemons) previous_option=daemons ;;
   --hostname=*) hostname=$parameter ;;
@@ -101,6 +107,15 @@ fi
 
 mkdir -p "$directory"
 
+if [ -n "$autoinstall" ]; then
+  mkdir -p -- "$directory/etc"
+  cp -- "$autoinstall" "$directory/etc/autoinstall.conf"
+fi
+
+if [ -n "$autoupgrade" ]; then
+  mkdir -p "-- $directory/etc"
+  cp -- "$autoupgrade" "$directory/etc/autoupgrade.conf"
+fi
 
 if [ -n "$daemons" ]; then
   mkdir -p -- "$directory/etc/init"

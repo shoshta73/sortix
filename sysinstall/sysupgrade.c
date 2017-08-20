@@ -28,6 +28,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fstab.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -42,6 +43,7 @@
 #include <mount/harddisk.h>
 #include <mount/partition.h>
 
+#include "autoconf.h"
 #include "conf.h"
 #include "devices.h"
 #include "execute.h"
@@ -338,6 +340,12 @@ void exit_gui(int code)
 	exit(code);
 }
 
+static void cancel_on_sigint(int signum)
+{
+	(void) signum;
+	errx(2, "fatal: Upgrade canceled");
+}
+
 int main(void)
 {
 	shlvl();
@@ -358,6 +366,8 @@ int main(void)
 	if ( atexit(exit_handler) != 0 )
 		err(2, "atexit");
 
+	autoconf_load("/etc/autoupgrade.conf");
+
 	struct utsname uts;
 	uname(&uts);
 
@@ -365,6 +375,39 @@ int main(void)
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " upgrader for %s.\n\n", uts.machine);
+
+	if ( autoconf_get("ready") &&
+	     autoconf_get("confirm_install") )
+	{
+		int countdown = 10;
+		// TODO: Is atoi defined on all inputs? Use a larger integer type!
+		//       Check for bad input!
+		if ( autoconf_get("countdown") )
+			countdown = atoi(autoconf_get("countdown"));
+		sigset_t old_set;
+		sigset_t new_set;
+		sigemptyset(&new_set);
+		sigaddset(&new_set, SIGINT);
+		sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		struct sigaction old_sa;
+		struct sigaction new_sa = { 0 };
+		new_sa.sa_handler = cancel_on_sigint;
+		sigaction(SIGINT, &new_sa, &old_sa);
+		for ( ; 0 < countdown; countdown-- )
+		{
+			textf("Automatically upgrading to " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR " in %i %s... (Control-C to cancel)\n", countdown,
+			      countdown != 1 ? "seconds" : "second");
+			sigprocmask(SIG_SETMASK, &old_set, NULL);
+			sleep(1);
+			sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		}
+		textf("Automatically upgrading " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR "...\n");
+		text("\n");
+		sigaction(SIGINT, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &old_set, NULL);
+	}
 
 	// '|' rather than '||' is to ensure side effects.
 	if ( missing_program("cut") |
@@ -379,7 +422,8 @@ int main(void)
 		     "software installed to properly upgrade installations.\n");
 		while ( true )
 		{
-			prompt(input, sizeof(input), "Sure you want to proceed?", "no");
+			prompt(input, sizeof(input), "ignore_missing_programs",
+			       "Sure you want to proceed?", "no");
 			if ( strcasecmp(input, "no") == 0 )
 				return 0;
 			if ( strcasecmp(input, "yes") == 0 )
@@ -409,14 +453,18 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
-	prompt(input, sizeof(input), "Ready?", ready);
+	if ( autoconf_get("confirm_upgrade") &&
+	     !strcasecmp(autoconf_get("confirm_upgrade"), "yes") )
+		text("Warning: This upgrader will automatically upgrade an operating "
+		     "system!\n");
+	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
 	bool kblayout_setable = 0 <= tcgetblob(0, "kblayout", NULL, 0);
 	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "kblayout",
 		       "Choose your keyboard layout ('?' or 'L' for list)", "default");
 		if ( !strcmp(input, "?") ||
 		     !strcmp(input, "l") ||
@@ -490,7 +538,7 @@ int main(void)
 		const char* def = good ? "no" : "yes";
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "videomode",
 			       "Select display resolution? (yes/no)", def);
 			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
 				continue;
@@ -530,7 +578,8 @@ int main(void)
 		{
 			while ( true )
 			{
-				prompt(input, sizeof(input), "No existing installations found, "
+				prompt(input, sizeof(input), "run_installer_instead",
+					   "No existing installations found, "
 					   "run installer instead? (yes/no)", "yes");
 				if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 					break;
@@ -560,7 +609,8 @@ int main(void)
 			const char* def = NULL;
 			if ( installations_count == 1 )
 				def = path_of_blockdevice(installations[0].bdev);
-			prompt(input, sizeof(input), "Which installation to upgrade?", def);
+			prompt(input, sizeof(input), "which_installaton",
+			       "Which installation to upgrade?", def);
 			target = NULL;
 			for ( size_t i = 0; i < installations_count; i++ )
 			{
@@ -594,7 +644,7 @@ int main(void)
 		      "promise this will work!\n", target->machine, source_machine);
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "switch_architecture",
 			       "Change the existing installation to another architecture?",
 			       "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
@@ -614,7 +664,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "downgrade_release",
 			       "Downgrade to an earlier release?", "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -631,7 +681,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "skip_release",
 			       "Skip across releases?", "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -650,7 +700,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "downgrade_abi",
 			       "Downgrade to an earlier ABI?", "no");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -716,7 +766,7 @@ int main(void)
 
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "cancel_pending_sysmerge",
 			       "Cancel pending sysmerge upgrade?", "yes");
 			if ( !strcasecmp(input, "no") || !strcasecmp(input, "yes") )
 				break;
@@ -783,7 +833,7 @@ int main(void)
 
 		while ( true )
 		{
-			promptx(input, sizeof(input),
+			promptx(input, sizeof(input), "confirm_upgrade",
 				   "Upgrade? (yes/no/exit/poweroff/reboot/halt)", "yes", true);
 			if ( !strcasecmp(input, "yes") )
 				break;
@@ -942,7 +992,7 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "finally",
 		       "What now? (exit/poweroff/reboot/halt)", "reboot");
 		if ( !strcasecmp(input, "exit") )
 			exit(0);

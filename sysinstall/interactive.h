@@ -29,10 +29,12 @@ __attribute__((format(printf, 1, 2)))
 void textf(const char* format, ...);
 void prompt(char* buffer,
             size_t buffer_size,
+            const char* autoconf_name,
             const char* question,
             const char* answer);
 void promptx(char* buffer,
              size_t buffer_size,
+             const char* autoconf_name,
              const char* question,
              const char* answer,
              bool catch_if_shell);

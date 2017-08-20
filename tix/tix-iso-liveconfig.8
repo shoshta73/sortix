@@ -6,6 +6,8 @@
 .Nd generate additional live environment configuration for Sortix .iso releases
 .Sh SYNOPSIS
 .Nm
+.Op Fl \-autoinstall Ns = Ns Ar file
+.Op Fl \-autoupgrade Ns = Ns Ar file
 .Op Fl \-daemons Ns = Ns Ar daemons
 .Op Fl \-hostname Ns = Ns Ar hostname
 .Op Fl \-kblayout Ns = Ns Ar kblayout
@@ -53,6 +55,20 @@ installations made from inside it.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
+.It Fl \-autoinstall Ns = Ns Ar file
+Copy
+.Ar file
+to
+.Pa output-directory/etc/autoinstall.conf .
+(See
+.Xr autoinstall.conf 5 )
+.It Fl \-autoupgrade Ns = Ns Ar file
+Copy
+.Ar file
+to
+.Pa output-directory/etc/autoupgrade.conf .
+(See
+.Xr autoupgrade.conf 5 )
 .It Fl \-daemons Ns = Ns Ar daemons
 Configures the
 .Sy local
@@ -286,9 +302,32 @@ rm -f bootconfig/boot/liveconfig.xz # When no longer useful.
 rm -f sortix.iso # When no longer useful.
 # And erase any media made from sortix.iso when no longer useful.
 .Ed
+.Ss Automatic Installation
+To customize a release so it automatically installs itself according to
+.Pa autoinstall.conf
+(see
+.Xr autoinstall.conf 5 ) :
+.Bd -literal
+tix-iso-liveconfig --autoinstall=autoinstall.conf liveconfig
+tix-iso-bootconfig --liveconfig=liveconfig --default=1 bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Automatic Upgrade
+To customize a release so it automatically upgrades a local installation
+according to
+.Pa autoupgrade.conf
+(see
+.Xr autoupgrade.conf 5 ) :
+.Bd -literal
+tix-iso-liveconfig --autoinstall=autoupgrade.conf liveconfig
+tix-iso-bootconfig --liveconfig=liveconfig --default=2 bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
 .Sh SEE ALSO
 .Xr ssh-keygen 1 ,
 .Xr xorriso 1 ,
+.Xr autoinstall.conf 5 ,
+.Xr autoupgrade.conf 5 ,
 .Xr hostname 5 ,
 .Xr kblayout 5 ,
 .Xr ssh_config 5 ,

@@ -16,6 +16,7 @@ sysmerge.o \
 sysupgrade.o \
 
 UTIL_OBJS=\
+autoconf.o \
 conf.o \
 devices.o \
 execute.o \
@@ -28,9 +29,9 @@ string_array.o \
 
 OBJS=$(MAIN_OBJS) $(UTIL_OBJS)
 
-SYSINSTALL_DEPS=conf devices execute fileops interactive manifest release string_array
+SYSINSTALL_DEPS=autoconf conf devices execute fileops interactive manifest release string_array
 SYSMERGE_DEPS=conf fileops execute hooks manifest release string_array
-SYSUPGRADE_DEPS=conf devices execute fileops hooks interactive manifest release string_array
+SYSUPGRADE_DEPS=autoconf conf devices execute fileops hooks interactive manifest release string_array
 
 SYSINSTALL_OBJS:=sysinstall.o $(SYSINSTALL_DEPS:=.o)
 SYSMERGE_OBJS:=sysmerge.o $(SYSMERGE_DEPS:=.o)
@@ -71,13 +72,14 @@ sysupgrade: $(SYSUPGRADE_OBJS)
 sysinstall.o: $(SYSINSTALL_DEPS:=.h)
 sysmerge.o: $(SYSMERGE_DEPS:=.h)
 sysupgrade.o: $(SYSUPGRADE_DEPS:=.h)
+autoconf.o: autoconf.h
 conf.o: conf.h
 devices.o: devices.h
 execute.o: execute.h
 fileops.o: fileops.h string_array.h
 string_array.o: string_array.h
 hooks.o: fileops.h manifest.h release.h string_array.h
-interactive.o: interactive.h execute.h
+interactive.o: interactive.h autoconf.h execute.h
 manifest.o: manifest.h fileops.h string_array.h
 release.o: release.h
 
