@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "execute.h"
@@ -34,6 +35,7 @@ int execute(const char* const* argv, const char* flags, ...)
 	bool exit_on_failure = false;
 	bool foreground = false;
 	bool gid_set = false;
+	const char* input = NULL;
 	bool raw_exit_code = false;
 	bool uid_set = false;
 	bool quiet = false;
@@ -50,6 +52,7 @@ int execute(const char* const* argv, const char* flags, ...)
 		case 'e': exit_on_failure = true; break;
 		case 'f': foreground = true; break;
 		case 'g': gid_set = true; gid = va_arg(ap, gid_t); break;
+		case 'i': input = va_arg(ap, const char*); break;
 		case 'r': raw_exit_code = true; break;
 		case 'u': uid_set = true; uid = va_arg(ap, uid_t); break;
 		case 'q': quiet = true; break;
@@ -89,6 +92,30 @@ int execute(const char* const* argv, const char* flags, ...)
 			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
 			tcsetpgrp(0, getpgid(0));
 			sigprocmask(SIG_SETMASK, &oldset, NULL);
+		}
+		if ( input )
+		{
+			// TODO: Error handling.
+			int pipes[2];
+			pipe(pipes);
+			if ( fork() == 0 )
+			{
+				close(pipes[0]);
+				size_t left = strlen(input);
+				while ( *input )
+				{
+					ssize_t written = write(pipes[1], input, left);
+					if ( written <= 0 )
+						break;
+					input += written;
+					left -= written;
+				}
+				_exit(0);
+			}
+			close(pipes[1]);
+			close(0);
+			dup2(pipes[0], 0);
+			close(pipes[0]);
 		}
 		if ( quiet )
 		{

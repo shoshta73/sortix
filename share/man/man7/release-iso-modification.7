@@ -18,7 +18,8 @@ default bootloader menu option and timeout, the default hostname, the default
 keyboard layout, the default graphics resolution, adding files of your choice to
 the live environment, control which drivers are loaded by default, control which
 live environment daemons are started by default, deploy ssh keys so secure shell
-connections are trusted on the first connection, and so on.
+connections are trusted on the first connection, configure automatic
+installation and upgrading, and and so on.
 .Ss Prerequisites
 .Bl -bullet -compact
 .It
@@ -514,6 +515,27 @@ option and password protect the private key to protect it in the case of a leak.
 To customize a release so it boots to a console instead of the GUI:
 .Bd -literal
 tix-iso-bootconfig --disable-gui bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Automatic Installation
+To customize a release so it automatically installs itself according to
+.Pa autoinstall.conf
+(see
+.Xr autoinstall.conf 5 ) :
+.Bd -literal
+tix-iso-liveconfig --autoinstall=autoinstall.conf liveconfig
+tix-iso-bootconfig --liveconfig=liveconfig --default=1 bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Automatic Upgrade
+To customize a release so it automatically upgrades a local installation
+according to
+.Pa autoupgrade.conf
+(see
+.Xr autoupgrade.conf 5 ) :
+.Bd -literal
+tix-iso-liveconfig --autoinstall=autoupgrade.conf liveconfig
+tix-iso-bootconfig --liveconfig=liveconfig --default=2 bootconfig
 tix-iso-add sortix.iso bootconfig
 .Ed
 .Sh SEE ALSO

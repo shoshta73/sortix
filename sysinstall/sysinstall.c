@@ -34,6 +34,7 @@
 #include <fstab.h>
 #include <limits.h>
 #include <pwd.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -53,6 +54,7 @@
 #include <mount/partition.h>
 #include <mount/uuid.h>
 
+#include "autoconf.h"
 #include "conf.h"
 #include "devices.h"
 #include "execute.h"
@@ -377,6 +379,12 @@ void exit_gui(int code)
 	exit(code);
 }
 
+static void cancel_on_sigint(int signum)
+{
+	(void) signum;
+	errx(2, "fatal: Installation canceled");
+}
+
 int main(void)
 {
 	shlvl();
@@ -412,10 +420,45 @@ int main(void)
 	if ( !conf_load(&conf, "/etc/upgrade.conf") && errno != ENOENT )
 		warn("/etc/upgrade.conf");
 
+	autoconf_load("/etc/autoinstall.conf");
+
 	static char input[256];
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " installer for %s.\n\n", uts.machine);
+
+	if ( autoconf_get("ready") &&
+	     autoconf_get("confirm_install") )
+	{
+		int countdown = 10;
+		// TODO: Is atoi defined on all inputs? Use a larger integer type!
+		//       Check for bad input!
+		if ( autoconf_get("countdown") )
+			countdown = atoi(autoconf_get("countdown"));
+		sigset_t old_set;
+		sigset_t new_set;
+		sigemptyset(&new_set);
+		sigaddset(&new_set, SIGINT);
+		sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		struct sigaction old_sa;
+		struct sigaction new_sa = { 0 };
+		new_sa.sa_handler = cancel_on_sigint;
+		sigaction(SIGINT, &new_sa, &old_sa);
+		for ( ; 0 < countdown; countdown-- )
+		{
+			textf("Automatically installing " BRAND_DISTRIBUTION_NAME " "
+			      VERSIONSTR " in %i %s... (Control-C to cancel)\n", countdown,
+			      countdown != 1 ? "seconds" : "second");
+			sigprocmask(SIG_SETMASK, &old_set, NULL);
+			sleep(1);
+			sigprocmask(SIG_BLOCK, &new_set, &old_set);
+		}
+		textf("Automatically installing " BRAND_DISTRIBUTION_NAME " "
+		      VERSIONSTR "...\n");
+		text("\n");
+		sigaction(SIGINT, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &old_set, NULL);
+	}
 
 	// '|' rather than '||' is to ensure side effects.
 	if ( missing_program("cut") |
@@ -430,7 +473,8 @@ int main(void)
 		     "software installed to properly install this operating system.\n");
 		while ( true )
 		{
-			prompt(input, sizeof(input), "Sure you want to proceed?", "no");
+			prompt(input, sizeof(input), "ignore_missing_programs",
+			       "Sure you want to proceed?", "no");
 			if ( strcasecmp(input, "no") == 0 )
 				return 0;
 			if ( strcasecmp(input, "yes") == 0 )
@@ -459,7 +503,14 @@ int main(void)
 	};
 	size_t num_readies = sizeof(readies) / sizeof(readies[0]);
 	const char* ready = readies[arc4random_uniform(num_readies)];
-	prompt(input, sizeof(input), "Ready?", ready);
+	if ( autoconf_get("disked") )
+		text("Warning: This installer will perform automatic harddisk "
+		     "partitioning!\n");
+	if ( autoconf_get("confirm_install") &&
+	     !strcasecmp(autoconf_get("confirm_install"), "yes") )
+		text("Warning: This installer will automatically install an operating "
+		     "system!\n");
+	prompt(input, sizeof(input), "ready", "Ready?", ready);
 	text("\n");
 
 	text("This is not yet a fully fledged operating system. You should adjust "
@@ -497,7 +548,7 @@ int main(void)
 	while ( kblayout_setable )
 	{
 		// TODO: Detect the name of the current keyboard layout.
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "kblayout",
 		       "Choose your keyboard layout ('?' or 'L' for list)", "default");
 		if ( !strcmp(input, "?") ||
 		     !strcmp(input, "l") ||
@@ -583,7 +634,7 @@ int main(void)
 		const char* def = good ? "no" : "yes";
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "videomode",
 			       "Select a default display resolution? (yes/no)", def);
 			if ( strcasecmp(input, "no") && strcasecmp(input, "yes") )
 				continue;
@@ -639,7 +690,7 @@ int main(void)
 	while ( true )
 	{
 		const char* def = bootloader_default ? "yes" : "no";
-		prompt(accept_grub, sizeof(accept_grub),
+		prompt(accept_grub, sizeof(accept_grub), "grub",
 		       "Install a new GRUB bootloader?", def);
 		if ( strcasecmp(accept_grub, "no") == 0 ||
 		     strcasecmp(accept_grub, "yes") == 0 )
@@ -661,12 +712,18 @@ int main(void)
 		while ( true )
 		{
 			prompt(accept_grub_password, sizeof(accept_grub_password),
+			       "grub_password",
 			       "Password protect interactive bootloader? (yes/no)", "yes");
 			if ( strcasecmp(accept_grub_password, "no") == 0 ||
 			     strcasecmp(accept_grub_password, "yes") == 0 )
 				break;
 		}
-		while ( !strcasecmp(accept_grub_password, "yes") )
+		if ( autoconf_get("grub_password_hash") )
+		{
+			const char* hash = autoconf_get("grub_password_hash");
+			install_configurationf("grubpw", "w", "%s\n", hash);
+		}
+		else while ( !strcasecmp(accept_grub_password, "yes") )
 		{
 			char first[128];
 			char second[128];
@@ -683,8 +740,8 @@ int main(void)
 			if ( !strcmp(first, "") )
 			{
 				char answer[32];
-				prompt(answer, sizeof(answer),
-					   "Empty password is stupid, are you sure? (yes/no)", "no");
+				prompt(answer, sizeof(answer), "grub_password_empty",
+				       "Empty password is stupid, are you sure? (yes/no)", "no");
 				if ( strcasecmp(answer, "yes") != 0 )
 					continue;
 			}
@@ -735,7 +792,8 @@ int main(void)
 			text("Type man to display the disked(8) man page.\n");
 		not_first = true;
 		const char* argv[] = { "disked", "--fstab=fstab", NULL };
-		if ( execute(argv, "f") != 0 )
+		const char* disked_input = autoconf_get("disked");
+		if ( execute(argv, "fi", disked_input) != 0 )
 		{
 			// TODO: We also end up here on SIGINT.
 			// TODO: Offer a shell here instead of failing?
@@ -812,6 +870,7 @@ int main(void)
 			while ( true )
 			{
 				prompt(return_to_disked, sizeof(return_to_disked),
+				       "missing_bios_boot_partition",
 				       "Return to disked to make a BIOS boot partition?", "yes");
 				if ( strcasecmp(accept_grub, "no") == 0 ||
 					 strcasecmp(accept_grub, "yes") == 0 )
@@ -849,8 +908,9 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input), "Install " BRAND_DISTRIBUTION_NAME "? "
-			"(yes/no/exit/poweroff/reboot)", "yes");
+		prompt(input, sizeof(input), "confirm_install",
+		       "Install " BRAND_DISTRIBUTION_NAME "? "
+		       "(yes/no/exit/poweroff/reboot)", "yes");
 		if ( !strcasecmp(input, "yes") )
 			break;
 		else if ( !strcasecmp(input, "no") )
@@ -1023,7 +1083,7 @@ int main(void)
 			fclose(defhost_fp);
 		}
 		char hostname[HOST_NAME_MAX + 1] = "";
-		prompt(hostname, sizeof(hostname), "System hostname?",
+		prompt(hostname, sizeof(hostname), "hostname", "System hostname?",
 		       defhost[0] ? defhost : NULL);
 		if ( !install_configurationf("etc/hostname", "w", "%s\n", hostname) )
 			continue;
@@ -1036,6 +1096,18 @@ int main(void)
 	     passwd_has_name("etc/passwd", "root") )
 	{
 		textf("Root account already exists, skipping creating it.\n");
+	}
+	else if ( autoconf_get("password_hash_root") )
+	{
+		const char* hash = autoconf_get("password_hash_root");
+		if ( !install_configurationf("etc/passwd", "a",
+			"root:%s:0:0:root:/root:sh\n", hash) )
+			err(2, "etc/passwd");
+		textf("User '%s' added to /etc/passwd\n", "root");
+		if ( !install_configurationf("etc/group", "a", "root::0:root\n") )
+			err(2, "etc/passwd");
+		install_skel("/root", 0, 0);
+		textf("Group '%s' added to /etc/group.\n", "root");
 	}
 	else while ( true )
 	{
@@ -1052,7 +1124,7 @@ int main(void)
 		if ( !strcmp(first, "") )
 		{
 			char answer[32];
-			prompt(answer, sizeof(answer),
+			prompt(answer, sizeof(answer), "empty_password",
 			       "Empty password is stupid, are you sure? (yes/no)", "no");
 			if ( strcasecmp(answer, "yes") != 0 )
 				continue;
@@ -1077,16 +1149,17 @@ int main(void)
 	}
 	struct ssh_file
 	{
+		const char* key;
 		const char* path;
 		const char* pub;
 	};
 	const struct ssh_file ssh_files[] =
 	{
-		{"/root/.ssh/authorized_keys", NULL},
-		{"/root/.ssh/config", NULL},
-		{"/root/.ssh/id_dsa", "/root/.ssh/id_dsa.pub"},
-		{"/root/.ssh/id_rsa", "/root/.ssh/id_rsa.pub"},
-		{"/root/.ssh/known_hosts", NULL},
+		{"copy_ssh_authorized_keys_root", "/root/.ssh/authorized_keys", NULL},
+		{"copy_ssh_config_root", "/root/.ssh/config", NULL},
+		{"copy_ssh_id_dsa_root", "/root/.ssh/id_dsa", "/root/.ssh/id_dsa.pub"},
+		{"copy_ssh_id_rsa_root", "/root/.ssh/id_rsa", "/root/.ssh/id_rsa.pub"},
+		{"copy_ssh_known_hosts_root", "/root/.ssh/known_hosts", NULL},
 	};
 	size_t ssh_files_count = sizeof(ssh_files) / sizeof(ssh_files[0]);
 	for ( size_t i = 0; i < ssh_files_count; i++ )
@@ -1096,14 +1169,14 @@ int main(void)
 			continue;
 		text("\n");
 		textf("Found %s\n", file->path);
-		if ( file->pub && !access_or_die(file->pub, F_OK) < 0 )
+		if ( file->pub && !access_or_die(file->pub, F_OK) )
 			textf("Found %s\n", file->pub);
 		while ( true )
 		{
 			char question[256];
 			snprintf(question, sizeof(question),
 			          "Copy %s from installer environment?", file->path);
-			prompt(input, sizeof(input), question, "no");
+			prompt(input, sizeof(input), file->key, question, "no");
 			if ( strcasecmp(input, "no") == 0 )
 				break;
 			if ( strcasecmp(input, "yes") != 0 )
@@ -1130,8 +1203,9 @@ int main(void)
 	text("Congratulations, the system is now functional! This is a good time "
 	     "to do further customization of the system.\n\n");
 
+	// TODO: autoconf users support.
 	bool made_user = false;
-	for ( uid_t uid = 1000; true; )
+	for ( uid_t uid = 1000; !has_autoconf; )
 	{
 		while ( passwd_has_uid("etc/passwd", uid) )
 			uid++;
@@ -1140,7 +1214,7 @@ int main(void)
 		const char* question = "Setup a user? (enter username or 'no')";
 		if ( made_user )
 			question = "Setup another user? (enter username or 'no')";
-		prompt(userstr, sizeof(userstr), question, "no");
+		prompt(userstr, sizeof(userstr), NULL, question, "no");
 		if ( !strcmp(userstr, "no") )
 			break;
 		if ( !strcmp(userstr, "yes") )
@@ -1154,7 +1228,7 @@ int main(void)
 			continue;
 		}
 		static char name[256];
-		prompt(name, sizeof(name), "Full name of user?", user);
+		prompt(name, sizeof(name), NULL, "Full name of user?", user);
 		char first[128];
 		char second[128];
 		while ( true )
@@ -1170,7 +1244,7 @@ int main(void)
 			if ( !strcmp(first, "") )
 			{
 				char answer[32];
-				prompt(answer, sizeof(answer),
+				prompt(answer, sizeof(answer), "empty_password",
 				       "Empty password is stupid, are you sure? (yes/no)", "no");
 				if ( strcasecmp(answer, "yes") != 0 )
 					continue;
@@ -1213,7 +1287,9 @@ int main(void)
 		uid++;
 		made_user = true;
 	}
-	text("\n");
+	// TODO: autoconf support.
+	if ( !has_autoconf )
+		text("\n");
 
 	// TODO: Ask if networking should be disabled / enabled.
 
@@ -1232,7 +1308,7 @@ int main(void)
 		     "warning applies to outgoing secure connections as well.\n\n");
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "enable_ssh",
 				   "Enable ssh server?", "no");
 			if ( strcasecmp(input, "no") == 0 )
 				break;
@@ -1278,7 +1354,7 @@ int main(void)
 	{
 		while ( true )
 		{
-			prompt(input, sizeof(input),
+			prompt(input, sizeof(input), "copy_sshd_private_keys",
 			       "Copy sshd private keys from installer environment?", "no");
 			if ( strcasecmp(input, "no") == 0 )
 				break;
@@ -1317,7 +1393,7 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input),
+		prompt(input, sizeof(input), "finally",
 		       "What now? (exit/poweroff/reboot/boot)", "boot");
 		if ( !strcasecmp(input, "exit") )
 			exit(0);
