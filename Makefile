@@ -435,11 +435,42 @@ $(SORTIX_RELEASE_DIR)/$(VERSION)/builds: $(SORTIX_RELEASE_DIR)/$(VERSION)
 $(SORTIX_RELEASE_DIR)/$(VERSION)/builds/$(BUILD_NAME).iso: $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_RELEASE_DIR)/$(VERSION)/builds
 	cp $< $@
 
+ifneq ($(MACHINE),)
+$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE): $(SORTIX_RELEASE_DIR)/$(VERSION)
+	mkdir -p $@
+endif
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot: $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)
+	mkdir -p $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/sortix.bin.xz: sysroot $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+	xz -c "$(SYSROOT)/boot/sortix.bin" > $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/live.initrd.xz: $(LIVE_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+	xz -c $< > $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/overlay.initrd.xz: $(OVERLAY_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+	test ! -e $< || xz -c $< > $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/src.initrd.xz: $(SRC_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+	xz -c $< > $@
+
+$(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/system.initrd.xz: $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot
+	xz -c $< > $@
+
+.PHONY: release-boot
+release-boot: \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/sortix.bin.xz \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/live.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/overlay.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/src.initrd.xz \
+  $(SORTIX_RELEASE_DIR)/$(VERSION)/$(MACHINE)/boot/system.initrd.xz \
+
 .PHONY: release-iso
 release-iso: $(SORTIX_RELEASE_DIR)/$(VERSION)/builds/$(BUILD_NAME).iso
 
 .PHONY: release-builds
-release-builds: release-iso
+release-builds: release-boot release-iso
 
 $(SORTIX_RELEASE_DIR)/$(VERSION)/scripts: $(SORTIX_RELEASE_DIR)/$(VERSION)
 	mkdir -p $@
