@@ -1,0 +1,219 @@
+#!/bin/sh
+# Copyright (c) 2017 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-check
+# Check the operating system installation.
+
+set -e
+
+collection=""
+sysroot=""
+existence=false
+owner=false
+permissions=false
+unknown_files=false
+
+dashdash=
+previous_option=
+for argument do
+  if test -n "$previous_option"; then
+    eval $previous_option=\$argument
+    previous_option=
+    shift
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --existence) existence=true ;;
+  --owner) owner=true ;;
+  --permissions) permissions=true ;;
+  --sysroot) previous_option=sysroot ;;
+  --sysroot=*) sysroot=$parameter ;;
+  --unknown-files) unknown_files=true ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *) break ;;
+  esac
+
+  shift
+done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+# TODO: Reject additional operands.
+
+if [ -z "$collection" ]; then
+  collection="$sysroot"
+fi
+
+if [ -n "$collection" ]; then
+  collection=$(cd "$collection" && pwd)
+fi
+
+tmp=
+trap '[ -n "$tmp" ] && rm -rf "$tmp"' EXIT HUP INT QUIT TERM
+tmp=$(mktemp -dt tix-check.XXXXXX)
+mkdir -p "$tmp/tmp"
+export TMPDIR="$tmp/tmp"
+
+escape_extended_regex_sed() {
+  printf "%s\n" "$1" | sed -E -e 's/[[$()*?\+.^{|}'"$2"']/\\\0/g'
+}
+
+# TODO: More portable way of doing this.
+getuid() {
+  stat -- "$1" | grep -E '^UID: ' | sed -E -e 's/^UID: //' -e 's,/.*,,'
+}
+
+# TODO: More portable way of doing this.
+getgid() {
+  stat -- "$1" | grep -E '^GID: ' | sed -E -e 's/^GID: //' -e 's,/.*,,'
+}
+
+# TODO: More portable way of doing this.
+getmode() {
+  stat -- "$1" | grep -E '^Mode: ' | sed -E -e 's,^Mode: [^/]*/,,'
+}
+
+# TODO: Rewrite in C with the following model.
+# - Every file must be in one state of being tracked:
+#   - Be tracked by exactly one manifest.
+#   - (Other states?)
+#   - Be a local file inside system directories (unknown file).
+#   - Be a local file outside system directories.
+
+exit_code=0
+
+# TODO: Store sha256sum of each file in metadata so we can do file
+#       consistency checks.
+if $existence || $owner || $permissions; then
+  for manifest in "$collection/tix/manifest/"*; do
+    manifest_name=$(basename -- "$manifest")
+    # TODO: Verify absolute paths.
+    cat -- "$manifest" | \
+    while read -r path; do
+      # TODO: Handle symbolic links that are intentionally dangling like
+      #       /share/vim/vimrc.
+      if [ ! -e "$collection$path" ]; then
+        if $existence; then
+          printf "%s: %s: %s%s: Missing file\n" "$0" "$manifest_name" "$collection" "$path" >&2
+          exit_code=1
+        fi
+        continue
+      fi
+      if $owner; then
+        expected_uid=0
+        expected_gid=0
+        uid=$(getuid "$collection$path")
+        gid=$(getgid "$collection$path")
+        if [ "$uid" != "$expected_uid" ]; then
+          printf "%s: %s: %s%s: Owned by uid %s instead of expected uid %s\n" "$0" "$manifest_name" "$collection" "$path" "$uid" "$expected_uid" >&2
+          exit_code=1
+        fi
+        if [ "$gid" != "$expected_gid" ]; then
+          printf "%s: %s: %s%s: Owned by gid %s instead of expected gid %s\n" "$0" "$manifest_name" "$collection" "$path" "$gid" "$expected_gid" >&2
+          exit_code=1
+        fi
+      fi
+      if $permissions; then
+        if [ -L "$collection$path" ]; then
+          expected_mode=lrwxrwxrwx
+        elif [ -d "$collection$path" ]; then
+          expected_mode=drwxr-xr-x
+        else
+          # TODO: Store the intended file permissions in tix metadata.
+          case "$path" in
+          /bin/*) expected_mode=-rwxr-xr-x ;;
+          /boot/sortix.bin) expected_mode=-rwxr-xr-x ;;
+          /etc/grub.d/README) expected_mode=-rw-r--r-- ;;
+          /etc/grub.d/*) expected_mode=-rwxr-xr-x ;;
+          /libexec/*) expected_mode=-rwxr-xr-x ;;
+          /lib/grub/i386-pc/*.exec) expected_mode=-rwxr-xr-x ;;
+          /lib/grub/i386-pc/*.image) expected_mode=-rwxr-xr-x ;;
+          /lib/grub/i386-pc/*.module) expected_mode=-rwxr-xr-x ;;
+          /sbin/*) expected_mode=-rwxr-xr-x ;;
+          /src/*) expected_mode= ;; # TODO.
+          *) expected_mode=-rw-r--r-- ;;
+          esac
+        fi
+        mode=$(getmode "$collection$path")
+        if [ -n "$expected_mode" ] && [ "$mode" != "$expected_mode" ]; then
+          printf "%s: %s: %s%s: Mode is %s instead of expected mode %s\n" "$0" "$manifest_name" "$collection" "$path" "$mode" "$expected_mode" >&2
+          exit_code=1
+        fi
+      fi
+    done
+  done
+fi
+
+if $unknown_files; then
+  # TODO: More exclusion patterns.
+  exclude_directories="/dev|/home|/mnt|/sysmerge|/tix|/tmp|/var/cache|/var/log|/var/run|/var/www"
+  # Find all known directories.
+  for manifest in "$collection/tix/manifest/"*; do
+    # TODO: Verify absolute paths.
+    cat -- "$manifest" | \
+    grep -Ev '^('"$exclude_directories"')($|/)' |
+    while read -r path; do
+      if [ -L "$collection$path" ]; then
+        :
+      elif [ -d "$collection$path" ]; then
+        printf "%s\n" "$path"
+      fi
+    done
+  # TODO: pipefail
+  done | \
+  LC_ALL=C sort -u > "$tmp/directories"
+
+  # Find all known files.
+  for manifest in "$collection/tix/manifest/"*; do
+    # TODO: Verify absolute paths.
+    grep -Ev '^('"$exclude_directories"')/' -- "$manifest"
+  # TODO: pipefail
+  done | \
+  LC_ALL=C sort -u > "$tmp/expected"
+
+  # List the contents of each system directory.
+  cat -- "$tmp/directories" | while read -r directory; do
+    (cd "${collection:-/}" &&
+     printf '%s\n' "$directory" &&
+     ls -1A -- ".$directory" |
+     sed -E -e "s,^,$(escape_extended_regex_sed "$directory" ,)/," -e 's,//,/,')
+  # TODO: pipefail
+  done | \
+  LC_ALL=C sort -u \
+  > "$tmp/actual"
+
+  # TODO: This requires diffutils in the minimal ports.
+  diff -- "$tmp/expected" "$tmp/actual" || true
+
+  cp -- "$tmp/directories" /tmp/directories
+  cp -- "$tmp/expected" /tmp/expected
+  cp -- "$tmp/actual" /tmp/actual
+fi
+
+exit $exit_code

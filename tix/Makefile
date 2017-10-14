@@ -26,6 +26,7 @@ tix-vars \
 
 PROGRAMS:=\
 $(BINARIES) \
+tix-check \
 tix-clean \
 tix-eradicate-libtool-la \
 tix-fetch \
