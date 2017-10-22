@@ -125,6 +125,7 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/lib"
 	mkdir -p "$(SYSROOT)/libexec"
 	mkdir -p "$(SYSROOT)/mnt"
+	#mkdir -p "$(SYSROOT)/root" -m 700
 	mkdir -p "$(SYSROOT)/sbin"
 	mkdir -p "$(SYSROOT)/share"
 	mkdir -p "$(SYSROOT)/src"
@@ -160,6 +161,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /lib >> "$(SYSROOT)/tix/manifest/system"
 	echo /libexec >> "$(SYSROOT)/tix/manifest/system"
 	echo /mnt >> "$(SYSROOT)/tix/manifest/system"
+	#echo /root >> "$(SYSROOT)/tix/manifest/system"
 	echo /sbin >> "$(SYSROOT)/tix/manifest/system"
 	echo /share >> "$(SYSROOT)/tix/manifest/system"
 	echo /src >> "$(SYSROOT)/tix/manifest/system"
