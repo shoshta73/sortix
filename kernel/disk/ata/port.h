@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,7 +65,9 @@ public:
 private:
 	__attribute__((format(printf, 2, 3)))
 	void LogF(const char* format, ...);
+	bool ReadCapacityATAPI();
 	void Seek(blkcnt_t block_index, size_t count);
+	bool CommandATAPI(size_t response_size);
 	void CommandDMA(uint8_t cmd, size_t size, bool write);
 	void CommandPIO(uint8_t cmd, size_t size, bool write);
 	bool FinishTransferDMA();
@@ -90,6 +92,7 @@ private:
 	bool is_dma_page_mapped;
 	bool is_lba48;
 	bool is_using_dma;
+	bool is_packet_interface;
 	off_t device_size;
 	blksize_t block_count;
 	blkcnt_t block_size;

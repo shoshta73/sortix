@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -92,7 +92,11 @@ static void InitializeDevice(Ref<Descriptor> dev, const char* devpath,
 {
 	HBA* hba = new HBA(devaddr);
 	if ( !hba )
-		PanicF("Failed to allocate ATA driver for AHCI device 0x%X", devaddr);
+	{
+		Log::PrintF("ahci: pci 0x%X: "
+		            "failed to allocate driver object", devaddr);
+		return;
+	}
 
 	if ( !hba->Initialize(dev, devpath) )
 		return delete hba;

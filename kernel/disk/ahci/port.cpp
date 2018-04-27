@@ -313,8 +313,6 @@ bool Port::FinishInitialize()
 		                  (uint64_t) words[118] << 16);
 	}
 
-	// TODO: Verify the block size is a power of two.
-
 	cylinder_count = words[1];
 	head_count = words[3];
 	sector_count = words[6];

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -170,7 +170,11 @@ bool Port::FinishInitialize()
 
 	channel->SelectDrive(port_index);
 
-	outport8(channel->port_base + REG_COMMAND, CMD_IDENTIFY);
+	// ATAPI can be detected by using the LBA registers after IDENTIFY.
+	is_packet_interface = false;
+retry_identify_packet:
+	outport8(channel->port_base + REG_COMMAND,
+	         is_packet_interface ? CMD_IDENTIFY_PACKET : CMD_IDENTIFY);
 
 	sleep_400_nanoseconds();
 
@@ -211,25 +215,29 @@ bool Port::FinishInitialize()
 
 		if ( (mid == 0x14 && high == 0xEB) || (mid == 0x69 && high == 0x96) )
 		{
-			// TODO: Add ATAPI support.
-			//LogF("ignoring: found ATAPI device instead");
-			return errno = ENODRV, false;
+			if ( is_packet_interface )
+			{
+				LogF("ignoring: IDENTIFY_PACKET returned error status");
+				return errno = EIO, false;
+			}
+			is_packet_interface = true;
+			goto retry_identify_packet;
 		}
 		else if ( mid == 0x3C && high == 0xC3 )
 		{
 			// TODO: Does this actually happen and can we do something?
-			//LogF("ignoring: found SATA device instead");
+			LogF("ignoring: found SATA device instead");
 			return errno = ENODRV, false;
 		}
 		else if ( (mid || high) && (mid != 0x7F && high != 0x7F) )
 		{
-			//LogF("ignoring: found unknown device instead (0x%02X:0x%02X)",
-			//     mid, high);
+			LogF("ignoring: found unknown device instead (0x%02X:0x%02X)",
+			     mid, high);
 			return errno = ENODRV, false;
 		}
 		else if ( mid == 0x7F && high == 0x7F )
 		{
-			//LogF("ignoring: non-existent");
+			LogF("ignoring: non-existent");
 			return errno = EIO, false;
 		}
 		else
@@ -248,45 +256,14 @@ bool Port::FinishInitialize()
 
 	little_uint16_t* words = (little_uint16_t*) identify_data;
 
-	if ( words[0] & (1 << 15) )
+	if ( !is_packet_interface && (words[0] & (1 << 15)) )
 		return errno = EINVAL, false; // Skipping non-ATA device.
-	if ( !(words[49] & (1 << 9)) )
+	if ( !is_packet_interface && !(words[49] & (1 << 9)) )
 		return errno = EINVAL, false; // Skipping non-LBA device.
-
-	this->is_lba48 = words[83] & (1 << 10);
 
 	copy_ata_string(serial, (const char*) &words[10], sizeof(serial) - 1);
 	copy_ata_string(revision, (const char*) &words[23], sizeof(revision) - 1);
 	copy_ata_string(model, (const char*) &words[27], sizeof(model) - 1);
-
-	uint64_t block_count;
-	if ( is_lba48 )
-	{
-		block_count = (uint64_t) words[100] << 0 |
-		              (uint64_t) words[101] << 16 |
-		              (uint64_t) words[102] << 32 |
-		              (uint64_t) words[103] << 48;
-	}
-	else
-	{
-		block_count = (uint64_t) words[60] << 0 |
-		              (uint64_t) words[61] << 16;
-	}
-
-	uint64_t block_size = 512;
-	if(  (words[106] & (1 << 14)) &&
-	    !(words[106] & (1 << 15)) &&
-	     (words[106] & (1 << 12)) )
-	{
-		block_size = 2 * ((uint64_t) words[117] << 0 |
-		                  (uint64_t) words[118] << 16);
-	}
-
-	// TODO: Verify the block size is a power of two.
-
-	cylinder_count = words[1];
-	head_count = words[3];
-	sector_count = words[6];
 
 	is_using_dma = true;
 
@@ -319,6 +296,49 @@ bool Port::FinishInitialize()
 	}
 #endif
 
+	if ( is_packet_interface )
+	{
+		is_lba48 = true;
+		block_count = 0;
+		block_size = 0;
+		cylinder_count = 0;
+		head_count = 0;
+		sector_count = 0;
+		device_size = 0;
+		if ( !ReadCapacityATAPI() )
+			LogF("ReadCapacityATAPI failed: %m");
+		return true;
+	}
+
+	this->is_lba48 = words[83] & (1 << 10);
+
+	uint64_t block_count;
+	if ( is_lba48 )
+	{
+		block_count = (uint64_t) words[100] << 0 |
+		              (uint64_t) words[101] << 16 |
+		              (uint64_t) words[102] << 32 |
+		              (uint64_t) words[103] << 48;
+	}
+	else
+	{
+		block_count = (uint64_t) words[60] << 0 |
+		              (uint64_t) words[61] << 16;
+	}
+
+	uint64_t block_size = 512;
+	if(  (words[106] & (1 << 14)) &&
+	    !(words[106] & (1 << 15)) &&
+	     (words[106] & (1 << 12)) )
+	{
+		block_size = 2 * ((uint64_t) words[117] << 0 |
+		                  (uint64_t) words[118] << 16);
+	}
+
+	cylinder_count = words[1];
+	head_count = words[3];
+	sector_count = words[6];
+
 	if ( __builtin_mul_overflow(block_count, block_size, &this->device_size) )
 	{
 		LogF("error: device size overflows off_t");
@@ -328,6 +348,78 @@ bool Port::FinishInitialize()
 	this->block_count = (blkcnt_t) block_count;
 	this->block_size = (blkcnt_t) block_size;
 
+	return true;
+}
+
+bool Port::ReadCapacityATAPI()
+{
+	// TODO: struct atapi_packet.
+	unsigned char* dma_data = (unsigned char*) dma_alloc.from;
+	dma_data[0] = ATAPI_CMD_READ_CAPACITY;
+	dma_data[1] = 0;
+	dma_data[2] = 0;
+	dma_data[3] = 0;
+	dma_data[4] = 0;
+	dma_data[5] = 0;
+	dma_data[6] = 0;
+	dma_data[7] = 0;
+	dma_data[8] = 0;
+	dma_data[9] = 0;
+	dma_data[10] = 0;
+	dma_data[11] = 0;
+	if ( !CommandATAPI(8 /* TODO: sizeof something */) )
+		return false;
+	uint32_t last_lba = (uint32_t) dma_data[0] << 24 |
+	                    (uint32_t) dma_data[1] << 16 |
+	                    (uint32_t) dma_data[2] <<  8 |
+	                    (uint32_t) dma_data[3] <<  0;
+	uint32_t block_count = last_lba + 1; // TODO: Overflow.
+	uint32_t block_size = (uint32_t) dma_data[4] << 24 |
+	                      (uint32_t) dma_data[5] << 16 |
+	                      (uint32_t) dma_data[6] <<  8 |
+	                      (uint32_t) dma_data[7] <<  0;
+	this->block_count = (blkcnt_t) block_count; // TODO: Truncation?
+	this->block_size = (blkcnt_t) block_size; // TODO: Truncation?
+	if ( __builtin_mul_overflow(block_count, block_size, &this->device_size) )
+	{
+		LogF("error: device size overflows off_t");
+		return errno = EOVERFLOW, false;
+	}
+	return true;
+}
+
+bool Port::CommandATAPI(size_t response_size)
+{
+	outport8(channel->port_base + REG_FEATURE, is_using_dma ? 0x01 : 0x00);
+	outport8(channel->port_base + REG_LBA_LOW, 0x08);
+	outport8(channel->port_base + REG_LBA_MID, 0x08);
+	if ( is_using_dma )
+		CommandDMA(CMD_PACKET, response_size, false);
+	else
+		CommandPIO(CMD_PACKET, response_size, false);
+	if ( !TransferPIO(12 /* TODO: sizeof something */, true) )
+	{
+		LogF("EIO %s:%u", __FILE__, __LINE__); // TODO
+		return errno = EIO, false;
+	}
+	if ( is_using_dma )
+	{
+		if ( !FinishTransferDMA() )
+		{
+			LogF("EIO %s:%u", __FILE__, __LINE__); // TODO
+			return errno = EIO, false;
+		}
+	}
+	else
+	{
+		// TODO: Read LBA Mid and LBA High to know how many bytes we are
+		//       expected to transfer.
+		if ( !TransferPIO(response_size, false) )
+		{
+			LogF("EIO %s:%u", __FILE__, __LINE__); // TODO
+			return errno = EIO, false;
+		}
+	}
 	return true;
 }
 
@@ -478,7 +570,9 @@ bool Port::TransferPIO(size_t size, bool write)
 
 		if ( status & (STATUS_ERROR | STATUS_DRIVEFAULT) )
 		{
-			LogF("error: %s error", op);
+			LogF("error: %s error%s%s", op,
+			     status & STATUS_ERROR ? " STATUS_ERROR" : "",
+			     status & STATUS_DRIVEFAULT ? " STATUS_DRIVEFAULT" : "");
 			return errno = EIO, false;
 		}
 
@@ -492,8 +586,8 @@ bool Port::TransferPIO(size_t size, bool write)
 		}
 
 		// Anticipate another IRQ if we're not at the end.
-		size_t i_sector_end = i + block_size;
-		if ( i_sector_end != size )
+		size_t i_sector_end = is_packet_interface ? i + size : i + block_size;
+		if ( (is_packet_interface  && write) || i_sector_end != size )
 			PrepareAwaitInterrupt();
 
 		uint8_t* dma_data = (uint8_t*) dma_alloc.from;
@@ -585,6 +679,11 @@ const unsigned char* Port::GetATAIdentify(size_t* size_ptr)
 
 int Port::sync(ioctx_t* ctx)
 {
+	if ( is_packet_interface )
+	{
+		// TODO: SYNCHRONIZE CACHE 0x35
+		return errno = ENOSYS, -1;
+	}
 	(void) ctx;
 	ScopedLock lock(&channel->hw_lock);
 	channel->SelectDrive(port_index);
@@ -635,20 +734,42 @@ ssize_t Port::pread(ioctx_t* ctx, unsigned char* buf, size_t count, off_t off)
 		unsigned char* dma_data = (unsigned char*) dma_alloc.from;
 		unsigned char* data = dma_data + block_offset;
 		size_t data_size = amount - block_offset;
-		Seek(block_index, num_blocks);
-		if ( is_using_dma )
+		if ( is_packet_interface )
 		{
-			uint8_t cmd = is_lba48 ? CMD_READ_DMA_EXT : CMD_READ_DMA;
-			CommandDMA(cmd, (size_t) full_amount, false);
-			if ( !FinishTransferDMA() )
+			// TODO: struct atapi_packet.
+			unsigned char* dma_data = (unsigned char*) dma_alloc.from;
+			dma_data[0] = ATAPI_CMD_READ;
+			dma_data[1] = 0;
+			dma_data[2] = block_index >> 24 & 0xFF;
+			dma_data[3] = block_index >> 16 & 0xFF;
+			dma_data[4] = block_index >>  8 & 0xFF;
+			dma_data[5] = block_index >>  0 & 0xFF;
+			dma_data[6] = 0;
+			dma_data[7] = 0;
+			dma_data[8] = 0;
+			dma_data[9] = num_blocks;
+			dma_data[10] = 0;
+			dma_data[11] = 0;
+			if ( !CommandATAPI((size_t) full_amount) )
 				return result ? result : -1;
 		}
 		else
 		{
-			uint8_t cmd = is_lba48 ? CMD_READ_EXT : CMD_READ;
-			CommandPIO(cmd, (size_t) full_amount, false);
-			if ( !TransferPIO((size_t) full_amount, false) )
-				return result ? result : -1;
+			Seek(block_index, num_blocks);
+			if ( is_using_dma )
+			{
+				uint8_t cmd = is_lba48 ? CMD_READ_DMA_EXT : CMD_READ_DMA;
+				CommandDMA(cmd, (size_t) full_amount, false);
+				if ( !FinishTransferDMA() )
+					return result ? result : -1;
+			}
+			else
+			{
+				uint8_t cmd = is_lba48 ? CMD_READ_EXT : CMD_READ;
+				CommandPIO(cmd, (size_t) full_amount, false);
+				if ( !TransferPIO((size_t) full_amount, false) )
+					return result ? result : -1;
+			}
 		}
 		if ( !ctx->copy_to_dest(buf, data, data_size) )
 			return result ? result : -1;
@@ -662,6 +783,8 @@ ssize_t Port::pread(ioctx_t* ctx, unsigned char* buf, size_t count, off_t off)
 
 ssize_t Port::pwrite(ioctx_t* ctx, const unsigned char* buf, size_t count, off_t off)
 {
+	if ( is_packet_interface )
+		return errno = EPERM, -1;
 	ssize_t result = 0;
 	while ( count )
 	{
