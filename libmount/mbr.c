@@ -87,7 +87,7 @@ blockdevice_get_partition_table_mbr(struct partition_table** pt_ptr,
                                     struct blockdevice* bdev)
 {
 	*pt_ptr = NULL;
-	blksize_t logical_block_size = blockdevice_logical_block_size(bdev);
+	blksize_t logical_block_size = 512;
 	if ( !blockdevice_check_reasonable_block_size(logical_block_size) )
 		return errno = EINVAL, PARTITION_ERROR_ERRNO;
 	off_t device_size = blockdevice_size(bdev);
@@ -143,6 +143,7 @@ blockdevice_get_partition_table_mbr(struct partition_table** pt_ptr,
 			return PARTITION_ERROR_BEFORE_USABLE;
 		off_t start = (off_t) pmbr.start_sector * (off_t) logical_block_size;
 		off_t length = (off_t) pmbr.total_sectors * (off_t) logical_block_size;
+		//fprintf(stderr, "[%u] @ sector %u + %u sectors of %u sectors\n", i, pmbr.start_sector, pmbr.total_sectors, device_size / logical_block_size);
 		if ( device_size < start || device_size - start < length )
 			return PARTITION_ERROR_BEYOND_DEVICE;
 		for ( size_t j = 0; j < pt->partitions_count; j++ )
