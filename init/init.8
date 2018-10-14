@@ -6,6 +6,8 @@
 .Nd system initialization
 .Sh SYNOPSIS
 .Nm init
+.Op Fl \-disable-dhclient
+.Op Fl \-enable-dhclient
 .Op Fl \-target Ns "=" Ns Ar init-target
 .Op Fl \-
 .Op Ar chain-init ...
@@ -113,9 +115,9 @@ target mounts the root filesystem as in
 and runs the next
 .Nm
 program.
-This is used by
+This configuration file is a copy of the real file made by
 .Xr update-initrd 8
-to make a bootstrap
+when it makes a bootstrap
 .Xr initrd 7 .
 .Pp
 Every block device and partition is scanned to determine if it is the root
@@ -178,6 +180,15 @@ If the upgrade succeeds, the temporary
 deinitializes the system and invokes the real (now upgraded)
 .Nm
 which will restart system initialization in the normal fashion.
+.Ss Network
+.Nm
+will configure the network interfaces by spawning a
+.Xr dhclient 8
+process for each network interface.
+.Fl \-enable-dhclient
+(default) enables this behavior and
+.Fl \-disable-dhclient
+disables it.
 .Ss Session
 Finally
 .Nm

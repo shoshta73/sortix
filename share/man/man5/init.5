@@ -1,0 +1,376 @@
+.Dd July 29, 2018
+.Dt INIT 5
+.Os
+.Sh NAME
+.Nm init
+.Nd system initialization configuration
+.Sh SYNOPSIS
+.Nm /etc/init/
+.Nm /share/init/
+.Sh DESCRIPTION
+.Xr init 8
+starts each daemon (system background process) according to the daemon's
+configuration file, which specifies the daemon's dependencies and how to run the
+daemon.
+.Pp
+Configuration files searched for in the
+.Pa /etc/init/
+directory (local initialization configuration owned by the system administrator,
+which may be modified) and the
+.Pa /share/init/
+directory (default initialization configuration owned by the operating system,
+which should not be modified).
+The file name of each configuration file is that of the daemon without any file
+extension.
+For instance, the daemon
+.Sy exampled
+might come with the default configuration file
+.Pa /share/init/exampled
+that the system administrator can override in
+.Pa /etc/init/exampled .
+.Pp
+.Xr init 8
+initially starts the
+.Sy default
+daemon which is configured in
+.Pa /etc/init/default ,
+which then depends on the daemons constituting the operating system (which in
+turn depend on the
+.Sy local
+daemon).
+Local system daemons should be started by overriding the
+.Sy local
+daemon in
+.Pa /etc/init/local ,
+which then depends on the locally required daemons.
+.\" TODO: Daemon model.
+.\" TODO: Log files.
+.\" TODO: Readyness.
+.\" TODO: chroot /var/empty
+.\" TODO: Environment variables.
+.\" TODO: No restart. exit 0 means finished. One stops.share/man/man5/init.5
+.\" TODO: Run daemon as specific user.
+.\" TODO: /etc/environment or /etc/environ.
+.\" TODO: Environment variables.
+.\" TODO: Method for including/extending files in /share/init
+.\" TODO: Reference counting. No cycles.
+.\" TODO: Init reload support?
+.Sh DAEMONS
+The
+.Sy default
+daemon should depend on exactly one top level daemon and nothing else.
+.Pp
+The following daemons are top level daemons that start the operating system.
+They are mutually exclusive and only a single one should be depended on:
+.Bl -tag -width "12345678"
+.It Sy multi-user
+Starts the operating system in the multi-user mode.
+It starts the
+.Sy login
+foreground daemon that provides a login screen and exits with login's exit code
+when login exits.
+This is a secure operating system mode where only authorized users have access.
+It depends on the
+.Sy base
+and
+.Sy local
+daemons.
+.It Sy no-user
+Starts the operating system in the no-user mode.
+This is a secure operating system mode where no user is granted access.
+Additional daemons can be started by configuring the
+.Sy local
+daemon.
+It depends on the
+.Sy base
+and
+.Sy local
+daemons.
+The dependency on
+.Sy local
+is marked
+.Sy exit-code ,
+letting the system administrator fully control the
+.Sy default
+daemon's exit code and when the system completes.
+.It Sy single-user
+Starts the operating system in the single user mode.
+It starts the
+.Sy sh
+foreground daemon that directly provides a root shell and exits with the shell's
+exit code when the shell exits.
+This is a insecure operating system mode that boots straight to root access
+without a password.
+It depends on the
+.Sy base
+and
+.Sy local
+daemons.
+.It Sy sysinstall
+Starts the operating system installer.
+It starts the
+.Sy sysinstall
+foreground daemon that provides the operating system installer and exits with
+the installer's exit code when the installer exits.
+This is a insecure operating system mode that boots straight to root access
+without a password.
+It depends on the
+.Sy base
+and
+.Sy local
+daemons.
+.It Sy sysupgrade
+Starts the operating system upgrader.
+It starts the
+.Sy sysupgrade
+foreground daemon that provides the operating system upgrader and exits with
+the upgrader's exit code when the upgrader exits.
+This is a insecure operating system mode that boots straight to root access
+without a password.
+It depends on the
+.Sy base
+and
+.Sy local
+daemons.
+.El
+.Pp
+The following daemons are provided by the system:
+.Bl -tag -width "12345678"
+.It Sy base
+Virtual daemon that depends on the core operating system daemons.
+It depends on the
+.Sy time
+daemon.
+.It Sy local
+Virtual daemon that starts daemons pertinent to the local system.
+The system provides a default implementation that does nothing.
+The system administrator is meant to override the daemon in
+.Pa /etc/init/local
+by depending on daemons outside of the base system that should run on the local
+system.
+.It Sy time
+Virtual daemon that becomes ready when the current date and time has been
+established.
+The system provides a default implementation that does nothing, as the base
+system does not contain a daemon that obtains the current date and time.
+The system administrator is meant to override the daemon in
+.Pa /etc/init/time
+by depending on a daemon that obtains the current date and time and sets the
+system time.
+Daemons can depend on this daemon if they need the current date and time to have
+been established before they start.
+.El
+.Sh FORMAT
+Daemon configuration files are processed line by line.
+The # character starts a comment and the rest of the line is ignored.
+Each line specifies a property of the daemon.
+.\" TODO: White space, tokenization.
+.Bl -tag -width "12345678"
+.It Sy cd Ar directory
+The working directory to run the deamon inside.
+(Default is
+.Pa / )
+.It Sy exec Ar command
+The command line that starts the daemon.
+.Pp
+If this property isn't specified, then the daemon is a virtual daemon.
+Virtual deamons become ready well all their dependencies are ready and finish
+when all their dependencies are finished.
+Virtual daemons exit 0 (success) if every dependency finished successfully,
+otherwise they exit 2 (failed).
+.It Sy exit-code-meaning Oo Sy default "|" poweroff-reboot Oc
+This property specifies how to interpret the exit code.
+.Pp
+The
+.Sy default
+meaning is that exiting 0 is successful.
+Any other exit means the daemon failed.
+.Pp
+The
+.Sy poweroff-reboot
+meaning is that exiting 0 means the system should power off, exiting 1 means the
+system should reboot, and any other exit means the daemon failed (exit 2 should
+preferably be used if the system should panic).
+.Pp
+Daemons are considered successful if they exit by
+.Sy SIGTERM
+if
+.Xr init 8
+stopped the daemon by sending
+.Sy SIGTERM.
+.It Sy furthermore
+The current daemon configuration file extends an existing daemon that is defined
+in a configuration file by the same name later in the search path.
+The later configuration file is included into the current configuration file.
+This statement can only be used once per configuration file, any subsequent uses
+are silently ignored, but it can be used recursively.
+Customizing an existing daemon should be done by adding a new daemon file
+earlier in the search path that starts with the
+.Sy furthermore
+statement, followed by additional configuration.
+.Pp
+This is not a property and cannot be
+.Sy unset .
+.It Sy need tty
+.\" TODO: Only a single daemon can be this.
+Specifies that the daemon is not a background daemon, but instead a foreground
+daemon that requires a terminal.
+.\" TODO: Make session leader.
+The daemon is made a process group leader.
+The terminal's foreground process group is set to that of the daemon.
+The terminal is enabled by setting
+.Sy CREAD .
+The daemon is not logged, and the standard input, output, and error are instead
+connected to the terminal.
+.\" TODO: Automatically being ready could be another independent property.
+Foreground daemons are automatically considered ready and don't participate in
+the
+.Ev READYFD
+daemon readiness protocol.
+Upon exit, the original terminal settings are restored and
+.Xr init 8
+regains ownership of the terminal.
+.It Sy require Ar dependency Oo Ar flag ... Oc
+.\" TODO: 'suggest dependency' which doesn't fail if it can't be provided,
+.\"       and is just best-effort.
+When the daemon is needed, start the
+.Ar dependency
+first.
+The daemon starts when all its dependencies have become ready or have finished.
+Dependencies are started in parallel whenever possible.
+.\" TODO: Whether all dependencies are waited for in the eror case.
+If the daemon hasn't started yet, and any dependency finishes unsuccessfully,
+the daemon doesn't start and instead directly finishes unsuccessfully.
+If the daemon has started, it is the daemon's responsibility to detect failures
+in its dependencies.
+.Pp
+The dependency can be customized with zero or more flags:
+.Bl -tag -width "12345678"
+.It Sy exit-code
+If the daemon is a virtual daemon, then the daemon's exit code is that of the
+specific
+.Ar dependency
+rather than whether all dependencies succeeded.
+The daemon exits as soon as the
+.Ar dependency
+exits, rather than waiting for all dependencies to exit.
+The
+.Sy exit-code-meaning
+field is set to that of the dependency.
+.Sy exit-code
+can at most be used on a single dependency for a daemon.
+.It Sy no-await
+Don't wait for the
+.Ar dependency
+to become ready before starting this daemon.
+This flag is meant for dependencies that the daemon can make use of, but isn't
+essential to the daemon itself becoming ready.
+It shouldn't be used if the daemon polls for the the dependency to come online,
+as it is more efficient to only start the daemon once the dependency is ready.
+.It Sy optional
+.\" TODO: What about a dependency that succeeds if the dependency isn't
+.\"       installed?
+Start the daemon even if the
+.Ar dependency
+fails.
+.\" TODO: Warning or error?
+The dependency is assumed to exist and a warning occurs if it doesn't exist.
+.El
+.Pp
+Dependencies can be forgotten using
+.Sy unset require Ar dependency .
+Flags on a dependency can be be unset using
+.Sy unset require Ar dependency flag ... .
+.It Sy unset Ar property
+Reset the given property to its default value.
+.It Sy tty Ar device
+.\" TODO: Do something with this property.
+If the daemon is a foreground daemon
+.Sy ( need tty
+is set), then connect the daemon to the terminal named
+.Ar device .
+This property is currently ignored and the daemon is always connected to
+.Pa tty1 .
+.El
+.Sh FILES
+.\" TODO: Interesting daemons: default, local, base, time, single-user, etc.
+.Bl -tag -width /share/init/ -compact
+.It Pa /etc/init/
+Daemon configuration for the local system (first in search path).
+.It Pa /share/init/
+Default daemon configuration provided by the operating system (second in search
+path).
+.It Pa /var/log/
+Daemon log files.
+.El
+.Sh EXAMPLES
+.Ss Configuring a daemon to start on boot
+The local system can be configured to start the
+.Sy exampled
+daemon by creating
+.Pa /etc/init/local
+with the following contents:
+.Bd -literal
+require exampled optional
+.Ed
+.Pp
+Additional lines can be included for any daemon you wish to start.
+The
+.Sy optional
+flag means the
+.Sy local
+daemon doesn't fail if the daemon fails.
+The top level daemons
+.Sy ( multi-user , single-user , ... )
+fails if the
+.Sy local
+daemon fails.
+The
+.Sy optional
+flag should only be omitted if a local daemon is critical and the boot should
+fail if the daemon fails.
+.Ss Creating a new virtual daemon
+The
+.Sy exampled
+daemon, which depends on the
+.Sy food , bard ,
+and
+.Sy quxd
+daemons and whose program file is called
+.Pa exampled ,
+can then be configured by creating
+.Pa /etc/init/exampled
+with the following contents:
+.Bd -literal
+require food
+require bard
+require quxd
+exec exampled
+.Ed
+.Ss Configuring a multi-user system
+The system can be configured to boot into multi-user mode by creating
+.Pa /etc/init/default
+with the following contents:
+.Bd -literal
+require multi-user exit-code
+.Ed
+.Ss Configuring an unattended system
+A fully unattended system that only starts the base system and the
+.Sy exampled
+daemon, shutting down when the
+.Sy exampled
+daemon finishes, can be done by first creating
+.Pa /etc/init/default
+with the following contents:
+.Bd -literal
+require no-user exit-code
+.Ed
+.Pp
+And then secondly creating
+.Pa /etc/init/local
+with the following contents:
+.Bd -literal
+require exampled exit-code
+.Ed
+.Sh SEE ALSO
+.Xr init 8

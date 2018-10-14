@@ -1,0 +1,8 @@
+require base no-await
+require local no-await
+
+tty tty0
+need tty
+
+exit-code-meaning poweroff-reboot
+exec login

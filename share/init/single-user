@@ -1,0 +1,9 @@
+require base no-await
+require local no-await
+
+tty tty0
+need tty
+
+cd "$HOME"
+exit-code-meaning poweroff-reboot
+exec "$SHELL"

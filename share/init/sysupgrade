@@ -1,0 +1,11 @@
+require base no-await
+require local no-await
+
+tty tty0
+need tty
+
+# TODO:
+#program=sysupgrade
+#exec "$program"
+exec sysupgrade
+exit-code-meaning poweroff-reboot

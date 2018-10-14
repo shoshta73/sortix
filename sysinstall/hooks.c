@@ -86,6 +86,58 @@ void upgrade_prepare(const struct release* old_release,
 		}
 		free(random_seed_path);
 	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(target_prefix, "sortix-1.1-init") )
+	{
+		char* init_target_path;
+		char* init_default_path;
+		if ( asprintf(&init_target_path, "%setc/init/target",
+		              target_prefix) < 0 ||
+		     asprintf(&init_default_path, "%setc/init/default",
+		              target_prefix) < 0 )
+		{
+			warn("malloc");
+			_exit(1);
+		}
+		FILE* init_target_fp = fopen(init_target_path, "r");
+		if ( init_target_fp )
+		{
+			printf(" - Converting /etc/init/target to /etc/init/default...\n");
+			char* line = NULL;
+			size_t line_size = 0;
+			ssize_t line_length = getline(&line, &line_size, init_target_fp);
+			if ( line_length < 0 )
+			{
+				warn("getline: %s", init_target_path);
+				_exit(1);
+			}
+			if ( line_length && line[line_length - 1] == '\n' )
+				line[line_length - 1] = '\0';
+			fclose(init_target_fp);
+			FILE* init_default_fp = fopen(init_default_path, "w");
+			if ( !init_default_fp ||
+			     fprintf(init_default_fp, "require %s exit-code\n", line) < 0 ||
+			     fclose(init_default_fp) == EOF )
+			{
+				warn("%s", init_default_path);
+				_exit(1);
+			}
+			free(line);
+			if ( unlink(init_target_path) < 0 )
+			{
+				warn("unlink: %s", init_target_path);
+				_exit(1);
+			}
+		}
+		else if ( errno != ENOENT )
+		{
+			warn("%s", init_target_path);
+			_exit(1);
+		}
+		free(init_target_path);
+		free(init_default_path);
+	}
 }
 
 void upgrade_finalize(const struct release* old_release,
