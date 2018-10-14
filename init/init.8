@@ -6,16 +6,14 @@
 .Nd system initialization
 .Sh SYNOPSIS
 .Nm init
-.Op Fl \-target Ns "=" Ns Ar init-target
+.Op Fl \-target Ns "=" Ns Ar default-daemon
 .Op Fl \-
 .Op Ar chain-init ...
 .Sh DESCRIPTION
 .Nm
 is the first program run after system startup and is responsible for
-initializing the operating system and starting the specified
-.Ar init-target .
-This is normally a login screen, a root shell, or a dedicated special purpose
-program.
+initializing the operating system constituted by the default daemon (system
+background process) and its dependencies.
 .Pp
 The
 .Xr kernel 7
@@ -34,56 +32,8 @@ If the system is installed on a harddisk, then the initrd is a minimal system
 made with
 .Xr update-initrd 8
 that will search for the actual root filesystem and chain init it.
-The next stage init will recognize it as the intended system and complete the
-system startup.
-.Ss Initialization Target
-.Nm
-first determines its target from the
-.Fl \-target
-option if specified or
-.Pa /etc/init/target
-otherwise.
-Supported targets are:
-.Pp
-.Bl -tag -width "single-user" -compact -offset indent
-.It Sy chain
-mount real root filesystem and run its
-.Nm .
-.It Sy chain-merge
-like
-.Sy chain
-but run
-.Pa /sysmerge/sbin/init
-with the
-.Sy merge
-target.
-.It Sy merge
-finish a
-.Xr sysmerge 8
-upgrade and then execute the real
-.Nm
-with its default target.
-.It Sy multi-user
-boot to
-.Xr login 8 .
-.It Sy single-user
-boot to root shell without password (not secure).
-.It Sy sysinstall
-boot to operating system installer (not secure).
-.It Sy sysupgrade
-boot to operating system upgrader (not secure).
-.El
-.Pp
-It is a full system compromise if unauthenticated users are able to boot the
-wrong target.
-The kernel command line can specify the path to
-.Nm
-and its arguments.
-Unprivileged users can change the kernel command line from the bootloader
-command line if it hasn't been password protected.
-Likewise unprivileged users can use their own replacement bootloader by booting
-a portable device under their control if the firmware configuration has not been
-password protected.
+The next stage init will recognize itself as the intended system and complete
+the system startup.
 .Ss Cleanup of /tmp and /var/run
 .Nm
 deletes everything inside of
@@ -104,18 +54,21 @@ will scan every block device for valid partition tables and create the
 corresponding partition devices in
 .Pa /dev .
 .Ss Chain Initialization
+.\" TODO: Clarify this under the new daemon model.
 The
 .Sy chain
-target mounts the root filesystem as in
+and
+.Sy chain-merge
+targets mounts the root filesystem as in
 .Pa /etc/fstab
 (see
 .Xr fstab 5 )
 and runs the next
 .Nm
 program.
-This is used by
+This configuration file is a copy of the real file made by
 .Xr update-initrd 8
-to make a bootstrap
+when it makes a bootstrap
 .Xr initrd 7 .
 .Pp
 Every block device and partition is scanned to determine if it is the root
@@ -164,6 +117,7 @@ on the next boot.
 The file is also written on system shutdown where the system has the most
 entropy.
 .Ss Merge
+.\" TODO: Clarify this under the new daemon model.
 The
 .Sy merge
 target completes a delayed system upgrade by invoking the
@@ -178,7 +132,20 @@ If the upgrade succeeds, the temporary
 deinitializes the system and invokes the real (now upgraded)
 .Nm
 which will restart system initialization in the normal fashion.
-.Ss Session
+.Ss Daemons
+TODO: This section.
+.Pp
+It is a full system compromise if unauthenticated users are able to boot the
+wrong target.
+The kernel command line can specify the path to
+.Nm
+and its arguments.
+Unprivileged users can change the kernel command line from the bootloader
+command line if it hasn't been password protected.
+Likewise unprivileged users can use their own replacement bootloader by booting
+a portable device under their control if the firmware configuration has not been
+password protected.
+.Pp
 Finally
 .Nm
 will start the target program according to its initialization target.
@@ -213,21 +180,44 @@ root
 .Sh FILES
 .Bl -tag -width "/boot/random.seed" -compact
 .It Pa /boot/random.seed
-initial kernel entropy
-.It Pa /etc/init/target
-default initialization target
+Initial kernel entropy
+.It Pa /etc/init/
+Daemon configuration for the local system (first in search path) (see
+.Xr init 5 )
+.It Pa /etc/init/default
+Configuration for the default daemon (see
+.Xr init 5 )
 .It Pa /etc/fstab
-filesystem table (see
+Filesystem table (see
 .Xr fstab 5 )
 .It Pa /etc/hostname
-hostname (see
+Hostname (see
 .Xr hostname 5 )
 .It Pa /etc/kblayout
-keyboard layout (see
+Keyboard layout (see
 .Xr kblayout 5 )
 .It Pa /etc/videomode
-graphics resolution (see
+Graphics resolution (see
 .Xr videomode 5 )
+.It Pa /share/init/
+Default daemon configuration provided by the operating system (second in
+search path) (see
+.Xr init 5 )
+.It Pa /var/log/
+Daemon log files (see
+.Xr init 5 )
+.It Pa /var/log/init.log
+.Nm Ns 's
+own log.
+.El
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGUSR1"
+.It Dv SIGTERM
+Request system poweroff.
+.It Dv SIGINT
+Request system reboot.
+.It Dv SIGQUIT
+Request system halt.
 .El
 .Sh EXIT STATUS
 .Nm
@@ -243,6 +233,7 @@ exits with the same exit status as its target session if it terminates normally.
 .Sh SEE ALSO
 .Xr fstab 5 ,
 .Xr hostname 5 ,
+.Xr init 5 ,
 .Xr kblayout 5 ,
 .Xr videomode 5 ,
 .Xr initrd 7 ,

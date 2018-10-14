@@ -1,0 +1,2 @@
+require base no-await
+require local no-await exit-code

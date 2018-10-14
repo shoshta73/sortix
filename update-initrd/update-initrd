@@ -77,9 +77,13 @@ mkdir "$tmp/etc"
 cp "$sysroot/etc/fstab" "$tmp/etc/fstab"
 mkdir "$tmp/etc/init"
 if $sysmerge; then
-  echo chain-merge > "$tmp/etc/init/target"
+  cat > "$tmp/etc/init/default" << EOF
+require chain-merge exit-code
+EOF
 else
-  echo chain > "$tmp/etc/init/target"
+  cat > "$tmp/etc/init/default" << EOF
+require chain exit-code
+EOF
 fi
 mkdir -p "$sysroot/boot"
 mkinitrd --format=sortix-initrd-2 "$tmp" -o "$sysroot/boot/sortix.initrd" > /dev/null

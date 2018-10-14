@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,14 +26,18 @@
 
 #include <assert.h>
 #include <ctype.h>
-#include <err.h>
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <fstab.h>
 #include <grp.h>
+#include <inttypes.h>
 #include <ioleast.h>
+#include <limits.h>
 #include <locale.h>
+#include <poll.h>
+#include <psctl.h>
 #include <pwd.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -45,6 +49,11 @@
 #include <time.h>
 #include <timespec.h>
 #include <unistd.h>
+
+// TODO: The Sortix <limits.h> doesn't expose this at the moment.
+#if !defined(HOST_NAME_MAX) && defined(__sortix__)
+#include <sortix/limits.h>
+#endif
 
 #include <fsmarshall.h>
 
@@ -69,7 +78,166 @@ struct mountpoint
 	char* absolute;
 };
 
+enum exit_code_meaning
+{
+	EXIT_CODE_MEANING_DEFAULT,
+	EXIT_CODE_MEANING_POWEROFF_REBOOT,
+};
+
+enum daemon_state
+{
+	DAEMON_STATE_TERMINATED,
+	DAEMON_STATE_SCHEDULED,
+	DAEMON_STATE_WAITING,
+	DAEMON_STATE_SATISFIED,
+	DAEMON_STATE_STARTING,
+	DAEMON_STATE_READY,
+	DAEMON_STATE_RUNNING,
+	DAEMON_STATE_TERMINATING,
+	DAEMON_STATE_FINISHED,
+	NUM_DAEMON_STATES
+};
+
+struct daemon;
+
+struct dependency
+{
+	struct daemon* source;
+	struct daemon* target;
+	char* target_name; // TODO: Can we avoid this?
+	int flags;
+	// TODO: bool ready, finished, failed?
+};
+
+#define DEPENDENCY_FLAG_REQUIRE (1 << 0)
+#define DEPENDENCY_FLAG_AWAIT (1 << 1)
+#define DEPENDENCY_FLAG_EXIT_CODE (1 << 2)
+// TODO: Flag to signal that it's okay if the dependency is restarted / isn't
+//       there all the time.
+
+enum log_method
+{
+	LOG_METHOD_NONE,
+	LOG_METHOD_APPEND,
+	LOG_METHOD_ROTATE,
+};
+
+enum log_format
+{
+	LOG_FORMAT_NONE,
+	LOG_FORMAT_SECONDS,
+	LOG_FORMAT_NANOSECONDS,
+	LOG_FORMAT_BASIC,
+	LOG_FORMAT_FULL,
+	LOG_FORMAT_SYSLOG,
+};
+
+struct log
+{
+	enum log_method method;
+	enum log_format format;
+	bool control_messages;
+	bool rotate_on_start;
+	size_t max_rotations;
+	size_t max_line_size;
+	off_t max_size;
+	char* path;
+	char* path_src;
+	char* path_dst;
+	size_t path_number_offset;
+	size_t path_number_size;
+	off_t size;
+	int fd;
+	bool line_terminated;
+	bool line_begun;
+};
+
+struct daemon
+{
+	char* name;
+	struct daemon* next_by_state;
+	struct daemon* prev_by_state;
+	struct daemon* parent_of_parameter;
+	struct daemon* first_by_parameter;
+	struct daemon* last_by_parameter;
+	struct daemon* prev_by_parameter;
+	struct daemon* next_by_parameter;
+	struct dependency** dependencies;
+	size_t dependencies_used;
+	size_t dependencies_length;
+	size_t dependencies_ready;
+	size_t dependencies_finished;
+	size_t dependencies_failed;
+	struct dependency** dependents;
+	size_t dependents_used;
+	size_t dependents_length;
+	size_t reference_count;
+	size_t pfd_readyfd_index;
+	size_t pfd_outputfd_index;
+	struct dependency* exit_code_from;
+	char* cd;
+	char* exec;
+	char* netif;
+	struct termios oldtio;
+	struct log log;
+	pid_t pid;
+	enum exit_code_meaning exit_code_meaning;
+	enum daemon_state state;
+	int exit_code;
+	int readyfd;
+	int outputfd;
+	bool need_tty;
+	bool was_ready;
+	bool was_terminated;
+	bool was_dereferenced;
+};
+
+struct dependency_config
+{
+	char* target;
+	int flags;
+};
+
+struct daemon_config
+{
+	char* name;
+	struct dependency_config** dependencies;
+	size_t dependencies_used;
+	size_t dependencies_length;
+	char** variables;
+	size_t variables_used;
+	size_t variables_length;
+	char* cd;
+	char* exec;
+	enum exit_code_meaning exit_code_meaning;
+	bool need_tty;
+	enum log_method log_method;
+	enum log_format log_format;
+	bool log_control_messages;
+	bool log_rotate_on_start;
+	size_t log_rotations;
+	size_t log_line_size;
+	off_t log_size;
+};
+
 static pid_t main_pid;
+static pid_t forward_signal_pid = -1;
+
+static volatile sig_atomic_t caught_exit_signal = -1;
+static sigset_t handled_signals;
+
+static struct daemon_config default_config =
+{
+	.log_method = LOG_METHOD_ROTATE,
+	.log_format = LOG_FORMAT_NANOSECONDS,
+	.log_control_messages = true,
+	.log_rotate_on_start = false,
+	.log_rotations = 3,
+	.log_line_size = 4096,
+	.log_size = 1048576,
+};
+
+static struct log init_log = { .fd = -1 };
 
 static struct harddisk** hds = NULL;
 static size_t hds_used = 0;
@@ -79,10 +247,69 @@ static struct mountpoint* mountpoints = NULL;
 static size_t mountpoints_used = 0;
 static size_t mountpoints_length = 0;
 
+static struct daemon** daemons = NULL;
+static size_t daemons_used = 0;
+static size_t daemons_length = 0;
+
+static struct daemon* first_daemon_by_state[NUM_DAEMON_STATES];
+static struct daemon* last_daemon_by_state[NUM_DAEMON_STATES];
+static size_t count_daemon_by_state[NUM_DAEMON_STATES];
+
+static struct pollfd* pfds = NULL;
+static size_t pfds_used = 0;
+static size_t pfds_length = 0;
+
+static struct daemon** pfds_daemon = NULL;
+static size_t pfds_daemon_length = 0;
+
 static bool chain_location_made = false;
 static char chain_location[] = "/tmp/fs.XXXXXX";
 static bool chain_location_dev_made = false;
 static char chain_location_dev[] = "/tmp/fs.XXXXXX/dev";
+
+static void signal_handler(int signum)
+{
+	if ( getpid() != main_pid )
+		return;
+
+	if ( forward_signal_pid != -1 )
+	{
+		if ( 0 < forward_signal_pid )
+			kill(forward_signal_pid, signum);
+		return;
+	}
+
+	switch ( signum )
+	{
+	case SIGINT: caught_exit_signal = 1; break;
+	case SIGTERM: caught_exit_signal = 0; break;
+	case SIGQUIT: caught_exit_signal = 2; break;
+	}
+}
+
+static void install_signal_handler(void)
+{
+	sigemptyset(&handled_signals);
+	sigaddset(&handled_signals, SIGINT);
+	sigaddset(&handled_signals, SIGQUIT);
+	sigaddset(&handled_signals, SIGTERM);
+	sigprocmask(SIG_BLOCK, &handled_signals, NULL);
+	struct sigaction sa = { .sa_handler = signal_handler, .sa_flags = 0 };
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGQUIT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
+}
+
+static void uninstall_signal_handler(void)
+{
+	struct sigaction sa = { .sa_handler = SIG_DFL, .sa_flags = 0 };
+	sa.sa_handler = SIG_DFL;
+	sa.sa_flags = 0;
+	sigaction(SIGINT, &sa, NULL);
+	sigaction(SIGQUIT, &sa, NULL);
+	sigaction(SIGTERM, &sa, NULL);
+	sigprocmask(SIG_UNBLOCK, &handled_signals, NULL);
+}
 
 static char* read_single_line(FILE* fp)
 {
@@ -110,6 +337,45 @@ static char* join_paths(const char* a, const char* b)
 	return result;
 }
 
+static bool array_add(void*** array_ptr,
+                      size_t* used_ptr,
+                      size_t* length_ptr,
+                      void* value)
+{
+	void** array;
+	memcpy(&array, array_ptr, sizeof(array)); // Strict aliasing.
+
+	if ( *used_ptr == *length_ptr )
+	{
+		// TODO: Avoid overflow (in all copies of this code).
+		size_t new_length = 2 * *length_ptr;
+		if ( !new_length )
+			new_length = 16;
+		// TODO: Avoid overflow and use reallocarray in all copies of this code.
+		size_t new_size = new_length * sizeof(void*);
+		void** new_array = (void**) realloc(array, new_size);
+		if ( !new_array )
+			return false;
+		array = new_array;
+		memcpy(array_ptr, &array, sizeof(array)); // Strict aliasing.
+		*length_ptr = new_length;
+	}
+
+	memcpy(array + (*used_ptr)++, &value, sizeof(value)); // Strict aliasing.
+
+	return true;
+}
+
+static int exit_code_to_exit_status(int exit_code)
+{
+	if ( WIFEXITED(exit_code) )
+		return WEXITSTATUS(exit_code);
+	else if ( WIFSIGNALED(exit_code) )
+		return 128 + WTERMSIG(exit_code);
+	else
+		return 1;
+}
+
 __attribute__((noreturn))
 __attribute__((format(printf, 1, 2)))
 static void fatal(const char* format, ...)
@@ -125,6 +391,8 @@ static void fatal(const char* format, ...)
 		exit(2);
 	_exit(2);
 }
+
+// TODO: error
 
 __attribute__((format(printf, 1, 2)))
 static void warning(const char* format, ...)
@@ -148,6 +416,1872 @@ static void note(const char* format, ...)
 	fprintf(stderr, "\n");
 	fflush(stderr);
 	va_end(ap);
+}
+
+// TODO: Log fsck and such early logging? What about chain booting?
+
+static void log_close(struct log* log)
+{
+	if ( 0 <= log->fd )
+		close(log->fd);
+	log->fd = -1;
+}
+
+static bool log_open(struct log* log)
+{
+	if ( log->method == LOG_METHOD_NONE )
+		return true;
+	int logflags = O_CREAT | O_WRONLY | O_APPEND | O_NOFOLLOW;
+	if ( log->method == LOG_METHOD_APPEND && log->rotate_on_start )
+		logflags |= O_TRUNC;
+	if ( 0 <= log->fd )
+		close(log->fd);
+	// TODO: Allow daemons to have non-public logs.
+	log->fd = open(log->path, logflags, 0644);
+	if ( log->fd < 0 )
+	{
+		// Don't let read-only filesystems block daemons from trying to start.
+		if ( errno == EROFS )
+		{
+			// TODO: Warn once about /var/log being read-only.
+			return true;
+		}
+		warning("%s: %m", log->path);
+		return false;
+	}
+	struct stat st;
+	if ( fstat(log->fd, &st) < 0 )
+	{
+		warning("stat: %s: %m", log->path);
+		close(log->fd);
+		log->fd = -1;
+		return false;
+	}
+	log->size = st.st_size;
+	log->line_terminated = true;
+	return true;
+}
+
+static bool log_rotate(struct log* log)
+{
+	if ( log->method == LOG_METHOD_NONE )
+		return true;
+	if ( 0 <= log->fd )
+	{
+		close(log->fd);
+		log->fd = -1;
+	}
+	for ( size_t i = log->max_rotations; 0 < i; i-- )
+	{
+		snprintf(log->path_dst + log->path_number_offset,
+		         log->path_number_size, ".%zu", i);
+		snprintf(log->path_src + log->path_number_offset,
+		         log->path_number_size, "%c%zu", i-1 != 0 ? '.' : '\0', i-1);
+		if ( i == log->max_rotations )
+		{
+			if ( !access(log->path_dst, F_OK) )
+			{
+				// Ensure the file system space usage has an upper bound by
+				// deleting the oldest log. However if another process has the
+				// log open, the kernel will keep the file contents alive. The
+				// file is truncated to zero size to avoid disk space remaining
+				// temporarily in use that way, although the inode itself does
+				// remain open temporarily.
+				// TODO: Handle EROFS.
+				// TODO: truncateat should have a flags parameter, to not follow
+				// symbolic links. Otherwise a symlink in /var/log could be
+				// used to truncate an arbitrary file, which is avoided here.
+				int fd = open(log->path_dst, O_WRONLY | O_NOFOLLOW);
+				if ( fd < 0 )
+					warning("archiving: opening: %s", log->path_dst);
+				else
+				{
+					if ( ftruncate(fd, 0) < 0 )
+					{
+						if ( errno == EROFS )
+						{
+							// TODO: Warn once about /var/log being read-only.
+						}
+						else
+							warning("archiving: truncate: %s", log->path_dst);
+					}
+					close(fd);
+				}
+				if ( unlink(log->path_dst) < 0 )
+				{
+					if ( errno == EROFS )
+					{
+						// TODO: Warn once about /var/log being read-only.
+					}
+					else
+						warning("archiving: unlink: %s", log->path_dst);
+				}
+			}
+			else if ( errno != ENOENT )
+				warning("archiving: %s", log->path_dst);
+		}
+		if ( rename(log->path_src, log->path_dst) < 0 )
+		{
+			if ( errno == ENOENT )
+			{
+				// Ignore non-existent logs.
+			}
+			else if ( errno == EROFS )
+			{
+				// TODO: Warn once about /var/log being read-only.
+			}
+			else
+			{
+				// TODO: Should an error message be printed here or elsewhere?
+				return false;
+			}
+		}
+	}
+	return log_open(log);
+}
+
+static bool log_begin(struct log* log)
+{
+	if ( log->method == LOG_METHOD_NONE )
+		return true;
+	if ( log->method == LOG_METHOD_ROTATE && log->rotate_on_start )
+		return log_rotate(log);
+	return log_open(log);
+}
+
+static bool log_initialize(struct log* log,
+                           const char* name,
+                           struct daemon_config* daemon_config)
+{
+	memset(log, 0, sizeof(*log));
+	log->fd = -1;
+	log->method = daemon_config->log_method;
+	log->format = daemon_config->log_format;
+	log->control_messages = daemon_config->log_control_messages;
+	log->rotate_on_start = daemon_config->log_rotate_on_start;
+	log->max_rotations = daemon_config->log_rotations;
+	log->max_line_size = daemon_config->log_line_size;
+	log->max_size = daemon_config->log_size;
+	if ( asprintf(&log->path, "/var/log/%s.log", name) < 0 )
+		return false;
+	// Preallocate the paths used when renaming log files so there's no error
+	// conditions when cycling logs.
+	if ( asprintf(&log->path_src, "%s.%i", log->path, INT_MAX) < 0 )
+		return free(log->path), false;
+	if ( asprintf(&log->path_dst, "%s.%i", log->path, INT_MAX) < 0 )
+		return free(log->path_src), free(log->path), false;
+	log->path_number_offset = strlen(log->path);
+	log->path_number_size = strlen(log->path_dst) + 1 - log->path_number_offset;
+	return true;
+}
+
+static void log_data(struct log* log, const char* data, size_t length)
+{
+	if ( log->method == LOG_METHOD_NONE )
+		return;
+	// TODO: Support for infinitely sized chunks / OFF_MAX chunks?
+	// TODO: Ensure log->max_line_size <= log->max_size.
+	const off_t chunk_cut_offset = log->max_size - log->max_line_size;
+	size_t sofar = 0;
+	while ( sofar < length )
+	{
+		if ( log->fd < 0 )
+		{
+			// TODO: Handle skipped data?
+			//log->skipped += length - sofar;
+			return;
+		}
+		// If the data is currently line terminated, then cut if we can't add
+		// another line of the maximum length, otherwise cut if the chunk is
+		// full.
+		if ( log->method == LOG_METHOD_ROTATE &&
+		      (log->line_terminated ?
+		      chunk_cut_offset :
+		      log->max_size) <= log->size )
+		{
+			if ( !log_rotate(log) )
+			{
+				// TODO: Handle skipped data?
+				//log->skipped += length - sofar;
+				return;
+			}
+		}
+		// Decide the size of the new chunk to write out.
+		const char* next_data = data + sofar;
+		size_t remaining_length = length - sofar;
+		size_t next_length = remaining_length;
+		if ( log->method == LOG_METHOD_ROTATE )
+		{
+			off_t chunk_left = log->max_size - log->size;
+			next_length =
+				(uintmax_t) remaining_length < (uintmax_t) chunk_left ?
+				(size_t) remaining_length : (size_t) chunk_left;
+			// Attempt to cut the log at a newline.
+			if ( chunk_cut_offset <= log->size + (off_t) next_length )
+			{
+				// Find where the data becomes eligible for a line cut, and
+				// search for a newline after that.
+				size_t first_cut_index =
+					log->size < chunk_cut_offset ?
+					0 :
+					(size_t) (chunk_cut_offset - log->size);
+				for ( size_t i = first_cut_index; i < next_length; i++ )
+				{
+					if ( next_data[i] == '\n' )
+					{
+						next_length = i + 1;
+						break;
+					}
+				}
+			}
+		}
+		ssize_t amount = write(log->fd, next_data, next_length);
+		if ( amount < 0 )
+		{
+			// TODO: Don't spam here.
+			warning("writing log: %s: %m", log->path);
+			// TODO: Always rotate on error if non-empty?
+			// TODO: Handle skipped data?
+			//log->skipped += length - sofar;
+			return;
+		}
+		sofar += amount;
+		log->size += amount;
+		log->line_terminated = next_data[amount - 1] == '\n';
+	}
+}
+
+static void log_formatted(struct log* log, const char* string, size_t length)
+{
+	if ( log->format == LOG_FORMAT_NONE )
+	{
+		log_data(log, string, length);
+		return;
+	}
+	// TODO: This information should be part of struct log.
+	const char* log_name = log->path;
+	if ( strrchr(log_name, '/') )
+		log_name = strrchr(log_name, '/') + 1;
+	size_t log_name_length = strlen(log_name) - 4 /* .log */;
+	for ( size_t i = 0; i < length; )
+	{
+		size_t fragment = 1;
+		while ( string[i + fragment - 1] != '\n' && i + fragment < length )
+			fragment++;
+		if ( !log->line_begun )
+		{
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			struct tm tm;
+			gmtime_r(&now.tv_sec, &tm);
+			char hostname[HOST_NAME_MAX + 1];
+			gethostname(hostname, sizeof(hostname));
+			if ( log->format == LOG_FORMAT_SYSLOG )
+			{
+				int pri = 3 /* system daemons */ * 8 + 6 /* informational */;
+				char header[64];
+				snprintf(header, sizeof(header), "<%d>1 ", pri);
+				log_data(log, header, strlen(header));
+			}
+			char timeformat[64] = "%F %T +0000";
+			if ( log->format == LOG_FORMAT_SYSLOG )
+				snprintf(timeformat, sizeof(timeformat),
+				         "%%FT%%T.%06liZ", now.tv_nsec / 1000);
+			else if ( log->format != LOG_FORMAT_SECONDS )
+				snprintf(timeformat, sizeof(timeformat),
+				         "%%F %%T.%09li +0000", now.tv_nsec);
+			char timestamp[64];
+			strftime(timestamp, sizeof(timestamp), timeformat, &tm);
+			log_data(log, timestamp, strlen(timestamp));
+			if ( log->format == LOG_FORMAT_FULL ||
+			     log->format == LOG_FORMAT_SYSLOG )
+			{
+				log_data(log, " ", 1);
+				log_data(log, hostname, strlen(hostname));
+			}
+			if ( log->format == LOG_FORMAT_BASIC ||
+			     log->format == LOG_FORMAT_FULL ||
+			     log->format == LOG_FORMAT_SYSLOG )
+			{
+				log_data(log, " ", 1);
+				log_data(log, log_name, log_name_length);
+			}
+			// TODO: Pid of the daemon instead.
+			if ( log->format == LOG_FORMAT_SYSLOG )
+				log_data(log, " - - - ", strlen(" - 1 - "));
+			else
+				log_data(log, ": ", 2);
+		}
+		log_data(log, string + i, fragment);
+		log->line_begun = string[i + fragment - 1] != '\n';
+		i += fragment;
+	}
+}
+
+static size_t log_callback(void* ctx, const char* str, size_t len)
+{
+	log_formatted((struct log*) ctx, str, len);
+	return len;
+}
+
+__attribute__((format(printf, 2, 3)))
+static void log_status(const char* status, const char* format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	vcbprintf(&init_log, log_callback, format, ap);
+	va_end(ap);
+	// TODO: Verbose logging mode.
+	if ( strcmp(status, "failed") != 0 )
+		return;
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	struct tm tm;
+	localtime_r(&now.tv_sec, &tm);
+	va_start(ap, format);
+	fprintf(stderr, "%04d-%02d-%02d %02d:%02d:%02d ",
+		tm.tm_year + 1900,
+		tm.tm_mon + 1,
+		tm.tm_mday + 1,
+		tm.tm_hour,
+		tm.tm_min,
+		tm.tm_sec);
+	if ( !strcmp(status, "starting") )
+		fprintf(stderr, "[      ] ");
+	else if ( !strcmp(status, "started") )
+		fprintf(stderr, "[  \e[92mOK\e[m  ] ");
+	else if ( !strcmp(status, "finished") )
+		fprintf(stderr, "[ \e[92mDONE\e[m ] ");
+	else if ( !strcmp(status, "failed") )
+		fprintf(stderr, "[\e[91mFAILED\e[m] ");
+	else if ( !strcmp(status, "stopping") )
+		fprintf(stderr, "[      ] ");
+	else if ( !strcmp(status, "stopped") )
+		fprintf(stderr, "[  \e[92mOK\e[m  ] ");
+	else
+		fprintf(stderr, "[  ??  ] ");
+	vfprintf(stderr, format, ap);
+	fprintf(stderr, "\n");
+	fflush(stderr);
+	va_end(ap);
+}
+
+static void daemon_config_free(struct daemon_config* daemon_config)
+{
+	free(daemon_config->name);
+	for ( size_t i = 0; i < daemon_config->dependencies_used; i++ )
+	{
+		free(daemon_config->dependencies[i]->target);
+		free(daemon_config->dependencies[i]);
+	}
+	free(daemon_config->dependencies);
+	for ( size_t i = 0; i < daemon_config->variables_used; i++ )
+		free(daemon_config->variables[i]);
+	free(daemon_config->variables);
+	free(daemon_config->cd);
+	free(daemon_config->exec);
+	free(daemon_config);
+}
+
+static bool daemon_config_load_search(struct daemon_config* daemon_config,
+                                      size_t next_search_path_index);
+
+static bool daemon_process_line(struct daemon_config* daemon_config,
+                                const char* path,
+                                char* line,
+                                off_t line_number,
+                                size_t next_search_path_index)
+{
+	// TODO: export foo="bar"
+	char* input = line;
+	while ( isspace((unsigned char) input[0]) )
+		input++;
+	if ( !input[0] || input[0] == '#' )
+		return true;
+	char* operation = input;
+	size_t operation_length = 0;
+	while ( operation[operation_length] &&
+	        !isspace((unsigned char) operation[operation_length]) )
+		operation_length++;
+	char* parameter = operation + operation_length;
+	while ( isspace((unsigned char) parameter[0]) )
+		parameter++;
+	operation[operation_length] = '\0';
+	if ( !strcmp(operation, "cd") )
+	{
+		free(daemon_config->cd);
+		if ( !(daemon_config->cd = strdup(parameter)) )
+		{
+			warning("strdup: %m");
+			return false;
+		}
+	}
+	else if ( !strcmp(operation, "exec") )
+	{
+		free(daemon_config->exec);
+		if ( !(daemon_config->exec = strdup(parameter)) )
+		{
+			warning("strdup: %m");
+			return false;
+		}
+	}
+	else if ( !strcmp(operation, "exit-code-meaning") )
+	{
+		if ( !strcmp(parameter, "default") )
+			daemon_config->exit_code_meaning = EXIT_CODE_MEANING_DEFAULT;
+		else if ( !strcmp(parameter, "poweroff-reboot") )
+			daemon_config->exit_code_meaning =
+				EXIT_CODE_MEANING_POWEROFF_REBOOT;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+	}
+	else if ( !strcmp(operation, "furthermore") )
+	{
+		if ( parameter[0] )
+			warning("%s:%ji: unexpected parameter to %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+		// TODO: Only once per search path level.
+		// TODO: How about requiring it to be the first statement?
+		if ( !daemon_config_load_search(daemon_config, next_search_path_index) )
+		{
+			if ( errno == ENOENT )
+			{
+				warning("%s:%ji: 'furthermore' failed to locate next '%s' "
+				        "configuration file in search path: %m",
+				        path, (intmax_t) line_number, daemon_config->name);
+				errno = EINVAL;
+			}
+			else
+				warning("%s: while processing 'furthermore': %m", path);
+			return false;
+		}
+	}
+	else if ( !strcmp(operation, "log-control-messages") )
+	{
+		if ( !strcmp(parameter, "true") )
+			daemon_config->log_control_messages = true;
+		else if ( !strcmp(parameter, "false") )
+			daemon_config->log_control_messages = false;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+	}
+	else if ( !strcmp(operation, "log-format") )
+	{
+		if ( !strcmp(parameter, "none") )
+			daemon_config->log_format = LOG_FORMAT_NONE;
+		else if ( !strcmp(parameter, "seconds") )
+			daemon_config->log_format = LOG_FORMAT_SECONDS;
+		else if ( !strcmp(parameter, "nanoseconds") )
+			daemon_config->log_format = LOG_FORMAT_NANOSECONDS;
+		else if ( !strcmp(parameter, "basic") )
+			daemon_config->log_format = LOG_FORMAT_BASIC;
+		else if ( !strcmp(parameter, "full") )
+			daemon_config->log_format = LOG_FORMAT_FULL;
+		else if ( !strcmp(parameter, "syslog") )
+			daemon_config->log_format = LOG_FORMAT_SYSLOG;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+	}
+	else if ( !strcmp(operation, "log-line-size") )
+	{
+		char* end;
+		errno = 0;
+		uintmax_t value = strtoumax(parameter, &end, 10);
+		if ( parameter == end || errno || value != (size_t) value )
+			warning("%s:%ji: invalid %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+		else
+			daemon_config->log_line_size = (size_t) value;
+	}
+	else if ( !strcmp(operation, "log-method") )
+	{
+		if ( !strcmp(parameter, "append") )
+			daemon_config->log_method = LOG_METHOD_APPEND;
+		else if ( !strcmp(parameter, "rotate") )
+			daemon_config->log_method = LOG_METHOD_ROTATE;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+	}
+	else if ( !strcmp(operation, "log-rotate-on-start") )
+	{
+		if ( !strcmp(parameter, "true") )
+			daemon_config->log_rotate_on_start = true;
+		else if ( !strcmp(parameter, "false") )
+			daemon_config->log_rotate_on_start = false;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+	}
+	else if ( !strcmp(operation, "log-size") )
+	{
+		char* end;
+		errno = 0;
+		intmax_t value = strtoimax(parameter, &end, 10);
+		if ( parameter == end || errno || value != (off_t) value )
+			warning("%s:%ji: invalid %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+		else
+			daemon_config->log_size = (off_t) value;
+	}
+	else if ( !strcmp(operation, "need") )
+	{
+		if ( !strcmp(parameter, "tty") )
+			daemon_config->need_tty = true;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+	}
+	else if ( !strcmp(operation, "require") )
+	{
+		// TODO: Better tokenization.
+		size_t target_name_length = 0;
+		while ( parameter[target_name_length] &&
+		        !isspace((unsigned char) parameter[target_name_length]) )
+			target_name_length++;
+		if ( !target_name_length )
+		{
+			warning("%s:%ji: error: No dependency was named: %s",
+			        path, (intmax_t) line_number, line);
+			return true;
+		}
+		char* target = strndup(parameter, target_name_length);
+		if ( !target )
+		{
+			warning("strdup: %m");
+			return false;
+		}
+		int negated_flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
+		int flags = negated_flags;
+		size_t flag_index = target_name_length;
+		while ( parameter[flag_index] )
+		{
+			while ( isspace((unsigned char) parameter[flag_index]) )
+				flag_index++;
+			if ( !parameter[flag_index] )
+				break;
+			char* flag = parameter + flag_index;
+			size_t flag_length = 0;
+			while ( flag[flag_length] &&
+			        !isspace((unsigned char) flag[flag_length]) )
+				flag_length++;
+			flag_index += flag_length;
+			if ( flag_length == strlen("optional") &&
+			     !memcmp(flag, "optional", strlen("optional")) )
+			{
+				flags &= ~DEPENDENCY_FLAG_REQUIRE;
+			}
+			else if ( flag_length == strlen("no-await") &&
+			          !memcmp(flag, "no-await", strlen("no-await")) )
+			{
+				flags &= ~DEPENDENCY_FLAG_AWAIT;
+			}
+			else if ( flag_length == strlen("exit-code") &&
+			          !memcmp(flag, "exit-code", strlen("exit-code")) )
+			{
+				// TODO: Warning if multiple requirements use exit-code.
+				flags |= DEPENDENCY_FLAG_EXIT_CODE;
+			}
+			else
+			{
+				warning("%s:%ji: error: Unsupported flag '%.*s' (%zu): %s",
+				        path, (intmax_t) line_number, (int) flag_length, flag,
+				        flag_length, line);
+				// TODO: Error handling?
+			}
+		}
+		// TODO: Linear time lookup.
+		struct dependency_config* dependency = NULL;
+		for ( size_t i = 0; i < daemon_config->dependencies_used; i++ )
+		{
+			if ( !strcmp(daemon_config->dependencies[i]->target, target) )
+			{
+				dependency = daemon_config->dependencies[i];
+				break;
+			}
+		}
+		if ( dependency )
+		{
+			dependency->flags &= flags & negated_flags;
+			dependency->flags |= flags & ~negated_flags;
+			free(target);
+		}
+		else
+		{
+			dependency = (struct dependency_config*)
+				calloc(1, sizeof(struct dependency_config));
+			if ( !dependency )
+			{
+				warning("malloc: %m");
+				free(target);
+				return false;
+			}
+			dependency->target = target;
+			dependency->flags = flags;
+			if ( !array_add((void***) &daemon_config->dependencies,
+				            &daemon_config->dependencies_used,
+				            &daemon_config->dependencies_length,
+				            dependency) )
+			{
+				warning("malloc: %m");
+				free(target);
+				free(dependency);
+				return false;
+			}
+		}
+	}
+	else if ( !strcmp(operation, "tty") )
+	{
+		// TODO: Implement.
+	}
+	else if ( !strcmp(operation, "unset") )
+	{
+		if ( !strcmp(parameter, "cd") )
+		{
+			free(daemon_config->cd);
+			daemon_config->cd = NULL;
+		}
+		else if ( !strcmp(parameter, "exec") )
+		{
+			free(daemon_config->exec);
+			daemon_config->exec = NULL;
+		}
+		else if ( !strcmp(parameter, "exit-code-meaning") )
+			daemon_config->exit_code_meaning = EXIT_CODE_MEANING_DEFAULT;
+		else if ( !strcmp(operation, "log-control-messages") )
+			daemon_config->log_control_messages =
+				default_config.log_control_messages;
+		else if ( !strcmp(operation, "log-format") )
+			daemon_config->log_format = default_config.log_format;
+		else if ( !strcmp(operation, "log-line-size") )
+			daemon_config->log_line_size = default_config.log_line_size;
+		else if ( !strcmp(operation, "log-method") )
+			daemon_config->log_method = default_config.log_method;
+		else if ( !strcmp(operation, "log-rotate-on-start") )
+			daemon_config->log_rotate_on_start =
+				default_config.log_rotate_on_start;
+		else if ( !strcmp(operation, "log-size") )
+			daemon_config->log_line_size = default_config.log_line_size;
+		// TODO: Proper tokenzation.
+		else if ( !strcmp(parameter, "need tty") )
+		{
+			daemon_config->need_tty = false;
+		}
+		// TODO: Better tokenzation.
+		// TODO: Fully test this implementation.
+		else if ( !strncmp(parameter, "require", strlen("require")) &&
+		          isspace((unsigned char) parameter[strlen("require")]) )
+		{
+			parameter += strlen("require");
+			while ( isspace((unsigned char) parameter[0]) )
+				parameter++;
+			// TODO: Better tokenization.
+			size_t target_name_length = 0;
+			while ( parameter[target_name_length] &&
+				    !isspace((unsigned char) parameter[target_name_length]) )
+				target_name_length++;
+			if ( !target_name_length )
+			{
+				// TODO: Instead delete all dependencies?
+				// TODO: Proper error handling.
+				warning("%s:%ji: error: No dependency was named: %s",
+				        path, (intmax_t) line_number, line);
+				return true;
+			}
+			// TODO: Linear time lookup.
+			struct dependency_config* dependency = NULL;
+			size_t i;
+			for ( i = 0; i < daemon_config->dependencies_used; i++ )
+			{
+				if ( !strncmp(daemon_config->dependencies[i]->target,
+				              parameter,
+				              target_name_length) &&
+				      !daemon_config->dependencies[i]->target[
+				          target_name_length] )
+				{
+					dependency = daemon_config->dependencies[i];
+					break;
+				}
+			}
+			if ( !dependency )
+			{
+				// TODO: Proper error handling.
+				warning("%s:%ji: error: Dependency wasn't already required: %s",
+				        path, (intmax_t) line_number, line);
+				return true;
+			}
+			parameter += target_name_length;
+			while ( isspace((unsigned char) parameter[0]) )
+				parameter++;
+			if ( !parameter[0] )
+			{
+				// TODO: Shrink array.
+				free(daemon_config->dependencies[i]->target);
+				size_t last = daemon_config->dependencies_used - 1;
+				if ( i != last )
+				{
+					daemon_config->dependencies[i] =
+						daemon_config->dependencies[last];
+					daemon_config->dependencies[last] = NULL;
+				}
+				daemon_config->dependencies_used--;
+				return true;
+			}
+			size_t flag_index = target_name_length;
+			while ( parameter[flag_index] )
+			{
+				while ( isspace((unsigned char) parameter[flag_index]) )
+					flag_index++;
+				if ( !parameter[flag_index] )
+					break;
+				char* flag = parameter + flag_index;
+				size_t flag_length = 0;
+				while ( flag[flag_length] &&
+					    !isspace((unsigned char) flag[flag_length]) )
+					flag_length++;
+				flag_index += flag_length;
+				if ( flag_length == strlen("optional") &&
+				     !memcmp(flag, "optional", strlen("optional")) )
+				{
+					if ( dependency->flags & DEPENDENCY_FLAG_REQUIRE )
+						warning("%s:%ji: error: "
+						        "Dependency wasn't already optional: %s",
+						        path, (intmax_t) line_number, line);
+					else
+						dependency->flags |= DEPENDENCY_FLAG_REQUIRE;
+				}
+				else if ( flag_length == strlen("no-await") &&
+				          !memcmp(flag, "no-await", strlen("no-await")) )
+				{
+					if ( dependency->flags & DEPENDENCY_FLAG_AWAIT )
+						warning("%s:%ji: error: "
+						        "Dependency wasn't already no-await: %s",
+						        path, (intmax_t) line_number, line);
+					else
+						dependency->flags |= DEPENDENCY_FLAG_AWAIT;
+				}
+				else if ( flag_length == strlen("exit-code") &&
+				          !memcmp(flag, "exit-code", strlen("exit-code")) )
+				{
+					if ( !(dependency->flags & DEPENDENCY_FLAG_EXIT_CODE) )
+						warning("%s:%ji: error: "
+						        "Dependency wasn't already exit-code: %s",
+						        path, (intmax_t) line_number, line);
+					else
+						dependency->flags &= ~DEPENDENCY_FLAG_EXIT_CODE;
+				}
+				else
+				{
+					warning("%s:%ji: error: Unsupported flag '%.*s' (%zu): %s",
+					        path, (intmax_t) line_number, (int) flag_length,
+					        flag, flag_length, line);
+					// TODO: Error handling?
+				}
+			}
+		}
+		else if ( !strcmp(parameter, "tty") )
+		{
+			// TODO: Implement.
+		}
+		else
+			warning("%s:%ji: unknown unset operation: %s",
+			        path, (intmax_t) line_number, operation);
+	}
+	else
+		warning("%s:%ji: unknown operation: %s",
+		        path, (intmax_t) line_number, operation);
+	return true;
+}
+
+static bool daemon_config_load_from_path(struct daemon_config* daemon_config,
+                                         const char* path,
+                                         size_t next_search_path_index)
+{
+	FILE* fp = fopen(path, "r");
+	if ( !fp )
+	{
+		if ( errno != ENOENT )
+			warning("%s: Failed to load daemon configuration file: %m", path);
+		return false;
+	}
+	char* line = NULL;
+	size_t line_size = 0;
+	ssize_t line_length;
+	off_t line_number = 0;
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
+	{
+		if ( line[line_length-1] == '\n' )
+			line[--line_length] = '\0';
+		line_number++;
+		if ( !daemon_process_line(daemon_config, path, line, line_number,
+		                          next_search_path_index) )
+		{
+			fclose(fp);
+			free(line);
+			return false;
+		}
+	}
+	free(line);
+	if ( ferror(fp) )
+	{
+		warning("%s: %m", path);
+		fclose(fp);
+		return false;
+	}
+	fclose(fp);
+	return true;
+}
+
+static bool daemon_config_load_search(struct daemon_config* daemon_config,
+                                      size_t next_search_path_index)
+{
+	// If the search path ever becomes arbitrarily long, consider handling the
+	// 'furthermore' feature in a manner using constant stack space rather than
+	// recursion.
+	const char* search_paths[] =
+	{
+		"/etc/init",
+		"/share/init",
+	};
+	size_t search_paths_count = sizeof(search_paths) / sizeof(search_paths[0]);
+	for ( size_t i = next_search_path_index; i < search_paths_count; i++ )
+	{
+		const char* search_path = search_paths[i];
+		char* path = join_paths(search_path, daemon_config->name);
+		if ( !path )
+		{
+			warning("malloc: %m");
+			return false;
+		}
+		if ( !daemon_config_load_from_path(daemon_config, path, i + 1) )
+		{
+			// TODO: Ensure ENOENT is not set recursively when using
+			//       furthermore and the next file doesn't exist.
+			if ( errno == ENOENT )
+				continue;
+			free(path);
+			return NULL;
+		}
+		free(path);
+		return true;
+	}
+	errno = ENOENT;
+	return false;
+}
+
+static void daemon_config_initialize(struct daemon_config* daemon_config)
+{
+	memset(daemon_config, 0, sizeof(*daemon_config));
+	daemon_config->log_method = default_config.log_method;
+	daemon_config->log_format = default_config.log_format;
+	daemon_config->log_control_messages = default_config.log_control_messages;
+	daemon_config->log_rotate_on_start = default_config.log_rotate_on_start;
+	daemon_config->log_rotations = default_config.log_rotations;
+	daemon_config->log_line_size = default_config.log_line_size;
+	daemon_config->log_size = default_config.log_size;
+}
+
+static struct daemon_config* daemon_config_load(const char* name)
+{
+	struct daemon_config* daemon_config = malloc(sizeof(struct daemon_config));
+	if ( !daemon_config )
+	{
+		warning("malloc: %m");
+		return NULL;
+	}
+	daemon_config_initialize(daemon_config);
+	if ( !(daemon_config->name = strdup(name)) )
+	{
+		warning("malloc: %m");
+		daemon_config_free(daemon_config);
+		return NULL;
+	}
+	if ( !daemon_config_load_search(daemon_config, 0) )
+	{
+		if ( errno == ENOENT )
+			warning("failed to locate daemon configuration: %s: %m", name);
+		daemon_config_free(daemon_config);
+		return NULL;
+	}
+	return daemon_config;
+}
+
+static char** generate_argv(const char* command, const char* netif)
+{
+	char** argv = NULL;
+	size_t argv_used = 0;
+	size_t argv_length = 0;
+	// TODO: Proper shell quote expander and parser.
+	while ( command[0] )
+	{
+		size_t length = strcspn(command, "\t\n ");
+		if ( length == 0 )
+		{
+			command++;
+			continue;
+		}
+		char* arg = strndup(command, length);
+		if ( !arg )
+			fatal("malloc: %m");
+		if ( !array_add((void***) &argv, &argv_used, &argv_length, arg) )
+			fatal("malloc: %m");
+		command += length;
+	}
+	if ( netif )
+	{
+		char* arg = strdup(netif);
+		if ( !arg )
+			fatal("malloc: %m");
+		if ( !array_add((void***) &argv, &argv_used, &argv_length, arg) )
+			fatal("malloc: %m");
+	}
+	if ( !array_add((void***) &argv, &argv_used, &argv_length, NULL) )
+		fatal("malloc: %m");
+	return argv;
+}
+
+// TODO: Replace with better data structure.
+static struct daemon* add_daemon(void)
+{
+	if ( daemons_used == daemons_length )
+	{
+		size_t new_length = 2 * daemons_length;
+		if ( new_length == 0 )
+			new_length = 16;
+		struct daemon** new_daemons =
+			reallocarray(daemons, sizeof(struct daemon*), new_length);
+		if ( !new_daemons )
+			fatal("malloc: %m");
+		daemons = new_daemons;
+		daemons_length = new_length;
+	}
+	struct daemon* daemon = calloc(1, sizeof(struct daemon));
+	if ( !daemon )
+		fatal("malloc: %m");
+	daemons[daemons_used++] = daemon;
+	return daemon;
+}
+
+// TODO: This runs in O(n) but could be in O(log n).
+static struct daemon* daemon_find_by_name(const char* name)
+{
+	for ( size_t i = 0; i < daemons_used; i++ )
+		if ( !strcmp(daemons[i]->name, name) )
+			return daemons[i];
+	return NULL;
+}
+
+// TODO: This runs in O(n) but could be in O(log n).
+static struct daemon* daemon_find_by_pid(pid_t pid)
+{
+	for ( size_t i = 0; i < daemons_used; i++ )
+		if ( daemons[i]->pid == pid )
+			return daemons[i];
+	return NULL;
+}
+
+static bool daemon_is_failed(struct daemon* daemon)
+{
+	if ( daemon->was_terminated &&
+	     WIFSIGNALED(daemon->exit_code) &&
+	     WTERMSIG(daemon->exit_code) == SIGTERM )
+		return false;
+	switch ( daemon->exit_code_meaning )
+	{
+	case EXIT_CODE_MEANING_DEFAULT:
+		return !WIFEXITED(daemon->exit_code) ||
+		       WEXITSTATUS(daemon->exit_code) != 0;
+	case EXIT_CODE_MEANING_POWEROFF_REBOOT:
+		return !WIFEXITED(daemon->exit_code) ||
+		       3 <= WEXITSTATUS(daemon->exit_code);
+	}
+	return true;
+}
+
+static void daemon_insert_state_list(struct daemon* daemon)
+{
+	assert(!daemon->prev_by_state);
+	assert(!daemon->next_by_state);
+	assert(first_daemon_by_state[daemon->state] != daemon);
+	assert(last_daemon_by_state[daemon->state] != daemon);
+	daemon->prev_by_state = last_daemon_by_state[daemon->state];
+	daemon->next_by_state = NULL;
+	if ( last_daemon_by_state[daemon->state] )
+		last_daemon_by_state[daemon->state]->next_by_state = daemon;
+	else
+		first_daemon_by_state[daemon->state] = daemon;
+	last_daemon_by_state[daemon->state] = daemon;
+	count_daemon_by_state[daemon->state]++;
+}
+
+static void daemon_remove_state_list(struct daemon* daemon)
+{
+	assert(daemon->prev_by_state ||
+	       daemon == first_daemon_by_state[daemon->state]);
+	assert(daemon->next_by_state ||
+	       daemon == last_daemon_by_state[daemon->state]);
+	assert(0 < count_daemon_by_state[daemon->state]);
+	if ( daemon->prev_by_state )
+		daemon->prev_by_state->next_by_state = daemon->next_by_state;
+	else
+		first_daemon_by_state[daemon->state] = daemon->next_by_state;
+	if ( daemon->next_by_state )
+		daemon->next_by_state->prev_by_state = daemon->prev_by_state;
+	else
+		last_daemon_by_state[daemon->state] = daemon->prev_by_state;
+	count_daemon_by_state[daemon->state]--;
+	daemon->prev_by_state = NULL;
+	daemon->next_by_state = NULL;
+}
+
+static void daemon_change_state_list(struct daemon* daemon,
+                                     enum daemon_state new_state)
+{
+	daemon_remove_state_list(daemon);
+	daemon->state = new_state;
+	daemon_insert_state_list(daemon);
+}
+
+static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
+                                        const char* netif)
+{
+	struct daemon* daemon = add_daemon();
+	daemon->state = DAEMON_STATE_TERMINATED;
+	daemon->readyfd = -1;
+	daemon->outputfd = -1;
+	daemon->log.fd = -1;
+	daemon_insert_state_list(daemon);
+	if ( netif )
+	{
+		if ( asprintf(&daemon->name, "%s.%s", daemon_config->name, netif) < 0 )
+			fatal("asprintf");
+	}
+	else
+	{
+		if ( !(daemon->name = strdup(daemon_config->name)) )
+			fatal("malloc: %m");
+	}
+	daemon->dependencies = (struct dependency**)
+		reallocarray(NULL, daemon_config->dependencies_used,
+		             sizeof(struct dependency*));
+	if ( !daemon->dependencies )
+		fatal("malloc: %m");
+	daemon->dependencies_used = daemon_config->dependencies_used;
+	daemon->dependencies_length = daemon_config->dependencies_length;
+	for ( size_t i = 0; i < daemon_config->dependencies_used; i++ )
+	{
+		struct dependency_config* dependency_config =
+			daemon_config->dependencies[i];
+		struct dependency* dependency = calloc(1, sizeof(struct dependency));
+		if ( !dependency )
+			fatal("malloc: %m");
+		if ( !(dependency->target_name = strdup(dependency_config->target)) )
+			fatal("malloc: %m");
+		dependency->flags = dependency_config->flags;
+		daemon->dependencies[i] = dependency;
+		// TODO: Either allow multiple dependencies to be exit code or enforce
+		//       that only a single one uses it.
+		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
+			daemon->exit_code_from = dependency;
+	}
+	if ( daemon_config->cd && !(daemon->cd = strdup(daemon_config->cd)) )
+		fatal("malloc: %m");
+	if ( daemon_config->exec && !(daemon->exec = strdup(daemon_config->exec)) )
+		fatal("malloc: %m");
+	daemon->exit_code_meaning = daemon_config->exit_code_meaning;
+	if ( netif && !(daemon->netif = strdup(netif)) )
+		fatal("malloc: %m");
+	if ( !log_initialize(&daemon->log, daemon->name, daemon_config) )
+		fatal("malloc: %m");
+	daemon->need_tty = daemon_config->need_tty;
+	return daemon;
+}
+
+static struct daemon* daemon_create(struct daemon_config* daemon_config)
+{
+	struct daemon* daemon = daemon_create_sub(daemon_config, NULL);
+	if ( !daemon )
+		fatal("malloc: %m");
+	return daemon;
+}
+
+static struct daemon* daemon_load_config_and_create(const char* name)
+{
+	struct daemon_config* daemon_config = daemon_config_load(name);
+	if ( !daemon_config )
+	{
+		warning("failed to load daemon configuration: %s: %m", name);
+		return NULL;
+	}
+	struct daemon* daemon = daemon_create(daemon_config);
+	if ( !daemon )
+	{
+		warning("failed to create daemon: %s: %m", name);
+		daemon_config_free(daemon_config);
+		return NULL;
+	}
+	daemon_config_free(daemon_config);
+	return daemon;
+}
+
+static void schedule_daemon(struct daemon* daemon)
+{
+	assert(daemon->state == DAEMON_STATE_TERMINATED);
+	daemon_change_state_list(daemon, DAEMON_STATE_SCHEDULED);
+}
+
+// TODO: Mutual recursion.
+static void daemon_on_finished(struct daemon* daemon);
+static void daemon_mark_finished(struct daemon* daemon);
+
+static void daemon_terminate(struct daemon* daemon)
+{
+	assert(!daemon->was_terminated);
+	daemon->was_terminated = true;
+	if ( 0 < daemon->pid )
+	{
+		log_status("stopping", "Stopping %s.\n", daemon->name);
+		// TODO: Send SIGKILL after a timeout.
+		kill(daemon->pid, SIGTERM);
+		daemon_change_state_list(daemon, DAEMON_STATE_TERMINATING);
+	}
+	else
+	{
+		daemon_change_state_list(daemon, DAEMON_STATE_TERMINATING);
+		// TODO: Recursion.
+		daemon_on_finished(daemon);
+	}
+}
+
+static void daemon_on_not_referenced(struct daemon* daemon)
+{
+	assert(daemon->reference_count == 0);
+	if ( daemon->state == DAEMON_STATE_TERMINATED ||
+	     daemon->state == DAEMON_STATE_SCHEDULED ||
+	     daemon->state == DAEMON_STATE_WAITING ||
+	     daemon->state == DAEMON_STATE_SATISFIED )
+	{
+		daemon_mark_finished(daemon);
+		assert(daemon->state == DAEMON_STATE_FINISHED);
+	}
+	else if ( daemon->state == DAEMON_STATE_STARTING ||
+	          daemon->state == DAEMON_STATE_READY ||
+	          daemon->state == DAEMON_STATE_RUNNING )
+	{
+		daemon_terminate(daemon);
+		// Dependencies are dereferenced when the daemon terminates.
+	}
+	else
+	{
+		// Dependencies are dereferenced when the daemon terminates.
+	}
+}
+
+static void daemon_dereference(struct daemon* daemon)
+{
+	assert(0 < daemon->reference_count);
+	daemon->reference_count--;
+	// TODO: Recursion.
+	if ( !daemon->reference_count )
+		daemon_on_not_referenced(daemon);
+}
+
+static void daemon_dereference_dependencies(struct daemon* daemon)
+{
+	assert(!daemon->was_dereferenced);
+	daemon->was_dereferenced = true;
+	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
+		daemon_dereference(daemon->dependencies[i]->target);
+}
+
+static void daemon_on_dependency_ready(struct dependency* dependency)
+{
+	struct daemon* daemon = dependency->source;
+	if ( !(dependency->flags & DEPENDENCY_FLAG_AWAIT) )
+		return;
+	daemon->dependencies_ready++;
+	if ( daemon->state == DAEMON_STATE_WAITING &&
+	     daemon->dependencies_ready == daemon->dependencies_used )
+		daemon_change_state_list(daemon, DAEMON_STATE_SATISFIED);
+}
+
+static void daemon_mark_ready(struct daemon* daemon)
+{
+	// TODO: Right place to do it?
+	daemon_change_state_list(daemon, DAEMON_STATE_RUNNING);
+	daemon->was_ready = true;
+	for ( size_t i = 0; i < daemon->dependents_used; i++ )
+		daemon_on_dependency_ready(daemon->dependents[i]);
+}
+
+static void daemon_on_ready(struct daemon* daemon)
+{
+	log_status("started", "Started %s.\n", daemon->name);
+	daemon_mark_ready(daemon);
+}
+
+static void daemon_on_dependency_finished(struct dependency* dependency)
+{
+	struct daemon* daemon = dependency->source;
+	struct daemon* target = dependency->target;
+	daemon->dependencies_finished++;
+	// TODO: This is to protect against virtual daemons where daemon_terminate
+	//       has already been called from calling daemon_on_finished again. Best
+	//       way to do this?
+	if ( daemon->state == DAEMON_STATE_FINISHED )
+		return;
+	bool failed = (dependency->flags & DEPENDENCY_FLAG_REQUIRE) &&
+	              daemon_is_failed(target);
+	if ( failed )
+		daemon->dependencies_failed++;
+	if ( daemon->exec )
+	{
+		if ( failed )
+		{
+			// TODO: If still waiting for dependencies to start, fail early.
+		}
+	}
+	else if ( daemon->exit_code_from )
+	{
+		// TODO: Either 1) enforce that only a single dependency can be exit
+		//       code, or 2) specifically allow this and support it.
+		// TODO: Require exit_code_from to be a dependency.
+		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
+		{
+			daemon->exit_code = target->exit_code;
+			// TODO: Recursion.
+			daemon_on_finished(daemon);
+		}
+		// TODO: This ignores the exit code from other dependencies. Make it
+		//       possible to still fail early if a key dependency fails, even
+		//       if we want the exit code from a particular dependency.
+	}
+	else
+	{
+		// TODO: This gathers all the exit codes before the virtual daemon
+		//       finished, maybe have a kind of virtual daemon that finished on
+		//       first error?
+		if ( failed )
+			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
+		if ( daemon->dependencies_finished == daemon->dependencies_used )
+		{
+			// TODO: Recursion.
+			daemon_on_finished(daemon);
+		}
+	}
+}
+
+static void daemon_mark_finished(struct daemon* daemon)
+{
+	assert(daemon->state != DAEMON_STATE_FINISHED);
+	if ( !daemon->was_ready )
+	{
+		// TODO: Does this have unintended consequences? Can/should we do a
+		//       special transition bypassing the ready logic?
+		daemon_mark_ready(daemon);
+	}
+	// TODO: Right place to do it?
+	daemon_change_state_list(daemon, DAEMON_STATE_FINISHED);
+	for ( size_t i = 0; i < daemon->dependents_used; i++ )
+		daemon_on_dependency_finished(daemon->dependents[i]);
+	daemon_dereference_dependencies(daemon);
+}
+
+static void daemon_on_finished(struct daemon* daemon)
+{
+	assert(daemon->state != DAEMON_STATE_FINISHED);
+	if ( daemon_is_failed(daemon) )
+		log_status("failed", "%s exited unsuccessfully.\n", daemon->name);
+	else if ( daemon->state == DAEMON_STATE_TERMINATING )
+		log_status("stopped", "Stopped %s.\n", daemon->name);
+	else
+		log_status("finished", "Finished %s.\n", daemon->name);
+	daemon_mark_finished(daemon);
+}
+
+static void daemon_register_pollfd(struct daemon* daemon,
+                                   int fd,
+                                   size_t* out_index,
+                                   short events)
+{
+	assert(pfds_used < pfds_length);
+	assert(pfds_used < pfds_daemon_length);
+	size_t index = pfds_used++;
+	struct pollfd* pfd = pfds + index;
+	memset(pfd, 0, sizeof(*pfd));
+	pfd->fd = fd;
+	pfd->events = events;
+	pfds_daemon[index] = daemon;
+	*out_index = index;
+}
+
+static void daemon_unregister_pollfd(struct daemon* daemon, size_t index)
+{
+	assert(pfds_used <= pfds_length);
+	assert(index < pfds_used);
+	assert(pfds_daemon[index] == daemon);
+	// This function is relied on to not mess with any pollfds prior to the
+	// index, so it doesn't break a forward iteration on the pollfds.
+	size_t last_index = pfds_used - 1;
+	if ( index != last_index )
+	{
+		memcpy(pfds + index, pfds + last_index, sizeof(*pfds));
+		pfds_daemon[index] = pfds_daemon[last_index];
+		if ( 0 <= pfds_daemon[index]->readyfd &&
+		     pfds_daemon[index]->pfd_readyfd_index == last_index )
+			pfds_daemon[index]->pfd_readyfd_index = index;
+		if ( 0 <= pfds_daemon[index]->outputfd &&
+		     pfds_daemon[index]->pfd_outputfd_index == last_index )
+			pfds_daemon[index]->pfd_outputfd_index = index;
+	}
+	pfds_used--;
+	memset(pfds + last_index, 0, sizeof(*pfds));
+	pfds_daemon[last_index] = NULL;
+}
+
+static void daemon_schedule(struct daemon* daemon)
+{
+	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
+	{
+		// TODO: Require the dependency graph to be an directed acylic graph.
+		struct dependency* dependency = daemon->dependencies[i];
+		dependency->source = daemon;
+		dependency->target = daemon_find_by_name(dependency->target_name);
+		if ( !dependency->target )
+		{
+			// TODO: It's not possible to depend on a parameterized
+			//       daemon.
+			dependency->target =
+				daemon_load_config_and_create(dependency->target_name);
+			if ( !dependency->target )
+			{
+				// TODO: What should print this error message?
+				log_status("failed", "%s could not load %s: %m\n",
+				           daemon->name, dependency->target_name);
+				if ( dependency->flags & DEPENDENCY_FLAG_REQUIRE )
+				{
+					// TODO: However, such a dependency hasn't been made below,
+					//       so it can be higher than dependents_used.
+					// TODO: This causes the daemon to fail, but it doesn't set
+					// the exit code.
+					daemon->dependencies_failed++;
+				}
+				else
+				{
+					// TODO: A null target has been left in this dependency. We
+					//       should probably avoid that or take care everywhere
+					//       else. This is probably not a good and tested state.
+				}
+				continue;
+			}
+		}
+		// TODO: This may already have been done if it has already run before.
+		// TODO: Don't add as dependent if failed?
+		if ( !array_add((void***) &dependency->target->dependents,
+		               &dependency->target->dependents_used,
+		               &dependency->target->dependents_length,
+		               dependency) )
+			fatal("malloc: %m");
+		dependency->target->reference_count++;
+		if ( daemon->exit_code_from == dependency  )
+			daemon->exit_code_meaning =
+				daemon->exit_code_from->target->exit_code_meaning;
+		if ( dependency->target->state == DAEMON_STATE_TERMINATED )
+		{
+			schedule_daemon(dependency->target);
+			if ( !(dependency->flags & DEPENDENCY_FLAG_AWAIT) )
+				daemon->dependencies_ready++;
+		}
+		else if ( dependency->target->state == DAEMON_STATE_SCHEDULED ||
+		          dependency->target->state == DAEMON_STATE_SATISFIED ||
+		          dependency->target->state == DAEMON_STATE_STARTING )
+		{
+			// Daemon start is already in progress.
+			if ( !(dependency->flags & DEPENDENCY_FLAG_AWAIT) )
+				daemon->dependencies_ready++;
+		}
+		else if ( dependency->target->state == DAEMON_STATE_RUNNING )
+		{
+			daemon->dependencies_ready++;
+		}
+		else if ( dependency->target->state == DAEMON_STATE_TERMINATING )
+		{
+			// TODO: Bring it back up first. How?
+		}
+		else if ( dependency->target->state == DAEMON_STATE_FINISHED )
+		{
+			daemon->dependencies_ready++;
+			daemon->dependencies_finished++;
+			if ( (dependency->flags & DEPENDENCY_FLAG_REQUIRE) &&
+			     daemon_is_failed(daemon) )
+			{
+				daemon->dependencies_failed++;
+				// TODO: Don't start more dependencies.
+				//break;
+			}
+		}
+		else
+		{
+			// TODO: This is unreachable.
+		}
+	}
+	if ( daemon->dependencies_ready < daemon->dependencies_used )
+		daemon_change_state_list(daemon, DAEMON_STATE_WAITING);
+	else
+		daemon_change_state_list(daemon, DAEMON_STATE_SATISFIED);
+}
+
+static void daemon_start(struct daemon* daemon)
+{
+	assert(daemon->state == DAEMON_STATE_SATISFIED);
+	if ( !daemon->exec )
+	{
+		daemon_on_ready(daemon);
+		if ( daemon->exit_code_from )
+		{
+			struct daemon* target = daemon->exit_code_from->target;
+			if ( target->state == DAEMON_STATE_FINISHED )
+			{
+				daemon->exit_code = target->exit_code;
+				daemon_on_finished(daemon);
+			}
+		}
+		else if ( daemon->dependencies_finished == daemon->dependencies_used )
+		{
+			daemon_on_finished(daemon);
+		}
+		return;
+	}
+	// TODO: Support for a virtual daemon using the exit-code flag to still fail
+	//       if certain key dependencies fail.
+	if ( 0 < daemon->dependencies_failed )
+	{
+		// TODO: daemon_on_finished also makes a message.
+		log_status("failed", "Failed to start %s.\n", daemon->name);
+		// TODO: Should this vary with exit_code_meaning?
+		daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
+		daemon_on_finished(daemon);
+		return;
+	}
+	log_status("starting", "Starting %s...\n", daemon->name);
+	uid_t uid = getuid();
+	pid_t ppid = getpid();
+	struct passwd* pwd = getpwuid(uid);
+	if ( !pwd )
+		fatal("looking up user by uid %" PRIuUID ": %m", uid);
+	const char* home = pwd->pw_dir[0] ? pwd->pw_dir : "/";
+	const char* shell = pwd->pw_shell[0] ? pwd->pw_shell : "sh";
+	const char* cd = daemon->cd ? daemon->cd : "/";
+	// TODO: This is a hack.
+	if ( !strcmp(cd, "\"$HOME\"") )
+		cd = home;
+	const char* exec = daemon->exec;
+	// TODO: This is a hack.
+	if ( !strcmp(exec, "\"$SHELL\"") )
+		exec = shell;
+	char** argv = generate_argv(exec, daemon->netif);
+	if ( !argv )
+		fatal("malloc: %m");
+	int outputfds[2];
+	int readyfds[2];
+	if ( !daemon->need_tty )
+	{
+		size_t required_fds = 2;
+		if ( pfds_length - pfds_used < required_fds )
+		{
+			size_t old_length = pfds_length ? pfds_length : required_fds;
+			struct pollfd* new_pfds =
+				reallocarray(pfds, old_length, 2 * sizeof(struct pollfd));
+			if ( !new_pfds )
+				fatal("malloc");
+			pfds = new_pfds;
+			pfds_length = old_length * 2;
+		}
+		if ( pfds_daemon_length - pfds_used < required_fds )
+		{
+			size_t old_length =
+				pfds_daemon_length ? pfds_daemon_length : required_fds;
+			struct daemon** new_pfds_daemon =
+				reallocarray(pfds_daemon, old_length,
+				             2 * sizeof(struct daemon*));
+			if ( !new_pfds_daemon )
+				fatal("malloc");
+			pfds_daemon = new_pfds_daemon;
+			pfds_daemon_length = old_length * 2;
+		}
+		if ( !log_begin(&daemon->log) )
+		{
+			// TODO: Should we not stop the daemon?
+		}
+		if ( pipe(outputfds) < 0 )
+			fatal("pipe");
+		daemon->outputfd = outputfds[0];
+		fcntl(daemon->outputfd, F_SETFL, O_NONBLOCK);
+		// Setup the pollfd for the outputfd.
+		daemon_register_pollfd(daemon, daemon->outputfd,
+		                       &daemon->pfd_outputfd_index, POLLIN);
+		// Create the readyfd.
+		if ( pipe(readyfds) < 0 )
+			fatal("pipe");
+		daemon->readyfd = readyfds[0];
+		fcntl(daemon->readyfd, F_SETFL, O_NONBLOCK);
+		// Setup the pollfd for the readyfd.
+		daemon_register_pollfd(daemon, daemon->readyfd,
+		                       &daemon->pfd_readyfd_index, POLLIN);
+	}
+	// TODO: This is not concurrency safe, build a environment array just for
+	//       this daemon.
+	char ppid_str[sizeof(pid_t) * 3];
+	snprintf(ppid_str, sizeof(ppid_str), "%" PRIiPID, ppid);
+	if ( (!daemon->need_tty && setenv("READYFD", "3", 1)) < 0 ||
+	     setenv("INIT_PID", ppid_str, 1) < 0 ||
+	     setenv("LOGNAME", pwd->pw_name, 1) < 0 ||
+	     setenv("USER", pwd->pw_name, 1) < 0 ||
+	     setenv("HOME", home, 1) < 0 ||
+	     setenv("SHELL", shell, 1) < 0 )
+		fatal("setenv");
+	// TODO: If argv is empty
+	daemon->pid = fork();
+	if ( daemon->pid < 0 )
+		fatal("fork: %m");
+	if ( daemon->need_tty )
+	{
+		// TODO: Any chance of SIGTTIN?
+		if ( tcgetattr(0, &daemon->oldtio) )
+			fatal("tcgetattr: %m");
+	}
+	if ( daemon->pid == 0 )
+	{
+		uninstall_signal_handler();
+		if ( chdir(cd) )
+		{
+			// TODO: Right way to send a fatal error back?
+			fatal("chdir: %s: %m", cd);
+		}
+		if ( daemon->need_tty )
+		{
+			pid_t pid = getpid();
+			// TODO: Support for setsid().
+			if ( setpgid(0, 0) < 0 )
+				fatal("setpgid: %m");
+			sigset_t oldset, sigttou;
+			sigemptyset(&sigttou);
+			sigaddset(&sigttou, SIGTTOU);
+			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
+			if ( tcsetpgrp(0, pid) < 0 )
+				fatal("tcsetpgrp: %m");
+			daemon->oldtio.c_cflag |= CREAD;
+			if ( tcsetattr(0, TCSANOW, &daemon->oldtio) )
+				fatal("tcgetattr: %m");
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+			closefrom(3);
+		}
+		else
+		{
+			close(0);
+			close(1);
+			close(2);
+			open("/dev/null", O_RDONLY);
+			// TODO: Fix daemon's logging to stdout instead of stderr.
+			//open("/dev/null", O_WRONLY);
+			dup2(outputfds[1], 1);
+			dup2(outputfds[1], 2);
+			dup2(readyfds[1], 3);
+			closefrom(4);
+		}
+		execvp(argv[0], argv);
+		// TODO: Use a pipe to send the errno back.
+		warning("%s: %m", argv[0]);
+		_exit(127);
+	}
+	if ( !daemon->need_tty )
+	{
+		close(outputfds[1]);
+		close(readyfds[1]);
+	}
+	// TODO: Not thread safe.
+	// TODO: Also unset other things.
+	if ( !daemon->need_tty )
+		unsetenv("READYFD");
+	unsetenv("INIT_PID");
+	unsetenv("LOGNAME");
+	unsetenv("USER");
+	unsetenv("HOME");
+	unsetenv("SHELL");
+	for ( size_t i = 0; argv[i]; i++ )
+		free(argv[i]);
+	free(argv);
+	if ( daemon->need_tty )
+		daemon_on_ready(daemon);
+	else
+		daemon_change_state_list(daemon, DAEMON_STATE_STARTING);
+}
+
+static bool daemon_process_ready(struct daemon* daemon)
+{
+	char c;
+	ssize_t amount = read(daemon->readyfd, &c, sizeof(c));
+	if ( amount < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) )
+		return true;
+	if ( amount < 0 )
+		return false;
+	else if ( amount == 0 )
+		return false;
+	if ( c == '\n' )
+	{
+		daemon_on_ready(daemon);
+		return false;
+	}
+	return true;
+}
+
+static bool daemon_process_output(struct daemon* daemon)
+{
+	char data[4096];
+	ssize_t amount = read(daemon->outputfd, data, sizeof(data));
+	if ( amount < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) )
+		return true;
+	if ( amount < 0 )
+		return false;
+	else if ( amount == 0 )
+		return false;
+	log_formatted(&daemon->log, data, amount);
+	return true;
+}
+
+static void daemon_on_exit(struct daemon* daemon, int exit_code)
+{
+	assert(daemon->state != DAEMON_STATE_FINISHED);
+	daemon->exit_code = exit_code;
+	if ( 0 <= daemon->readyfd )
+	{
+		daemon_unregister_pollfd(daemon, daemon->pfd_readyfd_index);
+		close(daemon->readyfd);
+		daemon->readyfd = -1;
+	}
+	if ( 0 <= daemon->outputfd )
+	{
+		daemon_process_output(daemon);
+		daemon_unregister_pollfd(daemon, daemon->pfd_outputfd_index);
+		close(daemon->outputfd);
+		daemon->outputfd = -1;
+	}
+	if ( 0 <= daemon->log.fd )
+		log_close(&daemon->log);
+	if ( daemon->need_tty )
+	{
+		// TODO: There is a race condition between getting the exit code from
+		//       waitpid and us reclaiming it here where some other process that
+		//       happened to get the right pid may own the tty.
+		sigset_t oldset, sigttou;
+		sigemptyset(&sigttou);
+		sigaddset(&sigttou, SIGTTOU);
+		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
+		if ( tcsetattr(0, TCSAFLUSH, &daemon->oldtio) )
+			fatal("tcsetattr: %m");
+		if ( tcsetpgrp(0, getpgid(0)) < 0 )
+			fatal("tcsetpgrp: %m");
+		sigprocmask(SIG_SETMASK, &oldset, NULL);
+	}
+	daemon_on_finished(daemon);
+}
+
+// TODO. This can just be directly inlined to main as the mainloop.
+static void schedule(void)
+{
+	int default_daemon_exit_code = -1;
+
+	while ( first_daemon_by_state[DAEMON_STATE_SCHEDULED] ||
+	        //first_daemon_by_state[DAEMON_STATE_WAITING] || // TODO?
+	        first_daemon_by_state[DAEMON_STATE_SATISFIED] ||
+	        first_daemon_by_state[DAEMON_STATE_STARTING] ||
+	        first_daemon_by_state[DAEMON_STATE_READY] ||
+	        first_daemon_by_state[DAEMON_STATE_RUNNING] ||
+	        first_daemon_by_state[DAEMON_STATE_TERMINATING] )
+	{
+		if ( caught_exit_signal != -1 && default_daemon_exit_code == -1)
+		{
+			struct daemon* default_daemon = daemon_find_by_name("default");
+			if ( caught_exit_signal == 0 )
+				log_status("stopped", "Powering off...\n");
+			else if ( caught_exit_signal == 1 )
+				log_status("stopped", "Rebooting...\n");
+			else if ( caught_exit_signal == 2 )
+				log_status("stopped", "Halting...\n");
+			else
+				log_status("stopped", "Exiting %i...\n", caught_exit_signal);
+			daemon_mark_finished(default_daemon);
+			default_daemon_exit_code =
+				WCONSTRUCT(WNATURE_EXITED, caught_exit_signal, 0);
+		}
+		caught_exit_signal = -1;
+
+		while ( first_daemon_by_state[DAEMON_STATE_SCHEDULED] )
+		{
+			struct daemon* daemon = first_daemon_by_state[DAEMON_STATE_SCHEDULED];
+			daemon_schedule(daemon);
+		}
+		while ( first_daemon_by_state[DAEMON_STATE_SATISFIED] )
+		{
+			struct daemon* daemon =
+				first_daemon_by_state[DAEMON_STATE_SATISFIED];
+			// TODO: Error handling.
+			daemon_start(daemon);
+		}
+		struct timespec timeout = timespec_make(-1, 0);
+		sigset_t mask;
+		sigemptyset(&mask);
+		sigaddset(&mask, SIGCHLD);
+		sigset_t oldset;
+		sigprocmask(SIG_BLOCK, &mask, &oldset);
+		sigset_t unhandled_signals;
+		signotset(&unhandled_signals, &handled_signals);
+		sigset_t pollset;
+		sigandset(&pollset, &oldset, &unhandled_signals);
+		int exit_code;
+		pid_t pid;
+		while ( 0 < (pid = waitpid(-1, &exit_code, WNOHANG)) )
+		{
+			struct daemon* daemon = daemon_find_by_pid(pid);
+			if ( daemon )
+				daemon_on_exit(daemon, exit_code);
+			timeout = timespec_make(0, 0);
+		}
+		// TODO: Use kqueue or such.
+		// Set a dummy SIGCHLD handler to ensure we get EINTR during ppoll(2).
+		struct sigaction sa = { 0 };
+		sa.sa_handler = signal_handler;
+		sa.sa_flags = 0;
+		struct sigaction old_sa;
+		sigaction(SIGCHLD, &sa, &old_sa);
+		// Await either an event, a timeout, or SIGCHLD.
+		int nevents = ppoll(pfds, pfds_used, &timeout, &pollset);
+		sigaction(SIGCHLD, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &oldset, NULL);
+		if ( nevents < 0 && errno != EINTR )
+			fatal("ppoll: %m");
+		for ( size_t i = 0; i < pfds_used; i++ )
+		{
+			if ( nevents <= 0 )
+				break;
+			struct pollfd* pfd = pfds + i;
+			if ( !pfd->revents )
+				continue;
+			nevents--;
+			struct daemon* daemon = pfds_daemon[i];
+			if ( 0 <= daemon->readyfd && pfd->fd == daemon->readyfd )
+			{
+				// TODO: POLLHUP? POLLERR? POLLNVAL?
+				if ( pfd->revents & (POLLIN | POLLHUP) )
+				{
+					if ( !daemon_process_ready(daemon) )
+					{
+						daemon_unregister_pollfd(daemon,
+						                         daemon->pfd_readyfd_index);
+						close(daemon->readyfd);
+						daemon->readyfd = -1;
+						i--; // Process this index again (something new there).
+					}
+				}
+			}
+			else if ( 0 <= daemon->outputfd && pfd->fd == daemon->outputfd )
+			{
+				// TODO: POLLHUP? POLLERR? POLLNVAL?
+				if ( pfd->revents & (POLLIN | POLLHUP) )
+				{
+					if ( !daemon_process_output(daemon) )
+					{
+						daemon_unregister_pollfd(daemon,
+						                         daemon->pfd_outputfd_index);
+						close(daemon->outputfd);
+						daemon->outputfd = -1;
+						i--; // Process this index again (something new there).
+					}
+				}
+			}
+			else
+			{
+				assert(false);
+			}
+		}
+	}
+
+	// Collect child processes reparented to us that we don't know about and
+	// attempt to politely shut them down with SIGTERM and SIGKILL after a
+	// timeout.
+	sigset_t saved_mask, sigchld_mask;
+	sigemptyset(&sigchld_mask);
+	sigaddset(&sigchld_mask, SIGCHLD);
+	sigprocmask(SIG_BLOCK, &sigchld_mask, &saved_mask);
+	struct sigaction sa = { .sa_handler = signal_handler };
+	struct sigaction old_sa;
+	sigaction(SIGCHLD, &sa, &old_sa);
+	struct timespec timeout = timespec_make(30, 0);
+	struct timespec begun;
+	clock_gettime(CLOCK_MONOTONIC, &begun);
+	bool sent_sigterm = false;
+	while ( true )
+	{
+		int exit_code;
+		for ( pid_t pid = 1; 0 < pid; pid = waitpid(-1, &exit_code, WNOHANG) );
+
+		struct timespec now;
+		clock_gettime(CLOCK_MONOTONIC, &now);
+		struct timespec elapsed = timespec_sub(now, begun);
+
+		struct psctl_stat psst;
+		if ( psctl(getpid(), PSCTL_STAT, &psst) < 0 )
+			fatal("psctl: %m");
+		bool any_unknown = false;
+		for ( pid_t pid = psst.ppid_first; pid != -1; pid = psst.ppid_next )
+		{
+			if ( psctl(pid, PSCTL_STAT, &psst) < 0 )
+			{
+				warn("psctl: %ji", (intmax_t) pid);
+				break;
+			}
+			bool known = false;
+			for ( size_t i = 0; !known && i < mountpoints_used; i++ )
+				if ( mountpoints[i].pid == pid )
+					known = true;
+			if ( !known )
+			{
+				any_unknown = true;
+				if ( !sent_sigterm )
+					kill(pid, SIGTERM);
+				// TODO: Hostile processes can try to escape by spawning more
+				//       processes, a kernel feature is needed to recursively
+				//       send a signal to all descendants atomically, although
+				//       want to avoid known safe processes (mountpoints) and
+				//       still catch processes reparented to us. Otherwise
+				//       retrying until we succeed is the best we can do.
+				else if ( timespec_le(timeout, elapsed) )
+					kill(pid, SIGKILL);
+			}
+		}
+
+		sent_sigterm = true;
+
+		if ( !any_unknown )
+			break;
+
+		// Wait for the timeout to happen, or for another process to exit by
+		// the poll failing with EINTR because a pending SIGCHLD was delivered
+		// when the saved signal mask is restored.
+		struct timespec left = timespec_sub(timeout, elapsed);
+		if ( left.tv_sec < 0 || (left.tv_sec == 0 && left.tv_nsec == 0) )
+			left = timespec_make(1, 0);
+		struct pollfd pfd = { .fd = -1 };
+		ppoll(&pfd, 1, &left, &saved_mask);
+	}
+	sigaction(SIGCHLD, &old_sa, NULL);
+	sigprocmask(SIG_SETMASK, &saved_mask, NULL);
+
+	if ( default_daemon_exit_code != -1 )
+		daemon_find_by_name("default")->exit_code = default_daemon_exit_code;
 }
 
 static void write_random_seed(void)
@@ -462,6 +2596,7 @@ static void set_kblayout(void)
 	}
 	if ( !child_pid )
 	{
+		uninstall_signal_handler();
 		execlp("chkblayout", "chkblayout", "--", kblayout, (const char*) NULL);
 		warning("setting keyboard layout: chkblayout: %m");
 		_exit(127);
@@ -669,32 +2804,6 @@ static void clean_tmp(const char* tmp_path)
 	}
 }
 
-static void init_early(void)
-{
-	static bool done = false;
-	if ( done )
-		return;
-	done = true;
-
-	// Make sure that we have a /tmp directory.
-	umask(0000);
-	mkdir("/tmp", 01777);
-	clean_tmp("/tmp");
-
-	// Make sure that we have a /var/run directory.
-	umask(0000);
-	mkdir("/var", 0755);
-	mkdir("/var/run", 0755);
-	clean_tmp("/var/run");
-
-	// Set the default file creation mask.
-	umask(0022);
-
-	// Set up the PATH variable.
-	if ( setenv("PATH", "/bin:/sbin", 1) < 0 )
-		fatal("setenv: %m");
-}
-
 static bool is_chain_init_mountpoint(const struct mountpoint* mountpoint)
 {
 	return !strcmp(mountpoint->entry.fs_file, "/");
@@ -765,6 +2874,7 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 		}
 		if ( child_pid == 0 )
 		{
+			uninstall_signal_handler();
 			execlp(fs->fsck, fs->fsck, "-fp", "--", bdev_path, (const char*) NULL);
 			note("%s: Failed to load filesystem checker: %s: %m", bdev_path, fs->fsck);
 			_exit(127);
@@ -844,11 +2954,13 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 	//       ready instead of having to poll like this.
 	if ( mountpoint->pid == 0 )
 	{
+		uninstall_signal_handler();
 		execlp(fs->driver, fs->driver, "--foreground", bdev_path, where,
 		       "--pretend-mount-path", pretend_where, (const char*) NULL);
 		warning("%s: Failed to load filesystem driver: %s: %m", bdev_path, fs->driver);
 		_exit(127);
 	}
+	// TODO: Use daemon readiness notification method (READYFD).
 	while ( true )
 	{
 		struct stat newst;
@@ -918,7 +3030,7 @@ static void mountpoints_unmount(void)
 		if ( unmount(mountpoint->absolute, 0) < 0 && errno != ENOMOUNT )
 			warning("unmount: %s: %m", mountpoint->entry.fs_file);
 		else if ( errno == ENOMOUNT )
-			kill(mountpoint->pid, SIGQUIT);
+			kill(mountpoint->pid, SIGTERM);
 		int code;
 		if ( waitpid(mountpoint->pid, &code, 0) < 0 )
 			note("waitpid: %m");
@@ -934,7 +3046,14 @@ static void niht(void)
 	if ( getpid() != main_pid )
 		return;
 
+	// TODO: Unify with new daemon system?
+
+	// TODO: Don't do this unless all the mountpoints were mounted (not for
+	//       chain init).
 	write_random_seed();
+
+	// Stop logging when unmounting the filesystems.
+	log_close(&init_log);
 
 	if ( chain_location_dev_made )
 	{
@@ -949,226 +3068,6 @@ static void niht(void)
 		rmdir(chain_location);
 		chain_location_made = false;
 	}
-}
-
-static int init(int argc, char** argv, const char* target)
-{
-	if ( 1 < argc )
-		fatal("unexpected extra operand: %s", argv[1]);
-	init_early();
-	set_hostname();
-	set_kblayout();
-	set_videomode();
-	prepare_block_devices();
-	load_fstab();
-	mountpoints_mount(false);
-	write_random_seed();
-	if ( !strcmp(target, "merge") )
-	{
-		pid_t child_pid = fork();
-		if ( child_pid < 0 )
-			fatal("fork: %m");
-		if ( !child_pid )
-		{
-			const char* argv[] = { "sysmerge", "--booting", NULL };
-			execv("/sysmerge/sbin/sysmerge", (char* const*) argv);
-			fatal("Failed to run automatic update: %s: %m", argv[0]);
-		}
-		int status;
-		if ( waitpid(child_pid, &status, 0) < 0 )
-			fatal("waitpid");
-		if ( WIFEXITED(status) && WEXITSTATUS(status) != 0 )
-			fatal("Automatic upgrade failed: Exit status %i",
-			      WEXITSTATUS(status));
-		else if ( WIFSIGNALED(status) )
-			fatal("Automatic upgrade failed: %s", strsignal(WTERMSIG(status)));
-		else if ( !WIFEXITED(status) )
-			fatal("Automatic upgrade failed: Unexpected unusual termination");
-		niht();
-		unsetenv("INIT_PID");
-		const char* argv[] = { "init", NULL };
-		execv("/sbin/init", (char* const*) argv);
-		fatal("Failed to load chain init: %s: %m", argv[0]);
-	}
-	sigset_t oldset, sigttou;
-	sigemptyset(&sigttou);
-	sigaddset(&sigttou, SIGTTOU);
-	int result;
-	while ( true )
-	{
-		struct termios tio;
-		if ( tcgetattr(0, &tio) )
-			fatal("tcgetattr: %m");
-		pid_t child_pid = fork();
-		if ( child_pid < 0 )
-			fatal("fork: %m");
-		if ( !child_pid )
-		{
-			uid_t uid = getuid();
-			pid_t pid = getpid();
-			pid_t ppid = getppid();
-			if ( setpgid(0, 0) < 0 )
-				fatal("setpgid: %m");
-			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-			if ( tcsetpgrp(0, pid) < 0 )
-				fatal("tcsetpgrp: %m");
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			struct passwd* pwd = getpwuid(uid);
-			if ( !pwd )
-				fatal("looking up user by uid %" PRIuUID ": %m", uid);
-			const char* home = pwd->pw_dir[0] ? pwd->pw_dir : "/";
-			const char* shell = pwd->pw_shell[0] ? pwd->pw_shell : "sh";
-			char ppid_str[sizeof(pid_t) * 3];
-			snprintf(ppid_str, sizeof(ppid_str), "%" PRIiPID, ppid);
-			if ( setenv("INIT_PID", ppid_str, 1) < 0 ||
-			     setenv("LOGNAME", pwd->pw_name, 1) < 0 ||
-			     setenv("USER", pwd->pw_name, 1) < 0 ||
-			     setenv("HOME", home, 1) < 0 ||
-			     setenv("SHELL", shell, 1) < 0 )
-				fatal("setenv: %m");
-			if ( chdir(home) < 0 )
-				warning("chdir: %s: %m", home);
-			const char* program = "login";
-			bool activate_terminal = false;
-			if ( !strcmp(target, "single-user") )
-			{
-				activate_terminal = true;
-				program = shell;
-			}
-			if ( !strcmp(target, "sysinstall") )
-			{
-				activate_terminal = true;
-				program = "sysinstall";
-			}
-			if ( !strcmp(target, "sysupgrade") )
-			{
-				program = "sysupgrade";
-				activate_terminal = true;
-			}
-			if ( activate_terminal )
-			{
-				tio.c_cflag |= CREAD;
-				if ( tcsetattr(0, TCSANOW, &tio) )
-					fatal("tcgetattr: %m");
-			}
-			const char* argv[] = { program, NULL };
-			execvp(program, (char* const*) argv);
-			fatal("%s: %m", program);
-		}
-		int status;
-		if ( waitpid(child_pid, &status, 0) < 0 )
-			fatal("waitpid");
-		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-		if ( tcsetattr(0, TCSAFLUSH, &tio) )
-			fatal("tcgetattr: %m");
-		if ( tcsetpgrp(0, getpgid(0)) < 0 )
-			fatal("tcsetpgrp: %m");
-		sigprocmask(SIG_SETMASK, &oldset, NULL);
-		const char* back = ": Trying to bring it back up again";
-		if ( WIFEXITED(status) )
-		{
-			result = WEXITSTATUS(status);
-			break;
-		}
-		else if ( WIFSIGNALED(status) )
-			note("session: %s%s", strsignal(WTERMSIG(status)), back);
-		else
-			note("session: Unexpected unusual termination%s", back);
-	}
-	return result;
-}
-
-static int init_chain(int argc, char** argv, const char* target)
-{
-	int next_argc = argc - 1;
-	char** next_argv = argv + 1;
-	init_early();
-	prepare_block_devices();
-	load_fstab();
-	if ( !mkdtemp(chain_location) )
-		fatal("mkdtemp: /tmp/fs.XXXXXX: %m");
-	chain_location_made = true;
-	bool found_root = false;
-	for ( size_t i = 0; i < mountpoints_used; i++ )
-	{
-		struct mountpoint* mountpoint = &mountpoints[i];
-		if ( !strcmp(mountpoint->entry.fs_file, "/") )
-			found_root = true;
-		char* absolute = join_paths(chain_location, mountpoint->absolute);
-		free(mountpoint->absolute);
-		mountpoint->absolute = absolute;
-	}
-	if ( !found_root )
-		fatal("/etc/fstab: Root filesystem not found in filesystem table");
-	mountpoints_mount(true);
-	snprintf(chain_location_dev, sizeof(chain_location_dev), "%s/dev",
-	         chain_location);
-	if ( mkdir(chain_location_dev, 0755) < 0 && errno != EEXIST )
-		fatal("mkdir: %s: %m", chain_location_dev);
-	int old_dev_fd = open("/dev", O_DIRECTORY | O_RDONLY);
-	if ( old_dev_fd < 0 )
-		fatal("%s: %m", "/dev");
-	int new_dev_fd = open(chain_location_dev, O_DIRECTORY | O_RDONLY);
-	if ( new_dev_fd < 0 )
-		fatal("%s: %m", chain_location_dev);
-	if ( fsm_fsbind(old_dev_fd, new_dev_fd, 0) < 0 )
-		fatal("mount: `%s' onto `%s': %m", "/dev", chain_location_dev);
-	close(new_dev_fd);
-	close(old_dev_fd);
-	int result;
-	while ( true )
-	{
-		pid_t child_pid = fork();
-		if ( child_pid < 0 )
-			fatal("fork: %m");
-		if ( !child_pid )
-		{
-			if ( chroot(chain_location) < 0 )
-				fatal("chroot: %s: %m", chain_location);
-			if ( chdir("/") < 0 )
-				fatal("chdir: %s: %m", chain_location);
-			unsetenv("INIT_PID");
-			const char* program = next_argv[0];
-			if ( !strcmp(target, "chain-merge") )
-			{
-				if ( next_argc < 1 )
-				{
-					program = "/sysmerge/sbin/init";
-					next_argv = (char*[]) { "init", "--target=merge", NULL };
-				}
-				execvp(program, (char* const*) next_argv);
-				fatal("Failed to load automatic update chain init: %s: %m",
-				      next_argv[0]);
-			}
-			else
-			{
-				if ( next_argc < 1 )
-				{
-					program = "/sbin/init";
-					next_argv = (char*[]) { "init", NULL };
-				}
-				execvp(program, (char* const*) next_argv);
-				fatal("Failed to load chain init: %s: %m", next_argv[0]);
-			}
-		}
-		int status;
-		if ( waitpid(child_pid, &status, 0) < 0 )
-			fatal("waitpid");
-		// Only run an automatic update once.
-		if ( !strcmp(target, "chain-merge") )
-			target = "chain";
-		const char* back = ": Trying to bring it back up again";
-		if ( WIFEXITED(status) )
-		{
-			result = WEXITSTATUS(status);
-			break;
-		}
-		else if ( WIFSIGNALED(status) )
-			note("chain init: %s%s", strsignal(WTERMSIG(status)), back);
-		else
-			note("chain init: Unexpected unusual termination%s", back);
-	}
-	return result;
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -1190,7 +3089,7 @@ int main(int argc, char* argv[])
 
 	setlocale(LC_ALL, "");
 
-	const char* target = NULL;
+	const char* target_name = "default";
 
 	for ( int i = 1; i < argc; i++ )
 	{
@@ -1210,12 +3109,12 @@ int main(int argc, char* argv[])
 			}
 		}
 		else if ( !strncmp(arg, "--target=", strlen("--target=")) )
-			target = arg + strlen("--target=");
+			target_name = arg + strlen("--target=");
 		else if ( !strcmp(arg, "--target") )
 		{
 			if ( i + 1 == argc )
 				errx(2, "option '--target' requires an argument");
-			target = argv[i+1];
+			target_name = argv[i+1];
 			argv[++i] = NULL;
 		}
 		else
@@ -1224,41 +3123,270 @@ int main(int argc, char* argv[])
 
 	compact_arguments(&argc, &argv);
 
-	char* target_string = NULL;
-	if ( !target )
-	{
-		const char* target_path = "/etc/init/target";
-		if ( access(target_path, F_OK) == 0 )
-		{
-			FILE* target_fp = fopen(target_path, "r");
-			if ( !target_fp )
-				fatal("%s: %m", target_path);
-			target_string = read_single_line(target_fp);
-			if ( !target_string )
-				fatal("read: %s: %m", target_path);
-			target = target_string;
-			fclose(target_fp);
-		}
-		else
-			fatal("Refusing to initialize because %s doesn't exist", target_path);
-	}
-
+	// Prevent recursive init without care.
 	if ( getenv("INIT_PID") )
 		fatal("System is already managed by an init process");
 
+	// Register handler that shuts down the system when init exits.
 	if ( atexit(niht) != 0 )
 		fatal("atexit: %m");
 
-	if ( !strcmp(target, "single-user") ||
-	     !strcmp(target, "multi-user") ||
-	     !strcmp(target, "sysinstall") ||
-	     !strcmp(target, "sysupgrade") ||
-	     !strcmp(target, "merge") )
-		return init(argc, argv, target);
+	// Handle signals but block them until the safe points where we handle them.
+	// All child processes have to uninstall the signal handler and unblock the
+	// signals or they keep blocking the signals.
+	install_signal_handler();
 
-	if ( !strcmp(target, "chain") ||
-	     !strcmp(target, "chain-merge") )
-		return init_chain(argc, argv, target);
+	// The default daemon brings up the operating system.
+	// TODO: After releasing Sortix 1.1, remove this compatibility since a
+	// sysmerge from 1.0 will not have a /etc/init directory.
+	struct daemon_config* default_daemon_config =
+		!strcmp(target_name, "merge") ? NULL : daemon_config_load("default");
 
-	fatal("Unknown initialization target `%s'", target);
+	// Daemons inherit their default settings from the default daemon. Load its
+	// configuration (if it exists) even if another default target has been set.
+	if ( default_daemon_config )
+	{
+		default_config.log_method = default_daemon_config->log_method;
+		default_config.log_format = default_daemon_config->log_format;
+		default_config.log_control_messages =
+			default_daemon_config->log_control_messages;
+		default_config.log_rotate_on_start =
+			default_daemon_config->log_rotate_on_start;
+		default_config.log_rotations = default_daemon_config->log_rotations;
+		default_config.log_line_size = default_daemon_config->log_line_size;
+		default_config.log_size = default_daemon_config->log_size;
+	}
+
+	// If another daemon has been specified as the boot target, create a fake
+	// default daemon that depends on the specified boot target daemon.
+	if ( strcmp(target_name, "default") != 0 )
+	{
+		if ( default_daemon_config )
+			daemon_config_free(default_daemon_config);
+		default_daemon_config = malloc(sizeof(struct daemon_config));
+		if ( !default_daemon_config )
+			fatal("malloc: %m");
+		daemon_config_initialize(default_daemon_config);
+		if ( !(default_daemon_config->name = strdup("default")) )
+			fatal("malloc: %m");
+		struct dependency_config* dependency_config =
+			calloc(1, sizeof(struct dependency_config));
+		if ( !dependency_config )
+			fatal("malloc: %m");
+		if ( !(dependency_config->target = strdup(target_name)) )
+			fatal("malloc: %m");
+		dependency_config->flags = DEPENDENCY_FLAG_REQUIRE |
+		                           DEPENDENCY_FLAG_AWAIT |
+		                           DEPENDENCY_FLAG_EXIT_CODE;
+		if ( !array_add((void***) &default_daemon_config->dependencies,
+		                &default_daemon_config->dependencies_used,
+		                &default_daemon_config->dependencies_length,
+		                dependency_config) )
+			fatal("malloc: %m");
+	}
+	else if ( !default_daemon_config )
+		fatal("Failed to load /etc/init/default: %m");
+
+	// Instantiate the default daemon from its configuration.
+	struct daemon* default_daemon = daemon_create(default_daemon_config);
+	daemon_config_free(default_daemon_config);
+
+	// The default daemon should depend on exactly one top level daemon.
+	const char* first_requirement =
+		1 <= default_daemon->dependencies_used ?
+		default_daemon->dependencies[0]->target_name :
+		"";
+
+	// Make sure that we have a /tmp directory.
+	umask(0000);
+	mkdir("/tmp", 01777);
+	clean_tmp("/tmp");
+
+	// Make sure that we have a /var/run directory.
+	umask(0000);
+	mkdir("/var", 0755);
+	mkdir("/var/run", 0755);
+	clean_tmp("/var/run");
+
+	// Set the default file creation mask.
+	umask(0022);
+
+	// Set up the PATH variable.
+	if ( setenv("PATH", "/bin:/sbin", 1) < 0 )
+		fatal("setenv: %m");
+
+	// Load partition tables and create all the block devices.
+	prepare_block_devices();
+
+	// Load the filesystem table.
+	load_fstab();
+
+	// If the default daemon's top level dependency is a chain boot target, then
+	// chain boot the actual root filesystem.
+	// TODO: Document this special kind of daemon.
+	if ( !strcmp(first_requirement, "chain") ||
+	     !strcmp(first_requirement, "chain-merge") )
+	{
+		int next_argc = argc - 1;
+		char** next_argv = argv + 1;
+		// Create a temporary directory where the real root filesystem will be
+		// mounted.
+		if ( !mkdtemp(chain_location) )
+			fatal("mkdtemp: /tmp/fs.XXXXXX: %m");
+		chain_location_made = true;
+		// Rewrite the filesystem table to mount inside the temporary directory.
+		bool found_root = false;
+		for ( size_t i = 0; i < mountpoints_used; i++ )
+		{
+			struct mountpoint* mountpoint = &mountpoints[i];
+			if ( !strcmp(mountpoint->entry.fs_file, "/") )
+				found_root = true;
+			char* absolute = join_paths(chain_location, mountpoint->absolute);
+			free(mountpoint->absolute);
+			mountpoint->absolute = absolute;
+		}
+		if ( !found_root )
+			fatal("/etc/fstab: Root filesystem not found in filesystem table");
+		// Mount the filesystem table entries marked for chain boot.
+		mountpoints_mount(true);
+		// Additionally bind the /dev filesystem inside the root filesystem.
+		snprintf(chain_location_dev, sizeof(chain_location_dev), "%s/dev",
+			     chain_location);
+		if ( mkdir(chain_location_dev, 0755) < 0 && errno != EEXIST )
+			fatal("mkdir: %s: %m", chain_location_dev);
+		int old_dev_fd = open("/dev", O_DIRECTORY | O_RDONLY);
+		if ( old_dev_fd < 0 )
+			fatal("%s: %m", "/dev");
+		int new_dev_fd = open(chain_location_dev, O_DIRECTORY | O_RDONLY);
+		if ( new_dev_fd < 0 )
+			fatal("%s: %m", chain_location_dev);
+		if ( fsm_fsbind(old_dev_fd, new_dev_fd, 0) < 0 )
+			fatal("mount: `%s' onto `%s': %m", "/dev", chain_location_dev);
+		close(new_dev_fd);
+		close(old_dev_fd);
+		// Run the chain booted operating system.
+		pid_t child_pid = fork();
+		if ( child_pid < 0 )
+			fatal("fork: %m");
+		if ( !child_pid )
+		{
+			uninstall_signal_handler();
+			if ( chroot(chain_location) < 0 )
+				fatal("chroot: %s: %m", chain_location);
+			if ( chdir("/") < 0 )
+				fatal("chdir: %s: %m", chain_location);
+			unsetenv("INIT_PID");
+			const char* program = next_argv[0];
+			// Chain boot the operating system upgrade if needed.
+			if ( !strcmp(first_requirement, "chain-merge") )
+			{
+				program = "/sysmerge/sbin/init";
+				// TODO: Concat next_argv onto this argv_next, so the arguments
+				//       can be passed to the final make.
+				next_argv =
+					(char*[]) { (char*) program, "--target=merge", NULL };
+			}
+			else if ( next_argc < 1 )
+			{
+				program = "/sbin/init";
+				next_argv = (char*[]) { "init", NULL };
+			}
+			execvp(program, (char* const*) next_argv);
+			fatal("Failed to chain load init: %s: %m", next_argv[0]);
+		}
+		forward_signal_pid = child_pid;
+		sigprocmask(SIG_UNBLOCK, &handled_signals, NULL);
+		int status;
+		while ( waitpid(child_pid, &status, 0) < 0 )
+		{
+			if ( errno != EINTR )
+				fatal("waitpid: %m");
+		}
+		sigprocmask(SIG_BLOCK, &handled_signals, NULL);
+		forward_signal_pid = -1; // Racy with waitpid.
+		if ( WIFEXITED(status) )
+			return WEXITSTATUS(status);
+		else if ( WIFSIGNALED(status) )
+			fatal("Chain booted init failed with signal: %s",
+			      strsignal(WTERMSIG(status)));
+		else
+			fatal("Chain booted init failed unusually");
+	}
+
+	// Mount the filesystems, except for the filesystems that would have been
+	// mounted by the chain init.
+	mountpoints_mount(false);
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility since a
+	// sysmerge from 1.0 will not have a /var/log directory.
+	if ( !strcmp(first_requirement, "merge") &&
+	     access("/var/log", F_OK) < 0 )
+		mkdir("/var/log", 0755);
+
+	// Logging works now that the filesystems have been mounted.
+	if ( !log_initialize(&init_log, "init", &default_config) )
+		fatal("malloc: %m");
+	log_begin(&init_log);
+
+	// Update the random seed in case the system fails before it can be written
+	// out during the system shutdown.
+	write_random_seed();
+
+	set_hostname();
+	set_kblayout();
+	set_videomode();
+
+	// Run the operating system upgrade if requested.
+	// TODO: Document this special kind of daemon.
+	if ( !strcmp(first_requirement, "merge") )
+	{
+		pid_t child_pid = fork();
+		if ( child_pid < 0 )
+			fatal("fork: %m");
+		if ( !child_pid )
+		{
+			uninstall_signal_handler();
+			const char* argv[] = { "sysmerge", "--booting", NULL };
+			execv("/sysmerge/sbin/sysmerge", (char* const*) argv);
+			fatal("Failed to load system upgrade: %s: %m", argv[0]);
+		}
+		forward_signal_pid = child_pid;
+		sigprocmask(SIG_UNBLOCK, &handled_signals, NULL);
+		int status;
+		while ( waitpid(child_pid, &status, 0) < 0 )
+		{
+			if ( errno != EINTR )
+				fatal("waitpid: %m");
+		}
+		sigprocmask(SIG_BLOCK, &handled_signals, NULL);
+		forward_signal_pid = -1; // Racy with waitpid.
+		if ( WIFEXITED(status) && WEXITSTATUS(status) != 0 )
+			fatal("Automatic upgrade failed: Exit status %i",
+			      WEXITSTATUS(status));
+		else if ( WIFSIGNALED(status) )
+			fatal("Automatic upgrade failed: %s", strsignal(WTERMSIG(status)));
+		else if ( !WIFEXITED(status) )
+			fatal("Automatic upgrade failed: Unexpected unusual termination");
+		// Soft reinit into the freshly upgraded operating system.
+		niht();
+		unsetenv("INIT_PID");
+		// TODO: Use next_argv here.
+		const char* argv[] = { "init", NULL };
+		execv("/sbin/init", (char* const*) argv);
+		fatal("Failed to load init during reinit: %s: %m", argv[0]);
+	}
+
+	// TODO: Use the arguments to specify additional things the default daemon
+	//       should depend on, as well as a blacklist of things not to start
+	//       even if in default's dependencies. Alternatively the blacklist can
+	//       be done with variables (that could be cleaner, if more flexible)?
+
+	// Request the default daemon be run.
+	schedule_daemon(default_daemon);
+
+	// Run the operating system.
+	schedule();
+
+	// Exit with the exit code of the default daemon.
+	return exit_code_to_exit_status(default_daemon->exit_code);
 }

@@ -441,7 +441,7 @@ $(LIVE_INITRD): sysroot
 	mkdir -p $(LIVE_INITRD).d
 	mkdir -p $(LIVE_INITRD).d/etc
 	mkdir -p $(LIVE_INITRD).d/etc/init
-	echo single-user > $(LIVE_INITRD).d/etc/init/target
+	echo require single-user exit-code > $(LIVE_INITRD).d/etc/init/default
 	echo "root::0:0:root:/root:sh" > $(LIVE_INITRD).d/etc/passwd
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
 	mkdir -p $(LIVE_INITRD).d/home

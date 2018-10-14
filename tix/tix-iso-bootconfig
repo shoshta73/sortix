@@ -43,6 +43,7 @@ for argument do
   *)    parameter=yes ;;
   esac
 
+  # TODO: Support setting the init --target
   case $dashdash$argument in
   --) dashdash=yes ;;
   --append-title=*) append_title=$parameter ;;

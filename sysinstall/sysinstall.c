@@ -1033,7 +1033,8 @@ int main(void)
 		else
 			warn("mkdir: etc/init");
 	}
-	install_configurationf("etc/init/target", "w", "multi-user\n");
+	install_configurationf("etc/init/default", "w",
+		"require multi-user exit-code\n");
 
 	text("Congratulations, the system is now functional! This is a good time "
 	     "to do further customization of the system.\n\n");

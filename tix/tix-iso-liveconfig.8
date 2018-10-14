@@ -6,6 +6,7 @@
 .Nd generate additional live environment configuration for Sortix .iso releases
 .Sh SYNOPSIS
 .Nm
+.Op Fl \-daemons Ns = Ns Ar daemons
 .Op Fl \-hostname Ns = Ns Ar hostname
 .Op Fl \-kblayout Ns = Ns Ar kblayout
 .Op Fl \-videomode Ns = Ns Ar videomode
@@ -43,6 +44,15 @@ installations made from inside it.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
+.It Fl \-daemons Ns = Ns Ar daemons
+Configures the
+.Sy local
+daemon to optionally depend on each of the
+.Ar daemons
+in
+.Pa output-directory/etc/init/local .
+(See
+.Xr init 5 )
 .It Fl \-hostname Ns = Ns Ar hostname
 Set the live environment's hostname by writing
 .Ar hostname
