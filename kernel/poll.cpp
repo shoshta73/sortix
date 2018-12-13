@@ -275,11 +275,6 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 		PollNode* node = nodes + reqs;
 		if ( fds[reqs].fd < 0 )
 		{
-			fds[reqs].revents = POLLNVAL;
-			// TODO: Should we set POLLNVAL in node->revents too? Should this
-			// system call ignore this error and keep polling, or return to
-			// user-space immediately? What if conditions are already true on
-			// some of the file descriptors (those we have processed so far?)?
 			node->revents = 0;
 			reqs++;
 			continue;
@@ -335,8 +330,6 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 		int num_events = 0;
 		for ( size_t i = 0; i < reqs; i++ )
 		{
-			if ( fds[i].fd < -1 )
-				continue;
 			if ( (fds[i].revents = nodes[i].revents) )
 				num_events++;
 		}
