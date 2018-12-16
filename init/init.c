@@ -130,6 +130,8 @@ struct daemon
 	size_t dependents_used;
 	size_t dependents_length;
 	size_t reference_count;
+	size_t pfd_readyfd_index;
+	size_t pfd_outputfd_index;
 	struct dependency* exit_code_from;
 	char* cd;
 	char* exec;
@@ -139,12 +141,16 @@ struct daemon
 	pid_t pid;
 	enum exit_code_meaning exit_code_meaning;
 	enum daemon_state state;
+	off_t log_size;
 	int exit_code;
 	int readyfd;
+	int outputfd;
+	int logfd;
 	bool need_tty;
 	bool was_ready;
 	bool was_terminated;
 	bool was_dereferenced;
+	bool log_line_terminated;
 };
 
 struct dependency_config
@@ -186,6 +192,13 @@ static size_t daemons_length = 0;
 static struct daemon* first_daemon_by_state[NUM_DAEMON_STATES];
 static struct daemon* last_daemon_by_state[NUM_DAEMON_STATES];
 static size_t count_daemon_by_state[NUM_DAEMON_STATES];
+
+static struct pollfd* pfds = NULL;
+static size_t pfds_used = 0;
+static size_t pfds_length = 0;
+
+static struct daemon** pfds_daemon = NULL;
+static size_t pfds_daemon_length = 0;
 
 static bool chain_location_made = false;
 static char chain_location[] = "/tmp/fs.XXXXXX";
@@ -944,6 +957,8 @@ static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
 	struct daemon* daemon = add_daemon();
 	daemon->state = DAEMON_STATE_TERMINATED;
 	daemon->readyfd = -1;
+	daemon->outputfd = -1;
+	daemon->logfd = -1;
 	daemon_insert_state_list(daemon);
 	if ( netif )
 	{
@@ -999,6 +1014,8 @@ static struct daemon* daemon_create(struct daemon_config* daemon_config)
 		struct daemon* daemon = add_daemon();
 		daemon->state = DAEMON_STATE_TERMINATED;
 		daemon->readyfd = -1;
+		daemon->outputfd = -1;
+		daemon->logfd = -1;
 		daemon_insert_state_list(daemon);
 		if ( !(daemon->name = strdup(daemon_config->name)) )
 			fatal("malloc: %m");
@@ -1187,7 +1204,7 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 	else
 	{
 		// TODO: This gathers all the exit codes before the virtual daemon
-		//       finished, maybe have a kind of virtual deamon that finished on
+		//       finished, maybe have a kind of virtual daemon that finished on
 		//       first error?
 		if ( failed )
 			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
@@ -1225,6 +1242,46 @@ static void daemon_on_finished(struct daemon* daemon)
 	else
 		daemon_status("finished", "Finished %s.", daemon->name);
 	daemon_mark_finished(daemon);
+}
+
+static void daemon_register_pollfd(struct daemon* daemon,
+                                   int fd,
+                                   size_t* out_index,
+                                   short events)
+{
+	assert(pfds_used < pfds_length);
+	assert(pfds_used < pfds_daemon_length);
+	size_t index = pfds_used++;
+	struct pollfd* pfd = pfds + index;
+	memset(pfd, 0, sizeof(*pfd));
+	pfd->fd = fd;
+	pfd->events = events;
+	pfds_daemon[index] = daemon;
+	*out_index = index;
+}
+
+static void daemon_unregister_pollfd(struct daemon* daemon, size_t index)
+{
+	assert(pfds_used <= pfds_length);
+	assert(index < pfds_used);
+	assert(pfds_daemon[index] == daemon);
+	// This function is relied on to not mess with any pollfds prior to the
+	// index, so it doesn't break a forward iteration on the pollfds.
+	size_t last_index = pfds_used - 1;
+	if ( index != last_index )
+	{
+		memcpy(pfds + index, pfds + last_index, sizeof(*pfds));
+		pfds_daemon[index] = pfds_daemon[last_index];
+		if ( 0 <= pfds_daemon[index]->readyfd &&
+		     pfds_daemon[index]->pfd_readyfd_index == last_index )
+			pfds_daemon[index]->pfd_readyfd_index = index;
+		if ( 0 <= pfds_daemon[index]->outputfd &&
+		     pfds_daemon[index]->pfd_outputfd_index == last_index )
+			pfds_daemon[index]->pfd_outputfd_index = index;
+	}
+	pfds_used--;
+	memset(pfds + last_index, 0, sizeof(*pfds));
+	pfds_daemon[last_index] = NULL;
 }
 
 static void daemon_schedule(struct daemon* daemon)
@@ -1319,6 +1376,158 @@ static void daemon_schedule(struct daemon* daemon)
 		daemon_change_state_list(daemon, DAEMON_STATE_SATISFIED);
 }
 
+static bool daemon_log_open(struct daemon* daemon)
+{
+	// TODO: Mode 644 may not be secure, it depends.
+	// TODO: Ignore symlinks?
+	// Create the outputfd.
+	int logflags = O_CREAT | O_WRONLY | O_APPEND;
+	daemon->logfd = open(daemon->log_path, logflags, 0644);
+	if ( daemon->logfd < 0 )
+	{
+		// TODO: Handle EROFS.
+		warning("%s: %m", daemon->log_path);
+		return false;
+	}
+	struct stat st;
+	if ( fstat(daemon->logfd, &st) < 0 )
+	{
+		warning("stat: %s: %m", daemon->log_path);
+		// TODO: Or true?
+		return false;
+	}
+	daemon->log_size = st.st_size;
+	daemon->log_line_terminated = true;
+	return true;
+}
+
+static bool daemon_log_cycle(struct daemon* daemon)
+{
+	const int max_logs = 3;
+	for ( int i = max_logs; 0 < i; i-- )
+	{
+		char* dstpath;
+		// TODO: Preallocate.
+		if ( asprintf(&dstpath, "%s.%i", daemon->log_path, i) < 0 )
+		{
+			return false;
+		}
+		if ( i == max_logs )
+		{
+			if ( !access(dstpath, F_OK) )
+			{
+				// Ensure the file system space usage has an upper bound by
+				// deleting the oldest log. However if another process has the
+				// log open, the kernel will keep the file contents alive. The
+				// file is truncated to zero size to avoid disk space remaining
+				// temporarily in use that way, although the inode itself does
+				// remain open temporarily.
+				// TODO: Handle EROFS.
+				if ( truncate(dstpath, 0) < 0 )
+					warning("archiving: truncate: %s", dstpath);
+				// TODO: Handle EROFS.
+				if ( unlink(dstpath) < 0 )
+					warning("archiving: unlink: %s", dstpath);
+			}
+			else if ( errno != ENOENT )
+			{
+				warning("archiving: %s", dstpath);
+			}
+		}
+		// TODO: Preallocate.
+		char* srcpath;
+		if ( asprintf(&srcpath, "%s%c%i", daemon->log_path,
+		              1 < i ? '.' : '\0', i - 1) < 0 )
+		{
+			free(dstpath);
+			return false;
+		}
+		// TODO: Handle EROFS.
+		note("%s: Renaming %s -> %s", daemon->name, srcpath, dstpath);
+		if ( rename(srcpath, dstpath) < 0 && errno != ENOENT )
+		{
+			free(srcpath);
+			free(dstpath);
+			return false;
+		}
+		free(srcpath);
+		free(dstpath);
+	}
+	return daemon_log_open(daemon);
+}
+
+static bool daemon_log_begin(struct daemon* daemon)
+{
+	if ( false )
+		return daemon_log_cycle(daemon);
+	return daemon_log_open(daemon);
+}
+
+static void daemon_log_data(struct daemon* daemon,
+                            const char* data,
+                            size_t length)
+{
+	const off_t log_chunk_max_size = 1048576;
+	const size_t max_line_length = 4096;
+	// TODO: Ensure max_line_length <= log_chunk_max_size.
+	const off_t log_chunk_cut_offset = log_chunk_max_size - max_line_length;
+	size_t sofar = 0;
+	while ( sofar < length )
+	{
+		if ( daemon->logfd < 0 )
+		{
+			//daemon->log_skipped += length;
+			return;
+		}
+		if ( (daemon->log_line_terminated ?
+		      log_chunk_cut_offset :
+		      log_chunk_max_size) <= daemon->log_size )
+		{
+			// TODO: Try to slice along a newline.
+			if ( !daemon_log_cycle(daemon) )
+			{
+				//daemon->log_skipped += length;
+				return;
+			}
+		}
+		// Decide the size of the new chunk to write out.
+		off_t chunk_left = log_chunk_max_size - daemon->log_size;
+		const char* next_data = data + sofar;
+		size_t remaining_length = length - sofar;
+		size_t next_length =
+			(uintmax_t) remaining_length < (uintmax_t) chunk_left ?
+			(size_t) remaining_length : (size_t) chunk_left;
+		// Attempt to cut the log at a newline.
+		if ( log_chunk_cut_offset <= daemon->log_size + (off_t) next_length )
+		{
+			size_t first_cut_index =
+				daemon->log_size < log_chunk_cut_offset ?
+				0 :
+				(size_t) (log_chunk_cut_offset - daemon->log_size);
+			for ( size_t i = first_cut_index; i < next_length; i++ )
+			{
+				if ( next_data[i] == '\n' )
+				{
+					next_length = i + 1;
+					break;
+				}
+			}
+		}
+		ssize_t amount = write(daemon->logfd, next_data, next_length);
+		if ( amount < 0 )
+		{
+			// TODO: How should this be handled?
+			// TODO: Always cycle on error if non-empty?
+			warning("writing log for %s: %m", daemon->name);
+			//daemon->log_skipped += length - sofar;
+			return;
+		}
+		sofar += amount;
+		daemon->log_size += amount;
+		daemon->log_line_terminated = next_data[amount - 1] == '\n';
+	}
+}
+
 static void daemon_start(struct daemon* daemon)
 {
 	assert(daemon->state == DAEMON_STATE_SATISFIED);
@@ -1370,13 +1579,53 @@ static void daemon_start(struct daemon* daemon)
 	char** argv = generate_argv(exec, daemon->netif);
 	if ( !argv )
 		fatal("malloc: %m");
+	int outputfds[2];
 	int readyfds[2];
 	if ( !daemon->need_tty )
 	{
+		size_t required_fds = 2;
+		if ( pfds_length - pfds_used < required_fds )
+		{
+			size_t old_length = pfds_length ? pfds_length : required_fds;
+			struct pollfd* new_pfds =
+				reallocarray(pfds, old_length, 2 * sizeof(struct pollfd));
+			if ( !new_pfds )
+				fatal("malloc");
+			pfds = new_pfds;
+			pfds_length = old_length * 2;
+		}
+		if ( pfds_daemon_length - pfds_used < required_fds )
+		{
+			size_t old_length =
+				pfds_daemon_length ? pfds_daemon_length : required_fds;
+			struct daemon** new_pfds_daemon =
+				reallocarray(pfds_daemon, old_length,
+				             2 * sizeof(struct daemon*));
+			if ( !new_pfds_daemon )
+				fatal("malloc");
+			pfds_daemon = new_pfds_daemon;
+			pfds_daemon_length = old_length * 2;
+		}
+		if ( !daemon_log_begin(daemon) )
+		{
+			// TODO: Handle EROFS.
+			fatal("%s: %m", daemon->log_path);
+		}
+		if ( pipe(outputfds) < 0 )
+			fatal("pipe");
+		daemon->outputfd = outputfds[0];
+		fcntl(daemon->outputfd, F_SETFL, O_NONBLOCK);
+		// Setup the pollfd for the outputfd.
+		daemon_register_pollfd(daemon, daemon->outputfd,
+		                       &daemon->pfd_outputfd_index, POLLIN);
+		// Create the readyfd.
 		if ( pipe(readyfds) < 0 )
 			fatal("pipe");
 		daemon->readyfd = readyfds[0];
 		fcntl(daemon->readyfd, F_SETFL, O_NONBLOCK);
+		// Setup the pollfd for the readyfd.
+		daemon_register_pollfd(daemon, daemon->readyfd,
+		                       &daemon->pfd_readyfd_index, POLLIN);
 	}
 	// TODO: This is not concurrency safe, build a environment array just for
 	//       this daemon.
@@ -1426,20 +1675,14 @@ static void daemon_start(struct daemon* daemon)
 		}
 		else
 		{
-			// TODO: Log rotation.
-			// TODO: Mode 644 may not be secure, it depends.
-			int logflags = O_CREAT | O_WRONLY | O_APPEND;
-			int log = open(daemon->log_path, logflags, 0644);
-			if ( log < 0 )
-			{
-				// TODO: Right way to send a fatal error back?
-				fatal("%s: %m", daemon->log_path);
-			}
-			// TODO: /dev/null to pid 0.
+			close(0);
 			close(1);
 			close(2);
-			dup2(log, 1);
-			dup2(log, 2);
+			open("/dev/null", O_RDONLY);
+			// TODO: Fix daemon's logging to stdout instead of stderr.
+			//open("/dev/null", O_WRONLY);
+			dup2(outputfds[1], 1);
+			dup2(outputfds[1], 2);
 			dup2(readyfds[1], 3);
 			closefrom(4);
 		}
@@ -1450,6 +1693,7 @@ static void daemon_start(struct daemon* daemon)
 	}
 	if ( !daemon->need_tty )
 	{
+		close(outputfds[1]);
 		close(readyfds[1]);
 	}
 	// TODO: Not thread safe.
@@ -1470,14 +1714,59 @@ static void daemon_start(struct daemon* daemon)
 		daemon_change_state_list(daemon, DAEMON_STATE_STARTING);
 }
 
+static bool daemon_process_ready(struct daemon* daemon)
+{
+	char c;
+	ssize_t amount = read(daemon->readyfd, &c, sizeof(c));
+	if ( amount < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) )
+		return true;
+	if ( amount < 0 )
+		return false;
+	else if ( amount == 0 )
+		return false;
+	if ( c == '\n' )
+	{
+		daemon_on_ready(daemon);
+		return false;
+	}
+	return true;
+}
+
+static bool daemon_process_output(struct daemon* daemon)
+{
+	char data[4096];
+	ssize_t amount = read(daemon->outputfd, data, sizeof(data));
+	if ( amount < 0 && (errno == EAGAIN || errno == EWOULDBLOCK) )
+		return true;
+	if ( amount < 0 )
+		return false;
+	else if ( amount == 0 )
+		return false;
+	daemon_log_data(daemon, data, amount);
+	return true;
+}
+
 static void daemon_on_exit(struct daemon* daemon, int exit_code)
 {
 	assert(daemon->state != DAEMON_STATE_FINISHED);
 	daemon->exit_code = exit_code;
 	if ( 0 <= daemon->readyfd )
 	{
+		daemon_unregister_pollfd(daemon, daemon->pfd_readyfd_index);
 		close(daemon->readyfd);
 		daemon->readyfd = -1;
+	}
+	if ( 0 <= daemon->outputfd )
+	{
+		daemon_process_output(daemon);
+		daemon_unregister_pollfd(daemon, daemon->pfd_outputfd_index);
+		close(daemon->outputfd);
+		daemon->outputfd = -1;
+	}
+	if ( 0 <= daemon->logfd )
+	{
+		close(daemon->logfd);
+		daemon->logfd = -1;
 	}
 	if ( daemon->need_tty )
 	{
@@ -1502,6 +1791,7 @@ static void dummy_signal_handler(int signum)
 	(void) signum;
 }
 
+// TODO. This can just be directly inlined to main as the mainloop.
 static void schedule(void)
 {
 	while ( first_daemon_by_state[DAEMON_STATE_SCHEDULED] ||
@@ -1539,21 +1829,7 @@ static void schedule(void)
 				daemon_on_exit(daemon, exit_code);
 			timeout = timespec_make(0, 0);
 		}
-		// TODO: Can this be allocated up front?
 		// TODO: Use kqueue or such.
-		size_t nfds = count_daemon_by_state[DAEMON_STATE_STARTING];
-		struct pollfd* pfds = calloc(sizeof(struct pollfd), nfds);
-		if ( !pfds )
-		{
-			// TODO: This is super bad, avoid it being possible.
-			fatal("malloc when allocating pollfds: %m");
-		}
-		struct daemon* daemon = first_daemon_by_state[DAEMON_STATE_STARTING];
-		for ( size_t i = 0; daemon; i++, daemon = daemon->next_by_state )
-		{
-			pfds[i].fd = daemon->readyfd;
-			pfds[i].events = POLLIN;
-		}
 		// Set a dummy SIGCHLD handler to ensure we get EINTR during ppoll(2).
 		struct sigaction sa = { 0 };
 		sa.sa_handler = dummy_signal_handler;
@@ -1561,40 +1837,55 @@ static void schedule(void)
 		struct sigaction old_sa;
 		sigaction(SIGCHLD, &sa, &old_sa);
 		// Await either an event, a timeout, or SIGCHLD.
-		int nevents = ppoll(pfds, nfds, &timeout, &oldset);
+		int nevents = ppoll(pfds, pfds_used, &timeout, &oldset);
 		sigaction(SIGCHLD, &old_sa, NULL);
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
 		if ( nevents < 0 && errno != EINTR )
 			fatal("ppoll: %m");
-		daemon = first_daemon_by_state[DAEMON_STATE_STARTING];
-		for ( size_t i = 0; daemon; i++, daemon = daemon->next_by_state )
+		for ( size_t i = 0; i < pfds_used; i++ )
 		{
 			if ( nevents <= 0 )
 				break;
-			// TODO: SIGHUP?
-			if ( pfds[i].revents & POLLIN )
+			struct pollfd* pfd = pfds + i;
+			if ( !pfd->revents )
+				continue;
+			nevents--;
+			struct daemon* daemon = pfds_daemon[i];
+			if ( 0 <= daemon->readyfd && pfd->fd == daemon->readyfd )
 			{
-				nevents--;
-				// TODO: Is this done O_NONBLOCK?
-				char c;
-				ssize_t amount = read(daemon->readyfd, &c, sizeof(c));
-				if ( amount < 0 )
+				// TODO: POLLHUP? POLLERR? POLLNVAL?
+				if ( pfd->revents & (POLLIN | POLLHUP) )
 				{
-					// TODO.
-				}
-				else if ( amount == 0 )
-				{
-					// TODO.
-				}
-				else if ( c == '\n' )
-				{
-					close(daemon->readyfd);
-					daemon->readyfd = -1;
-					daemon_on_ready(daemon);
+					if ( !daemon_process_ready(daemon) )
+					{
+						daemon_unregister_pollfd(daemon,
+						                         daemon->pfd_readyfd_index);
+						close(daemon->readyfd);
+						daemon->readyfd = -1;
+						i--; // Process this index again (something new there).
+					}
 				}
 			}
+			else if ( 0 <= daemon->outputfd && pfd->fd == daemon->outputfd )
+			{
+				// TODO: POLLHUP? POLLERR? POLLNVAL?
+				if ( pfd->revents & (POLLIN | POLLHUP) )
+				{
+					if ( !daemon_process_output(daemon) )
+					{
+						daemon_unregister_pollfd(daemon,
+						                         daemon->pfd_outputfd_index);
+						close(daemon->outputfd);
+						daemon->outputfd = -1;
+						i--; // Process this index again (something new there).
+					}
+				}
+			}
+			else
+			{
+				assert(false);
+			}
 		}
-		free(pfds);
 	}
 }
 
@@ -2663,7 +2954,7 @@ int main(int argc, char* argv[])
 	//       even if in default's dependencies. Alternatively the blacklist can
 	//       be done with variables (that could be cleaner, if more flexible)?
 
-	// Request the default deamon be run.
+	// Request the default daemon be run.
 	schedule_daemon(default_daemon);
 
 	// Run the operating system.
