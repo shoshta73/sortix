@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2019 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1378,14 +1378,17 @@ static void daemon_schedule(struct daemon* daemon)
 
 static bool daemon_log_open(struct daemon* daemon)
 {
+	int logflags = O_CREAT | O_WRONLY | O_APPEND | O_NOFOLLOW;
 	// TODO: Mode 644 may not be secure, it depends.
-	// TODO: Ignore symlinks?
-	// Create the outputfd.
-	int logflags = O_CREAT | O_WRONLY | O_APPEND;
 	daemon->logfd = open(daemon->log_path, logflags, 0644);
 	if ( daemon->logfd < 0 )
 	{
-		// TODO: Handle EROFS.
+		// Don't let read-onlt filesystems block daemons from trying to start.
+		if ( errno == EROFS )
+		{
+			// TODO: Warn once about /var/log being read-only.
+			return true;
+		}
 		warning("%s: %m", daemon->log_path);
 		return false;
 	}
@@ -1393,7 +1396,6 @@ static bool daemon_log_open(struct daemon* daemon)
 	if ( fstat(daemon->logfd, &st) < 0 )
 	{
 		warning("stat: %s: %m", daemon->log_path);
-		// TODO: Or true?
 		return false;
 	}
 	daemon->log_size = st.st_size;
@@ -1423,16 +1425,37 @@ static bool daemon_log_cycle(struct daemon* daemon)
 				// temporarily in use that way, although the inode itself does
 				// remain open temporarily.
 				// TODO: Handle EROFS.
-				if ( truncate(dstpath, 0) < 0 )
-					warning("archiving: truncate: %s", dstpath);
-				// TODO: Handle EROFS.
+				// TODO: truncateat should have a flags parameter, to not follow
+				// symbolic links. Otherwise a symlink in /var/log could be
+				// used to truncate an arbitrary file.
+				int fd = open(dstpath, O_WRONLY | O_NOFOLLOW);
+				if ( fd < 0 )
+					warning("archiving: opening: %s", dstpath);
+				else
+				{
+					if ( ftruncate(fd, 0) < 0 )
+					{
+						if ( errno == EROFS )
+						{
+							// TODO: Warn once about /var/log being read-only.
+						}
+						else
+							warning("archiving: truncate: %s", dstpath);
+					}
+					close(fd);
+				}
 				if ( unlink(dstpath) < 0 )
-					warning("archiving: unlink: %s", dstpath);
+				{
+					if ( errno == EROFS )
+					{
+						// TODO: Warn once about /var/log being read-only.
+					}
+					else
+						warning("archiving: unlink: %s", dstpath);
+				}
 			}
 			else if ( errno != ENOENT )
-			{
 				warning("archiving: %s", dstpath);
-			}
 		}
 		// TODO: Preallocate.
 		char* srcpath;
@@ -1443,12 +1466,22 @@ static bool daemon_log_cycle(struct daemon* daemon)
 			return false;
 		}
 		// TODO: Handle EROFS.
-		note("%s: Renaming %s -> %s", daemon->name, srcpath, dstpath);
-		if ( rename(srcpath, dstpath) < 0 && errno != ENOENT )
+		if ( rename(srcpath, dstpath) < 0 )
 		{
-			free(srcpath);
-			free(dstpath);
-			return false;
+			if ( errno == ENOENT )
+			{
+				// Ignore non-existent logs.
+			}
+			else if ( errno == EROFS )
+			{
+				// TODO: Warn once about /var/log being read-only.
+			}
+			else
+			{
+				free(srcpath);
+				free(dstpath);
+				return false;
+			}
 		}
 		free(srcpath);
 		free(dstpath);
