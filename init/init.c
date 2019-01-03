@@ -110,6 +110,14 @@ struct dependency
 // TODO: Flag to signal that it's okay if the dependency is restarted / isn't
 //       there all the time.
 
+struct log
+{
+	char* path;
+	off_t size;
+	int fd;
+	bool line_terminated;
+};
+
 struct daemon
 {
 	char* name;
@@ -136,21 +144,18 @@ struct daemon
 	char* cd;
 	char* exec;
 	char* netif;
-	char* log_path;
 	struct termios oldtio;
+	struct log log;
 	pid_t pid;
 	enum exit_code_meaning exit_code_meaning;
 	enum daemon_state state;
-	off_t log_size;
 	int exit_code;
 	int readyfd;
 	int outputfd;
-	int logfd;
 	bool need_tty;
 	bool was_ready;
 	bool was_terminated;
 	bool was_dereferenced;
-	bool log_line_terminated;
 };
 
 struct dependency_config
@@ -958,7 +963,7 @@ static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
 	daemon->state = DAEMON_STATE_TERMINATED;
 	daemon->readyfd = -1;
 	daemon->outputfd = -1;
-	daemon->logfd = -1;
+	daemon->log.fd = -1;
 	daemon_insert_state_list(daemon);
 	if ( netif )
 	{
@@ -1001,7 +1006,7 @@ static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
 	daemon->exit_code_meaning = daemon_config->exit_code_meaning;
 	if ( netif && !(daemon->netif = strdup(netif)) )
 		fatal("malloc: %m");
-	if ( asprintf(&daemon->log_path, "/var/log/%s.log", daemon->name) < 0 )
+	if ( asprintf(&daemon->log.path, "/var/log/%s.log", daemon->name) < 0 )
 		fatal("malloc: %m");
 	daemon->need_tty = daemon_config->need_tty;
 	return daemon;
@@ -1015,7 +1020,7 @@ static struct daemon* daemon_create(struct daemon_config* daemon_config)
 		daemon->state = DAEMON_STATE_TERMINATED;
 		daemon->readyfd = -1;
 		daemon->outputfd = -1;
-		daemon->logfd = -1;
+		daemon->log.fd = -1;
 		daemon_insert_state_list(daemon);
 		if ( !(daemon->name = strdup(daemon_config->name)) )
 			fatal("malloc: %m");
@@ -1376,41 +1381,43 @@ static void daemon_schedule(struct daemon* daemon)
 		daemon_change_state_list(daemon, DAEMON_STATE_SATISFIED);
 }
 
-static bool daemon_log_open(struct daemon* daemon)
+// TODO: Log fsck and such early logging? What about chain booting?
+
+static bool log_open(struct log* log)
 {
 	int logflags = O_CREAT | O_WRONLY | O_APPEND | O_NOFOLLOW;
 	// TODO: Mode 644 may not be secure, it depends.
-	daemon->logfd = open(daemon->log_path, logflags, 0644);
-	if ( daemon->logfd < 0 )
+	log->fd = open(log->path, logflags, 0644);
+	if ( log->fd < 0 )
 	{
-		// Don't let read-onlt filesystems block daemons from trying to start.
+		// Don't let read-only filesystems block daemons from trying to start.
 		if ( errno == EROFS )
 		{
 			// TODO: Warn once about /var/log being read-only.
 			return true;
 		}
-		warning("%s: %m", daemon->log_path);
+		warning("%s: %m", log->path);
 		return false;
 	}
 	struct stat st;
-	if ( fstat(daemon->logfd, &st) < 0 )
+	if ( fstat(log->fd, &st) < 0 )
 	{
-		warning("stat: %s: %m", daemon->log_path);
+		warning("stat: %s: %m", log->path);
 		return false;
 	}
-	daemon->log_size = st.st_size;
-	daemon->log_line_terminated = true;
+	log->size = st.st_size;
+	log->line_terminated = true;
 	return true;
 }
 
-static bool daemon_log_cycle(struct daemon* daemon)
+static bool log_cycle(struct log* log)
 {
 	const int max_logs = 3;
 	for ( int i = max_logs; 0 < i; i-- )
 	{
 		char* dstpath;
 		// TODO: Preallocate.
-		if ( asprintf(&dstpath, "%s.%i", daemon->log_path, i) < 0 )
+		if ( asprintf(&dstpath, "%s.%i", log->path, i) < 0 )
 		{
 			return false;
 		}
@@ -1459,7 +1466,7 @@ static bool daemon_log_cycle(struct daemon* daemon)
 		}
 		// TODO: Preallocate.
 		char* srcpath;
-		if ( asprintf(&srcpath, "%s%c%i", daemon->log_path,
+		if ( asprintf(&srcpath, "%s%c%i", log->path,
 		              1 < i ? '.' : '\0', i - 1) < 0 )
 		{
 			free(dstpath);
@@ -1486,57 +1493,55 @@ static bool daemon_log_cycle(struct daemon* daemon)
 		free(srcpath);
 		free(dstpath);
 	}
-	return daemon_log_open(daemon);
+	return log_open(log);
 }
 
-static bool daemon_log_begin(struct daemon* daemon)
+static bool log_begin(struct log* log)
 {
 	if ( false )
-		return daemon_log_cycle(daemon);
-	return daemon_log_open(daemon);
+		return log_cycle(log);
+	return log_open(log);
 }
 
-static void daemon_log_data(struct daemon* daemon,
-                            const char* data,
-                            size_t length)
+static void log_data(struct log* log, const char* data, size_t length)
 {
-	const off_t log_chunk_max_size = 1048576;
+	const off_t chunk_max_size = 1048576;
 	const size_t max_line_length = 4096;
-	// TODO: Ensure max_line_length <= log_chunk_max_size.
-	const off_t log_chunk_cut_offset = log_chunk_max_size - max_line_length;
+	// TODO: Ensure max_line_length <= chunk_max_size.
+	const off_t chunk_cut_offset = chunk_max_size - max_line_length;
 	size_t sofar = 0;
 	while ( sofar < length )
 	{
-		if ( daemon->logfd < 0 )
+		if ( log->fd < 0 )
 		{
-			//daemon->log_skipped += length;
+			//log->skipped += length;
 			return;
 		}
-		if ( (daemon->log_line_terminated ?
-		      log_chunk_cut_offset :
-		      log_chunk_max_size) <= daemon->log_size )
+		if ( (log->line_terminated ?
+		      chunk_cut_offset :
+		      chunk_max_size) <= log->size )
 		{
 			// TODO: Try to slice along a newline.
-			if ( !daemon_log_cycle(daemon) )
+			if ( !log_cycle(log) )
 			{
-				//daemon->log_skipped += length;
+				//log->skipped += length;
 				return;
 			}
 		}
 		// Decide the size of the new chunk to write out.
-		off_t chunk_left = log_chunk_max_size - daemon->log_size;
+		off_t chunk_left = chunk_max_size - log->size;
 		const char* next_data = data + sofar;
 		size_t remaining_length = length - sofar;
 		size_t next_length =
 			(uintmax_t) remaining_length < (uintmax_t) chunk_left ?
 			(size_t) remaining_length : (size_t) chunk_left;
 		// Attempt to cut the log at a newline.
-		if ( log_chunk_cut_offset <= daemon->log_size + (off_t) next_length )
+		if ( chunk_cut_offset <= log->size + (off_t) next_length )
 		{
 			size_t first_cut_index =
-				daemon->log_size < log_chunk_cut_offset ?
+				log->size < chunk_cut_offset ?
 				0 :
-				(size_t) (log_chunk_cut_offset - daemon->log_size);
+				(size_t) (chunk_cut_offset - log->size);
 			for ( size_t i = first_cut_index; i < next_length; i++ )
 			{
 				if ( next_data[i] == '\n' )
@@ -1546,18 +1551,18 @@ static void daemon_log_data(struct daemon* daemon,
 				}
 			}
 		}
-		ssize_t amount = write(daemon->logfd, next_data, next_length);
+		ssize_t amount = write(log->fd, next_data, next_length);
 		if ( amount < 0 )
 		{
 			// TODO: How should this be handled?
 			// TODO: Always cycle on error if non-empty?
-			warning("writing log for %s: %m", daemon->name);
-			//daemon->log_skipped += length - sofar;
+			warning("writing log: %s: %m", log->path);
+			//log->skipped += length - sofar;
 			return;
 		}
 		sofar += amount;
-		daemon->log_size += amount;
-		daemon->log_line_terminated = next_data[amount - 1] == '\n';
+		log->size += amount;
+		log->line_terminated = next_data[amount - 1] == '\n';
 	}
 }
 
@@ -1639,10 +1644,9 @@ static void daemon_start(struct daemon* daemon)
 			pfds_daemon = new_pfds_daemon;
 			pfds_daemon_length = old_length * 2;
 		}
-		if ( !daemon_log_begin(daemon) )
+		if ( !log_begin(&daemon->log) )
 		{
-			// TODO: Handle EROFS.
-			fatal("%s: %m", daemon->log_path);
+			// TODO: Should we not stop the daemon?
 		}
 		if ( pipe(outputfds) < 0 )
 			fatal("pipe");
@@ -1775,7 +1779,7 @@ static bool daemon_process_output(struct daemon* daemon)
 		return false;
 	else if ( amount == 0 )
 		return false;
-	daemon_log_data(daemon, data, amount);
+	log_data(&daemon->log, data, amount);
 	return true;
 }
 
@@ -1796,10 +1800,11 @@ static void daemon_on_exit(struct daemon* daemon, int exit_code)
 		close(daemon->outputfd);
 		daemon->outputfd = -1;
 	}
-	if ( 0 <= daemon->logfd )
+	if ( 0 <= daemon->log.fd )
 	{
-		close(daemon->logfd);
-		daemon->logfd = -1;
+		// TODO: log_close
+		close(daemon->log.fd);
+		daemon->log.fd = -1;
 	}
 	if ( daemon->need_tty )
 	{
