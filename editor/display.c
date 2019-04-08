@@ -221,7 +221,7 @@ void render_editor(struct editor* editor, struct terminal_state* state)
 			bool selected = (is_row_column_lt(cursor_y, cursor_x, select_y, select_x) &&
 			                 is_row_column_le(cursor_y, cursor_x, line_index, column_index) &&
 			                 is_row_column_lt(line_index, column_index, select_y, select_x)) ||
-                            (is_row_column_lt(select_y, select_x, cursor_y, cursor_x) &&
+			                (is_row_column_lt(select_y, select_x, cursor_y, cursor_x) &&
 			                 is_row_column_le(select_y, select_x, line_index, column_index) &&
 			                 is_row_column_lt(line_index, column_index, cursor_y, cursor_x));
 			bool at_margin = column_index == editor->margin;
@@ -229,7 +229,7 @@ void render_editor(struct editor* editor, struct terminal_state* state)
 			wchar_t c = is_blank ? L' ' : chars[x].character;
 			uint8_t color = (is_blank ? 7 : chars[x].color);
 			data_line[x] = selected && is_blank && at_margin ? make_terminal_datum(L'|', 0x41) :
-                           selected ? make_terminal_datum(c, 0x47) :
+			               selected ? make_terminal_datum(c, 0x47) :
 			               is_blank && at_margin ? make_terminal_datum(L'|', 0x01) :
 			               make_terminal_datum(c, color);
 		}
