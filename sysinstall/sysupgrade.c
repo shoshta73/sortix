@@ -775,7 +775,7 @@ int main(void)
 		while ( true )
 		{
 			promptx(input, sizeof(input),
-				   "Upgrade? (yes/no/poweroff/reboot)", "yes", true);
+				   "Upgrade? (yes/no/poweroff/reboot/halt)", "yes", true);
 			if ( !strcasecmp(input, "yes") )
 				break;
 			else if ( !strcasecmp(input, "no") )
@@ -784,14 +784,16 @@ int main(void)
 				     "upgrade(7) manual page. You can edit the upgrade.conf(5) "
 				     "configuration file of the target system to change which "
 				     "upgrade operations are performed.\n");
-				text("Alternatively, you can answer 'poweroff' or 'reboot' to "
-				     "cancel the upgrade.\n");
+				text("Alternatively, you can answer 'poweroff', 'reboot', or "
+				     "'halt' or cancel the upgrade.\n");
 				continue;
 			}
 			else if ( !strcasecmp(input, "poweroff") )
 				exit(0);
 			else if ( !strcasecmp(input, "reboot") )
 				exit(1);
+			else if ( !strcasecmp(input, "halt") )
+				exit(2);
 			else if ( !strcasecmp(input, "!") )
 				break;
 			else
@@ -928,10 +930,13 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input), "What now? (poweroff/reboot)", "reboot");
+		prompt(input, sizeof(input),
+		       "What now? (poweroff/reboot/halt)", "reboot");
 		if ( !strcasecmp(input, "poweroff") )
 			return 0;
 		if ( !strcasecmp(input, "reboot") )
 			return 1;
+		if ( !strcasecmp(input, "halt") )
+			return 2;
 	}
 }

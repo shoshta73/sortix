@@ -213,11 +213,14 @@ own log.
 .Sh ASYNCHRONOUS EVENTS
 .Bl -tag -width "SIGUSR1"
 .It Dv SIGTERM
-Request system poweroff.
+Request system poweroff, normally sent by
+.Xr poweroff 8 .
 .It Dv SIGINT
-Request system reboot.
+Request system reboot, normally sent by
+.Xr reboot 8 .
 .It Dv SIGQUIT
-Request system halt.
+Request system halt, normally sent by
+.Xr halt 8 .
 .El
 .Sh EXIT STATUS
 .Nm
@@ -238,6 +241,9 @@ exits with the same exit status as its target session if it terminates normally.
 .Xr videomode 5 ,
 .Xr initrd 7 ,
 .Xr kernel 7 ,
+.Xr halt 8 ,
 .Xr login 8 ,
+.Xr poweroff 8 ,
+.Xr reboot 8 ,
 .Xr sysmerge 8 ,
 .Xr update-initrd 8

@@ -345,6 +345,8 @@ int textual(void)
 			exit(0);
 		if ( !strcmp(username, "reboot") )
 			exit(1);
+		if ( !strcmp(username, "halt") )
+			exit(2);
 
 		if ( settermmode(0, pw_termmode) < 0 )
 			err(2, "settermmode");

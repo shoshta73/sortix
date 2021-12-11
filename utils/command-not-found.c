@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
  * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -27,47 +27,9 @@
 
 #define ARRAY_LENGTH(array) (sizeof(array) / sizeof((array)[0]))
 
-static const char* tty_name(void)
-{
-	int tty_fd = open("/dev/tty", O_RDONLY);
-	const char* result = NULL;
-	if ( 0 <= tty_fd )
-	{
-		result = ttyname(tty_fd);
-		close(tty_fd);
-	}
-	return result ? result : "/dev/tty";
-}
-
 static void suggest_logout(void)
 {
 	fprintf(stderr, " Exiting your shell normally to logout.\n");
-}
-
-static void suggest_poweroff(void)
-{
-	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
-		fprintf(stderr, " Powering off on /dev/tty1.\n");
-	else if ( getenv("LOGIN_PID") )
-	{
-		fprintf(stderr, " Exiting your shell normally to logout.\n");
-		fprintf(stderr, " Login as user 'poweroff' to power off computer.\n");
-	}
-	else
-		fprintf(stderr, " Exiting your shell normally to poweroff.\n");
-}
-
-static void suggest_reboot(void)
-{
-	if ( strcmp(tty_name(), "/dev/tty1") != 0 )
-		fprintf(stderr, " Rebooting on /dev/tty1.\n");
-	else if ( getenv("LOGIN_PID") )
-	{
-		fprintf(stderr, " Exiting your shell normally to logout.\n");
-		fprintf(stderr, " Login as user 'reboot' to reboot computer.\n");
-	}
-	else
-		fprintf(stderr, " Exiting your shell with 'exit 1' to reboot.\n");
 }
 
 enum category
@@ -79,7 +41,6 @@ enum category
 	MOUNT,
 	PAGER,
 	POWEROFF,
-	REBOOT,
 	RW,
 	SHELL,
 	UNMOUNT,
@@ -122,11 +83,8 @@ struct command commands[] =
 	{PAGER, "more", NULL, NULL},
 	{PAGER, "pager", "system", NULL},
 
-	{POWEROFF, "halt", NULL, NULL},
-	{POWEROFF, "poweroff", NULL, suggest_poweroff},
+	{POWEROFF, "poweroff", "system", NULL},
 	{POWEROFF, "shutdown", NULL, NULL},
-
-	{REBOOT, "reboot", NULL, suggest_reboot},
 
 	{RW, "dd", NULL, NULL},
 	{RW, "rw", "system", NULL},

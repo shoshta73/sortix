@@ -636,6 +636,8 @@ static void keyboard_event(struct glogin* state, uint32_t codepoint)
 				exit(0);
 			if ( !strcmp(textbox_username.text, "reboot") )
 				exit(1);
+			if ( !strcmp(textbox_username.text, "halt") )
+				exit(2);
 			state->stage = STAGE_PASSWORD;
 			textbox_reset(&textbox_password);
 			break;

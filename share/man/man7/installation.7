@@ -357,8 +357,9 @@ if applicable restore boot priorities in your firmware.
 If you did not accept the bootloader, you will need to manually configure a
 bootloader to boot the new operating system.
 .Pp
-You will be given the choice between powering off the system, rebooting it, or
-directly booting the new system.
+You will be given the choice between powering off the system, rebooting it,
+halting it, or directly booting the new system.
+.Pp
 The last option will directly boot the new system in a chroot while the live
 environment remains in the background.
 If you invoked
@@ -369,10 +370,17 @@ Otherwise the computer will power off when the chroot environment terminates.
 Upon boot of the new system it will be configured in multi-user mode and you
 will be presented with a login screen.
 Authenticate as one of the local users and you will be given a shell.
+.Pp
 To power off the computer login as user
 .Sy poweroff
-and to reboot the computer login as user
-.Sy reboot .
+or run
+.Xr poweroff 8
+after logging in.
+To reboot the computer login as user
+.Sy reboot
+or run
+.Xr reboot 8
+after logging in.
 .Pp
 The
 .Xr user-guide 7

@@ -20,9 +20,10 @@ env
 expr
 false
 find
+halt
 head
-id
 help
+id
 kernelinfo
 kill
 ln
@@ -35,11 +36,13 @@ mv
 nl
 pager
 passwd
+poweroff
 ps
 pstree
 pwd
 readlink
 realpath
+reboot
 rm
 rmdir
 sleep

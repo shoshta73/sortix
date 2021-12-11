@@ -828,22 +828,24 @@ int main(void)
 	while ( true )
 	{
 		prompt(input, sizeof(input),
-		       "Install " BRAND_DISTRIBUTION_NAME "? (yes/no/poweroff/reboot)",
-		       "yes");
+		       "Install " BRAND_DISTRIBUTION_NAME "? "
+		       "(yes/no/poweroff/reboot/halt)", "yes");
 		if ( !strcasecmp(input, "yes") )
 			break;
 		else if ( !strcasecmp(input, "no") )
 		{
 			text("Answer '!' to get a shell. Type !man to view the "
 			     "installation(7) manual page.\n");
-			text("Alternatively, you can answer 'poweroff' or 'reboot' to "
-			     "cancel the installation.\n");
+			text("Alternatively, you can answer 'poweroff', 'reboot', or "
+			     "'halt' to cancel the installation.\n");
 			continue;
 		}
 		else if ( !strcasecmp(input, "poweroff") )
 			exit(0);
 		else if ( !strcasecmp(input, "reboot") )
 			exit(1);
+		else if ( !strcasecmp(input, "halt") )
+			exit(2);
 		else
 			continue;
 	}
@@ -1133,17 +1135,21 @@ int main(void)
 
 	text("Upon boot, you'll be greeted with a login screen. Enter your "
 	     "credentials to get a command line. Login as user 'poweroff' as "
-	     "described in login(8) to power off the machine.  After logging in, "
-	     "type 'man user-guide' to view the introductory documentation.\n");
+	     "described in login(8) to power off the machine or run poweroff(8). "
+	     "After logging in, type 'man user-guide' to view the introductory "
+	     "documentation.\n");
 	text("\n");
 
 	while ( true )
 	{
-		prompt(input, sizeof(input), "What now? (poweroff/reboot/boot)", "boot");
+		prompt(input, sizeof(input),
+		       "What now? (poweroff/reboot/halt/boot)", "boot");
 		if ( !strcasecmp(input, "poweroff") )
 			exit(0);
 		if ( !strcasecmp(input, "reboot") )
 			exit(1);
+		if ( !strcasecmp(input, "halt") )
+			exit(2);
 		if ( !strcasecmp(input, "boot") )
 		{
 			unmount_all_but_root();

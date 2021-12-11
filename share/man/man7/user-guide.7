@@ -24,17 +24,16 @@ This is
 if the system is booted in multi-user mode.
 This is a root shell if booted in single-user mode.
 .Pp
-To power off from the login screen, login as user
-.Sy poweroff .
-To reboot, login as user
-.Sy reboot .
-.Pp
-To power off from a single-user boot root shell, run
-.Sy exit 0
-in the shell.
-To reboot, run
-.Sy exit 1
-in the shell.
+To power off the computer login as user
+.Sy poweroff
+or run
+.Xr poweroff 8
+after logging in.
+To reboot the computer login as user
+.Sy reboot
+or run
+.Xr reboot 8
+after logging in.
 .Ss Keyboard Layout
 The kernel has a default US keyboard layout compiled into it.
 .Pp
