@@ -1178,6 +1178,18 @@ static void RenderSenaryDigit(FrameBufferInfo fb, unsigned int digit,
 
 static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 {
+	uint32_t green_color = MakeColor(0, 220, 0);
+	uint32_t bright_green_color = MakeColor(0, 255, 0);
+
+	uint32_t red_color = MakeColor(255, 0, 0);
+	uint32_t bright_red_color = MakeColor(255, 255, 255);
+
+	uint32_t text_color = desktop->object->is_core() ? green_color : MakeColor(255, 255, 255);
+	uint32_t selected_text_color = desktop->object->is_core() ? bright_green_color : MakeColor(255, 222, 0);
+
+	uint32_t emotional_color = desktop->object->is_core() ? text_color : red_color;
+	uint32_t very_emotional_color = desktop->object->is_core() ? bright_green_color : bright_red_color;
+
 	bool was_runes = use_runes;
 	use_runes = use_runes || desktop->object->is_core();
 	if ( desktop->object->is_unstable_core() )
@@ -1216,12 +1228,15 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 
-	RenderSenaryDigit(fb, now.tv_sec/(6*6*6*6*6) % 6, MakeColor(255, 255, 255), MakeColor(255, 100, 100), 15, fb.xres-SENARY_FONT_WIDTH*(6+1));
-	RenderSenaryDigit(fb, now.tv_sec/(6*6*6*6) % 6, MakeColor(255, 255, 255), MakeColor(255, 100, 100), 15, fb.xres-SENARY_FONT_WIDTH*(5+1));
-	RenderSenaryDigit(fb, now.tv_sec/(6*6*6) % 6, MakeColor(255, 255, 255), MakeColor(255, 100, 100), 15, fb.xres-SENARY_FONT_WIDTH*(4+1));
-	RenderSenaryDigit(fb, now.tv_sec/(6*6) % 6, MakeColor(255, 255, 255), MakeColor(255, 100, 100), 15, fb.xres-SENARY_FONT_WIDTH*(3+1));
-	RenderSenaryDigit(fb, now.tv_sec/6 % 6, MakeColor(255, 255, 255), MakeColor(255, 100, 100), 15, fb.xres-SENARY_FONT_WIDTH*(2+1));
-	RenderSenaryDigit(fb, now.tv_sec/1 % 6, MakeColor(255, 255, 255), MakeColor(255, 100, 100), 15, fb.xres-SENARY_FONT_WIDTH*(1+1));
+	uint32_t digit_pri = text_color;
+	uint32_t digit_sec = desktop->object->is_core() ? green_color : MakeColor(255, 100, 100);
+
+	RenderSenaryDigit(fb, now.tv_sec/(6*6*6*6*6) % 6, digit_pri, digit_sec, 15, fb.xres-SENARY_FONT_WIDTH*(6+1));
+	RenderSenaryDigit(fb, now.tv_sec/(6*6*6*6) % 6, digit_pri, digit_sec, 15, fb.xres-SENARY_FONT_WIDTH*(5+1));
+	RenderSenaryDigit(fb, now.tv_sec/(6*6*6) % 6, digit_pri, digit_sec, 15, fb.xres-SENARY_FONT_WIDTH*(4+1));
+	RenderSenaryDigit(fb, now.tv_sec/(6*6) % 6, digit_pri, digit_sec, 15, fb.xres-SENARY_FONT_WIDTH*(3+1));
+	RenderSenaryDigit(fb, now.tv_sec/6 % 6, digit_pri, digit_sec, 15, fb.xres-SENARY_FONT_WIDTH*(2+1));
+	RenderSenaryDigit(fb, now.tv_sec/1 % 6, digit_pri, digit_sec, 15, fb.xres-SENARY_FONT_WIDTH*(1+1));
 
 	struct timespec xtime = desktop->experienced_time;
 
@@ -1252,8 +1267,8 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 	int slogan_pos_x = (fb.xres - slogan_width) / 2;
 	int slogan_pos_y = 15;
 	uint32_t slogan_color = desktop->angry ?
-	                        MakeColor(255, 0, 0) :
-	                        MakeColor(255, 255, 255);
+	                        emotional_color :
+	                        text_color;
 	RenderText(fb, slogan, slogan_color, slogan_pos_x, slogan_pos_y, INT_MAX, INT_MAX);
 
 	bool show_warning = !desktop->flashing_warning || xtime.tv_nsec < 500000000;
@@ -1265,8 +1280,8 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 		int warning_pos_x = (fb.xres - warning_width) / 2;
 		int warning_pos_y = 15 + FONT_HEIGHT * 2;
 		uint32_t warning_color = desktop->critical_warning ?
-			                    MakeColor(255, 0, 0) :
-			                    MakeColor(255, 255, 255);
+			                    very_emotional_color :
+			                    text_color;
 		bool used_runes = use_runes;
 		use_runes = use_runes || desktop->rune_warning;
 		RenderText(fb, warning, warning_color, warning_pos_x, warning_pos_y, INT_MAX, INT_MAX);
@@ -1280,7 +1295,7 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 	int title_width = (int) title_length * (FONT_WIDTH+1);
 	int title_pos_x = (fb.xres - title_width) / 2;
 	int title_pos_y = fb.yres - 15 - FONT_HEIGHT;
-	uint32_t title_color = MakeColor(255, 255, 255);
+	uint32_t title_color = text_color;
 	RenderText(fb, title, title_color, title_pos_x, title_pos_y, INT_MAX, INT_MAX);
 
 	int alpha = (uint8_t) ((sin(desktop->color_angle) + 1.0f) * 128.f);
@@ -1289,13 +1304,17 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 	if ( 255 < alpha )
 		alpha = 255;
 
-	uint32_t pri_color = desktop->object->is_core() && !desktop->object->is_unstable_core() ?
-	                     MakeColor(255, 255, 255, alpha) :
+	uint32_t pri_color = desktop->object->is_core() ?
+	                     is_angry ?
+	                     MakeColor(0, 255, 0, alpha) :
+	                     MakeColor(0, 160, 0, alpha) :
 	                     is_angry ?
 	                     MakeColor(114, 21, 36, alpha) :
 	                     MakeColor(255, 222, 0, alpha);
-	uint32_t sec_color = desktop->object->is_core() && !desktop->object->is_unstable_core() ?
-	                     MakeColor(255, 255, 255, 255) :
+	uint32_t sec_color = desktop->object->is_core()?
+	                     is_angry ?
+	                     MakeColor(0, 32, 0, 255) :
+	                     MakeColor(0, 160, 0, 255) :
 	                     is_angry ?
 	                     MakeColor(255, 0, 0, 255) :
 	                     MakeColor(114, 255, 36, 255);
@@ -1342,7 +1361,7 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 			int help_height = FONT_HEIGHT;
 			int help_pos_x = (fb.xres - help_width) / 2;
 			int help_pos_y = 15 + (3 + i) * (help_height);
-			RenderTextShadow(fb, help, MakeColor(255, 255, 255), help_pos_x, help_pos_y, INT_MAX, INT_MAX);
+			RenderTextShadow(fb, help, text_color, help_pos_x, help_pos_y, INT_MAX, INT_MAX);
 		}
 
 		use_runes = was_runes;
@@ -1351,8 +1370,8 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 
 	float normal_dist = size * 2.0;
 
-	uint32_t unselected_color = MakeColor(255, 255, 255);
-	uint32_t selected_color = MakeColor(255, 222, 0);
+	uint32_t unselected_color = text_color;
+	uint32_t selected_color = selected_text_color;
 	for ( size_t i = 0; i < desktop->num_actions; i++ )
 	{
 		float dist = normal_dist;
@@ -1386,7 +1405,7 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 	int command_height = FONT_HEIGHT;
 	int command_pos_x = (fb.xres - command_width) / 2;
 	int command_pos_y = (fb.yres - command_height) / 2;
-	RenderTextShadow(fb, command, MakeColor(255, 255, 255), command_pos_x, command_pos_y, INT_MAX, INT_MAX);
+	RenderTextShadow(fb, command, text_color, command_pos_x, command_pos_y, INT_MAX, INT_MAX);
 	if ( is_password_prompt )
 		free(password_command);
 
@@ -1396,7 +1415,7 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 	int prompt_height = FONT_HEIGHT;
 	int prompt_pos_x = (fb.xres - prompt_width) / 2;
 	int prompt_pos_y = (fb.yres - prompt_height) / 2 - FONT_HEIGHT - 2;
-	RenderTextShadow(fb, prompt, MakeColor(255, 255, 255), prompt_pos_x, prompt_pos_y, INT_MAX, INT_MAX);
+	RenderTextShadow(fb, prompt, text_color, prompt_pos_x, prompt_pos_y, INT_MAX, INT_MAX);
 
 	const char* error = desktop->object->error_message();
 	int error_length = strlen(error);
@@ -1404,7 +1423,7 @@ static void RenderBackground(FrameBufferInfo fb, struct Desktop* desktop)
 	int error_height = FONT_HEIGHT;
 	int error_pos_x = (fb.xres - error_width) / 2;
 	int error_pos_y = (fb.yres - error_height) / 2 + FONT_HEIGHT - 2;
-	RenderText(fb, error, MakeColor(255, 0, 0), error_pos_x, error_pos_y, INT_MAX, INT_MAX);
+	RenderText(fb, error, emotional_color, error_pos_x, error_pos_y, INT_MAX, INT_MAX);
 
 	use_runes = was_runes;
 }
