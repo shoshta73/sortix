@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -64,9 +65,12 @@ private:
 		STATE_INIT = 0,
 		STATE_RESET_LED,
 		STATE_RESET_TYPEMATIC,
+		STATE_SET_SCANCODE_SET,
 		STATE_ENABLE_SCAN,
 		STATE_NORMAL,
 		STATE_NORMAL_ESCAPED,
+		STATE_NORMAL_RELEASED,
+		STATE_NORMAL_ESCAPED_RELEASED,
 	} state;
 	size_t tries;
 	uint8_t leds;

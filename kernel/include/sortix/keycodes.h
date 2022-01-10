@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -108,20 +109,14 @@
 #define KBKEY_KPAD3 0x51
 #define KBKEY_KPAD0 0x52
 #define KBKEY_SYM15 0x53
-#define KBKEY_ALTSYSRQ 0x54
-#define KBKEY_NO_STANDARD_MEANING_1 0x55 /* Sometimes F11, F12, or even FN */
-#define KBKEY_NO_STANDARD_MEANING_2 0x56 /* Possibly Windows key? */
+#define KBKEY_NO_STANDARD_MEANING_2 0x56 /* Key between left shift and Z */
 #define KBKEY_F11 0x57
 #define KBKEY_F12 0x58
 /* [0x59, 0x7F] are not really standard. */
 #define KBKEY_KPADENTER (0x80 + 0x1C)
 #define KBKEY_RCTRL (0x80 + 0x1D)
-#define KBKEY_FAKELSHIFT (0x80 + 0x2A)
 #define KBKEY_SYM16 (0x80 + 0x35)
-#define KBKEY_FAKERSHIFT (0x80 + 0x36)
-#define KBKEY_CTRLPRINTSCRN (0x80 + 0x37)
 #define KBKEY_RALT (0x80 + 0x38)
-#define KBKEY_CTRLBREAK (0x80 + 0x46)
 #define KBKEY_HOME (0x80 + 0x47)
 #define KBKEY_UP (0x80 + 0x48)
 #define KBKEY_PGUP (0x80 + 0x49)
