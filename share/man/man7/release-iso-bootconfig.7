@@ -128,6 +128,8 @@ The
 .Sy hook_advanced_menu_pre
 hook is run.
 .Pp
+A menu entry is emitted to control whether network drivers are enabled.
+.Pp
 A menu entry is emitted that goes to the binary packages menu (which runs
 .Li configfile /boot/grub/tix.cfg )
 .Pp
@@ -260,6 +262,13 @@ If the selected menu option itself is a submenu, it can be appended with a
 .Sy '>'
 and another selection to pick a default menu option in that submenu, and so on.
 (Default: 0)
+.It Sy enable_network_drivers
+An additional
+.Xr kernel 7
+command line parameter that controls whether network drivers are enabled.
+Either set to the empty string (network drivers are enabled) or
+.Sy --disable-network-drivers .
+(Default: The empty string).
 .It Sy enable_src
 Whether to load the source code initrd containing
 .Pa /src .
@@ -330,6 +339,7 @@ with a
 .Xr kernel 7
 command line consisting of
 .Sy $no_random_seed
+.Sy $enable_network_drivers
 followed by the arguments to this function (which should contain
 .Li "-- /sbin/init --target=desired-target" )
 followed by any additional options to

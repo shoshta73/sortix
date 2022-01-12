@@ -84,6 +84,10 @@
 #include "mouse/ps2.h"
 #include "multiboot.h"
 #include "net/fs.h"
+#include "net/lo/lo.h"
+#include "net/ping.h"
+#include "net/tcp.h"
+#include "net/udp.h"
 #include "poll.h"
 #include "pty.h"
 #include "uart.h"
@@ -111,6 +115,7 @@ static void SystemIdleThread(void* user);
 static int argc;
 static char** argv;
 static multiboot_info_t* bootinfo;
+static bool enable_network_drivers = true;
 
 static char* cmdline_tokenize(char** saved)
 {
@@ -291,6 +296,10 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 				HaltKernel();
 			}
 		}
+		else if ( !strcmp(arg, "--disable-network-drivers") )
+			enable_network_drivers = false;
+		else if ( !strcmp(arg, "--enable-network-drivers") )
+			enable_network_drivers = true;
 		else if ( !strcmp(arg, "--no-random-seed") )
 			no_random_seed = true;
 		else
@@ -609,6 +618,23 @@ static void BootThread(void* /*user*/)
 
 	// Initialize the filesystem network.
 	NetFS::Init();
+
+	// Initialize the ping protocol.
+	Ping::Init();
+
+	// Initialize the TCP.
+	TCP::Init();
+
+	// Initialize the UDP.
+	UDP::Init();
+
+	// Initialize the loopback driver.
+	Loopback::Init("/dev", slashdev);
+
+	// Initialize the network drivers.
+	if ( enable_network_drivers )
+	{
+	}
 
 	//
 	// Stage 6. Executing Hosted Environment ("User-Space")

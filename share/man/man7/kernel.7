@@ -6,6 +6,8 @@
 .Nd operating system kernel
 .Sh SYNOPSIS
 .Pa /boot/sortix.bin
+.Op Fl \-disable-network-drivers
+.Op Fl \-enable-network-drivers
 .Op Fl \-no-random-seed
 .Op Fl \-
 .Op Ar init ...
@@ -46,6 +48,12 @@ otherwise.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
+.It Fl \-disable-networking-drivers
+Don't initialize any networking drivers.
+This option ensures the booted system is not networked.
+.It Fl \-enable-networking-drivers
+Do initialize network drivers.
+This is the default behavior.
 .It Fl \-no-random-seed
 Don't warn if no random seed file was loaded by the bootloader (usually from
 .Pa /boot/random.seed ) .

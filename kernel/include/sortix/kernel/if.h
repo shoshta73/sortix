@@ -1,0 +1,64 @@
+/*
+ * Copyright (c) 2015 Meisaka Yukara.
+ * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ * sortix/kernel/if.h
+ * Network Interface.
+ */
+
+#ifndef _INCLUDE_SORTIX_KERNEL_IF_H
+#define _INCLUDE_SORTIX_KERNEL_IF_H
+
+#include <net/if.h>
+
+#include <sortix/kernel/descriptor.h>
+#include <sortix/kernel/kthread.h>
+#include <sortix/kernel/packet.h>
+
+namespace Sortix {
+
+namespace ARP {
+struct arp_table;
+} // namespace ARP
+
+class NetworkInterface
+{
+public:
+	NetworkInterface();
+	virtual ~NetworkInterface();
+
+public:
+	virtual bool Send(Ref<Packet> pkt) = 0;
+
+public:
+	kthread_mutex_t cfg_lock;
+	kthread_cond_t cfg_cond;
+	struct if_info ifinfo;
+	struct if_status ifstatus;
+	struct if_config cfg;
+	struct ARP::arp_table* arp_table;
+
+};
+
+bool RegisterNetworkInterface(NetworkInterface* netif,
+                              Ref<Descriptor> dev);
+
+extern kthread_mutex_t netifs_lock;
+extern NetworkInterface** netifs;
+extern size_t netifs_count;
+
+} // namespace Sortix
+
+#endif

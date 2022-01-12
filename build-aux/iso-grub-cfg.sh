@@ -185,6 +185,7 @@ else
   no_random_seed=--no-random-seed
 fi
 set enable_src=true
+set enable_network_drivers=
 
 export version
 export machine
@@ -194,6 +195,7 @@ export timeout
 export default
 export no_random_seed
 export enable_src
+export enable_network_drivers
 EOF
 
 if [ -n "$ports" ]; then
@@ -280,7 +282,7 @@ esac
 cat << EOF
   hook_kernel_pre
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot /$kernel \$no_random_seed "\$@"
+  multiboot /$kernel \$no_random_seed \$enable_network_drivers "\$@"
   echo done
   hook_kernel_post
   if [ \$no_random_seed != --no-random-seed ]; then
@@ -414,6 +416,18 @@ if "\$enable_src"; then
 else
   menuentry "Enable loading source code" {
     enable_src=true
+    configfile /boot/grub/advanced.cfg
+  }
+fi
+
+if [ "\$enable_network_drivers" = --disable-network-drivers ]; then
+  menuentry "Enable networking drivers" {
+    enable_network_drivers=
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "Disable networking drivers" {
+    enable_network_drivers=--disable-network-drivers
     configfile /boot/grub/advanced.cfg
   }
 fi

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,13 +23,10 @@
 #include <sys/cdefs.h>
 
 #include <sys/__/types.h>
+
 #include <__/endian.h>
 
 #include <inttypes.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #ifndef __in_port_t_defined
 #define __in_port_t_defined
@@ -43,7 +40,7 @@ typedef uint32_t in_addr_t;
 
 #ifndef __sa_family_t_defined
 #define __sa_family_t_defined
-typedef unsigned short int sa_family_t;
+typedef uint16_t sa_family_t;
 #endif
 
 #ifndef __socklen_t_defined
@@ -77,8 +74,6 @@ struct sockaddr_in6
 	uint32_t sin6_scope_id;
 };
 
-extern const struct in6_addr in6addr_any;        /* :: */
-extern const struct in6_addr in6addr_loopback;   /* ::1 */
 #define IN6ADDR_ANY_INIT { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 } }
 #define IN6ADDR_LOOPBACK_INIT { { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 } }
 
@@ -90,16 +85,20 @@ struct ipv6_mreq
 
 /* #define SOL_SOCKET 0 - in <sys/socket.h> */
 #define IPPROTO_ICMP 1
-#define IPPROTO_IP 2
-#define IPPROTO_IPV6 3
-#define IPPROTO_RAW 4
-#define IPPROTO_TCP 5
-#define IPPROTO_UDP 6
+#define IPPROTO_TCP 6
+#define IPPROTO_UDP 17
+#define IPPROTO_RAW 255
+#define IPPROTO_IP 256
+#define IPPROTO_IPV6 257
+#define IPPROTO_PING 258
 
-#define INADDR_ANY        ((in_addr_t) 0x00000000)
-#define INADDR_BROADCAST  ((in_addr_t) 0xffffffff)
-#define INADDR_NONE       ((in_addr_t) 0xffffffff)
-#define INADDR_LOOPBACK   ((in_addr_t) 0x7f000001)
+#define INADDR_ANY        ((in_addr_t) 0x00000000) /* 0.0.0.0 */
+#define INADDR_BROADCAST  ((in_addr_t) 0xffffffff) /* 255.255.255.255 */
+#define INADDR_LOOPBACK   ((in_addr_t) 0x7f000001) /* 127.0.0.1 */
+#define INADDR_NONE       ((in_addr_t) 0xffffffff) /* 255.255.255.255 */
+#if __USE_SORTIX
+#define INADDR_LOOPMASK   ((in_addr_t) 0xff000000) /* 255.0.0.0 */
+#endif
 
 #define INADDR_UNSPEC_GROUP     ((in_addr_t) 0xe0000000)
 #define INADDR_ALLHOSTS_GROUP   ((in_addr_t) 0xe0000001)
@@ -177,6 +176,15 @@ struct ipv6_mreq
 #define IN_BADCLASS(a)          ((((in_addr_t)(a)) & 0xf0000000) == 0xf0000000)
 
 #define IN_LOOPBACKNET 127
+
+#define IP_EVIL_INTENT 1
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern const struct in6_addr in6addr_any;        /* :: */
+extern const struct in6_addr in6addr_loopback;   /* ::1 */
 
 #ifdef __cplusplus
 } /* extern "C" */

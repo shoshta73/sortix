@@ -36,6 +36,7 @@
 #include <ioleast.h>
 #include <limits.h>
 #include <locale.h>
+#include <net/if.h>
 #include <poll.h>
 #include <psctl.h>
 #include <pwd.h>
@@ -210,6 +211,7 @@ struct daemon_config
 	char* cd;
 	char* exec;
 	enum exit_code_meaning exit_code_meaning;
+	bool per_if;
 	bool need_tty;
 	enum log_method log_method;
 	enum log_format log_format;
@@ -927,6 +929,14 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 		else
 			daemon_config->log_size = (off_t) value;
 	}
+	else if ( !strcmp(operation, "per") )
+	{
+		if ( !strcmp(parameter, "if") )
+			daemon_config->per_if = true;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+	}
 	else if ( !strcmp(operation, "need") )
 	{
 		if ( !strcmp(parameter, "tty") )
@@ -1065,6 +1075,11 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 				default_config.log_rotate_on_start;
 		else if ( !strcmp(operation, "log-size") )
 			daemon_config->log_line_size = default_config.log_line_size;
+		// TODO: Proper tokenzation.
+		else if ( !strcmp(parameter, "per if") )
+		{
+			daemon_config->per_if = false;
+		}
 		// TODO: Proper tokenzation.
 		else if ( !strcmp(parameter, "need tty") )
 		{
@@ -1502,6 +1517,41 @@ static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
 
 static struct daemon* daemon_create(struct daemon_config* daemon_config)
 {
+	if ( daemon_config->per_if )
+	{
+		struct daemon* daemon = add_daemon();
+		daemon->state = DAEMON_STATE_TERMINATED;
+		daemon->readyfd = -1;
+		daemon->outputfd = -1;
+		daemon->log.fd = -1;
+		daemon_insert_state_list(daemon);
+		if ( !(daemon->name = strdup(daemon_config->name)) )
+			fatal("malloc: %m");
+		struct if_nameindex* ifs = if_nameindex();
+		if ( !ifs )
+			fatal("if_nameindex: %m");
+		for ( size_t i = 0; ifs[i].if_name; i++ )
+		{
+			struct daemon* parameterized =
+				daemon_create_sub(daemon_config, ifs[i].if_name);
+			char* name_clone = strdup(parameterized->name);
+			if ( !name_clone )
+				fatal("malloc: %m");
+			struct dependency* dependency =
+				calloc(1, sizeof(struct dependency));
+			if ( !dependency )
+				fatal("malloc: %m");
+			dependency->target_name = name_clone;
+			dependency->flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
+			if ( !array_add((void***) &daemon->dependencies,
+			                &daemon->dependencies_used,
+			                &daemon->dependencies_length,
+			                dependency) )
+				fatal("malloc: %m");
+		}
+		if_freenameindex(ifs);
+		return daemon;
+	}
 	struct daemon* daemon = daemon_create_sub(daemon_config, NULL);
 	if ( !daemon )
 		fatal("malloc: %m");

@@ -997,7 +997,11 @@ int Descriptor::bind(ioctx_t* ctx, const uint8_t* addr, size_t addrlen)
 
 int Descriptor::connect(ioctx_t* ctx, const uint8_t* addr, size_t addrlen)
 {
-	return vnode->connect(ctx, addr, addrlen);
+	int old_ctx_dflags = ctx->dflags;
+	ctx->dflags = ContextFlags(old_ctx_dflags, dflags);
+	int result = vnode->connect(ctx, addr, addrlen);
+	ctx->dflags = old_ctx_dflags;
+	return result;
 }
 
 int Descriptor::listen(ioctx_t* ctx, int backlog)

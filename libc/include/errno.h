@@ -108,6 +108,7 @@
 #define ETXTBSY 98
 #define ENOMOUNT 99
 #define ENOMEDIUM 100
+/* TODO: EHOSTDOWN is documented but not implemented? */
 
 #define EOPNOTSUPP ENOTSUP
 #define EWOULDBLOCK EAGAIN

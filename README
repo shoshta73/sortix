@@ -11,8 +11,8 @@ tinkering.
 It has been in development since 2011 by a single developer and contributors.
 Though the system is stable and capable right now, it is still early in
 development, and a number of crucial features haven't been made yet.  Releases
-are made yearly and future releases will add features such as networking, SMP,
-and USB that were skipped in favor of becoming self-hosting now.
+are made yearly and future releases will add features such as SMP, and USB that
+were skipped in favor of becoming self-hosting now.
 
 Documentation
 -------------

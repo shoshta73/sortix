@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,5 +39,24 @@
 #define TIOCGNAME __IOCTL(6, __IOCTL_TYPE_PTR)
 #define TIOCGPTN __IOCTL(7, __IOCTL_TYPE_PTR)
 #define TIOCGDISPLAYS __IOCTL(8, __IOCTL_TYPE_PTR)
+
+#define IOC_TYPE(x) ((x) >> 0 & 0xFF)
+#define IOC_TYPE_BLOCK_DEVICE 1
+#define IOC_TYPE_NETWORK_INTERFACE 2
+#define IOC_SUBTYPE(x) ((x) >> 8 & 0xFF)
+#define IOC_SUBTYPE_BLOCK_DEVICE_HARDDISK 1
+#define IOC_SUBTYPE_BLOCK_DEVICE_PARTITION 2
+#define IOC_MAKE_TYPE(type, subtype) ((type) << 0 | (subtype) << 8)
+#define IOCGETTYPE __IOCTL(9, __IOCTL_TYPE_VOID)
+
+#define NIOC_GETINFO __IOCTL(10, __IOCTL_TYPE_PTR)
+#define NIOC_GETSTATUS __IOCTL(11, __IOCTL_TYPE_PTR)
+#define NIOC_GETCONFIG __IOCTL(12, __IOCTL_TYPE_PTR)
+#define NIOC_SETCONFIG __IOCTL(13, __IOCTL_TYPE_PTR)
+#define NIOC_GETCONFIG_ETHER __IOCTL(14, __IOCTL_TYPE_PTR)
+#define NIOC_SETCONFIG_ETHER __IOCTL(15, __IOCTL_TYPE_PTR)
+#define NIOC_GETCONFIG_INET __IOCTL(16, __IOCTL_TYPE_PTR)
+#define NIOC_SETCONFIG_INET __IOCTL(17, __IOCTL_TYPE_PTR)
+#define NIOC_WAITLINKSTATUS __IOCTL(18, __IOCTL_TYPE_INT)
 
 #endif

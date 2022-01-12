@@ -1,0 +1,103 @@
+.Dd June 5, 2017
+.Dt ARP 4
+.Os
+.Sh NAME
+.Nm arp
+.Nd address resolution protocol
+.Sh SYNOPSIS
+.In netinet/if_ether.h
+.In netinet/in.h
+.Sh DESCRIPTION
+The Address Resolution Protocol (ARP) provides resolution of network layer
+addresses to link layer addresses on the local network.
+ARP requests asks for the link layer address of a network layer address and ARP
+replies contains the link layer address of the requested network layer
+address.
+Requests are broadcast on the local network, while replies are unicast back to
+the sending machine.
+.Pp
+The
+.Xr kernel 7
+uses the ARP to resolve Internet Protocol version 4 addresses
+.Xr ( inet 4 )
+to Ethernet addresses
+.Xr ( ether 4 )
+in order to transmit Internet Protocol version 4
+.Xr ( ip 4 )
+datagrams on Ethernet network interfaces
+.Xr ( if 4 ) .
+.Pp
+The
+.Xr kernel 7
+maintains a cache of ARP replies for every network interface, which is actively
+populated whenever there is a need to transmit to a network layer address, and
+passively populated with the source addresses of ARP requests from other hosts.
+Network layer datagrams are queued whenever a network layer address needs to
+be resolved.
+Queued datagrams are transmitted when the destination link layer address has
+been resolved, or are discarded if the resolution times out.
+.Sh IMPLEMENTATION NOTES
+The transmission queue is limited to 16 packets for each network layer address.
+.Pp
+ARP requests are attempted three times, each attempt timing out after a second.
+If each request fails, the cache entry is evicted.
+.Pp
+When an network address is resolved, its cache entry remains valid for 60
+seconds.
+Upon expiry, if the cache entry was unused, it is evicted.
+Otherwise, its network address is renewed by resolving it again with three
+attempts.
+In the meanwhile, the entry cache continues to be used for routing.
+If the renewal fails, the cache entry is evicted.
+.Pp
+The ARP cache can contain up to 256 entries.
+If the cache is full,
+the least recently used cache entry is evicted when a network address is resolved
+that is not currently in the cache, and the source addresses from received ARP
+messages are not passively added to the cache.
+.Pp
+The ARP cache uses a hash table with 256 entries, using a linked list in case
+of hash collisions.
+The hash is the the bytewise xor (exclusive or) of every byte in the network
+address.
+This hash is perfect if the subnet contains no more than 256 addresses, and
+degrades in quality for larger subnets, at worst needing to linearly scan the
+whole ARP cache.
+.Pp
+The ARP cache is purged when the network interface's
+.Xr ether 4
+or
+.Xr inet 4
+configuration changes.
+Packets in the ARP transmission queue are dropped.
+.Sh SEE ALSO
+.Xr ether 4 ,
+.Xr if 4 ,
+.Xr inet 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A D. Plummer
+.%D November 1982
+.%R STD 37
+.%R RFC 826
+.%T \&An Ethernet Address Resolution Protocol
+.Re
+.Sh SECURITY
+The source network layer and source link layer addresses of received ARP request
+and replies are trusted.
+If the router does not validate ARP messages on the network are consistent with
+the DHCP leases, an attacker will be able to engage in an ARP spoofing attack
+that would allow denial of service, man in the middle, and session hijacking
+attacks.
+.Pp
+The cache is limited to 256 entries per interface and if the local subnet is
+larger than 256 addresses, then if an attacker is capable of making the local
+system concurrently transmit to 256 addresses on the local network not currently
+in the ARP cache, then doing so would purge the whole transmission queue.
+If the attacker can do this faster than the machines on the local network can
+answer ARP requests, transmission service may be denied entirely, or at the
+least be significantly degraded as the higher layers wait a little while before
+they retransmit.
+.Sh BUGS
+The ARP timeout is not configurable.

@@ -1,0 +1,213 @@
+.Dd June 1, 2017
+.Dt INET 4
+.Os
+.Sh NAME
+.Nm inet
+.Nd internet protocol family
+.Sh SYNOPSIS
+.In sys/socket.h
+.In netinet/in.h
+.Pp
+.Fd #define AF_INET 1
+.Bd -literal
+typedef uint16_t sa_family_t;
+typedef uint16_t in_port_t;
+typedef uint32_t in_addr_t;
+
+struct in_addr {
+        in_addr_t s_addr;
+};
+
+struct sockaddr_in {
+        sa_family_t sin_family;
+        in_port_t sin_port;
+        struct in_addr sin_addr;
+};
+.Ed
+.Sh DESCRIPTION
+The Internet Protocol version 4 protocol family is a set of protocols using the
+Internet Protocol version 4
+.Xr ip 4
+as the network layer.
+.Dv SOCK_STREAM
+sockets are provided by the Transmission Control Protocol
+.Xr tcp 4 .
+.Dv SOCK_DATAGRAM sockets are provided by the User Datagram Protocol
+.Xr udp 4 .
+.Pp
+Hosts are addressed with a four byte Internet Protocol (IP) address stored in a
+.Vt struct in_addr
+in network byte order.
+IP addresses are notated by
+the decimal byte values interspaced with periods, e.g. 192.0.2.255.
+Subnetworks are ranges of IP addresses given by a starting IP address along with
+how many leading bits (most significant bit first) of the IP address are common
+to the network (the prefix), the first address of the the subnetwork is the
+prefix with the remaining bits set to zero, and the last address is the prefix
+with the
+remaining bits set to one.
+A subnetwork can be denoted by the starting IP address and the leading bits,
+e.g. 198.51.100.0/24 spans from 198.51.100.0 to 198.51.100.255.
+The subnet mask of a subnetwork is an IP address with the bits set that belong
+to the network prefix, e.g. the subnet mask of 203.0.113.0/24 is 255.255.255.0.
+The subnetworks 192.0.2.0/24 (TEST-NET-1), 198.51.100.0/24 (TEST-NET-2), and
+203.0.113.0/24 (TEST-NET-2) are reserved for documentation.
+The last address in a network is normally the broadcast address for the network.
+.Pp
+Services are addressed
+with a 16-bit byte port number in a
+.Vt in_port_t
+in network byte order.
+.Pp
+Sockets are addressed with the combination of a host address and port number
+stored in a
+.Vt struct sockaddr_in
+where
+.Va sin_family
+is set to
+.Dv AF_INET ,
+.Va sin_port
+is set to the 16-bit port number in network byte order, and
+.Va sin_addr
+is set to the host address in network byte order.
+.Pp
+.Va sin_port
+can be set to
+.Li 0
+(converted to network byte order)
+to request
+.Xr bind 2
+allocate a port.
+Port
+.Li 0
+is not valid as a destination port.
+.Pp
+.Va sin_addr.s_addr
+can be set to
+.Dv INADDR_ANY
+.Pq 0.0.0.0
+(converted to network byte order) to mean an unspecified address.
+When a socket is bound to the address
+.Dv INADDR_ANY ,
+messages are accepted from any address.
+In
+.Xr connect 2
+and
+.Xr sendto 2 ,
+the destination address
+.Dv INADDR_ANY
+means the current host.
+.Pp
+.Va sin_addr.s_addr
+can be set to
+.Dv INADDR_BROADCAST
+.Pq 255.255.255.255
+(converted to network byte order),
+the broadcast address of the local network.
+.Pp
+.Va sin_addr.s_addr
+can be set to
+.Dv INADDR_LOOPBACK
+.Pq 127.0.0.1
+(converted to network byte order), the address of the loopback interface
+.Xr lo 4 .
+.Dv INADDR_LOOPMASK
+.Pq 255.0.0.0
+contains the subnet mask of the loopback interface.
+.Pp
+Sockets of this protocol family can be created by passing
+.Dv AF_INET
+as the
+.Fa domain
+parameter of
+.Xr socket 2 .
+.Pp
+The network byte order is big-endian.
+.Pp
+IP addresses in 32-bit integer format in the host endian can be converted
+to network byte order using
+.Xr htobe32 3
+or
+.Xr htonl 3
+and back using
+.Xr be32toh 3
+or
+.Xr ntohl 3 .
+.Pp
+Port numbers in 16-bit integer format in the host endian can be converted
+to network byte order using
+.Xr htobe16 3
+or
+.Xr htons 3
+and back using
+.Xr be16toh 3
+or
+.Xr ntohs 3 .
+.Pp
+.Xr inet_pton 3
+can be used to convert an IP address from textual representation to binary
+representation.
+.Xr inet_ntop 3
+can be used to convert an IP address from binary representation to textual
+representation.
+.Sh EXAMPLES
+This example manually constructs and deconstructs a
+.Vt struct inaddr_in .
+.Bd -literal
+struct sockaddr_in saddr;
+
+memset(&saddr, 0, sizeof(saddr));
+saddr.sin_family = AF_INET;
+saddr.sin_addr.s_addr = htobe32(0xC0000201); /* 192.0.2.1 */
+saddr.sin_port = htobe16(1234);
+
+sa_family_t family = saddr.sin_family;
+in_addr_t addr = be32toh(saddr.sin_addr.s_addr);
+in_port_t port = be16toh(saddr.sin_port);
+.Ed
+.Sh COMPATIBILITY
+On some operating systems,
+.Vt struct sockaddr_in
+may contain padding and additional members and the structure should be
+initialized to zero prior to initializing its members.
+.Sh SEE ALSO
+.Xr socket 2 ,
+.Xr arp 4 ,
+.Xr icmp 4 ,
+.Xr ip 4 ,
+.Xr ping 4 ,
+.Xr tcp 4 ,
+.Xr udp 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A J. Postel (ed.)
+.%D September 1981
+.%R STD 5
+.%R RFC 791
+.%T Internet Protocol - DARPA Internet Program Protocol Specification
+.%Q USC/Information Sciences Institute
+.Re
+.Pp
+.Rs
+.%A Internet Engineering Task Force
+.%A J. Arkko
+.%A M. Cotton
+.%A L. Vegoda
+.%D January 2010
+.%R RFC 5737
+.%T IPv4 Address Blocks Reserved for Documentation
+.%Q Ericsson
+.%Q ICANN
+.Re
+.Pp
+The protocol family programming interface conforms to
+.St -p1003.1-2008 .
+.Sh BUGS
+The network stack implementation is incomplete and has known bugs.
+See the protocol manual pages for more information.
+.Pp
+The 4-byte address space allows only a maximum of 4294967296 addresses and is
+being exhausted.
+The Internet Protocol version 6 replaces version 4 and provides a 16-byte
+address space instead.

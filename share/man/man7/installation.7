@@ -82,7 +82,7 @@ per the instructions in
 The release modification procedure lets you customize aspects such as the
 default bootloader menu option and timeout, the default hostname, the default
 keyboard layout, the default graphics resolution, adding files of your choice to
-the live environment, and so on.
+the live environment, control which drivers are loaded by default, and so on.
 .Pp
 Warning: The live environment does not come with any random entropy and entropy
 gathering is not yet implemented.
@@ -130,6 +130,11 @@ You need enough memory to store the whole system and the runtime usage.
 If the system memory is really insufficient, then the bootloader may have
 strange behavior, take a really long time to load, or not complete the boot at
 all.
+.Ss Bootloader Advanced Options
+The bootloader advanced options menu lets you customize the live environment by
+making one-time adjustments to the boot process.
+These decisions will not carry over to the final installed system, which you
+instead will need to configure to have the same effects.
 .Pp
 You can configure which ports gets loaded using the bootloader menu.
 The base system is rather lean and can be made quite small.
@@ -367,6 +372,17 @@ If you invoked
 yourself, then you will be returned to your live environment shell.
 Otherwise the computer will power off when the chroot environment terminates.
 .Pp
+This is a last chance to make modifications before the new system boots for the
+first time.
+If you want to make final modifications to the system (examples are below), you
+can answer
+.Sy '!'
+to escape to a shell in the live environment inside the subdirectory where the
+new system is mounted.
+You can then run
+.Sy "chroot -d ."
+to enter a shell within the new installation.
+.Pp
 Upon boot of the new system it will be configured in multi-user mode and you
 will be presented with a login screen.
 Authenticate as one of the local users and you will be given a shell.
@@ -387,6 +403,55 @@ The
 manual page is a basic overview of the system for new users.
 .Pp
 Congratulations on your new Sortix system.
+.Ss Disabling Networking by Default
+To disable networking drivers by default, edit the bootloader configuration to
+pass the
+.Fl \-disable-network-drivers
+option by default on the
+.Xr kernel 7
+command line.
+.Pp
+If you are at the final stage of installation, you can answer
+.Sy '!'
+to get a shell in the live environment and then run
+.Sy "chroot -d ."
+to enter a shell inside the new installation.
+.Pp
+For instance, if GRUB is used the bootloader, networking can be disabled by
+default by done by editing
+.Pa /etc/grub.d/10_sortix
+of the new installation.
+.Xr editor 1
+or any editor can be used to edit the file.
+Change the line from
+.Bd -literal
+    multiboot $BOOT_REL/sortix.bin
+.Ed
+.Pp
+to instead be
+.Bd -literal
+    multiboot $BOOT_REL/sortix.bin --disable-network-drivers
+.Ed
+.Pp
+If the included GRUB bootloader is used, after making the above edit, run
+.Xr update-grub 8
+within the new installation to regenerate the bootloader configuration.
+Note that
+.Pa /etc/grub.d/10_sortix
+is part of the GRUB package and local changes will be undone when the GRUB
+package is updated or reinstalled, in which case you must make this change again
+and run
+.Xr update-grub 8
+again.
+.Pp
+If the included GRUB bootloader is not used, but instead the
+.Pa /etc/grub.d/10_sortix.cache
+fragment is spliced into another GRUB installation, make the above change and
+then run the
+.Pa /etc/grub.d/10_sortix
+command and use the freshly regenerated
+.Pa /etc/grub.d/10_sortix.cache
+fragment instead.
 .Sh SEE ALSO
 .Xr chkblayout 1 ,
 .Xr chvideomode 1 ,

@@ -82,6 +82,7 @@ alarm.o \
 clock.o \
 com.o \
 copy.o \
+crc32.o \
 descriptor.o \
 disk/ahci/ahci.o \
 disk/ahci/hba.o \
@@ -124,8 +125,17 @@ logterminal.o \
 memorymanagement.o \
 mouse/ps2.o \
 mtable.o \
+net/arp.o \
+net/ether.o \
 net/fs.o \
+net/if.o \
+net/ipv4.o \
+net/lo/lo.o \
+net/packet.o \
+net/ping.o \
 net/socket.o \
+net/tcp.o \
+net/udp.o \
 op-new.o \
 panic.o \
 partition.o \

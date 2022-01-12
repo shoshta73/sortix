@@ -1,0 +1,537 @@
+.Dd June 4, 2017
+.Dt PING 4
+.Os
+.Sh NAME
+.Nm ping
+.Nd ping protocol
+.Sh SYNOPSIS
+.In sys/socket.h
+.In netinet/in.h
+.In netinet/ping.h
+.Ft int
+.Fn socket AF_INET SOCK_DGRAM IPPROTO_PING
+.Sh DESCRIPTION
+The Ping Protocol uses the Echo Request and Echo Reply messages of the Internet
+Control Message Protocol (ICMP) to provide a connectionless best-effort echo of
+datagrams.
+A cooperating host will send back a Echo Reply message containing the same data
+as any Echo Request messages it receives.
+It is designed for packet-switched networks and provides multiplexing with a
+16-bit port number (using the identifier field of the Echo Request and Echo
+Reply messages), and basic data integrity checks (16-bit ones' complement sum),
+and broadcasting.
+It does not provide a guarantee of delivery, avoidance of delivering multiple
+times, ordering, out of band data, nor flow control.
+.Pp
+Ping sockets allow only sending Echo Request messages and receiving Echo Reply
+messages.
+The kernel will automatically send Echo Reply messages in response to any
+received Echo Request Messages.
+.Pp
+The structure of ping datagrams is a 4 bytes sequence number (in big endian)
+followed by 0 or more bytes of an optional payload.
+Ping datagrams are sent inside a Echo Request message (with that sequence
+number) and received inside a Echo Reply message (also containing a sequence
+number).
+.Pp
+Ping sockets are made with
+.Xr socket 2
+by passing an appropriate
+.Fa domain
+.Dv ( AF_INET ) ,
+.Dv SOCK_DGRAM
+as the
+.Fa type ,
+and
+.Dv IPPROTO_PING
+as the
+.Fa protocol .
+Initially a socket is not bound, it won't receive datagrams, and it does not
+have a remote address and port set.
+.Pp
+A Ping socket has the following state:
+.Pp
+.Bl -bullet -compact
+.It
+The address family it belongs to.
+.It
+The network interface it is bound to (if any)
+.Dv ( SO_BINDTODEVICE
+and
+.Dv SO_BINDTOINDEX )
+(initially none).
+.It
+The local address and port (when bound) (initially none).
+.It
+The remote address and port (when connected) (initially none).
+.It
+A receive queue (initially empty).
+.It
+Whether the socket has been
+.Xr shutdown 2
+for read and/or write (initially neither).
+.It
+A single pending asynchronous error (if any)
+.Dv ( SO_ERROR )
+(initially none).
+.It
+Whether broadcast datagrams can be sent
+.Dv ( SO_BROADCAST )
+(initially no).
+.It
+Whether binding to the any address and a port doesn't conflict with binding to
+another address on the same port
+.Dv ( SO_REUSEADDR )
+(initially no).
+.It
+Limits on the size of the receive and send queues
+.Dv ( SO_RCVBUF
+and
+.Dv SO_SNDBUF ) .
+.El
+.Pp
+Datagrams are sent as a packet with a header and the datagram itself.
+The header contains the port and the checksum.
+The header is 8 bytes.
+.Pp
+Port numbers are 16-bit and range from 1 to 65535.
+Port 0 is not valid.
+Binding to port 0 will assign an available port on the requested address.
+Sending or connecting to port 0 will fail with
+.Ev EADDRNOTAVAIL .
+Received Echo Reply packets whose port number is port 0 will be silently
+dropped.
+Ping ports are distinct from ports in other transport layer protocols.
+.Pp
+Packets contain a 16-bit ones' complement checksum.
+A received packet will be silently discarded if its checksum does not match its
+contents.
+.Pp
+Sockets can be bound to a local address and port with
+.Xr bind 2
+(if not already bound),
+or an local address and port will be automatically assigned on the first send
+or connect operation.
+The local address and port can be read with
+.Xr getsockname 2 .
+If the socket hasn't been bound, the local address and port is reported as the
+any address on port 0.
+There are no ports that require superuser privileges.
+.Pp
+Sockets can be bound to the any address, the broadcast address, the address of
+a network interface, or the broadcast address of a network interface.
+Binding to port 0 will automatically assign an available port on the requested
+local address or fail with
+.Ev EAGAIN
+if no port is available.
+No two sockets can bind to the same local address and port.
+No two sockets can be bound such that one is bound to the any address and a
+port, and the other socket is bound to another address and the same port; unless
+both sockets had the
+.Dv SO_REUSEADDR
+socket option set when the second socket was bound, and the current user is the
+same that bound the first socket or the current user has superuser privileges.
+.Pp
+A socket bound to a local address and port will receive an incoming datagram of
+the following conditions hold:
+.Pp
+.Bl -bullet -compact
+.It
+The datagram belongs to the socket's address family and the protocol is Ping.
+.It
+The datagram's checksum matches the datagram.
+.It
+The datagram is an Echo Reply message.
+.It
+The datagram's port number is not port 0.
+.It
+The datagram is sent to the address or broadcast address of the network
+interface it is received on, or the datagram was sent to the broadcast address;
+.It
+The socket is either bound to the receiving network interface, or the socket is
+not bound to a network interface;
+.It
+The datagram is sent to the socket's local port;
+.It
+The datagram is sent to the socket's local address, or the socket's local
+address is the any address (and no other socket is bound to the datagram's
+address and that port);
+.It
+The socket is connected and the datagram was sent from the remote address and
+the remote port, or the socket is not connected; and
+.It
+The socket is not shut down for reading.
+.El
+.Pp
+If so, the datagram is added to the socket's receive queue, otherwise it is
+discarded.
+The receive queue contains incoming packets waiting to be received.
+Incoming packets are dropped if the receive queue is full.
+Shrinking the receive queue limit drops packets as needed to stay below the
+limit.
+.Pp
+The remote address and port can be set multiple times with
+.Xr connect 2 ,
+after which the socket is said to be connected, but Ping is connectionless and
+no handshake is sent.
+The remote port must not be port 0 or the connection will fail with
+.Ev EADDRNOTAVAIL .
+If the socket is not bound,
+.Xr connect 2
+will determine which network interface will be used to send to the remote
+address, and then bind to the address of that network interface together with an
+available port.
+.Xr connect 2
+will fail if there is no route from the local address to the requested remote
+address.
+A connected socket only receive datagrams from the remote address and port.
+.Xr connect 2
+will drop datagrams in the receive queue that don't originate from the
+requested remote address.
+The
+.Xr send 2 ,
+.Xr write 2 ,
+and
+.Xr writev 2
+functions can be used on a connected socket and they send to the remote address
+and port by default.
+If the socket is connected, the destination given to
+.Xr sendto 2
+and
+.Xr sendmsg 2
+must be
+.Dv NULL .
+The remote address and port can be read with
+.Xr getpeername 2 .
+.Pp
+The socket can be disconnected by connecting to a socket address with the family
+value set to
+.Dv AF_UNSPEC ,
+which resets the remote address and port (if set), and otherwise has no effect.
+.Pp
+Datagrams can be sent with
+.Xr sendmsg 2
+and
+.Xr sendto 2 .
+Sending on a socket not bound to a local address and port will bind to the
+any address and an available port, or fail with
+.Ev EAGAIN
+if no port is available.
+Datagrams can be received with
+.Xr recvmsg 2 ,
+.Xr recvfrom 2 ,
+.Xr recv 2 ,
+.Xr read 2 ,
+and
+.Xr readv 2 .
+If an asynchronous error is pending, the next send and receive operation will
+fail with that error and clear the asynchronous eror, so the next operation can
+succeed.
+Asynchronous errors can arise from network problems.
+There is no send queue at the Ping level and datagrams are directly forwarded to
+the network layer.
+It is an error to use any of the flags
+.Dv MSG_CMSG_CLOEXEC ,
+.Dv MSG_CMSG_CLOFORK ,
+.Dv MSG_EOR ,
+.Dv MSG_OOB ,
+and
+.Dv MSG_WAITALL .
+.Pp
+The condition of the socket can be tested with
+.Xr poll 2
+where
+.Dv POLLIN
+signifies a packet has been received (or the socket is shut down for reading),
+.Dv POLLOUT
+signifies a packet can be sent now (and the socket is not shut down for
+writing),
+.Dv POLLHUP
+signifies the socket is shut down for writing, and
+.Dv POLLERR
+signifies an asynchronous error is pending.
+.Pp
+The socket can be shut down for receiving and/or sending with
+.Xr shutdown 2 .
+The receive queue is emptied when shut down for receive (asynchronous errors are
+preserved) and receive operations will succeed with an end of file
+condition, but any pending asynchronous errors will take precedence and be
+delivered instead.
+Sending when shut down for writing will raise
+.Dv SIGPIPE
+and fail with
+.Ev EPIPE
+(regardless of a pending asynchronous error).
+.Pp
+Socket options can be set with
+.Xr setsockopt 2
+and read with
+.Xr getsockopt 2
+and exist on the
+.Dv IPPROTO_PING
+level as well as applicable underlying protocol levels.
+.Pp
+Broadcast Echo Requests can be sent by setting the
+.Dv SO_BROADCAST
+socket option with
+.Xr setsockopt 2
+and sending to a broadcast address of the network layer.
+RFC 1122 3.2.2.6 allows hosts to ignore broadcast Echo Requests.
+.Sh SOCKET OPTIONS
+Ping sockets support these
+.Xr setsockopt 2 /
+.Xr getsockopt 2
+options at level
+.Dv SOL_SOCKET :
+.Bl -tag -width "12345678"
+.It Dv SO_BINDTODEVICE Fa "char[]"
+Bind to a network interface by its name.
+(Described in
+.Xr if 4 )
+.It Dv SO_BINDTOINDEX Fa "unsigned int"
+Bind to a network interface by its index number.
+(Described in
+.Xr if 4 )
+.It Dv SO_BROADCAST Fa "int"
+Whether sending to a broadcast address is allowed.
+(Described in
+.Xr if 4 )
+.It Dv SO_DEBUG Fa "int"
+Whether the socket is in debug mode.
+This option is not implemented and is initially 0.
+Attempting to set it to non-zero will fail with
+.Ev EPERM .
+(Described in
+.Xr if 4 )
+.It Dv SO_DOMAIN Fa "sa_family_t"
+The socket
+.Fa domain
+(the address family).
+This option can only be read.
+(Described in
+.Xr if 4 )
+.It Dv SO_DONTROUTE Fa "int"
+Whether to bypass the routing table and only send on the local network.
+This option is not implemented and is initially 0.
+Attempting to set it to non-zero will fail with
+.Ev EPERM .
+(Described in
+.Xr if 4 )
+.It Dv SO_ERROR Fa "int"
+The asynchronous pending error
+(an
+.Xr errno 3
+value).
+Cleared to 0 when read.
+This option can only be read.
+(Described in
+.Xr if 4 )
+.It Dv SO_PROTOCOL Fa "int"
+The socket protocol
+.Dv ( IPPROTO_PING ) .
+This option can only be read.
+(Described in
+.Xr if 4 )
+.It Dv SO_RCVBUF Fa "int"
+How many bytes the receive queue can use (default is 64 pages, max 4096 pages).
+(Described in
+.Xr if 4 )
+.It Dv SO_REUSEADDR Fa "int"
+Whether binding to the any address on a port doesn't conflict with binding to
+another address and the same port, if both sockets have this option set and the
+user binding the second socket is the same that bound the first socket or the
+user binding the second socket has superuser privileges.
+(Described in
+.Xr if 4 )
+.It Dv SO_SNDBUF Fa "int"
+How many bytes the send queue can use (default is 64 pages, max 4096 pages).
+(Described in
+.Xr if 4 )
+.It Dv SO_TYPE Fa "int"
+The socket type
+.Dv ( SOCK_DGRAM ) .
+This option can only be read.
+(Described in
+.Xr if 4 )
+.El
+.Sh IMPLEMENTATION NOTES
+Received broadcast echo requests are ignored as permitted by RFC 1122 3.2.2.6.
+.Pp
+Each packet currently use a page of memory, which counts towards the receive
+queue limit.
+.Pp
+If no specific port is requested, one is randomly selected in the dynamic port
+range 32768 (inclusive) through 61000 (exclusive).
+.Sh EXAMPLES
+This example sends a Echo Request and blocks indefinitely until it receives a
+Echo Reply.
+.Va remote
+is the remote socket address and
+.Va remote_len
+is the size of
+.Va remote.
+The
+.Va remote
+and
+.Va remote_len
+values should all be chosen according to the address family and network layer.
+.Bd -literal
+sa_family_t af = /* ... */;
+const struct sockaddr *remote = /* ... */;
+socklen_t remote_len = /* ... */;
+
+int fd = socket(af, SOCK_DGRAM, IPPROTO_PING);
+if (fd < 0)
+        err(1, "socket");
+if (connect(fd, remote, remote_len) < 0)
+        err(1, "connect");
+unsigned char request[56];
+arc4random_buf(request, sizeof(request));
+if (send(fd, request, sizeof(request), 0) < 0)
+        err(1, "send");
+unsigned char reply[56 + 1 /* detect too large reply */];
+ssize_t amount = recv(fd, reply, sizeof(reply), 0);
+if (amount < 0 )
+        err(1, "recv");
+if (amount == sizeof(request) && !memcmp(request, reply, sizeof(request)))
+        printf("correct echo reply\\n");
+else
+        printf("incorrect echo reply\\n");
+.Ed
+.Sh ERRORS
+Socket operations can fail these error conditions, in addition to the error
+conditions of the network and link layer, and the error conditions of the
+invoked function.
+.Bl -tag -width [EADDRNOTAVAIL]
+.It Bq Er EACCES
+A datagram was sent to a broadcast address, but
+.Dv SO_BROADCAST
+is turned off.
+.It Bq Er EADDRINUSE
+The socket cannot be bound to the requested address and port because another
+socket was already bound to 1) the same address and port 2) the any address
+and the same port (and
+.Dv SO_REUSEADDR
+was not set on both sockets), or 3) some address and the same port but the
+requested address was the any address (and
+.Dv SO_REUSEADDR
+was not set on both sockets).
+.It Bq Er EADDRNOTAVAIL
+The socket cannot be bound to the requested address because no network interface
+had that address or broadcast address.
+.It Bq Er EAGAIN
+A port could not be assigned because each port in the dynamic port range had
+already been bound to a socket in a conflicting manner.
+.It Bq Er ECONNREFUSED
+The destination host of a datagram was not listening on the port.
+This error can happen asynchronously.
+.It Bq Er EHOSTDOWN
+The destination host of a datagram is not up.
+This error can happen asynchronously.
+.It Bq Er EHOSTUNREACH
+The destination host of a datagram was unreachable.
+This error can happen asynchronously.
+.It Bq Er EISCONN
+A destination address and port was specified when sending a datagram, but the
+socket has already been connected to a remote address and port.
+.It Bq Er EMSGSIZE
+The datagram was too large to be sent because it exceeded the maximum
+transmission unit (MTU) on the path between the local and remote address.
+This error can happen asynchronously.
+.It Bq Er ENETDOWN
+The network interface used to deliver a datagram isn't up.
+This error can happen asynchronously.
+.It Bq Er ENETUNREACH
+The destination network of a datagram was unreachable.
+This error can happen asynchronously.
+.It Bq Er ENETUNREACH
+The remote address could not be connected because there was no route from the
+local address to the remote address.
+.It Bq Er ENOBUFS
+There was not enough memory available for network packets.
+.It Bq Er EPERM
+One of the unimplemented
+.Dv SO_DEBUG
+and
+.Dv SO_DONTROUTE
+socket options was attempted to be set to a non-zero value.
+.El
+.Sh SEE ALSO
+.Xr bind 2 ,
+.Xr connect 2 ,
+.Xr getpeername 2 ,
+.Xr getsockname 2 ,
+.Xr getsockopt 2 ,
+.Xr poll 2 ,
+.Xr recvfrom 2 ,
+.Xr recvmsg 2 ,
+.Xr sendmsg 2 ,
+.Xr sendto 2 ,
+.Xr setsockopt 2 ,
+.Xr shutdown 2 ,
+.Xr socket 2 ,
+.Xr icmp 4 ,
+.Xr if 4 ,
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A J. Postel (ed.)
+.%D September 1981
+.%R STD 5
+.%R RFC 792
+.%T Internet Control Message Protocol - DARPA Internet Program Protocol Specification
+.%Q USC/Information Sciences Institute
+.Re
+.Pp
+.Rs
+.%A Internet Engineering Task Force
+.%A R. Braden (ed.)
+.%D October 1989
+.%R STD 3
+.%R RFC 1122
+.%T Requirements for Internet Hosts -- Communication Layers
+.%Q USC/Information Sciences Institute
+.Re
+.Sh HISTORY
+Ping sockets originally appeared in Sortix 1.1.
+.Sh BUGS
+The handling of
+.Dv SO_REUSEADDR in
+.Xr bind 2
+does not yet enforce the two sockets to be bound by the same user or the second
+socket to be bound by a user with superuser privileges.
+The requirement that both sockets have
+.Dv SO_REUSEADDR
+set might be relaxed to only the second socket having it set when this
+permission check is implemented.
+.Pp
+The integration with the network layer is inadequate and the asynchronous errors
+.Ev ECONNREFUSED ,
+.Ev EHOSTDOWN ,
+.Ev EHOSTUNREACH ,
+and
+.Ev ENETUNREACH
+are never delivered asynchronously from the network.
+.Pp
+Ping sockets does not yet provide access to IP header values such as the Time
+To Live and does not yet report ICMP error messages.
+.Pp
+The
+.Xr send 2
+flag
+.Dv MSG_DONTROUTE
+and the
+.Dv SO_DONTROUTE
+socket option are not implemented yet.
+.Pp
+The
+.Dv SO_SNDBUF
+socket option is currently not used and the send queue is not limited at the
+socket level.
+.Pp
+The automatic assignment of ports is random, but is statistically biased.
+A random port is picked, and if it is taken, the search sequentially iterates
+ports in ascending order until an available port is found or the search
+terminates.

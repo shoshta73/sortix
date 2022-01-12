@@ -1,0 +1,135 @@
+.Dd June 3, 2017
+.Dt IP 4
+.Os
+.Sh NAME
+.Nm ip
+.Nd internet protocol
+.Sh SYNOPSIS
+.In sys/socket.h
+.In netinet/in.h
+.Ft int
+.Fn socket AF_INET type protocol
+.Sh DESCRIPTION
+The Internet Protocol version 4 is the original network layer protocol of the
+Internet and provides best-effort delivery of datagrams between hosts.
+It provides for addressing of hosts, routing over packet-switched networks,
+fragmentation and reassembly of datagrams across networks with small maximum
+transmission unit sizes; but it does not provide guarantee of delivery,
+avoidance of delivering multiple times, ordering, flow control, nor data
+integrity.
+Its protocol family
+.Xr inet 4
+can be layered on top of the Internet Protocol to provide the enhanced service
+of the transport layer.
+For instance, the Transmission Control Protocol
+.Xr tcp 4
+can be used to provide multiplexed reliable communication across the Internet,
+while the User Datagram Protocol
+.Xr udp 4
+can be used to provide low-overhead multiplexed unreliable communication across
+the Internet.
+.Pp
+Datagrams contain a header followed by a datagram of the above protocol layer.
+The header contains the Internet Protocol version (4), the header size, the
+desired type of service, the datagram size, information for the reassembly of
+fragmented datagrams, the remaining time this datagram has left to live, the
+protocol number of the above protocol layer, a checksum of the header, the
+address of the source host and the address of the destination host, and an
+optional set of options.
+.Pp
+An incoming datagram on a network interface will be received and passed to the
+higher level protocol if the following conditions hold:
+.Pp
+.Bl -bullet -compact
+.It
+The checksum is valid.
+.It
+The protocol is Internet Protocol version 4 and the packet is well-formed.
+.It
+The source address is neither the broadcast address
+.Pq 255.255.255.255
+or the subnet's broadcast address.
+.It
+If the network interface is not the loopback network interface
+.Xr lo 4 ,
+neither the source nor the destination belong to the loopback subnet
+.Pq 127.0.0.0/24
+.It
+The destination address is either the local address (and the link layer
+destination address was not a broadcast address) of the network interface, the
+broadcast address of the network interface, or the broadcast address
+.Pq 255.255.255.255 .
+.El
+.Sh ERRORS
+Socket operations can fail these error conditions, in addition to the error
+conditions of link layer and the error conditions of the invoked function.
+.Bl -tag -width [EADDRNOTAVAIL]
+.It Bq Er EACCES
+A datagram was sent to a broadcast address, but
+.Dv SO_BROADCAST
+is turned off.
+.It Bq Er EADDRNOTAVAIL
+The socket cannot be bound to the requested address because no network interface
+had that address or broadcast address.
+.It Bq Er ECONNREFUSED
+The destination host of a datagram was not listening on the port.
+.It Bq Er EHOSTDOWN
+The destination host of a datagram is not up.
+.It Bq Er EHOSTUNREACH
+The destination host of a datagram was unreachable.
+.It Bq Er EMSGSIZE
+The datagram was too large to be sent because it exceeded the maximum
+transmission unit (MTU) on the path between the local and remote address.
+.It Bq Er ENETDOWN
+The network interface used to deliver a datagram isn't up.
+.It Bq Er ENETUNREACH
+The destination network of a datagram was unreachable.
+.It Bq Er ENOBUFS
+There was not enough memory available for network packets.
+.El
+.Sh SEE ALSO
+.Xr arp 4 ,
+.Xr icmp 4 ,
+.Xr inet 4 ,
+.Xr ping 4 ,
+.Xr tcp 4 ,
+.Xr udp 4 ,
+.Xr kernel 7
+.Sh STANDARDS
+.Rs
+.%A J. Postel (ed.)
+.%D September 1981
+.%R STD 5
+.%R RFC 791
+.%T Internet Protocol - DARPA Internet Program Protocol Specification
+.%Q USC/Information Sciences Institute
+.Re
+.Pp
+.Rs
+.%A Internet Engineering Task Force
+.%A R. Braden (ed.)
+.%D October 1989
+.%R STD 3
+.%R RFC 1122
+.%T Requirements for Internet Hosts -- Communication Layers
+.%Q USC/Information Sciences Institute
+.Re
+.Sh BUGS
+The implementation is incomplete and has known bugs.
+.Pp
+Fragmented datagrams are not yet supported and are discarded on receipt.
+The fragment identification field is always set to 0, preventing the proper
+reassembly of multiple datagrams that became fragmented around the same time.
+.Pp
+Options are not yet supported and are ignored.
+.Pp
+The 4-byte address space allows only a maximum of 4294967296 addresses and is
+being exhausted.
+The Internet Protocol version 6 replaces version 4 and provides a 16-byte
+address space instead.
+.Pp
+There is no routing table that can be configured.
+Routing happens by searching for the first appropriate network interface that
+can transmit the datagram.
+If multiple network interfaces have a default route, the packet is sent using
+the default route of the network interface with the lowest index number.

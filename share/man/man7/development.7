@@ -398,19 +398,21 @@ The
 makefile target can be used to verify your work needs some of the development
 conventions.
 .Pp
-You can then easily prepare your a set of patches for upstream submission:
+Prepare a set of patches suitable for upstream submission and submit a merge
+request to the upstream project.
+.Pp
+If your installation does not have network connectivity, you will need to
+submit the changes from another system.
+If you are dual booting and have another operating system with network
+connectivity, you can boot into the other operating system and mount the
+appropriate filesystem from there.
+If you have a serial line, you can produce a set of .patch files containing
+your changes with
 .Bd -literal
     git format-patch master..local
 .Ed
 .Pp
-This will create a series of .patch files containing your changes.
-Review them and rewrite git history as needed until they are of submittable
-quality.
-You can then submit them for review at the official website.
-.Pp
-To transfer files out of the operating system, you can either mount the local
-root filesystem from another operating system with networking, or you transmit
-the patches over the serial connection as described in
+and then transfer them over the serial connection as described in
 .Xr serial-transfer 7 .
 .Ss Releases
 CD-ROM release of the operating system can be built with the

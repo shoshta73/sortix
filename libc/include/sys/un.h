@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,13 +24,15 @@
 
 #include <sys/__/types.h>
 
+#include <__/stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #ifndef __sa_family_t_defined
 #define __sa_family_t_defined
-typedef unsigned short int sa_family_t;
+typedef __uint16_t sa_family_t;
 #endif
 
 struct sockaddr_un

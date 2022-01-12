@@ -1,0 +1,36 @@
+.Dd May 27, 2017
+.Dt LO 4
+.Os
+.Sh NAME
+.Nm lo
+.Nd loopback network interface
+.Sh SYNOPSIS
+.Nm /dev/lo Ns Ar X
+.Sh DESCRIPTION
+.Nm
+is a loopback network interface that receives what is sent on it, used for
+communication within the local host.
+.Nm
+is implemented in software and the packets sent on it are not transmitted on the
+network.
+.Pp
+The
+.Xr kernel 7
+creates the
+.Sy lo0
+network interface on boot and configures it with the
+.Xr inet 4
+address
+.Dv 127.0.0.1
+in the subnet
+.Dv 127.0.0.0/8 .
+Packets with source or destination outside this subnet are dropped.
+.Sh SEE ALSO
+.Xr kernel 7
+.Sh CAVEATS
+The default
+.Xr inet 4
+configuration
+of the
+.Sy lo0
+network interface must not be changed or local loopback communication may fail.

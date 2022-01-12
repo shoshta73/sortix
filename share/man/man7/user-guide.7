@@ -120,9 +120,14 @@ You can make a compatible filesystem with:
 .Pp
 .Dl $ mkfs.ext2 -O none,large_file,filetype
 .Ss Networking
-Sortix does not have networking at this time.
-Unix sockets have a basic implementation incapable of advanced features.
-The standard library and kernel provides stubs for many network interfaces.
+Internet Protocol version 4
+.Pq Xr ip 4
+networking is available if you have a supported network interface
+.Pq Xr if 4 .
+.Pp
+The Internet Protocol version 6
+.Xr ( ip6 4 )
+is not yet supported.
 .Ss Serial Transfer
 It is possible to transfer files over serial devices as described in
 .Xr serial-transfer 7 .
