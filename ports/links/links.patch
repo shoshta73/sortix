@@ -1,0 +1,53 @@
+diff -Paur --no-dereference -- links.upstream/configure links/configure
+--- links.upstream/configure
++++ links/configure
+@@ -122,7 +122,7 @@
+ includedir='${prefix}/include'
+ oldincludedir='/usr/include'
+ infodir='${prefix}/info'
+-mandir='${prefix}/man'
++mandir='${prefix}/share/man'
+ 
+ # Initialize some other variables.
+ subdirs=
+@@ -239,7 +239,7 @@
+   --includedir=DIR        C header files in DIR [PREFIX/include]
+   --oldincludedir=DIR     C header files for non-gcc in DIR [/usr/include]
+   --infodir=DIR           info documentation in DIR [PREFIX/info]
+-  --mandir=DIR            man documentation in DIR [PREFIX/man]
++  --mandir=DIR            man documentation in DIR [PREFIX/share/man]
+   --srcdir=DIR            find the sources in DIR [configure dir or ..]
+   --program-prefix=PREFIX prepend PREFIX to installed program names
+   --program-suffix=SUFFIX append SUFFIX to installed program names
+diff -Paur --no-dereference -- links.upstream/language.c links/language.c
+--- links.upstream/language.c
++++ links/language.c
+@@ -2,6 +2,7 @@
+  * (c) 2002 Mikulas Patocka
+  * This file is a part of the Links program, released under GPL.
+  */
++#include <langinfo.h>
+ 
+ #include "links.h"
+ 
+@@ -130,6 +131,8 @@
+ 	lang = cast_uchar getenv("LC_CTYPE");
+ 	if (!lang)
+ 		lang = cast_uchar getenv("LANG");
++	if (!lang)
++		lang = cast_uchar nl_langinfo(CODESET);
+ 	if (!lang) {
+ 		i = 0;
+ 		goto ret_i;
+diff -Paur --no-dereference -- links.upstream/Makefile.in links/Makefile.in
+--- links.upstream/Makefile.in
++++ links/Makefile.in
+@@ -35,8 +35,6 @@
+ includedir = @includedir@
+ oldincludedir = /usr/include
+ 
+-DESTDIR =
+-
+ pkgdatadir = $(datadir)/@PACKAGE@
+ pkglibdir = $(libdir)/@PACKAGE@
+ pkgincludedir = $(includedir)/@PACKAGE@
