@@ -1,0 +1,1439 @@
+diff -Paur --no-dereference -- httpd.upstream/compat/daemon.c httpd/compat/daemon.c
+--- httpd.upstream/compat/daemon.c
++++ httpd/compat/daemon.c
+@@ -29,10 +29,10 @@
+  */
+ 
+ #include <fcntl.h>
+-#include <paths.h>
+ #include <unistd.h>
+ #include <stdlib.h>
+ 
++#if defined(__sortix__) && !defined(__SORTIX_HAS_DAEMON__)
+ int
+ daemon(int nochdir, int noclose)
+ {
+@@ -53,7 +53,7 @@
+ 	if (!nochdir)
+ 		(void)chdir("/");
+ 
+-	if (!noclose && (fd = open(_PATH_DEVNULL, O_RDWR, 0)) != -1) {
++	if (!noclose && (fd = open("/dev/null", O_RDWR, 0)) != -1) {
+ 		(void)dup2(fd, STDIN_FILENO);
+ 		(void)dup2(fd, STDOUT_FILENO);
+ 		(void)dup2(fd, STDERR_FILENO);
+@@ -62,3 +62,4 @@
+ 	}
+ 	return (0);
+ }
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/fnmatch.h httpd/compat/fnmatch.h
+--- httpd.upstream/compat/fnmatch.h
++++ httpd/compat/fnmatch.h
+@@ -0,0 +1,4 @@
++#include_next <fnmatch.h>
++#ifndef FNM_CASEFOLD
++#define FNM_CASEFOLD 0
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/freezero.c httpd/compat/freezero.c
+--- httpd.upstream/compat/freezero.c
++++ httpd/compat/freezero.c
+@@ -0,0 +1,11 @@
++#include <stdlib.h>
++#include <string.h>
++
++#if defined(__sortix__) && !defined(__SORTIX_HAS_FREEZERO__)
++void freezero(void* ptr, size_t size)
++{
++	if ( ptr )
++		explicit_bzero(ptr, size);
++	free(ptr);
++}
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/grp.h httpd/compat/grp.h
+--- httpd.upstream/compat/grp.h
++++ httpd/compat/grp.h
+@@ -0,0 +1,4 @@
++#include_next <grp.h>
++#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS___)
++#define setgroups(size, list) ((void) (size), (void) (list), 0)
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/imsg-buffer.c httpd/compat/imsg-buffer.c
+--- httpd.upstream/compat/imsg-buffer.c
++++ httpd/compat/imsg-buffer.c
+@@ -71,6 +71,7 @@
+ ibuf_realloc(struct ibuf *buf, size_t len)
+ {
+ 	u_char	*b;
++	size_t new_size;
+ 
+ 	/* on static buffers max is eq size and so the following fails */
+ 	if (buf->wpos + len > buf->max) {
+@@ -78,10 +79,13 @@
+ 		return (-1);
+ 	}
+ 
+-	b = recallocarray(buf->buf, buf->size, buf->wpos + len, 1);
++	new_size = buf->wpos + len;
++	b = realloc(buf->buf, new_size);
+ 	if (b == NULL)
+ 		return (-1);
+ 	buf->buf = b;
++	if (buf->size < new_size)
++		memset(buf->buf + buf->size, 0, new_size - buf->size);
+ 	buf->size = buf->wpos + len;
+ 
+ 	return (0);
+@@ -252,7 +256,7 @@
+ 	msg.msg_iovlen = i;
+ 
+ 	if (buf != NULL && buf->fd != -1) {
+-		msg.msg_control = (caddr_t)&cmsgbuf.buf;
++		msg.msg_control = (char*)&cmsgbuf.buf;
+ 		msg.msg_controllen = sizeof(cmsgbuf.buf);
+ 		cmsg = CMSG_FIRSTHDR(&msg);
+ 		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+diff -Paur --no-dereference -- httpd.upstream/compat/imsg.c httpd/compat/imsg.c
+--- httpd.upstream/compat/imsg.c
++++ httpd/compat/imsg.c
+@@ -71,6 +71,8 @@
+ 		return (-1);
+ 
+ again:
++// TODO: Sortix should have the ability to reserve file descriptor table room.
++#if !defined(__sortix__)
+ 	if (getdtablecount() + imsg_fd_overhead +
+ 	    (int)((CMSG_SPACE(sizeof(int))-CMSG_SPACE(0))/sizeof(int))
+ 	    >= getdtablesize()) {
+@@ -78,6 +80,7 @@
+ 		free(ifd);
+ 		return (-1);
+ 	}
++#endif
+ 
+ 	if ((n = recvmsg(ibuf->fd, &msg, 0)) == -1) {
+ 		if (errno == EINTR)
+@@ -150,7 +153,8 @@
+ 	else
+ 		imsg->fd = -1;
+ 
+-	memcpy(imsg->data, ibuf->r.rptr, datalen);
++	if (imsg->data)
++		memcpy(imsg->data, ibuf->r.rptr, datalen);
+ 
+ 	if (imsg->hdr.len < av) {
+ 		left = av - imsg->hdr.len;
+diff -Paur --no-dereference -- httpd.upstream/compat/limits.h httpd/compat/limits.h
+--- httpd.upstream/compat/limits.h
++++ httpd/compat/limits.h
+@@ -0,0 +1,2 @@
++#include_next <limits.h>
++#define IOV_MAX 1024
+diff -Paur --no-dereference -- httpd.upstream/compat/pledge.c httpd/compat/pledge.c
+--- httpd.upstream/compat/pledge.c
++++ httpd/compat/pledge.c
+@@ -0,0 +1,9 @@
++#include <unistd.h>
++#if defined(__sortix__) && !defined(__SORTIX_HAS_PLEDGE__)
++int	pledge(const char *pledges, const char **paths)
++{
++	(void)pledges;
++	(void)paths;
++	return 0;
++}
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/stdlib.h httpd/compat/stdlib.h
+--- httpd.upstream/compat/stdlib.h
++++ httpd/compat/stdlib.h
+@@ -0,0 +1,10 @@
++#include_next <stdlib.h>
++#if defined(__sortix__) && !defined(__SORTIX_HAS_DAEMON__)
++int	 daemon(int, int);
++#endif
++#if defined(__sortix__) && !defined(__SORTIX_HAS_STRTONUM__)
++long long strtonum(const char *, long long, long long, const char **);
++#endif
++#if defined(__sortix__) && !defined(__SORTIX_HAS_FREEZERO__)
++void freezero(void *ptr, size_t size); 
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/strtonum.c httpd/compat/strtonum.c
+--- httpd.upstream/compat/strtonum.c
++++ httpd/compat/strtonum.c
+@@ -21,6 +21,7 @@
+ #include <limits.h>
+ #include <stdlib.h>
+ 
++#if defined(__sortix__) && !defined(__SORTIX_HAS_STRTONUM__)
+ #define	INVALID		1
+ #define	TOOSMALL	2
+ #define	TOOLARGE	3
+@@ -63,4 +64,4 @@
+ 
+ 	return (ll);
+ }
+-DEF_WEAK(strtonum);
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/sys/queue.h httpd/compat/sys/queue.h
+--- httpd.upstream/compat/sys/queue.h
++++ httpd/compat/sys/queue.h
+@@ -32,10 +32,12 @@
+  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
+  */
+ 
+-#ifndef	_SYS_QUEUE_H_
++#if __has_include_next(<sys/queue.h>)
++#include_next <sys/queue.h>
++#elif !defined(_SYS_QUEUE_H_)
+ #define	_SYS_QUEUE_H_
+ 
+-#include <sys/_null.h>
++#include <stddef.h>
+ 
+ /*
+  * This file defines five types of data structures: singly-linked lists,
+diff -Paur --no-dereference -- httpd.upstream/compat/sys/time.h httpd/compat/sys/time.h
+--- httpd.upstream/compat/sys/time.h
++++ httpd/compat/sys/time.h
+@@ -0,0 +1,40 @@
++#include_next <sys/time.h>
++#include <time.h>
++#ifndef TIMEVAL_TO_TIMESPEC
++#define	TIMEVAL_TO_TIMESPEC(tv, ts) {					\
++	(ts)->tv_sec = (tv)->tv_sec;					\
++	(ts)->tv_nsec = (tv)->tv_usec * 1000;				\
++}
++#endif
++#ifndef TIMESPEC_TO_TIMEVAL
++#define	TIMESPEC_TO_TIMEVAL(tv, ts) {					\
++	(tv)->tv_sec = (ts)->tv_sec;					\
++	(tv)->tv_usec = (ts)->tv_nsec / 1000;				\
++}
++#endif
++#ifndef timeradd
++#define	timerclear(tvp)		(tvp)->tv_sec = (tvp)->tv_usec = 0
++#define	timerisset(tvp)		((tvp)->tv_sec || (tvp)->tv_usec)
++#define	timercmp(tvp, uvp, cmp)						\
++	(((tvp)->tv_sec == (uvp)->tv_sec) ?				\
++	    ((tvp)->tv_usec cmp (uvp)->tv_usec) :			\
++	    ((tvp)->tv_sec cmp (uvp)->tv_sec))
++#define	timeradd(tvp, uvp, vvp)						\
++	do {								\
++		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
++		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
++		if ((vvp)->tv_usec >= 1000000) {			\
++			(vvp)->tv_sec++;				\
++			(vvp)->tv_usec -= 1000000;			\
++		}							\
++	} while (0)
++#define	timersub(tvp, uvp, vvp)						\
++	do {								\
++		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
++		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
++		if ((vvp)->tv_usec < 0) {				\
++			(vvp)->tv_sec--;				\
++			(vvp)->tv_usec += 1000000;			\
++		}							\
++	} while (0)
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/sys/tree.h httpd/compat/sys/tree.h
+--- httpd.upstream/compat/sys/tree.h
++++ httpd/compat/sys/tree.h
+@@ -24,10 +24,12 @@
+  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+  */
+ 
+-#ifndef	_SYS_TREE_H_
++#if __has_include_next(<sys/tree.h>)
++#include_next <sys/tree.h>
++#elif !defined(_SYS_TREE_H_)
+ #define	_SYS_TREE_H_
+ 
+-#include <sys/_null.h>
++#include <stddef.h>
+ 
+ /*
+  * This file defines data structures for different types of trees:
+diff -Paur --no-dereference -- httpd.upstream/compat/sys/types.h httpd/compat/sys/types.h
+--- httpd.upstream/compat/sys/types.h
++++ httpd/compat/sys/types.h
+@@ -0,0 +1,18 @@
++#include_next <sys/types.h>
++#include <stdint.h>
++typedef unsigned char u_char;
++typedef unsigned int u_int;
++typedef uint16_t u_int16_t;
++typedef uint32_t u_int32_t;
++#include <limits.h>
++#if defined(__sortix__)
++#include <sortix/limits.h>
++#endif
++#ifndef NAME_MAX
++#define NAME_MAX 255
++#endif
++#ifndef PATH_MAX
++#define PATH_MAX 4096
++#endif
++#include <stdnoreturn.h>
++#define __dead noreturn
+diff -Paur --no-dereference -- httpd.upstream/compat/unistd.h httpd/compat/unistd.h
+--- httpd.upstream/compat/unistd.h
++++ httpd/compat/unistd.h
+@@ -0,0 +1,26 @@
++#include_next <unistd.h>
++#if defined(__sortix__) && !defined(__SORTIX_HAS_PLEDGE__)
++int	 pledge(const char *, const char **paths);
++#endif
++#if defined(__sortix__) && !defined(__SORTIX_HAS_SETRESUID__)
++static inline int setresuid(uid_t ruid, uid_t euid, uid_t suid)
++{
++	(void) suid;
++	if (seteuid(euid) < 0)
++		return -1;
++	if (setuid(ruid) < 0)
++		return -1;
++	return 0;
++}
++#endif
++#if defined(__sortix__) && !defined(__SORTIX_HAS_SETRESGID__)
++static inline int setresgid(gid_t rgid, gid_t egid, gid_t sgid)
++{
++	(void) sgid;
++	if (setegid(egid) < 0)
++		return -1;
++	if (setgid(rgid) < 0)
++		return -1;
++	return 0;
++}
++#endif
+diff -Paur --no-dereference -- httpd.upstream/compat/vis.c httpd/compat/vis.c
+--- httpd.upstream/compat/vis.c
++++ httpd/compat/vis.c
+@@ -136,7 +136,6 @@
+ 	*dst = '\0';
+ 	return (dst);
+ }
+-DEF_WEAK(vis);
+ 
+ /*
+  * strvis, strnvis, strvisx - visually encode characters from src into dst
+@@ -162,7 +161,6 @@
+ 	*dst = '\0';
+ 	return (dst - start);
+ }
+-DEF_WEAK(strvis);
+ 
+ int
+ strnvis(char *dst, const char *src, size_t siz, int flag)
+diff -Paur --no-dereference -- httpd.upstream/compat/vis.h httpd/compat/vis.h
+--- httpd.upstream/compat/vis.h
++++ httpd/compat/vis.h
+@@ -75,19 +75,13 @@
+ 
+ #include <sys/cdefs.h>
+ 
+-__BEGIN_DECLS
+ char	*vis(char *, int, int, int);
+ int	strvis(char *, const char *, int);
+ int	stravis(char **, const char *, int);
+-int	strnvis(char *, const char *, size_t, int)
+-		__attribute__ ((__bounded__(__string__,1,3)));
+-int	strvisx(char *, const char *, size_t, int)
+-		__attribute__ ((__bounded__(__string__,1,3)));
++int	strnvis(char *, const char *, size_t, int);
++int	strvisx(char *, const char *, size_t, int);
+ int	strunvis(char *, const char *);
+ int	unvis(char *, char, int *, int);
+-ssize_t strnunvis(char *, const char *, size_t)
+-		__attribute__ ((__bounded__(__string__,1,3)));
+-
+-__END_DECLS
++ssize_t strnunvis(char *, const char *, size_t);
+ 
+ #endif /* !_VIS_H_ */
+diff -Paur --no-dereference -- httpd.upstream/httpd.c httpd/httpd.c
+--- httpd.upstream/httpd.c
++++ httpd/httpd.c
+@@ -40,6 +40,15 @@
+ #include <unistd.h>
+ #include <ctype.h>
+ #include <pwd.h>
++#include <fcntl.h>
++
++#if defined(__sortix__) && !defined(__SORTIX_HAS_GROWING_STACK__)
++#include <pthread.h>
++#endif
++
++#if defined(__sortix__)
++#define __progname program_invocation_name
++#endif
+ 
+ #include "httpd.h"
+ 
+@@ -109,8 +118,48 @@
+ 	exit(1);
+ }
+ 
++/* TODO: Sortix does not have growable stacks at the moment and the httpd.conf
++         parsing needs at least 1 MiB of stack. Replace the main thread with
++         another thread with a larger stack to avoid this problem. */
++#if defined(__sortix__) && !defined(__SORTIX_HAS_GROWING_STACK__)
++static int main_thread_argc;
++static char **main_thread_argv;
++
++void *main_thread(void *ctx);
++int real_main(int argc, char *argv[]);
++
++void *
++main_thread(void *ctx)
++{
++	(void) ctx;
++	exit(real_main(main_thread_argc, main_thread_argv));
++}
++
++int
++main(int argc, char *argv[])
++{
++	int errnum;
++	pthread_attr_t attr;
++	pthread_t thread;
++	pthread_attr_init(&attr);
++	pthread_attr_setstacksize(&attr, 1 * 1024 * 1024);
++	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
++	main_thread_argc = argc;
++	main_thread_argv = argv;
++	if ((errnum = pthread_create(&thread, &attr, main_thread, NULL))) {
++		errno = errnum;
++		err(1, "pthread_create");
++	}
++	pthread_attr_destroy(&attr);
++	pthread_exit(NULL);
++}
++
++int
++real_main(int argc, char *argv[])
++#else
+ int
+ main(int argc, char *argv[])
++#endif
+ {
+ 	int			 c;
+ 	unsigned int		 proc;
+@@ -123,6 +172,7 @@
+ 	int			 proc_instance = 0;
+ 	const char		*errp, *title = NULL;
+ 	int			 argc0 = argc;
++	int			 readyfd = -1;
+ 
+ 	while ((c = getopt(argc, argv, "dD:nf:I:P:v")) != -1) {
+ 		switch (c) {
+@@ -162,6 +212,12 @@
+ 		}
+ 	}
+ 
++	if (getenv("READYFD")) {
++		readyfd = atoi(getenv("READYFD"));
++		unsetenv("READYENV");
++		fcntl(readyfd, F_SETFD, O_CLOEXEC | O_CLOFORK);
++	}
++
+ 	/* log to stderr until daemonized */
+ 	log_init(debug ? debug : 1, LOG_DAEMON);
+ 
+@@ -260,6 +316,13 @@
+ 	if (parent_configure(env) == -1)
+ 		fatalx("configuration failed");
+ 
++	if (0 <= readyfd) {
++		char newline = '\n';
++		write(readyfd, &newline, 1);
++		close(readyfd);
++		readyfd = -1;
++	}
++
+ 	event_dispatch();
+ 
+ 	parent_shutdown(env);
+@@ -399,7 +462,7 @@
+ 	free(env->sc_ps);
+ 	free(env);
+ 
+-	log_info("parent terminating, pid %d", getpid());
++	log_info("parent terminating, pid %lld", (long long)getpid());
+ 
+ 	exit(0);
+ }
+@@ -792,7 +855,7 @@
+ 
+ 	if (getrlimit(RLIMIT_NOFILE, &rl) == -1)
+ 		fatal("socket_rlimit: failed to get resource limit");
+-	log_debug("%s: max open files %llu", __func__, rl.rlim_max);
++	log_debug("%s: max open files %llu", __func__, (unsigned long long)rl.rlim_max);
+ 
+ 	/*
+ 	 * Allow the maximum number of open file descriptors for this
+@@ -850,7 +913,7 @@
+ 		    isspace((unsigned char)ptr[i])))
+ 			break;
+ 
+-	return strndup(ptr, i);
++	return strndup((char *)ptr, i);
+ }
+ 
+ void *
+@@ -966,11 +1029,15 @@
+     int reserve, volatile int *counter)
+ {
+ 	int ret;
++// TODO: Perhaps we want to expose a kernel facility to preallocate room in the
++//       file descriptor table on Sortix.
++#if !defined(__sortix__)
+ 	if (getdtablecount() + reserve +
+ 	    *counter >= getdtablesize()) {
+ 		errno = EMFILE;
+ 		return (-1);
+ 	}
++#endif
+ 
+ 	if ((ret = accept4(sockfd, addr, addrlen, SOCK_NONBLOCK)) > -1) {
+ 		(*counter)++;
+@@ -1316,9 +1383,9 @@
+ 
+ 
+ const char *
+-print_host(struct sockaddr_storage *ss, char *buf, size_t len)
++print_host(struct sockaddr_storage *ss, size_t sslen, char *buf, size_t len)
+ {
+-	if (getnameinfo((struct sockaddr *)ss, ss->ss_len,
++	if (getnameinfo((struct sockaddr *)ss, sslen,
+ 	    buf, len, NULL, 0, NI_NUMERICHOST) != 0) {
+ 		buf[0] = '\0';
+ 		return (NULL);
+diff -Paur --no-dereference -- httpd.upstream/httpd.h httpd/httpd.h
+--- httpd.upstream/httpd.h
++++ httpd/httpd.h
+@@ -46,7 +46,7 @@
+ #define CONF_FILE		"/etc/httpd.conf"
+ #define HTTPD_SOCKET		"/var/run/httpd.sock"
+ #define HTTPD_USER		"www"
+-#define HTTPD_SERVERNAME	"OpenBSD httpd"
++#define HTTPD_SERVERNAME	"OpenBSD httpd (Sortix)"
+ #define HTTPD_DOCROOT		"/htdocs"
+ #define HTTPD_INDEX		"index.html"
+ #define HTTPD_FCGI_SOCKET	"/run/slowcgi.sock"
+@@ -152,10 +152,11 @@
+ 
+ struct address {
+ 	struct sockaddr_storage	 ss;
++	size_t			 sslen;
+ 	int			 ipproto;
+ 	int			 prefixlen;
+ 	struct portrange	 port;
+-	char			 ifname[IFNAMSIZ];
++	char			 ifname[IF_NAMESIZE];
+ 	TAILQ_ENTRY(address)	 entry;
+ };
+ TAILQ_HEAD(addresslist, address);
+@@ -327,11 +328,13 @@
+ 	void			*clt_srv_conf;
+ 	uint32_t		 clt_srv_id;
+ 	struct sockaddr_storage	 clt_srv_ss;
++	size_t			 clt_srv_sslen;
+ 	struct str_match	 clt_srv_match;
+ 
+ 	int			 clt_s;
+ 	in_port_t		 clt_port;
+ 	struct sockaddr_storage	 clt_ss;
++	size_t			 clt_sslen;
+ 	struct bufferevent	*clt_bev;
+ 	struct evbuffer		*clt_output;
+ 	struct event		 clt_ev;
+@@ -469,6 +472,7 @@
+ 
+ 	in_port_t		 port;
+ 	struct sockaddr_storage	 ss;
++	size_t			 sslen;
+ 	int			 prefixlen;
+ 	struct timeval		 timeout;
+ 	struct timeval		 requesttimeout;
+@@ -596,7 +600,7 @@
+ int	 server_socket_af(struct sockaddr_storage *, in_port_t);
+ in_port_t
+ 	 server_socket_getport(struct sockaddr_storage *);
+-int	 server_socket_connect(struct sockaddr_storage *, in_port_t,
++int	 server_socket_connect(struct sockaddr_storage *, socklen_t, in_port_t,
+ 	    struct server_config *);
+ void	 server_write(struct bufferevent *, void *);
+ void	 server_read(struct bufferevent *, void *);
+@@ -614,7 +618,7 @@
+ 	    struct evbuffer *);
+ int	 server_bufferevent_write_chunk(struct client *,
+ 	    struct evbuffer *, size_t);
+-int	 server_bufferevent_add(struct event *, int);
++int	 server_bufferevent_add(struct event *, struct timeval);
+ int	 server_bufferevent_write(struct client *, void *, size_t);
+ struct server *
+ 	 server_byaddr(struct sockaddr *, in_port_t);
+@@ -656,7 +660,7 @@
+ struct server_config *
+ 	 server_getlocation(struct client *, const char *);
+ const char *
+-	 server_http_host(struct sockaddr_storage *, char *, size_t);
++	 server_http_host(struct sockaddr_storage *, size_t, char *, size_t);
+ char	*server_http_parsehost(char *, char *, size_t, int *);
+ ssize_t	 server_http_time(time_t, char *, size_t);
+ int	 server_log_http(struct client *, unsigned int, size_t);
+@@ -717,7 +721,7 @@
+ struct auth	*auth_add(struct serverauth *, struct auth *);
+ struct auth	*auth_byid(struct serverauth *, uint32_t);
+ void		 auth_free(struct serverauth *, struct auth *);
+-const char	*print_host(struct sockaddr_storage *, char *, size_t);
++const char	*print_host(struct sockaddr_storage *, size_t, char *, size_t);
+ const char	*print_time(struct timeval *, struct timeval *, char *, size_t);
+ const char	*printb_flags(const uint32_t, const char *);
+ void		 getmonotime(struct timeval *);
+diff -Paur --no-dereference -- httpd.upstream/init/httpd httpd/init/httpd
+--- httpd.upstream/init/httpd
++++ httpd/init/httpd
+@@ -0,0 +1,4 @@
++require network
++#program=httpd
++#exec $program -d
++exec httpd -d
+diff -Paur --no-dereference -- httpd.upstream/log.c httpd/log.c
+--- httpd.upstream/log.c
++++ httpd/log.c
+@@ -24,6 +24,14 @@
+ #include <errno.h>
+ #include <time.h>
+ 
++#ifndef __dead
++#include <stdnoreturn.h>
++#define __dead noreturn
++#endif
++#if defined(__sortix__)
++#define __progname program_invocation_name
++#endif
++
+ static int	 debug;
+ static int	 verbose;
+ const char	*log_procname;
+diff -Paur --no-dereference -- httpd.upstream/Makefile httpd/Makefile
+--- httpd.upstream/Makefile
++++ httpd/Makefile
+@@ -0,0 +1,60 @@
++include ../../../build-aux/platform.mak
++include ../../../build-aux/compiler.mak
++include ../../../build-aux/version.mak
++include ../../../build-aux/dirs.mak
++
++OPTLEVEL?=$(DEFAULT_OPTLEVEL)
++CFLAGS?=$(OPTLEVEL)
++
++CFLAGS:=$(CFLAGS) -Wall -Wextra -Wno-logical-not-parentheses -Wno-unused-parameter -Wno-unused-but-set-variable -Wno-missing-field-initializers -Wno-pointer-sign -Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations -Wshadow -Wpointer-arith -Wsign-compare -Wcast-qual -Werror=format
++CPPFLAGS:=$(CPPFLAGS) -I. -Icompat
++
++PROGRAM=httpd
++LIBS:=$(LIBS) -levent -ltls -lssl -lcrypto
++
++OBJS=\
++compat/daemon.o \
++compat/freezero.o \
++compat/imsg-buffer.o \
++compat/imsg.o \
++compat/strtonum.o \
++compat/vis.o \
++compat/pledge.o \
++config.o \
++control.o \
++httpd.o \
++logger.o \
++log.o \
++parse.o \
++patterns.o \
++proc.o \
++server_fcgi.o \
++server_file.o \
++server_http.o \
++server.o \
++
++.PHONY: all
++all: $(PROGRAM)
++
++$(PROGRAM): $(OBJS)
++	$(CC) $(CFLAGS) -o $(PROGRAM) $(OBJS) $(LIBS)
++
++%: %.c
++	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
++
++.PHONY: clean
++clean:
++	rm -f $(PROGRAM) $(OBJS)
++
++.PHONY: install
++install: all
++	mkdir -p $(DESTDIR)$(SBINDIR)
++	install $(PROGRAM) $(DESTDIR)$(SBINDIR)
++	mkdir -p $(DESTDIR)$(MANDIR)/man5
++	install httpd.conf.5 $(DESTDIR)$(MANDIR)/man5
++	mkdir -p $(DESTDIR)$(MANDIR)/man7
++	install patterns.7 $(DESTDIR)$(MANDIR)/man7
++	mkdir -p $(DESTDIR)$(MANDIR)/man8
++	install httpd.8 $(DESTDIR)$(MANDIR)/man8
++	mkdir -p $(DESTDIR)$(DATADIR)/init
++	cp init/httpd $(DESTDIR)$(DATADIR)/init/httpd
+diff -Paur --no-dereference -- httpd.upstream/parse.y httpd/parse.y
+--- httpd.upstream/parse.y
++++ httpd/parse.y
+@@ -31,7 +31,9 @@
+ #include <sys/queue.h>
+ #include <sys/tree.h>
+ #include <sys/ioctl.h>
++#if __has_include(<sys/sockio.h>)
+ #include <sys/sockio.h>
++#endif
+ #include <sys/time.h>
+ 
+ #include <net/if.h>
+@@ -50,6 +52,7 @@
+ #include <string.h>
+ #include <ifaddrs.h>
+ #include <syslog.h>
++#include <stdlib.h>
+ 
+ #include "httpd.h"
+ #include "http.h"
+@@ -195,7 +198,7 @@
+ 				break;
+ 			if ($2 <= 0 || $2 > PROC_MAX_INSTANCES) {
+ 				yyerror("invalid number of preforked "
+-				    "servers: %lld", $2);
++				    "servers: %lld", (long long)$2);
+ 				YYERROR;
+ 			}
+ 			conf->sc_prefork_server = $2;
+@@ -434,6 +437,7 @@
+ 			free($3);
+ 			h = TAILQ_FIRST(&al);
+ 			memcpy(&s_conf->ss, &h->ss, sizeof(s_conf->ss));
++			s_conf->sslen = h->sslen;
+ 			s_conf->port = h->port.val[0];
+ 			s_conf->prefixlen = h->prefixlen;
+ 			host_free(&al);
+@@ -628,7 +632,7 @@
+ 
+ hstsflags	: MAXAGE NUMBER		{
+ 			if ($2 < 0 || $2 > INT_MAX) {
+-				yyerror("invalid number of seconds: %lld", $2);
++				yyerror("invalid number of seconds: %lld", (long long)$2);
+ 				YYERROR;
+ 			}
+ 			srv_conf->hsts_max_age = $2;
+@@ -968,7 +972,7 @@
+ 
+ filter		: block RETURN NUMBER optstring	{
+ 			if ($3 <= 0 || server_httperror_byid($3) == NULL) {
+-				yyerror("invalid return code: %lld", $3);
++				yyerror("invalid return code: %lld", (long long)$3);
+ 				free($4);
+ 				YYERROR;
+ 			}
+@@ -1032,7 +1036,7 @@
+ 		}
+ 		| BACKLOG NUMBER	{
+ 			if ($2 < 0 || $2 > SERVER_MAX_CLIENTS) {
+-				yyerror("invalid backlog: %lld", $2);
++				yyerror("invalid backlog: %lld", (long long)$2);
+ 				YYERROR;
+ 			}
+ 			srv_conf->tcpbacklog = $2;
+@@ -1040,13 +1044,13 @@
+ 		| SOCKET BUFFER NUMBER	{
+ 			srv_conf->tcpflags |= TCPFLAG_BUFSIZ;
+ 			if ((srv_conf->tcpbufsiz = $3) < 0) {
+-				yyerror("invalid socket buffer size: %lld", $3);
++				yyerror("invalid socket buffer size: %lld", (long long)$3);
+ 				YYERROR;
+ 			}
+ 		}
+ 		| IP STRING NUMBER	{
+ 			if ($3 < 0) {
+-				yyerror("invalid ttl: %lld", $3);
++				yyerror("invalid ttl: %lld", (long long)$3);
+ 				free($2);
+ 				YYERROR;
+ 			}
+@@ -1119,7 +1123,7 @@
+ 
+ port		: PORT NUMBER {
+ 			if ($2 <= 0 || $2 >= (int)USHRT_MAX) {
+-				yyerror("invalid port: %lld", $2);
++				yyerror("invalid port: %lld", (long long)$2);
+ 				YYERROR;
+ 			}
+ 			$$.val[0] = htons($2);
+@@ -1141,7 +1145,7 @@
+ timeout		: NUMBER
+ 		{
+ 			if ($1 < 0) {
+-				yyerror("invalid timeout: %lld", $1);
++				yyerror("invalid timeout: %lld", (long long)$1);
+ 				YYERROR;
+ 			}
+ 			$$.tv_sec = $1;
+@@ -1151,7 +1155,7 @@
+ 
+ numberstring	: NUMBER		{
+ 			char *s;
+-			if (asprintf(&s, "%lld", $1) == -1) {
++			if (asprintf(&s, "%lld", (long long)$1) == -1) {
+ 				yyerror("asprintf: number");
+ 				YYERROR;
+ 			}
+@@ -1613,14 +1617,18 @@
+ 		return (-1);
+ 
+ 	topfile = file;
++#if !defined(__sortix__) || defined(__SORTIX_HAS_SETSERVENT__)
+ 	setservent(1);
++#endif
+ 
+ 	yyparse();
+ 	errors = file->errors;
+ 	popfile();
+ 
++#if !defined(__sortix__) || defined(__SORTIX_HAS_SETSERVENT__)
+ 	endservent();
+ 	endprotoent();
++#endif
+ 
+ 	/* Free macros */
+ 	TAILQ_FOREACH_SAFE(sym, &symhead, entry, next) {
+@@ -1657,14 +1665,18 @@
+ 		return (-1);
+ 
+ 	topfile = file;
++#if !defined(__sortix__) || defined(__SORTIX_HAS_SETSERVENT__)
+ 	setservent(1);
++#endif
+ 
+ 	yyparse();
+ 	errors = file->errors;
+ 	popfile();
+ 
++#if !defined(__sortix__) || defined(__SORTIX_HAS_SETSERVENT__)
+ 	endservent();
+ 	endprotoent();
++#endif
+ 
+ 	/* Free macros and check which have not been used. */
+ 	for (sym = TAILQ_FIRST(&symhead); sym != NULL; sym = next) {
+@@ -1798,7 +1810,7 @@
+ 	if ((h = calloc(1, sizeof(*h))) == NULL)
+ 		fatal(__func__);
+ 	sain = (struct sockaddr_in *)&h->ss;
+-	sain->sin_len = sizeof(struct sockaddr_in);
++	h->sslen = sizeof(struct sockaddr_in);
+ 	sain->sin_family = AF_INET;
+ 	sain->sin_addr.s_addr = ina.s_addr;
+ 	if (sain->sin_addr.s_addr == INADDR_ANY)
+@@ -1823,7 +1835,7 @@
+ 		if ((h = calloc(1, sizeof(*h))) == NULL)
+ 			fatal(__func__);
+ 		sa_in6 = (struct sockaddr_in6 *)&h->ss;
+-		sa_in6->sin6_len = sizeof(struct sockaddr_in6);
++		h->sslen = sizeof(struct sockaddr_in6);
+ 		sa_in6->sin6_family = AF_INET6;
+ 		memcpy(&sa_in6->sin6_addr,
+ 		    &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
+@@ -1859,7 +1871,11 @@
+ 	hints.ai_socktype = SOCK_DGRAM; /* DUMMY */
+ 	hints.ai_flags = AI_ADDRCONFIG;
+ 	error = getaddrinfo(s, NULL, &hints, &res0);
+-	if (error == EAI_AGAIN || error == EAI_NODATA || error == EAI_NONAME)
++	if (error == EAI_AGAIN ||
++#ifdef EAI_NODATA
++	    error == EAI_NODATA ||
++#endif
++	    error == EAI_NONAME)
+ 		return (0);
+ 	if (error) {
+ 		log_warnx("%s: could not parse \"%s\": %s", __func__, s,
+@@ -1892,12 +1908,12 @@
+ 
+ 		if (res->ai_family == AF_INET) {
+ 			sain = (struct sockaddr_in *)&h->ss;
+-			sain->sin_len = sizeof(struct sockaddr_in);
++			h->sslen = sizeof(struct sockaddr_in);
+ 			sain->sin_addr.s_addr = ((struct sockaddr_in *)
+ 			    res->ai_addr)->sin_addr.s_addr;
+ 		} else {
+ 			sin6 = (struct sockaddr_in6 *)&h->ss;
+-			sin6->sin6_len = sizeof(struct sockaddr_in6);
++			h->sslen = sizeof(struct sockaddr_in6);
+ 			memcpy(&sin6->sin6_addr, &((struct sockaddr_in6 *)
+ 			    res->ai_addr)->sin6_addr, sizeof(struct in6_addr));
+ 		}
+@@ -1955,12 +1971,12 @@
+ 
+ 		if (af == AF_INET) {
+ 			sain = (struct sockaddr_in *)&h->ss;
+-			sain->sin_len = sizeof(struct sockaddr_in);
++			h->sslen = sizeof(struct sockaddr_in);
+ 			sain->sin_addr.s_addr = ((struct sockaddr_in *)
+ 			    p->ifa_addr)->sin_addr.s_addr;
+ 		} else {
+ 			sin6 = (struct sockaddr_in6 *)&h->ss;
+-			sin6->sin6_len = sizeof(struct sockaddr_in6);
++			h->sslen = sizeof(struct sockaddr_in6);
+ 			memcpy(&sin6->sin6_addr, &((struct sockaddr_in6 *)
+ 			    p->ifa_addr)->sin6_addr, sizeof(struct in6_addr));
+ 			sin6->sin6_scope_id = ((struct sockaddr_in6 *)
+@@ -2074,6 +2090,7 @@
+ 	/* Now set alias and listen address */
+ 	strlcpy(dst->srv_conf.name, alias->name, sizeof(dst->srv_conf.name));
+ 	memcpy(&dst->srv_conf.ss, &addr->ss, sizeof(dst->srv_conf.ss));
++	dst->srv_conf.sslen = addr->sslen;
+ 	dst->srv_conf.port = addr->port;
+ 	dst->srv_conf.prefixlen = addr->prefixlen;
+ 	if (addr->flags & SRVFLAG_TLS)
+@@ -2128,6 +2145,7 @@
+ 		dstl->srv_conf.parent_id = dst->srv_conf.id;
+ 		memcpy(&dstl->srv_conf.ss, &addr->ss,
+ 		    sizeof(dstl->srv_conf.ss));
++		dstl->srv_conf.sslen = addr->sslen;
+ 		dstl->srv_conf.port = addr->port;
+ 		dstl->srv_conf.prefixlen = addr->prefixlen;
+ 		dstl->srv_s = -1;
+@@ -2167,6 +2185,7 @@
+ int
+ is_if_in_group(const char *ifname, const char *groupname)
+ {
++#ifdef SIOCGIFGROUP
+ 	unsigned int		 len;
+ 	struct ifgroupreq	 ifgr;
+ 	struct ifg_req		*ifg;
+@@ -2177,8 +2196,8 @@
+ 		err(1, "socket");
+ 
+ 	memset(&ifgr, 0, sizeof(ifgr));
+-	if (strlcpy(ifgr.ifgr_name, ifname, IFNAMSIZ) >= IFNAMSIZ)
+-		err(1, "IFNAMSIZ");
++	if (strlcpy(ifgr.ifgr_name, ifname, IF_NAMESIZE) >= IF_NAMESIZE)
++		err(1, "IF_NAMESIZE");
+ 	if (ioctl(s, SIOCGIFGROUP, (caddr_t)&ifgr) == -1) {
+ 		if (errno == EINVAL || errno == ENOTTY)
+ 			goto end;
+@@ -2206,4 +2225,7 @@
+ end:
+ 	close(s);
+ 	return (ret);
++#else
++	return (0);
++#endif
+ }
+diff -Paur --no-dereference -- httpd.upstream/patterns.h httpd/patterns.h
+--- httpd.upstream/patterns.h
++++ httpd/patterns.h
+@@ -35,12 +35,10 @@
+ 	unsigned int	 sm_nmatch; /* number of elements in array */
+ };
+ 
+-__BEGIN_DECLS
+ int	 str_find(const char *, const char *, struct str_find *, size_t,
+ 	    const char **);
+ int	 str_match(const char *, const char *, struct str_match *,
+ 	    const char **);
+ void	 str_match_free(struct str_match *);
+-__END_DECLS
+ 
+ #endif /* PATTERNS_H */
+diff -Paur --no-dereference -- httpd.upstream/proc.c httpd/proc.c
+--- httpd.upstream/proc.c
++++ httpd/proc.c
+@@ -29,6 +29,7 @@
+ #include <string.h>
+ #include <errno.h>
+ #include <signal.h>
++#include <grp.h>
+ #include <pwd.h>
+ #include <event.h>
+ #include <imsg.h>
+@@ -368,7 +369,7 @@
+ 	proc_close(ps);
+ 
+ 	do {
+-		pid = waitpid(WAIT_ANY, &status, 0);
++		pid = waitpid(-1, &status, 0);
+ 		if (pid <= 0)
+ 			continue;
+ 
+@@ -386,10 +387,10 @@
+ 		if (len == 0) {
+ 			/* child exited OK, don't print a warning message */
+ 		} else if (len != -1) {
+-			log_warnx("lost child: pid %u %s", pid, cause);
++			log_warnx("lost child: pid %lld %s", (long long)pid, cause);
+ 			free(cause);
+ 		} else
+-			log_warnx("lost child: pid %u", pid);
++			log_warnx("lost child: pid %lld", (long long)pid);
+ 	} while (pid != -1 || (pid == -1 && errno == EINTR));
+ }
+ 
+@@ -483,7 +484,7 @@
+ 
+ 	proc_close(ps);
+ 
+-	log_info("%s exiting, pid %d", p->p_title, getpid());
++	log_info("%s exiting, pid %lld", p->p_title, (long long)getpid());
+ 
+ 	exit(0);
+ }
+@@ -551,7 +552,9 @@
+ 
+ 	privsep_process = p->p_id;
+ 
++#if !defined(__sortix__) || defined(__SORTIX_HAS_SETPROCTITLE__)
+ 	setproctitle("%s", p->p_title);
++#endif
+ 
+ 	if (setgroups(1, &pw->pw_gid) ||
+ 	    setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) ||
+diff -Paur --no-dereference -- httpd.upstream/server.c httpd/server.c
+--- httpd.upstream/server.c
++++ httpd/server.c
+@@ -56,7 +56,7 @@
+ void		 server_launch(void);
+ int		 server_socket(struct sockaddr_storage *, in_port_t,
+ 		    struct server_config *, int, int);
+-int		 server_socket_listen(struct sockaddr_storage *, in_port_t,
++int		 server_socket_listen(struct sockaddr_storage *, socklen_t, in_port_t,
+ 		    struct server_config *);
+ struct server	*server_byid(uint32_t);
+ 
+@@ -120,7 +120,7 @@
+ 
+ 	/* Open listening socket in the privileged process */
+ 	if ((srv->srv_s = server_socket_listen(&srv->srv_conf.ss,
+-	    srv->srv_conf.port, &srv->srv_conf)) == -1)
++	    srv->srv_conf.sslen, srv->srv_conf.port, &srv->srv_conf)) == -1)
+ 		return (-1);
+ 
+ 	return (0);
+@@ -530,13 +530,9 @@
+ 	switch (ss->ss_family) {
+ 	case AF_INET:
+ 		((struct sockaddr_in *)ss)->sin_port = port;
+-		((struct sockaddr_in *)ss)->sin_len =
+-		    sizeof(struct sockaddr_in);
+ 		break;
+ 	case AF_INET6:
+ 		((struct sockaddr_in6 *)ss)->sin6_port = port;
+-		((struct sockaddr_in6 *)ss)->sin6_len =
+-		    sizeof(struct sockaddr_in6);
+ 		break;
+ 	default:
+ 		return (-1);
+@@ -584,9 +580,11 @@
+ 		goto bad;
+ 	if (reuseport) {
+ 		val = 1;
++#ifdef SO_REUSEPORT
+ 		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &val,
+ 		    sizeof(int)) == -1)
+ 			goto bad;
++#endif
+ 	}
+ 	if (srv_conf->tcpflags & TCPFLAG_BUFSIZ) {
+ 		val = srv_conf->tcpbufsiz;
+@@ -606,9 +604,11 @@
+ 		val = (int)srv_conf->tcpipttl;
+ 		switch (ss->ss_family) {
+ 		case AF_INET:
++#ifdef IP_TTL
+ 			if (setsockopt(s, IPPROTO_IP, IP_TTL,
+ 			    &val, sizeof(val)) == -1)
+ 				goto bad;
++#endif
+ 			break;
+ 		case AF_INET6:
+ 			if (setsockopt(s, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
+@@ -621,14 +621,18 @@
+ 		val = (int)srv_conf->tcpipminttl;
+ 		switch (ss->ss_family) {
+ 		case AF_INET:
++#ifdef IP_MINTTL
+ 			if (setsockopt(s, IPPROTO_IP, IP_MINTTL,
+ 			    &val, sizeof(val)) == -1)
+ 				goto bad;
++#endif
+ 			break;
+ 		case AF_INET6:
++#ifdef IPV6_MINHOPCOUNT
+ 			if (setsockopt(s, IPPROTO_IPV6, IPV6_MINHOPCOUNT,
+ 			    &val, sizeof(val)) == -1)
+ 				goto bad;
++#endif
+ 			break;
+ 		}
+ 	}
+@@ -650,9 +654,11 @@
+ 			val = 0;
+ 		else
+ 			val = 1;
++#ifdef TCP_SACK_ENABLE
+ 		if (setsockopt(s, IPPROTO_TCP, TCP_SACK_ENABLE,
+ 		    &val, sizeof(val)) == -1)
+ 			goto bad;
++#endif
+ 	}
+ 
+ 	return (s);
+@@ -664,7 +670,7 @@
+ }
+ 
+ int
+-server_socket_listen(struct sockaddr_storage *ss, in_port_t port,
++server_socket_listen(struct sockaddr_storage *ss, socklen_t sslen, in_port_t port,
+     struct server_config *srv_conf)
+ {
+ 	int s;
+@@ -672,7 +678,7 @@
+ 	if ((s = server_socket(ss, port, srv_conf, -1, 1)) == -1)
+ 		return (-1);
+ 
+-	if (bind(s, (struct sockaddr *)ss, ss->ss_len) == -1)
++	if (bind(s, (struct sockaddr *)ss, sslen) == -1)
+ 		goto bad;
+ 	if (listen(s, srv_conf->tcpbacklog) == -1)
+ 		goto bad;
+@@ -685,15 +691,15 @@
+ }
+ 
+ int
+-server_socket_connect(struct sockaddr_storage *ss, in_port_t port,
+-    struct server_config *srv_conf)
++server_socket_connect(struct sockaddr_storage *ss, socklen_t sslen,
++    in_port_t port, struct server_config *srv_conf)
+ {
+ 	int	s;
+ 
+ 	if ((s = server_socket(ss, port, srv_conf, -1, 0)) == -1)
+ 		return (-1);
+ 
+-	if (connect(s, (struct sockaddr *)ss, ss->ss_len) == -1) {
++	if (connect(s, (struct sockaddr *)ss, sslen) == -1) {
+ 		if (errno != EINPROGRESS)
+ 			goto bad;
+ 	}
+@@ -1025,6 +1031,7 @@
+ 	clt->clt_srv_id = srv->srv_conf.id;
+ 	clt->clt_pid = getpid();
+ 	clt->clt_inflight = 1;
++	clt->clt_sslen = slen;
+ 
+ 	/* get local address */
+ 	slen = sizeof(clt->clt_srv_ss);
+@@ -1033,6 +1040,7 @@
+ 		server_close(clt, "listen address lookup failed");
+ 		return;
+ 	}
++	clt->clt_srv_sslen = slen;
+ 
+ 	/* get client address */
+ 	memcpy(&clt->clt_ss, &ss, sizeof(clt->clt_ss));
+@@ -1202,8 +1210,9 @@
+ 	if (debug_cmd != -1 && msg != NULL) {
+ 		memset(ibuf, 0, sizeof(ibuf));
+ 		memset(obuf, 0, sizeof(obuf));
+-		(void)print_host(&clt->clt_ss, ibuf, sizeof(ibuf));
+-		(void)server_http_host(&clt->clt_srv_ss, obuf, sizeof(obuf));
++		(void)print_host(&clt->clt_ss, clt->clt_sslen, ibuf, sizeof(ibuf));
++		(void)server_http_host(&clt->clt_srv_ss, clt->clt_srv_sslen, obuf,
++		    sizeof(obuf));
+ 		if (EVBUFFER_LENGTH(clt->clt_log) &&
+ 		    evbuffer_add_printf(clt->clt_log, "\n") != -1)
+ 			ptr = evbuffer_readline(clt->clt_log);
+@@ -1228,7 +1237,8 @@
+ 	/* free the HTTP descriptors incl. headers */
+ 	server_close_http(clt);
+ 
+-	event_del(&clt->clt_ev);
++	// TODO: This issues a warning because event_base is NULL.
++	//event_del(&clt->clt_ev);
+ 	if (clt->clt_bev != NULL)
+ 		bufferevent_disable(clt->clt_bev, EV_READ|EV_WRITE);
+ 	if (clt->clt_srvbev != NULL)
+@@ -1320,14 +1330,12 @@
+ }
+ 
+ int
+-server_bufferevent_add(struct event *ev, int timeout)
++server_bufferevent_add(struct event *ev, struct timeval timeout)
+ {
+-	struct timeval tv, *ptv = NULL;
++	struct timeval *ptv = NULL;
+ 
+-	if (timeout) {
+-		timerclear(&tv);
+-		tv.tv_sec = timeout;
+-		ptv = &tv;
++	if (timeout.tv_sec || timeout.tv_usec) {
++		ptv = &timeout;
+ 	}
+ 
+ 	return (event_add(ev, ptv));
+@@ -1374,10 +1382,16 @@
+     struct evbuffer *buf, size_t size)
+ {
+ 	int ret;
+-	ret = server_bufferevent_write(clt, buf->buffer, size);
+-	if (ret != -1)
+-		evbuffer_drain(buf, size);
+-	return (ret);
++	while (0 < size) {
++		struct evbuffer_iovec iov;
++		if (evbuffer_peek(buf, size, NULL, &iov, 1) < 1)
++			return (-1);
++		ret = server_bufferevent_write(clt, iov.iov_base, iov.iov_len);
++		if (ret)
++			return ret;
++		evbuffer_drain(buf, iov.iov_len);
++	}
++	return (0);
+ }
+ 
+ int
+diff -Paur --no-dereference -- httpd.upstream/server_fcgi.c httpd/server_fcgi.c
+--- httpd.upstream/server_fcgi.c
++++ httpd/server_fcgi.c
+@@ -63,13 +63,13 @@
+ 	uint16_t	content_len;
+ 	uint8_t		padding_len;
+ 	uint8_t		reserved;
+-} __packed;
++} __attribute__((packed));
+ 
+ struct fcgi_begin_request_body {
+ 	uint16_t	role;
+ 	uint8_t		flags;
+ 	uint8_t		reserved[5];
+-} __packed;
++} __attribute__((packed));
+ 
+ struct server_fcgi_param {
+ 	int		total_len;
+@@ -115,8 +115,9 @@
+ 		((struct sockaddr_in *)
+ 		    &ss)->sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+ 		port = htons(port);
++		socklen_t sslen = sizeof(struct sockaddr_in);
+ 
+-		if ((fd = server_socket_connect(&ss, port, srv_conf)) == -1)
++		if ((fd = server_socket_connect(&ss, sslen, port, srv_conf)) == -1)
+ 			goto fail;
+ 	} else {
+ 		struct sockaddr_un	 sun;
+@@ -288,7 +289,7 @@
+ 			goto fail;
+ 		}
+ 
+-	(void)print_host(&clt->clt_ss, hbuf, sizeof(hbuf));
++	(void)print_host(&clt->clt_ss, clt->clt_sslen, hbuf, sizeof(hbuf));
+ 	if (fcgi_add_param(&param, "REMOTE_ADDR", hbuf, clt) == -1) {
+ 		errstr = "failed to encode param";
+ 		goto fail;
+@@ -326,7 +327,7 @@
+ 		}
+ 	}
+ 
+-	(void)print_host(&clt->clt_srv_ss, hbuf, sizeof(hbuf));
++	(void)print_host(&clt->clt_srv_ss, clt->clt_srv_sslen, hbuf, sizeof(hbuf));
+ 	if (fcgi_add_param(&param, "SERVER_ADDR", hbuf, clt) == -1) {
+ 		errstr = "failed to encode param";
+ 		goto fail;
+diff -Paur --no-dereference -- httpd.upstream/server_file.c httpd/server_file.c
+--- httpd.upstream/server_file.c
++++ httpd/server_file.c
+@@ -310,7 +310,7 @@
+ 	if ((nranges = parse_ranges(clt, range_str, st->st_size)) < 1) {
+ 		code = 416;
+ 		(void)snprintf(content_range, sizeof(content_range),
+-		    "bytes */%lld", st->st_size);
++		    "bytes */%lld", (long long)st->st_size);
+ 		errstr = content_range;
+ 		goto abort;
+ 	}
+@@ -325,8 +325,8 @@
+ 	if (nranges == 1) {
+ 		range = &r->range[0];
+ 		(void)snprintf(content_range, sizeof(content_range),
+-		    "bytes %lld-%lld/%lld", range->start, range->end,
+-		    st->st_size);
++		    "bytes %lld-%lld/%lld", (long long)range->start,
++		    (long long)range->end, (long long)st->st_size);
+ 		if (kv_add(&resp->http_headers, "Content-Range",
+ 		    content_range) == NULL)
+ 			goto abort;
+@@ -346,9 +346,10 @@
+ 			    "\r\n--%llu\r\n"
+ 			    "Content-Type: %s/%s\r\n"
+ 			    "Content-Range: bytes %lld-%lld/%lld\r\n\r\n",
+-			    clt->clt_boundary,
++			    (unsigned long long)clt->clt_boundary,
+ 			    media->media_type, media->media_subtype,
+-			    range->start, range->end, st->st_size)) < 0)
++			    (long long)range->start, (long long)range->end,
++			    (long long)st->st_size)) < 0)
+ 				goto abort;
+ 
+ 			/* Add data length */
+@@ -356,7 +357,7 @@
+ 
+ 		}
+ 		if ((ret = snprintf(NULL, 0, "\r\n--%llu--\r\n",
+-		    clt->clt_boundary)) < 0)
++		    (unsigned long long)clt->clt_boundary)) < 0)
+ 			goto abort;
+ 		content_length += ret;
+ 
+@@ -365,7 +366,7 @@
+ 		    sizeof(multipart_media.media_type));
+ 		(void)snprintf(multipart_media.media_subtype,
+ 		    sizeof(multipart_media.media_subtype),
+-		    "byteranges; boundary=%llu", clt->clt_boundary);
++		    "byteranges; boundary=%llu", (unsigned long long)clt->clt_boundary);
+ 		media = &multipart_media;
+ 	}
+ 
+@@ -526,7 +527,7 @@
+ 			    strchr(escapeduri, ':') != NULL ? "./" : "",
+ 			    escapeduri, escapedhtml,
+ 			    MAXIMUM(namewidth, 0), " ",
+-			    tmstr, st->st_size) == -1)
++			    tmstr, (unsigned long long)st->st_size) == -1)
+ 				skip = 1;
+ 		}
+ 		free(escapeduri);
+@@ -660,10 +661,12 @@
+ 		 * Return "Not modified" if the file hasn't changed since
+ 		 * the requested time.
+ 		 */
++#if !defined(__sortix__) || defined(__SORTIX_HAS_STRPTIME__)
+ 		if (strptime(since->kv_value,
+ 		    "%a, %d %h %Y %T %Z", &tm) != NULL &&
+ 		    timegm(&tm) >= st->st_mtim.tv_sec)
+ 			return (304);
++#endif
+ 	}
+ 
+ 	return (-1);
+diff -Paur --no-dereference -- httpd.upstream/server_http.c httpd/server_http.c
+--- httpd.upstream/server_http.c
++++ httpd/server_http.c
+@@ -32,7 +32,9 @@
+ #include <fnmatch.h>
+ #include <stdio.h>
+ #include <time.h>
++#if __has_include(<resolv.h>)
+ #include <resolv.h>
++#endif
+ #include <event.h>
+ #include <ctype.h>
+ #include <vis.h>
+@@ -139,9 +141,12 @@
+ 	if (strncmp(ba->kv_value, "Basic ", strlen("Basic ")) != 0)
+ 		goto done;
+ 
++/* TODO: Where is b64_pton supposed to come from? */
++#if !defined(__sortix__)
+ 	if (b64_pton(strchr(ba->kv_value, ' ') + 1, (uint8_t *)decoded,
+ 	    sizeof(decoded)) <= 0)
+ 		goto done;
++#endif
+ 
+ 	if ((clt_pass = strchr(decoded, ':')) == NULL)
+ 		goto done;
+@@ -669,7 +674,7 @@
+ 				/* Add end marker */
+ 				if (server_bufferevent_printf(clt,
+ 				    "\r\n--%llu--\r\n",
+-				    clt->clt_boundary) == -1)
++				    (unsigned long long)clt->clt_boundary) == -1)
+ 					goto fail;
+ 			}
+ 			r->range_toread = TOREAD_HTTP_NONE;
+@@ -684,9 +689,10 @@
+ 			    "\r\n--%llu\r\n"
+ 			    "Content-Type: %s/%s\r\n"
+ 			    "Content-Range: bytes %lld-%lld/%zu\r\n\r\n",
+-			    clt->clt_boundary,
++			    (unsigned long long)clt->clt_boundary,
+ 			    media->media_type, media->media_subtype,
+-			    range->start, range->end, r->range_total) == -1)
++			    (long long)range->start, (long long)range->end,
++			    r->range_total) == -1)
+ 				goto fail;
+ 		}
+ 		r->range_toread = range->end - range->start + 1;
+@@ -756,12 +762,13 @@
+ }
+ 
+ const char *
+-server_http_host(struct sockaddr_storage *ss, char *buf, size_t len)
++server_http_host(struct sockaddr_storage *ss, size_t sslen, char *buf,
++    size_t len)
+ {
+ 	char		hbuf[HOST_NAME_MAX+1];
+ 	in_port_t	port;
+ 
+-	if (print_host(ss, buf, len) == NULL)
++	if (print_host(ss, sslen, buf, len) == NULL)
+ 		return (NULL);
+ 
+ 	port = ntohs(server_socket_getport(ss));
+@@ -864,7 +871,7 @@
+ 		goto done;
+ 
+ 	/* Some system information */
+-	if (print_host(&srv_conf->ss, hbuf, sizeof(hbuf)) == NULL)
++	if (print_host(&srv_conf->ss, srv_conf->sslen, hbuf, sizeof(hbuf)) == NULL)
+ 		goto done;
+ 
+ 	if (server_http_time(time(NULL), tmbuf, sizeof(tmbuf)) <= 0)
+@@ -1078,7 +1085,7 @@
+ 	}
+ 	if (strstr(val, "$REMOTE_") != NULL) {
+ 		if (strstr(val, "$REMOTE_ADDR") != NULL) {
+-			if (print_host(&clt->clt_ss,
++			if (print_host(&clt->clt_ss, clt->clt_sslen,
+ 			    ibuf, sizeof(ibuf)) == NULL)
+ 				return (NULL);
+ 			if (expand_string(buf, len,
+@@ -1130,7 +1137,7 @@
+ 	}
+ 	if (strstr(val, "$SERVER_") != NULL) {
+ 		if (strstr(val, "$SERVER_ADDR") != NULL) {
+-			if (print_host(&srv_conf->ss,
++			if (print_host(&srv_conf->ss, srv_conf->sslen,
+ 			    ibuf, sizeof(ibuf)) == NULL)
+ 				return (NULL);
+ 			if (expand_string(buf, len,
+@@ -1258,7 +1265,7 @@
+ 
+ 	if (srv_conf != NULL) {
+ 		/* Use the actual server IP address */
+-		if (server_http_host(&clt->clt_srv_ss, hostname,
++		if (server_http_host(&clt->clt_srv_ss, clt->clt_srv_sslen, hostname,
+ 		    sizeof(hostname)) == NULL)
+ 			goto fail;
+ 	} else {
+@@ -1603,7 +1610,7 @@
+ 	if (strftime(tstamp, sizeof(tstamp), "%d/%b/%Y:%H:%M:%S %z", tm) == 0)
+ 		return (-1);
+ 
+-	if (print_host(&clt->clt_ss, ip, sizeof(ip)) == NULL)
++	if (print_host(&clt->clt_ss, clt->clt_sslen, ip, sizeof(ip)) == NULL)
+ 		return (-1);
+ 
+ 	/*

@@ -186,6 +186,9 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/var/empty" -m 555
 	mkdir -p "$(SYSROOT)/var/log"
 	mkdir -p "$(SYSROOT)/var/run"
+	mkdir -p "$(SYSROOT)/var/www"
+	mkdir -p "$(SYSROOT)/var/www/logs"
+	mkdir -p "$(SYSROOT)/var/www/htdocs"
 	ln -sfT . "$(SYSROOT)/usr"
 
 .PHONY: sysroot-base-headers
@@ -220,6 +223,9 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /var/empty >> "$(SYSROOT)/tix/manifest/system"
 	echo /var/log >> "$(SYSROOT)/tix/manifest/system"
 	echo /var/run >> "$(SYSROOT)/tix/manifest/system"
+	echo /var/www >> "$(SYSROOT)/tix/manifest/system"
+	echo /var/www/logs >> "$(SYSROOT)/tix/manifest/system"
+	echo /var/www/htdocs >> "$(SYSROOT)/tix/manifest/system"
 	echo "$(HOST_MACHINE)" > "$(SYSROOT)/etc/machine"
 	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
 	(echo 'NAME="Sortix"' && \
@@ -448,7 +454,9 @@ $(LIVE_INITRD): sysroot
 	mkdir -p $(LIVE_INITRD).d/etc/init
 	echo require single-user exit-code > $(LIVE_INITRD).d/etc/init/default
 	echo "root::0:0:root:/root:sh" > $(LIVE_INITRD).d/etc/passwd
+	echo "www::1:1:www:/var/www:sh" >> $(LIVE_INITRD).d/etc/passwd
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
+	echo "www::1:www" >> $(LIVE_INITRD).d/etc/group
 	mkdir -p $(LIVE_INITRD).d/home
 	mkdir -p $(LIVE_INITRD).d/root -m 700
 	cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root
