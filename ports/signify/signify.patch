@@ -1,0 +1,15 @@
+diff -Paur --no-dereference -- signify.upstream/Makefile signify/Makefile
+--- signify.upstream/Makefile
++++ signify/Makefile
+@@ -1,7 +1,7 @@
+-include ../../build-aux/platform.mak
+-include ../../build-aux/compiler.mak
+-include ../../build-aux/version.mak
+-include ../../build-aux/dirs.mak
++include ../../../build-aux/platform.mak
++include ../../../build-aux/compiler.mak
++include ../../../build-aux/version.mak
++include ../../../build-aux/dirs.mak
+ 
+ OPTLEVEL?=$(DEFAULT_OPTLEVEL)
+ CFLAGS?=$(OPTLEVEL)
