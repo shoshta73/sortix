@@ -17,7 +17,8 @@ The release modification procedure lets you customize aspects such as the
 default bootloader menu option and timeout, the default hostname, the default
 keyboard layout, the default graphics resolution, adding files of your choice to
 the live environment, control which drivers are loaded by default, control which
-live environment daemons are started by default, and so on.
+live environment daemons are started by default, deploy ssh keys so secure shell
+connections are trusted on the first connection, and so on.
 .Ss Prerequisites
 .Bl -bullet -compact
 .It
@@ -410,6 +411,105 @@ wants to manually configure network interfaces with
 tix-iso-bootconfig --disable-dhclient bootconfig
 tix-iso-add sortix.iso bootconfig
 .Ed
+.Ss Enable SSH Server By Default
+To customize a release so it starts the SSH server
+.Xr sshd 8
+automatically using the SSH configuration found in the liveconfig directory:
+.Bd -literal
+tix-iso-bootconfig --liveconfig=liveconfig --enable-sshd bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss SSH Into Live Environment
+To customize the live environment of a release so you can ssh into its root
+user, to have the the hostname
+.Sy example.com ,
+to start a ssh server with the keys generated now, authorize the local user to
+ssh into the live environment's root user, and register the sshd server's keys
+by their hostnames and network addresses so the connection is trusted on the
+first attempt (you can omit the network addresses if you don't know yet):
+.Bd -literal
+tix-iso-liveconfig \\
+  --hostname=example.com \\
+  --root-ssh-authorized-keys="$HOME/.ssh/id_rsa.pub" \\
+  --sshd-keygen \\
+  --sshd-key-known-hosts-file="$HOME/.ssh/known_hosts" \\
+  --sshd-key-known-hosts-hosts="example.com example.com,192.0.2.1 192.0.2.1" \\
+  liveconfig
+tix-iso-bootconfig --liveconfig=liveconfig --enable-sshd bootconfig
+tix-iso-add sortix.iso bootconfig
+rm -f liveconfig/etc/ssh_host_*_key # When no longer useful.
+rm -f bootconfig/boot/liveconfig.xz # When no longer useful.
+rm -f sortix.iso # When no longer useful.
+# And erase any media made from sortix.iso when no longer useful.
+ssh root@example.org # When the system is running.
+.Ed
+This example generates sshd private keys (remember to delete them when no longer
+needed, see the warnings in
+.Xr tix-iso-liveconfig 8 )
+and shows them by running:
+.Bd -literal
+mkdir -p liveconfig/etc
+for keytype in rsa dsa ecdsa ed25519; do
+  ssh-keygen -t $keytype -f liveconfig/etc/ssh_host_${keytype}_key" -N "" \\
+             -C "root@$hostname"
+done
+for keytype in rsa dsa ecdsa ed25519; do
+  ssh-keygen -l -f liveconfig/etc/ssh_host_${keytype}_key
+done
+.Ed
+It then constructs a
+.Pa known_hosts
+file for each network address and hashes it.
+.Bd -literal
+(for host in $network_addresses; do
+  for keytype in rsa dsa ecdsa ed25519; do
+    printf '%s ' "$host" &&
+    sed -E 's/^([^ ]* [^ ]*).*/\1/' \\
+      liveconfig/etc/ssh_host_${keytype}_key.pub
+  done
+done) > known_hosts
+ssh-keygen -H -f known_hosts
+rm -f known_hosts.old
+.Ed
+.Xr ssh 1
+will trust the server by the network addresses on the first connection if you
+append the contents of
+.Pa known_hosts
+to your
+.Pa ~/.ssh/known_hosts .
+.Pa liveconfig/root/.ssh/authorized_keys
+file is made by appending the appropriate public keys previously made with
+.Xr ssh-keygen 1 .
+.Ss SSH Back From Live Environment
+To customize the live environment of a release so its root user can ssh back to
+your user, where the local hostname is
+.Sy example.com
+(the address to which the new installation will be connecting), by
+generating a private key for the root user
+(remember to delete it when no longer
+needed, see the warnings in
+.Xr tix-iso-liveconfig 8 )
+and adding its public key to your local
+.Pa ~/.ssh/authorized_keys :
+.Bd -literal
+tix-iso-liveconfig --root-ssh-keygen liveconfig
+ssh-keyscan -H example.com > liveconfig/root/.ssh/known_hosts
+cat liveconfig/root/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
+tix-iso-bootconfig --liveconfig=liveconfig --enable-sshd bootconfig
+tix-iso-add sortix.iso bootconfig
+rm -f output-directory/root/.ssh/id_rsa # When no longer useful.
+rm -f bootconfig/boot/liveconfig.xz # When no longer useful.
+rm -f sortix.iso # When no longer useful.
+# And erase any media made from sortix.iso when no longer useful.
+.Ed
+This example will generate a ssh key for the root user by running:
+.Bd -literal
+mkdir -p -m 700 liveconfig/root/.ssh
+ssh-keygen -t rsa -f liveconfig/root/.ssh/id_rsa -N "" -C "root@$hostname"
+.Ed
+Consider omitting the
+.Fl N
+option and password protect the private key to protect it in the case of a leak.
 .Sh SEE ALSO
 .Xr xorriso 1 ,
 .Xr development 7 ,

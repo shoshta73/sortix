@@ -12,10 +12,12 @@
 .Op Fl \-disable-dhclient
 .Op Fl \-disable-network-drivers
 .Op Fl \-disable-src
+.Op Fl \-disable-sshd
 .Op Fl \-enable-append-title
 .Op Fl \-enable-dhclient
 .Op Fl \-enable-network-drivers
 .Op Fl \-enable-src
+.Op Fl \-enable-sshd
 .Op Fl \-liveconfig Ns = Ns Ar liveconfig-directory
 .Op Fl \-random-seed
 .Op Fl \-timeout Ns = Ns Ar boot-menu-timeout
@@ -115,6 +117,14 @@ by setting
 .Sy enable_src
 GRUB variable to
 .Sy false .
+.It Fl \-disable-sshd
+Disable automatically starting the ssh server by setting the
+.Sy enable_sshd
+GRUB variable to
+.Sy false ,
+selecting the the default behavior of not starting the
+.Xr sshd 8
+daemon.
 .It Fl \-enable-append-title
 Enable appending " - " followed by the value set with
 .Fl \-append-title
@@ -146,6 +156,14 @@ by setting
 .Sy enable_src
 GRUB variable to
 .Sy true .
+.It Fl \-enable-sshd
+Enable automatically starting the ssh server by setting the
+.Sy enable_sshd
+GRUB variable to
+.Sy true ,
+causing the bootloader to load additional configuration that turns on the
+.Xr sshd 8
+daemon on boot.
 .It Fl \-liveconfig Ns = Ns Ar liveconfig-directory
 Overlay the
 .Ar liveconfig-directory
@@ -280,6 +298,14 @@ wants to manually configure network interfaces with
 .Xr ifconfig 8 .
 .Bd -literal
 tix-iso-bootconfig --disable-dhclient bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Enable SSH Server By Default
+To customize a release so it starts the SSH server
+.Xr sshd 8
+automatically using the SSH configuration found in the liveconfig directory:
+.Bd -literal
+tix-iso-bootconfig --liveconfig=liveconfig --enable-sshd bootconfig
 tix-iso-add sortix.iso bootconfig
 .Ed
 .Sh SEE ALSO

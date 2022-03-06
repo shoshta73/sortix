@@ -1,0 +1,1763 @@
+diff -Paur --no-dereference -- ssh.upstream/auth.c ssh/auth.c
+--- ssh.upstream/auth.c
++++ ssh/auth.c
+@@ -100,7 +100,9 @@
+ int
+ allowed_user(struct ssh *ssh, struct passwd * pw)
+ {
++#if !defined(__sortix__)
+ 	struct stat st;
++#endif
+ 	const char *hostname = NULL, *ipaddr = NULL;
+ 	u_int i;
+ 	int r;
+@@ -121,6 +123,8 @@
+ 	 */
+ 	if (options.chroot_directory == NULL ||
+ 	    strcasecmp(options.chroot_directory, "none") == 0) {
++/* TODO: Search PATH for the shell instead. */
++#if !defined(__sortix__)
+ 		char *shell = xstrdup((pw->pw_shell[0] == '\0') ?
+ 		    _PATH_BSHELL : pw->pw_shell); /* empty = /bin/sh */
+ 
+@@ -138,6 +142,7 @@
+ 			return 0;
+ 		}
+ 		free(shell);
++#endif
+ 	}
+ 
+ 	if (options.num_deny_users > 0 || options.num_allow_users > 0 ||
+diff -Paur --no-dereference -- ssh.upstream/auth-passwd.c ssh/auth-passwd.c
+--- ssh.upstream/auth-passwd.c
++++ ssh/auth-passwd.c
+@@ -44,6 +44,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdarg.h>
++#include <unistd.h>
+ 
+ #include "packet.h"
+ #include "sshbuf.h"
+@@ -187,6 +188,21 @@
+ 		return (auth_close(as));
+ 	}
+ }
++#elif defined(__sortix__)
++/* PATCH: Sortix authentication support. */
++int
++sys_auth_passwd(struct ssh *ssh, const char *password)
++{
++	Authctxt *authctxt = ssh->authctxt;
++	struct passwd *pw = authctxt->pw;
++
++	/* Just use the supplied fake password if authctxt is invalid */
++	/* TODO: Use the default number of rounds according to login.conf once
++	         this is implemented. */
++	char *pw_password = authctxt->valid ? pw->pw_passwd : NULL;
++
++	return crypt_checkpass(password, pw_password) == 0;
++}
+ #elif !defined(CUSTOM_SYS_AUTH_PASSWD)
+ int
+ sys_auth_passwd(struct ssh *ssh, const char *password)
+diff -Paur --no-dereference -- ssh.upstream/channels.c ssh/channels.c
+--- ssh.upstream/channels.c
++++ ssh/channels.c
+@@ -1268,7 +1268,6 @@
+ channel_decode_socks4(Channel *c, struct sshbuf *input, struct sshbuf *output)
+ {
+ 	const u_char *p;
+-	char *host;
+ 	u_int len, have, i, found, need;
+ 	char username[256];
+ 	struct {
+@@ -1332,7 +1331,9 @@
+ 	free(c->path);
+ 	c->path = NULL;
+ 	if (need == 1) {			/* SOCKS4: one string */
+-		host = inet_ntoa(s4_req.dest_addr);
++		/* PATCH: Prefer the better designed inet_ntop over inet_ntoa. */
++		char host[INET_ADDRSTRLEN + 1];
++		inet_ntop(AF_INET, &s4_req.dest_addr, host, sizeof(host));
+ 		c->path = xstrdup(host);
+ 	} else {				/* SOCKS4A: two strings */
+ 		have = sshbuf_len(input);
+@@ -2323,8 +2324,8 @@
+ 		return;
+ 	}
+ 	if ((euid != 0) && (getuid() != euid)) {
+-		error("multiplex uid mismatch: peer euid %u != uid %u",
+-		    (u_int)euid, (u_int)getuid());
++		error("multiplex uid mismatch: peer euid %ju != uid %ju",
++		    (uintmax_t)euid, (uintmax_t)getuid());
+ 		close(newsock);
+ 		return;
+ 	}
+diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
+--- ssh.upstream/configure
++++ ssh/configure
+@@ -7705,6 +7705,7 @@
+ # the --with-solaris-privs option and --with-sandbox=solaris).
+ SOLARIS_PRIVS="no"
+ 
++default_user_path="/usr/bin:/bin:/usr/sbin:/sbin"
+ # Check for some target-specific stuff
+ case "$host" in
+ *-*-aix*)
+@@ -7718,6 +7719,9 @@
+ 	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
++/* PATCH: Fix implicit declaration of exit(3). */
++#include <stdlib.h>
++
+ #define testmacro foo
+ #define testmacro bar
+ int
+@@ -9458,6 +9462,10 @@
+ $as_echo "#define BROKEN_SETVBUF 1" >>confdefs.h
+ 
+ 	;;
++*-*-sortix*)
++    default_user_path="/bin:/sbin"
++	MANTYPE=doc
++	;;
+ esac
+ 
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking compiler and flags for sanity" >&5
+@@ -17364,7 +17372,12 @@
+ 	long long num = 0x7fffffffffffffffll;
+ #endif
+ 	strcpy(expected_out, "9223372036854775807");
+-	snprintf(buf, mazsize, "%lld", num);
++/* PATCH: Fix format type issue. */
++#if (SIZEOF_LONG_INT == 8)
++	snprintf(buf, mazsize, "%ld", num);
++#else
++ 	snprintf(buf, mazsize, "%lld", num);
++#endif
+ 	if(strcmp(buf, expected_out) != 0)
+ 		exit(1);
+ 	exit(0);
+@@ -20285,7 +20298,8 @@
+ 	elif ${NROFF} -man ${srcdir}/ssh.1 >/dev/null 2>&1; then
+ 		MANTYPE=man
+ 	else
+-		MANTYPE=cat
++		# PATCH: Sortix uses mandoc (mdocml) even when cross-compiling.
++		MANTYPE=doc
+ 	fi
+ fi
+ 
+@@ -20466,7 +20480,7 @@
+ otherwise scp will not work." >&2;}
+ 		fi
+ 		if test "$cross_compiling" = yes; then :
+-   user_path="/usr/bin:/bin:/usr/sbin:/sbin"
++   user_path="$default_user_path"
+ 
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -20482,7 +20496,7 @@
+ # ifdef _PATH_USERPATH	/* Irix */
+ #  define _PATH_STDPATH _PATH_USERPATH
+ # else
+-#  define _PATH_STDPATH "/usr/bin:/bin:/usr/sbin:/sbin"
++#  define _PATH_STDPATH "$default_user_path"
+ # endif
+ #endif
+ #include <sys/types.h>
+@@ -20513,7 +20527,7 @@
+ if ac_fn_c_try_run "$LINENO"; then :
+    user_path=`cat conftest.stdpath`
+ else
+-   user_path="/usr/bin:/bin:/usr/sbin:/sbin"
++   user_path="$default_user_path"
+ fi
+ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+   conftest.$ac_objext conftest.beam conftest.$ac_ext
+diff -Paur --no-dereference -- ssh.upstream/defines.h ssh/defines.h
+--- ssh.upstream/defines.h
++++ ssh/defines.h
+@@ -56,7 +56,9 @@
+  * Definitions for IP type of service (ip_tos)
+  */
+ #include <netinet/in_systm.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ #ifndef IPTOS_LOWDELAY
+ # define IPTOS_LOWDELAY          0x10
+ # define IPTOS_THROUGHPUT        0x08
+@@ -121,10 +123,14 @@
+ # ifdef PATH_MAX
+ #  define MAXPATHLEN PATH_MAX
+ # else /* PATH_MAX */
+-#  define MAXPATHLEN 64
++#  define MAXPATHLEN 4096
+ # endif /* PATH_MAX */
+ #endif /* MAXPATHLEN */
+ 
++#ifndef PATH_MAX
++# define PATH_MAX 4096
++#endif
++
+ #ifndef HOST_NAME_MAX
+ # include "netdb.h" /* for MAXHOSTNAMELEN */
+ # if defined(_POSIX_HOST_NAME_MAX)
+@@ -216,7 +222,9 @@
+ /* (or die trying) */
+ 
+ #ifndef HAVE_U_INT
++typedef unsigned short u_short;
+ typedef unsigned int u_int;
++typedef unsigned long u_long;
+ #endif
+ 
+ #ifndef HAVE_INTXX_T
+diff -Paur --no-dereference -- ssh.upstream/dh.c ssh/dh.c
+--- ssh.upstream/dh.c
++++ ssh/dh.c
+@@ -54,7 +54,10 @@
+ 
+ static const char * get_moduli_filename(void)
+ {
+-	return moduli_filename ? moduli_filename : _PATH_DH_MODULI;
++	/* PATCH: Use /etc/default for the default configuration. */
++	return moduli_filename ? moduli_filename :
++	       !access(_PATH_DH_MODULI, F_OK) ? _PATH_DH_MODULI :
++	       _PATH_DH_MODULI_DEFAULT;
+ }
+ 
+ static int
+diff -Paur --no-dereference -- ssh.upstream/includes.h ssh/includes.h
+--- ssh.upstream/includes.h
++++ ssh/includes.h
+@@ -109,7 +109,9 @@
+ #endif
+ 
+ #include <netinet/in.h>
++#if __has_include(<netinet/in_systm.h>)
+ #include <netinet/in_systm.h> /* For typedefs */
++#endif
+ #ifdef HAVE_RPC_TYPES_H
+ # include <rpc/types.h> /* For INADDR_LOOPBACK */
+ #endif
+@@ -152,6 +154,9 @@
+ #endif
+ 
+ #include <errno.h>
++#ifndef EPFNOSUPPORT
++#define EPFNOSUPPORT EAFNOSUPPORT
++#endif
+ 
+ /*
+  * On HP-UX 11.11, shadow.h and prot.h provide conflicting declarations
+diff -Paur --no-dereference -- ssh.upstream/init/sshd ssh/init/sshd
+--- ssh.upstream/init/sshd
++++ ssh/init/sshd
+@@ -0,0 +1,6 @@
++require network
++require sshd-keygen
++# sshd requires an absolute path.
++#program=/sbin/sshd
++#exec $program -D
++exec /sbin/sshd -De
+diff -Paur --no-dereference -- ssh.upstream/init/sshd-keygen ssh/init/sshd-keygen
+--- ssh.upstream/init/sshd-keygen
++++ ssh/init/sshd-keygen
+@@ -0,0 +1,3 @@
++#program=ssh-keygen
++#exec $program -A
++exec ssh-keygen -A
+diff -Paur --no-dereference -- ssh.upstream/kex.h ssh/kex.h
+--- ssh.upstream/kex.h
++++ ssh/kex.h
+@@ -85,6 +85,9 @@
+ 	PROPOSAL_MAX
+ };
+ 
++#ifdef MODE_MAX
++#undef MODE_MAX /* Collides with Sortix constant. */
++#endif
+ enum kex_modes {
+ 	MODE_IN,
+ 	MODE_OUT,
+diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
+--- ssh.upstream/loginrec.c
++++ ssh/loginrec.c
+@@ -147,6 +147,7 @@
+ 
+ #include "includes.h"
+ 
++#include <sys/time.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/socket.h>
+@@ -187,6 +188,20 @@
+ # include <util.h>
+ #endif
+ 
++#if defined(__sortix__) && !__has_include(<utmpx.h>)
++struct utmpx
++{
++	short ut_type;
++	pid_t ut_pid;
++	char ut_line[32];
++	char ut_id[4];
++	char ut_user[32];
++	struct timeval ut_tv;
++};
++#define USER_PROCESS    7
++#define DEAD_PROCESS    8
++#endif
++
+ /**
+  ** prototypes for helper functions in this file
+  **/
+@@ -439,6 +454,10 @@
+ int
+ login_write(struct logininfo *li)
+ {
++/* TODO: Sortix doesn't have anything like utmp yet. */
++#if defined(__sortix__) && !__has_include(<utmpx.h>)
++	return 0;
++#endif
+ #ifndef HAVE_CYGWIN
+ 	if (geteuid() != 0) {
+ 		logit("Attempt to write login records by non-root user (aborting)");
+@@ -1033,7 +1052,7 @@
+ 		return (0);
+ 	}
+ # else
+-	if (!utmpx_write_direct(li, &ut)) {
++	if (!utmpx_write_direct(li, &utx)) {
+ 		logit("%s: utmp_write_direct() failed", __func__);
+ 		return (0);
+ 	}
+diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
+--- ssh.upstream/Makefile.in
++++ ssh/Makefile.in
+@@ -18,7 +18,7 @@
+ abs_top_srcdir=@abs_top_srcdir@
+ abs_top_builddir=@abs_top_builddir@
+ 
+-DESTDIR=
++DESTDIR?=
+ VPATH=@srcdir@
+ SSH_PROGRAM=@bindir@/ssh
+ ASKPASS_PROGRAM=$(libexecdir)/ssh-askpass
+@@ -28,11 +28,12 @@
+ SSH_SK_HELPER=$(libexecdir)/ssh-sk-helper
+ PRIVSEP_PATH=@PRIVSEP_PATH@
+ SSH_PRIVSEP_USER=@SSH_PRIVSEP_USER@
+-STRIP_OPT=@STRIP_OPT@
++STRIP_OPT=
+ TEST_SHELL=@TEST_SHELL@
+ BUILDDIR=@abs_top_builddir@
+ 
+ PATHS= -DSSHDIR=\"$(sysconfdir)\" \
++	-DSSHDIRDEFAULT=\"$(sysconfdir)/default\" \
+ 	-D_PATH_SSH_PROGRAM=\"$(SSH_PROGRAM)\" \
+ 	-D_PATH_SSH_ASKPASS_DEFAULT=\"$(ASKPASS_PROGRAM)\" \
+ 	-D_PATH_SFTP_SERVER=\"$(SFTP_SERVER)\" \
+@@ -208,44 +209,44 @@
+ 	$(RANLIB) $@
+ 
+ ssh$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHOBJS)
+-	$(LD) -o $@ $(SSHOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(GSSLIBS)
++	$(CC) -o $@ $(SSHOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(GSSLIBS)
+ 
+ sshd$(EXEEXT): libssh.a	$(LIBCOMPAT) $(SSHDOBJS)
+-	$(LD) -o $@ $(SSHDOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(SSHDLIBS) $(LIBS) $(GSSLIBS) $(K5LIBS)
++	$(CC) -o $@ $(SSHDOBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(SSHDLIBS) $(LIBS) $(GSSLIBS) $(K5LIBS)
+ 
+ scp$(EXEEXT): $(LIBCOMPAT) libssh.a $(SCP_OBJS)
+-	$(LD) -o $@ $(SCP_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
++	$(CC) -o $@ $(SCP_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ 
+ ssh-add$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHADD_OBJS)
+-	$(LD) -o $@ $(SSHADD_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
++	$(CC) -o $@ $(SSHADD_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ 
+ ssh-agent$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHAGENT_OBJS)
+-	$(LD) -o $@ $(SSHAGENT_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
++	$(CC) -o $@ $(SSHAGENT_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ 
+ ssh-keygen$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHKEYGEN_OBJS)
+-	$(LD) -o $@ $(SSHKEYGEN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
++	$(CC) -o $@ $(SSHKEYGEN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ 
+ ssh-keysign$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHKEYSIGN_OBJS)
+-	$(LD) -o $@ $(SSHKEYSIGN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
++	$(CC) -o $@ $(SSHKEYSIGN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS)
+ 
+ ssh-pkcs11-helper$(EXEEXT): $(LIBCOMPAT) libssh.a $(P11HELPER_OBJS)
+-	$(LD) -o $@ $(P11HELPER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
++	$(CC) -o $@ $(P11HELPER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+ ssh-sk-helper$(EXEEXT): $(LIBCOMPAT) libssh.a $(SKHELPER_OBJS)
+-	$(LD) -o $@ $(SKHELPER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS) $(LIBFIDO2)
++	$(CC) -o $@ $(SKHELPER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS) $(LIBFIDO2)
+ 
+ ssh-keyscan$(EXEEXT): $(LIBCOMPAT) libssh.a $(SSHKEYSCAN_OBJS)
+-	$(LD) -o $@ $(SSHKEYSCAN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh $(LIBS)
++	$(CC) -o $@ $(SSHKEYSCAN_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh $(LIBS)
+ 
+ sftp-server$(EXEEXT): $(LIBCOMPAT) libssh.a $(SFTPSERVER_OBJS)
+-	$(LD) -o $@ $(SFTPSERVER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh $(LIBS)
++	$(CC) -o $@ $(SFTPSERVER_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat -lssh $(LIBS)
+ 
+ sftp$(EXEEXT): $(LIBCOMPAT) libssh.a $(SFTP_OBJS)
+-	$(LD) -o $@ $(SFTP_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(LIBEDIT)
++	$(CC) -o $@ $(SFTP_OBJS) $(LDFLAGS) -lssh -lopenbsd-compat $(LIBS) $(LIBEDIT)
+ 
+ # test driver for the loginrec code - not built by default
+ logintest: logintest.o $(LIBCOMPAT) libssh.a loginrec.o
+-	$(LD) -o $@ logintest.o $(LDFLAGS) loginrec.o -lopenbsd-compat -lssh $(LIBS)
++	$(CC) -o $@ logintest.o $(LDFLAGS) loginrec.o -lopenbsd-compat -lssh $(LIBS)
+ 
+ $(MANPAGES): $(MANPAGES_IN)
+ 	if test "$(MANTYPE)" = "cat"; then \
+@@ -381,7 +382,8 @@
+ 	$(AUTORECONF)
+ 	-rm -rf autom4te.cache .depend.bak
+ 
+-install: $(CONFIGFILES) $(MANPAGES) $(TARGETS) install-files install-sysconf host-key check-config
++# PATCH: Depending on check-config isn't safe for cross-compilation.
++install: $(CONFIGFILES) $(MANPAGES) $(TARGETS) install-files install-sysconf host-key
+ install-nokeys: $(CONFIGFILES) $(MANPAGES) $(TARGETS) install-files install-sysconf
+ install-nosysconf: $(CONFIGFILES) $(MANPAGES) $(TARGETS) install-files
+ 
+@@ -395,6 +397,8 @@
+ 	$(MKDIR_P) $(DESTDIR)$(mandir)/$(mansubdir)5
+ 	$(MKDIR_P) $(DESTDIR)$(mandir)/$(mansubdir)8
+ 	$(MKDIR_P) $(DESTDIR)$(libexecdir)
++	$(MKDIR_P) $(DESTDIR)$(datadir)
++	$(MKDIR_P) $(DESTDIR)$(datadir)/init
+ 	$(MKDIR_P) -m 0755 $(DESTDIR)$(PRIVSEP_PATH)
+ 	$(INSTALL) -m 0755 $(STRIP_OPT) ssh$(EXEEXT) $(DESTDIR)$(bindir)/ssh$(EXEEXT)
+ 	$(INSTALL) -m 0755 $(STRIP_OPT) scp$(EXEEXT) $(DESTDIR)$(bindir)/scp$(EXEEXT)
+@@ -423,29 +427,16 @@
+ 	$(INSTALL) -m 644 ssh-keysign.8.out $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-keysign.8
+ 	$(INSTALL) -m 644 ssh-pkcs11-helper.8.out $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-pkcs11-helper.8
+ 	$(INSTALL) -m 644 ssh-sk-helper.8.out $(DESTDIR)$(mandir)/$(mansubdir)8/ssh-sk-helper.8
++	$(INSTALL) -m 644 init/sshd $(DESTDIR)$(datadir)/init/sshd
++	$(INSTALL) -m 644 init/sshd-keygen $(DESTDIR)$(datadir)/init/sshd-keygen
+ 
+ install-sysconf:
+ 	$(MKDIR_P) $(DESTDIR)$(sysconfdir)
+-	@if [ ! -f $(DESTDIR)$(sysconfdir)/ssh_config ]; then \
+-		$(INSTALL) -m 644 ssh_config.out $(DESTDIR)$(sysconfdir)/ssh_config; \
+-	else \
+-		echo "$(DESTDIR)$(sysconfdir)/ssh_config already exists, install will not overwrite"; \
+-	fi
+-	@if [ ! -f $(DESTDIR)$(sysconfdir)/sshd_config ]; then \
+-		$(INSTALL) -m 644 sshd_config.out $(DESTDIR)$(sysconfdir)/sshd_config; \
+-	else \
+-		echo "$(DESTDIR)$(sysconfdir)/sshd_config already exists, install will not overwrite"; \
+-	fi
+-	@if [ ! -f $(DESTDIR)$(sysconfdir)/moduli ]; then \
+-		if [ -f $(DESTDIR)$(sysconfdir)/primes ]; then \
+-			echo "moving $(DESTDIR)$(sysconfdir)/primes to $(DESTDIR)$(sysconfdir)/moduli"; \
+-			mv "$(DESTDIR)$(sysconfdir)/primes" "$(DESTDIR)$(sysconfdir)/moduli"; \
+-		else \
+-			$(INSTALL) -m 644 moduli.out $(DESTDIR)$(sysconfdir)/moduli; \
+-		fi ; \
+-	else \
+-		echo "$(DESTDIR)$(sysconfdir)/moduli already exists, install will not overwrite"; \
+-	fi
++	# PATCH: Use /etc/default for the default configuration.
++	$(MKDIR_P) $(DESTDIR)$(sysconfdir)/default
++	$(INSTALL) -m 644 ssh_config.out $(DESTDIR)$(sysconfdir)/default/ssh_config
++	$(INSTALL) -m 644 sshd_config.out $(DESTDIR)$(sysconfdir)/default/sshd_config
++	$(INSTALL) -m 644 moduli.out $(DESTDIR)$(sysconfdir)/default/moduli
+ 
+ host-key: ssh-keygen$(EXEEXT)
+ 	@if [ -z "$(DESTDIR)" ] ; then \
+@@ -461,8 +452,8 @@
+ 	fi
+ 
+ uninstallall:	uninstall
+-	-rm -f $(DESTDIR)$(sysconfdir)/ssh_config
+-	-rm -f $(DESTDIR)$(sysconfdir)/sshd_config
++	-rm -f $(DESTDIR)$(sysconfdir)/default/ssh_config
++	-rm -f $(DESTDIR)$(sysconfdir)/default/sshd_config
+ 	-rmdir $(DESTDIR)$(sysconfdir)
+ 	-rmdir $(DESTDIR)$(bindir)
+ 	-rmdir $(DESTDIR)$(sbindir)
+@@ -556,7 +547,7 @@
+ 
+ regress/unittests/sshbuf/test_sshbuf$(EXEEXT): ${UNITTESTS_TEST_SSHBUF_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHBUF_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHBUF_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -570,7 +561,7 @@
+ 
+ regress/unittests/sshkey/test_sshkey$(EXEEXT): ${UNITTESTS_TEST_SSHKEY_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHKEY_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHKEY_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -581,7 +572,7 @@
+ 
+ regress/unittests/sshsig/test_sshsig$(EXEEXT): ${UNITTESTS_TEST_SSHSIG_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHSIG_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_SSHSIG_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -590,7 +581,7 @@
+ 
+ regress/unittests/bitmap/test_bitmap$(EXEEXT): ${UNITTESTS_TEST_BITMAP_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_BITMAP_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_BITMAP_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -602,7 +593,7 @@
+ regress/unittests/authopt/test_authopt$(EXEEXT): \
+     ${UNITTESTS_TEST_AUTHOPT_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_AUTHOPT_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_AUTHOPT_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -612,7 +603,7 @@
+ regress/unittests/conversion/test_conversion$(EXEEXT): \
+     ${UNITTESTS_TEST_CONVERSION_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_CONVERSION_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_CONVERSION_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -623,7 +614,7 @@
+ 
+ regress/unittests/kex/test_kex$(EXEEXT): ${UNITTESTS_TEST_KEX_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_KEX_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_KEX_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -635,7 +626,7 @@
+ regress/unittests/hostkeys/test_hostkeys$(EXEEXT): \
+     ${UNITTESTS_TEST_HOSTKEYS_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_HOSTKEYS_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_HOSTKEYS_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -645,7 +636,7 @@
+ regress/unittests/match/test_match$(EXEEXT): \
+     ${UNITTESTS_TEST_MATCH_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_MATCH_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_MATCH_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -661,7 +652,7 @@
+ regress/unittests/misc/test_misc$(EXEEXT): \
+     ${UNITTESTS_TEST_MISC_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_MISC_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_MISC_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+@@ -671,7 +662,7 @@
+ regress/unittests/utf8/test_utf8$(EXEEXT): \
+     ${UNITTESTS_TEST_UTF8_OBJS} \
+     regress/unittests/test_helper/libtest_helper.a libssh.a
+-	$(LD) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_UTF8_OBJS) \
++	$(CC) -o $@ $(LDFLAGS) $(UNITTESTS_TEST_UTF8_OBJS) \
+ 	    regress/unittests/test_helper/libtest_helper.a \
+ 	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(LIBS)
+ 
+diff -Paur --no-dereference -- ssh.upstream/misc.c ssh/misc.c
+--- ssh.upstream/misc.c
++++ ssh/misc.c
+@@ -70,6 +70,33 @@
+ #include "ssherr.h"
+ #include "platform.h"
+ 
++#if defined(__sortix__) && !defined(timerclear)
++static inline void timerclear(struct timeval *tvp)
++{
++	tvp->tv_sec = 0;
++	tvp->tv_usec = 0;
++}
++#endif
++#if defined(__sortix__) && !defined(timerisset)
++static inline int timerisset(const struct timeval *tvp)
++{
++	return tvp->tv_sec || tvp->tv_usec;
++}
++#endif
++#if defined(__sortix__) && !defined(timercmp)
++#define timercmp(s,t,op) ((s)->tv_sec == (t)->tv_sec ? \
++	(s)->tv_usec op (t)->tv_usec : (s)->tv_sec op (t)->tv_sec)
++#endif
++
++#if defined(__sortix__) && !defined(__SORTIX_HAS_INITGROUPS__)
++static inline int initgroups(const char *user, gid_t group)
++{
++	(void)user;
++	(void)group;
++	return 0;
++}
++#endif
++
+ /* remove newline at end of string */
+ char *
+ chop(char *s)
+@@ -2729,17 +2756,17 @@
+ 
+ 		if (geteuid() == 0 &&
+ 		    initgroups(pw->pw_name, pw->pw_gid) == -1) {
+-			error("%s: initgroups(%s, %u): %s", tag,
+-			    pw->pw_name, (u_int)pw->pw_gid, strerror(errno));
++			error("%s: initgroups(%s, %ju): %s", tag,
++			    pw->pw_name, (uintmax_t)pw->pw_gid, strerror(errno));
+ 			_exit(1);
+ 		}
+ 		if (setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) == -1) {
+-			error("%s: setresgid %u: %s", tag, (u_int)pw->pw_gid,
++			error("%s: setresgid %ju: %s", tag, (uintmax_t)pw->pw_gid,
+ 			    strerror(errno));
+ 			_exit(1);
+ 		}
+ 		if (setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) == -1) {
+-			error("%s: setresuid %u: %s", tag, (u_int)pw->pw_uid,
++			error("%s: setresuid %ju: %s", tag, (uintmax_t)pw->pw_uid,
+ 			    strerror(errno));
+ 			_exit(1);
+ 		}
+diff -Paur --no-dereference -- ssh.upstream/monitor_fdpass.c ssh/monitor_fdpass.c
+--- ssh.upstream/monitor_fdpass.c
++++ ssh/monitor_fdpass.c
+@@ -67,11 +67,11 @@
+ 
+ 	memset(&msg, 0, sizeof(msg));
+ #ifdef HAVE_ACCRIGHTS_IN_MSGHDR
+-	msg.msg_accrights = (caddr_t)&fd;
++	msg.msg_accrights = (char *)&fd;
+ 	msg.msg_accrightslen = sizeof(fd);
+ #else
+ 	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
+-	msg.msg_control = (caddr_t)&cmsgbuf.buf;
++	msg.msg_control = (char *)&cmsgbuf.buf;
+ 	msg.msg_controllen = sizeof(cmsgbuf.buf);
+ 	cmsg = CMSG_FIRSTHDR(&msg);
+ 	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+@@ -132,7 +132,7 @@
+ 	msg.msg_iov = &vec;
+ 	msg.msg_iovlen = 1;
+ #ifdef HAVE_ACCRIGHTS_IN_MSGHDR
+-	msg.msg_accrights = (caddr_t)&fd;
++	msg.msg_accrights = (char *)&fd;
+ 	msg.msg_accrightslen = sizeof(fd);
+ #else
+ 	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
+diff -Paur --no-dereference -- ssh.upstream/mux.c ssh/mux.c
+--- ssh.upstream/mux.c
++++ ssh/mux.c
+@@ -496,7 +496,7 @@
+ 	/* prepare reply */
+ 	if ((r = sshbuf_put_u32(reply, MUX_S_ALIVE)) != 0 ||
+ 	    (r = sshbuf_put_u32(reply, rid)) != 0 ||
+-	    (r = sshbuf_put_u32(reply, (u_int)getpid())) != 0)
++	    (r = sshbuf_put_u32(reply, (uintmax_t)getpid())) != 0)
+ 		fatal_fr(r, "reply");
+ 
+ 	return 0;
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/bsd-misc.c ssh/openbsd-compat/bsd-misc.c
+--- ssh.upstream/openbsd-compat/bsd-misc.c
++++ ssh/openbsd-compat/bsd-misc.c
+@@ -109,12 +109,17 @@
+ #ifndef HAVE_UTIMES
+ int utimes(const char *filename, struct timeval *tvp)
+ {
+-	struct utimbuf ub;
+-
+-	ub.actime = tvp[0].tv_sec;
+-	ub.modtime = tvp[1].tv_sec;
+-
+-	return (utime(filename, &ub));
++	struct timespec times[2];
++ 
++	if (!tvp)
++		return (utimens(filename, NULL));
++ 
++	times[0].tv_sec = tvp[0].tv_sec;
++	times[0].tv_nsec = tvp[0].tv_usec * 1000L;
++	times[1].tv_sec = tvp[0].tv_sec;
++	times[1].tv_nsec = tvp[0].tv_usec * 1000L;
++	
++	return (utimens(filename, times));
+ }
+ #endif
+ 
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/bsd-misc.h ssh/openbsd-compat/bsd-misc.h
+--- ssh.upstream/openbsd-compat/bsd-misc.h
++++ ssh/openbsd-compat/bsd-misc.h
+@@ -23,7 +23,7 @@
+ int seed_from_prngd(unsigned char *, size_t);
+ 
+ #ifndef HAVE_SETSID
+-#define setsid() setpgrp(0, getpid())
++#define setsid() setpgid(0, getpid())
+ #endif /* !HAVE_SETSID */
+ 
+ #ifndef HAVE_SETENV
+@@ -190,7 +190,10 @@
+ struct tm *localtime_r(const time_t *, struct tm *);
+ #endif
+ 
+-#ifndef HAVE_REALPATH
++/* TODO: Quick hack to avoid rewriting all the realpath invocations */
++#if !defined(HAVE_REALPATH) || defined(__sortix__)
++#include <stdlib.h>
++char* sftp_realpath(const char *path, char *resolved);
+ #define realpath(x, y)	(sftp_realpath((x), (y)))
+ #endif
+ 
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/bsd-pselect.c ssh/openbsd-compat/bsd-pselect.c
+--- ssh.upstream/openbsd-compat/bsd-pselect.c
++++ ssh/openbsd-compat/bsd-pselect.c
+@@ -102,8 +102,8 @@
+ 		set_nonblock(notify_pipe[0]);
+ 		set_nonblock(notify_pipe[1]);
+ 		notify_pid = getpid();
+-		debug3_f("pid %d saved %d pipe0 %d pipe1 %d", getpid(),
+-		    notify_pid, notify_pipe[0], notify_pipe[1]);
++		debug3_f("pid %jd saved %jd pipe0 %d pipe1 %d", (intmax_t)getpid(),
++		    (intmax_t)notify_pid, notify_pipe[0], notify_pipe[1]);
+ 		initialized = 1;
+ 		return;
+ 	}
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/bsd-setres_id.c ssh/openbsd-compat/bsd-setres_id.c
+--- ssh.upstream/openbsd-compat/bsd-setres_id.c
++++ ssh/openbsd-compat/bsd-setres_id.c
+@@ -37,20 +37,20 @@
+ #if defined(HAVE_SETREGID) && !defined(BROKEN_SETREGID)
+ 	if (setregid(rgid, egid) < 0) {
+ 		saved_errno = errno;
+-		error("setregid %lu: %.100s", (u_long)rgid, strerror(errno));
++		error("setregid %ju: %.100s", (uintmax_t)rgid, strerror(errno));
+ 		errno = saved_errno;
+ 		ret = -1;
+ 	}
+ #else
+ 	if (setegid(egid) < 0) {
+ 		saved_errno = errno;
+-		error("setegid %lu: %.100s", (u_long)egid, strerror(errno));
++		error("setegid %ju: %.100s", (uintmax_t)egid, strerror(errno));
+ 		errno = saved_errno;
+ 		ret = -1;
+ 	}
+ 	if (setgid(rgid) < 0) {
+ 		saved_errno = errno;
+-		error("setgid %lu: %.100s", (u_long)rgid, strerror(errno));
++		error("setgid %ju: %.100s", (uintmax_t)rgid, strerror(errno));
+ 		errno = saved_errno;
+ 		ret = -1;
+ 	}
+@@ -72,7 +72,7 @@
+ #if defined(HAVE_SETREUID) && !defined(BROKEN_SETREUID)
+ 	if (setreuid(ruid, euid) < 0) {
+ 		saved_errno = errno;
+-		error("setreuid %lu: %.100s", (u_long)ruid, strerror(errno));
++		error("setreuid %ju: %.100s", (uintmax_t)ruid, strerror(errno));
+ 		errno = saved_errno;
+ 		ret = -1;
+ 	}
+@@ -81,14 +81,14 @@
+ # ifndef SETEUID_BREAKS_SETUID
+ 	if (seteuid(euid) < 0) {
+ 		saved_errno = errno;
+-		error("seteuid %lu: %.100s", (u_long)euid, strerror(errno));
++		error("seteuid %ju: %.100s", (uintmax_t)euid, strerror(errno));
+ 		errno = saved_errno;
+ 		ret = -1;
+ 	}
+ # endif
+ 	if (setuid(ruid) < 0) {
+ 		saved_errno = errno;
+-		error("setuid %lu: %.100s", (u_long)ruid, strerror(errno));
++		error("setuid %ju: %.100s", (uintmax_t)ruid, strerror(errno));
+ 		errno = saved_errno;
+ 		ret = -1;
+ 	}
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/getrrsetbyname.c ssh/openbsd-compat/getrrsetbyname.c
+--- ssh.upstream/openbsd-compat/getrrsetbyname.c
++++ ssh/openbsd-compat/getrrsetbyname.c
+@@ -57,6 +57,28 @@
+ 
+ #include "getrrsetbyname.h"
+ 
++#if !__has_include(<arpa/nameser.h>)
++
++int
++getrrsetbyname(const char *hostname, unsigned int rdclass,
++    unsigned int rdtype, unsigned int flags,
++    struct rrsetinfo **res)
++{
++	(void)hostname;
++	(void)rdclass;
++	(void)rdtype;
++	(void)flags;
++	return ERRSET_NONAME;
++}
++
++void
++freerrset(struct rrsetinfo *rrset)
++{
++	(void)rrset;
++}
++
++#else
++
+ #if defined(HAVE_DECL_H_ERRNO) && !HAVE_DECL_H_ERRNO
+ extern int h_errno;
+ #endif
+@@ -606,4 +628,6 @@
+ 	return (n);
+ }
+ 
++#endif
++
+ #endif /*  !defined (HAVE_GETRRSETBYNAME) && !defined (HAVE_LDNS) */
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/getrrsetbyname.h ssh/openbsd-compat/getrrsetbyname.h
+--- ssh.upstream/openbsd-compat/getrrsetbyname.h
++++ ssh/openbsd-compat/getrrsetbyname.h
+@@ -54,9 +54,13 @@
+ 
+ #include <sys/types.h>
+ #include <netinet/in.h>
++#if __has_include(<arpa/nameser.h>)
+ #include <arpa/nameser.h>
++#endif
+ #include <netdb.h>
++#if __has_include(<resolv.h>)
+ #include <resolv.h>
++#endif
+ 
+ #ifndef HFIXEDSZ
+ #define HFIXEDSZ 12
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/pwcache.c ssh/openbsd-compat/pwcache.c
+--- ssh.upstream/openbsd-compat/pwcache.c
++++ ssh/openbsd-compat/pwcache.c
+@@ -67,7 +67,7 @@
+ 		if ((pw = getpwuid(uid)) == NULL) {
+ 			if (nouser)
+ 				return (NULL);
+-			(void)snprintf(nbuf, sizeof(nbuf), "%lu", (u_long)uid);
++			(void)snprintf(nbuf, sizeof(nbuf), "%ju", (uintmax_t)uid);
+ 		}
+ 		cp->uid = uid;
+ 		if (cp->name != NULL)
+@@ -102,7 +102,7 @@
+ 		if ((gr = getgrgid(gid)) == NULL) {
+ 			if (nogroup)
+ 				return (NULL);
+-			(void)snprintf(nbuf, sizeof(nbuf), "%lu", (u_long)gid);
++			(void)snprintf(nbuf, sizeof(nbuf), "%ju", (uintmax_t)gid);
+ 		}
+ 		cp->gid = gid;
+ 		if (cp->name != NULL)
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/strptime.c ssh/openbsd-compat/strptime.c
+--- ssh.upstream/openbsd-compat/strptime.c
++++ ssh/openbsd-compat/strptime.c
+@@ -68,7 +68,9 @@
+ {
+ 	unsigned char c;
+ 	const unsigned char *bp;
++#if 0
+ 	size_t len;
++#endif
+ 	int alt_format, i;
+ 	static int century, relyear;
+ 
+diff -Paur --no-dereference -- ssh.upstream/pathnames.h ssh/pathnames.h
+--- ssh.upstream/pathnames.h
++++ ssh/pathnames.h
+@@ -13,9 +13,11 @@
+  */
+ 
+ #define ETCDIR				"/etc"
++#define ETCDIRDEFAULT			"/etc/default"
+ 
+ #ifndef SSHDIR
+ #define SSHDIR				ETCDIR "/ssh"
++#define SSHDIRDEFAULT			ETCDIRDEFAULT "/ssh"
+ #endif
+ 
+ #ifndef _PATH_SSH_PIDDIR
+@@ -35,13 +37,16 @@
+  * should be world-readable.
+  */
+ #define _PATH_SERVER_CONFIG_FILE	SSHDIR "/sshd_config"
++#define _PATH_SERVER_CONFIG_DEFAULT	SSHDIRDEFAULT "/sshd_config"
+ #define _PATH_HOST_CONFIG_FILE		SSHDIR "/ssh_config"
++#define _PATH_HOST_CONFIG_DEFAULT	SSHDIRDEFAULT "/ssh_config"
+ #define _PATH_HOST_DSA_KEY_FILE		SSHDIR "/ssh_host_dsa_key"
+ #define _PATH_HOST_ECDSA_KEY_FILE	SSHDIR "/ssh_host_ecdsa_key"
+ #define _PATH_HOST_ED25519_KEY_FILE	SSHDIR "/ssh_host_ed25519_key"
+ #define _PATH_HOST_XMSS_KEY_FILE	SSHDIR "/ssh_host_xmss_key"
+ #define _PATH_HOST_RSA_KEY_FILE		SSHDIR "/ssh_host_rsa_key"
+ #define _PATH_DH_MODULI			SSHDIR "/moduli"
++#define _PATH_DH_MODULI_DEFAULT		SSHDIRDEFAULT "/moduli"
+ 
+ #ifndef _PATH_SSH_PROGRAM
+ #define _PATH_SSH_PROGRAM		"/usr/bin/ssh"
+diff -Paur --no-dereference -- ssh.upstream/progressmeter.c ssh/progressmeter.c
+--- ssh.upstream/progressmeter.c
++++ ssh/progressmeter.c
+@@ -81,7 +81,8 @@
+ static int
+ can_output(void)
+ {
+-	return (getpgrp() == tcgetpgrp(STDOUT_FILENO));
++	/* PATCH: Prefer the agreed upon and standard getpgid over getpgrp.  */
++	return (getpgid(0) == tcgetpgrp(STDOUT_FILENO));
+ }
+ 
+ static void
+diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
+--- ssh.upstream/readconf.c
++++ ssh/readconf.c
+@@ -507,6 +507,10 @@
+ int
+ default_ssh_port(void)
+ {
++// TODO: Sortix doesn't have getservbyname or a replacement at this time.
++#if defined(__sortix__) && !defined(__SORTIX_HAS_GETSERVBYNAME__)
++	return SSH_DEFAULT_PORT;
++#else
+ 	static int port;
+ 	struct servent *sp;
+ 
+@@ -515,6 +519,7 @@
+ 		port = sp ? ntohs(sp->s_port) : SSH_DEFAULT_PORT;
+ 	}
+ 	return port;
++#endif
+ }
+ 
+ /*
+diff -Paur --no-dereference -- ssh.upstream/regress/netcat.c ssh/regress/netcat.c
+--- ssh.upstream/regress/netcat.c
++++ ssh/regress/netcat.c
+@@ -1020,11 +1020,11 @@
+ 
+ 	memset(&msg, 0, sizeof(msg));
+ #ifdef HAVE_ACCRIGHTS_IN_MSGHDR
+-	msg.msg_accrights = (caddr_t)&nfd;
++	msg.msg_accrights = (char *)&nfd;
+ 	msg.msg_accrightslen = sizeof(nfd);
+ #else
+ 	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
+-	msg.msg_control = (caddr_t)&cmsgbuf.buf;
++	msg.msg_control = (char *)&cmsgbuf.buf;
+ 	msg.msg_controllen = sizeof(cmsgbuf.buf);
+ 	cmsg = CMSG_FIRSTHDR(&msg);
+ 	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+diff -Paur --no-dereference -- ssh.upstream/scp.c ssh/scp.c
+--- ssh.upstream/scp.c
++++ ssh/scp.c
+@@ -598,7 +598,7 @@
+ 		mode = MODE_SCP;
+ 
+ 	if ((pwd = getpwuid(userid = getuid())) == NULL)
+-		fatal("unknown user %u", (u_int) userid);
++		fatal("unknown user %ju", (uintmax_t) userid);
+ 
+ 	if (!isatty(STDOUT_FILENO))
+ 		showprogress = 0;
+@@ -960,7 +960,7 @@
+ 
+ static struct sftp_conn *
+ do_sftp_connect(char *host, char *user, int port, char *sftp_direct,
+-   int *reminp, int *remoutp, int *pidp)
++   int *reminp, int *remoutp, pid_t *pidp)
+ {
+ 	if (sftp_direct == NULL) {
+ 		if (do_cmd(ssh_program, host, user, port, 1, "sftp",
+diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
+--- ssh.upstream/servconf.c
++++ ssh/servconf.c
+@@ -305,7 +305,10 @@
+ 	if (options->pid_file == NULL)
+ 		options->pid_file = xstrdup(_PATH_SSH_DAEMON_PID_FILE);
+ 	if (options->moduli_file == NULL)
+-		options->moduli_file = xstrdup(_PATH_DH_MODULI);
++		/* PATCH: Use /etc/default for the default configuration. */
++		options->moduli_file = xstrdup(!access(_PATH_DH_MODULI, F_OK) ?
++		                               _PATH_DH_MODULI :
++		                               _PATH_DH_MODULI_DEFAULT);
+ 	if (options->login_grace_time == -1)
+ 		options->login_grace_time = 120;
+ 	if (options->permit_root_login == PERMIT_NOT_SET)
+@@ -446,7 +449,12 @@
+ 
+ 	/* Turn privilege separation and sandboxing on by default */
+ 	if (use_privsep == -1)
++/* PATCH: Until Sortix MAP_SHARED works. */
++#if defined(__sortix__) && !defined(__SORTIX_HAS_WORKING_MAP_SHARED__)
++		use_privsep = PRIVSEP_OFF;
++#else
+ 		use_privsep = PRIVSEP_ON;
++#endif
+ 
+ #define CLEAR_ON_NONE(v) \
+ 	do { \
+diff -Paur --no-dereference -- ssh.upstream/session.c ssh/session.c
+--- ssh.upstream/session.c
++++ ssh/session.c
+@@ -104,6 +104,15 @@
+ #include <selinux/selinux.h>
+ #endif
+ 
++#if defined(__sortix__) && !defined(__SORTIX_HAS_INITGROUPS__)
++static inline int initgroups(const char *user, gid_t group)
++{
++	(void)user;
++	(void)group;
++	return 0;
++}
++#endif
++
+ #define IS_INTERNAL_SFTP(c) \
+ 	(!strncmp(c, INTERNAL_SFTP_NAME, sizeof(INTERNAL_SFTP_NAME) - 1) && \
+ 	 (c[sizeof(INTERNAL_SFTP_NAME) - 1] == '\0' || \
+@@ -1052,9 +1061,11 @@
+ #endif /* HAVE_LOGIN_CAP */
+ 
+ 	if (!options.use_pam) {
++#ifdef _PATH_MAILDIR
+ 		snprintf(buf, sizeof buf, "%.200s/%.50s",
+ 		    _PATH_MAILDIR, pw->pw_name);
+ 		child_set_env(&env, &envsize, "MAIL", buf);
++#endif
+ 	}
+ 
+ 	/* Normal systems set SHELL by default. */
+@@ -1434,7 +1445,7 @@
+ 	}
+ 
+ 	if (getuid() != pw->pw_uid || geteuid() != pw->pw_uid)
+-		fatal("Failed to set uids to %u.", (u_int) pw->pw_uid);
++		fatal("Failed to set uids to %ju.", (uintmax_t)pw->pw_uid);
+ }
+ 
+ static void
+@@ -1683,6 +1694,14 @@
+ 	if (!command) {
+ 		char argv0[256];
+ 
++/* PATCH: Sortix doesn't support the login shell distinction at this time. */
++#if defined(__sortix__)
++		if (strlcpy(argv0, shell0, sizeof(argv0)) >= sizeof(argv0)) {
++			errno = EINVAL;
++			perror(shell);
++			exit(1);
++		}
++#else
+ 		/* Start the shell.  Set initial character to '-'. */
+ 		argv0[0] = '-';
+ 
+@@ -1692,11 +1711,13 @@
+ 			perror(shell);
+ 			exit(1);
+ 		}
++#endif
+ 
+ 		/* Execute the shell. */
+ 		argv[0] = argv0;
+ 		argv[1] = NULL;
+-		execve(shell, argv, env);
++		/* PATCH: Sortix passwd(5) shell paths search the PATH.  */
++		execvpe(shell, argv, env);
+ 
+ 		/* Executing the shell failed. */
+ 		perror(shell);
+@@ -1710,7 +1731,7 @@
+ 	argv[1] = "-c";
+ 	argv[2] = (char *) command;
+ 	argv[3] = NULL;
+-	execve(shell, argv, env);
++	execvpe(shell, argv, env);
+ 	perror(shell);
+ 	exit(1);
+ }
+diff -Paur --no-dereference -- ssh.upstream/sftp-common.c ssh/sftp-common.c
+--- ssh.upstream/sftp-common.c
++++ ssh/sftp-common.c
+@@ -217,15 +217,15 @@
+ 	int ulen, glen, sz = 0;
+ 	struct tm *ltime = localtime(&st->st_mtime);
+ 	const char *user, *group;
+-	char buf[1024], lc[8], mode[11+1], tbuf[12+1], ubuf[11+1], gbuf[11+1];
++	char buf[1024], lc[8], mode[11+1], tbuf[12+1], ubuf[3*sizeof(uid_t)], gbuf[3*sizeof(gid_t)];
+ 	char sbuf[FMT_SCALED_STRSIZE];
+ 	time_t now;
+ 
+ 	strmode(st->st_mode, mode);
+ 	if (remote) {
+-		snprintf(ubuf, sizeof ubuf, "%u", (u_int)st->st_uid);
++		snprintf(ubuf, sizeof ubuf, "%ju", (uintmax_t)st->st_uid);
+ 		user = ubuf;
+-		snprintf(gbuf, sizeof gbuf, "%u", (u_int)st->st_gid);
++		snprintf(gbuf, sizeof gbuf, "%ju", (uintmax_t)st->st_gid);
+ 		group = gbuf;
+ 		strlcpy(lc, "?", sizeof(lc));
+ 	} else {
+diff -Paur --no-dereference -- ssh.upstream/sftp-server.c ssh/sftp-server.c
+--- ssh.upstream/sftp-server.c
++++ ssh/sftp-server.c
+@@ -1011,8 +1011,8 @@
+ 			status = errno_to_portable(errno);
+ 	}
+ 	if (a.flags & SSH2_FILEXFER_ATTR_UIDGID) {
+-		logit("set \"%s\" owner %lu group %lu", name,
+-		    (u_long)a.uid, (u_long)a.gid);
++		logit("set \"%s\" owner %ju group %ju", name,
++		    (uintmax_t)a.uid, (uintmax_t)a.gid);
+ 		r = chown(name, a.uid, a.gid);
+ 		if (r == -1)
+ 			status = errno_to_portable(errno);
+@@ -1072,8 +1072,8 @@
+ 				status = errno_to_portable(errno);
+ 		}
+ 		if (a.flags & SSH2_FILEXFER_ATTR_UIDGID) {
+-			logit("set \"%s\" owner %lu group %lu", name,
+-			    (u_long)a.uid, (u_long)a.gid);
++			logit("set \"%s\" owner %ju group %ju", name,
++			    (uintmax_t)a.uid, (uintmax_t)a.gid);
+ #ifdef HAVE_FCHOWN
+ 			r = fchown(fd, a.uid, a.gid);
+ #else
+@@ -1491,8 +1491,8 @@
+ 			status = errno_to_portable(errno);
+ 	}
+ 	if (a.flags & SSH2_FILEXFER_ATTR_UIDGID) {
+-		logit("set \"%s\" owner %lu group %lu", name,
+-		    (u_long)a.uid, (u_long)a.gid);
++		logit("set \"%s\" owner %ju group %ju", name,
++		    (uintmax_t)a.uid, (uintmax_t)a.gid);
+ 		r = fchownat(AT_FDCWD, name, a.uid, a.gid,
+ 		    AT_SYMLINK_NOFOLLOW);
+ 		if (r == -1)
+diff -Paur --no-dereference -- ssh.upstream/sftp-server-main.c ssh/sftp-server-main.c
+--- ssh.upstream/sftp-server-main.c
++++ ssh/sftp-server-main.c
+@@ -45,8 +45,8 @@
+ 	seed_rng();
+ 
+ 	if ((user_pw = getpwuid(getuid())) == NULL) {
+-		fprintf(stderr, "No user found for uid %lu\n",
+-		    (u_long)getuid());
++		fprintf(stderr, "No user found for uid %ju\n",
++		    (uintmax_t)getuid());
+ 		return 1;
+ 	}
+ 
+diff -Paur --no-dereference -- ssh.upstream/ssh-add.c ssh/ssh-add.c
+--- ssh.upstream/ssh-add.c
++++ ssh/ssh-add.c
+@@ -979,8 +979,8 @@
+ 		int count = 0;
+ 
+ 		if ((pw = getpwuid(getuid())) == NULL) {
+-			fprintf(stderr, "No user found with uid %u\n",
+-			    (u_int)getuid());
++			fprintf(stderr, "No user found with uid %ju\n",
++			    (uintmax_t)getuid());
+ 			ret = 1;
+ 			goto done;
+ 		}
+diff -Paur --no-dereference -- ssh.upstream/ssh-agent.c ssh/ssh-agent.c
+--- ssh.upstream/ssh-agent.c
++++ ssh/ssh-agent.c
+@@ -1758,8 +1758,8 @@
+ 		return -1;
+ 	}
+ 	if ((euid != 0) && (getuid() != euid)) {
+-		error("uid mismatch: peer euid %u != uid %u",
+-		    (u_int) euid, (u_int) getuid());
++		error("uid mismatch: peer euid %ju != uid %ju",
++		    (uintmax_t)euid, (uintmax_t)getuid());
+ 		close(fd);
+ 		return -1;
+ 	}
+diff -Paur --no-dereference -- ssh.upstream/ssh.c ssh/ssh.c
+--- ssh.upstream/ssh.c
++++ ssh/ssh.c
+@@ -549,6 +549,7 @@
+ {
+ 	char buf[PATH_MAX];
+ 	int r;
++	const char* host_config_file = _PATH_HOST_CONFIG_FILE;
+ 
+ 	if (config != NULL) {
+ 		if (strcasecmp(config, "none") != 0 &&
+@@ -565,8 +566,11 @@
+ 			    &options, SSHCONF_CHECKPERM | SSHCONF_USERCONF |
+ 			    (final_pass ? SSHCONF_FINAL : 0), want_final_pass);
+ 
++		/* PATCH: Use /etc/default for the default configuration. */
++		if (access(host_config_file, F_OK) < 0)
++			host_config_file = _PATH_HOST_CONFIG_DEFAULT;
+ 		/* Read systemwide configuration file after user config. */
+-		(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw,
++		(void)read_config_file(host_config_file, pw,
+ 		    host, host_name, &options,
+ 		    final_pass ? SSHCONF_FINAL : 0, want_final_pass);
+ 	}
+@@ -659,7 +663,7 @@
+ 	/* Get user data. */
+ 	pw = getpwuid(getuid());
+ 	if (!pw) {
+-		logit("No user exists for uid %lu", (u_long)getuid());
++		logit("No user exists for uid %ju", (uintmax_t)getuid());
+ 		exit(255);
+ 	}
+ 	/* Take a copy of the returned structure. */
+diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
+--- ssh.upstream/sshconnect.c
++++ ssh/sshconnect.c
+@@ -164,7 +164,8 @@
+ 		 * Execute the proxy command.
+ 		 * Note that we gave up any extra privileges above.
+ 		 */
+-		execv(argv[0], argv);
++		/* PATCH: Search the PATH for the shell.  */
++		execvp(argv[0], argv);
+ 		perror(argv[0]);
+ 		exit(1);
+ 	}
+@@ -248,7 +249,7 @@
+ 		 * extra privileges above.
+ 		 */
+ 		ssh_signal(SIGPIPE, SIG_DFL);
+-		execv(argv[0], argv);
++		execvp(argv[0], argv);
+ 		perror(argv[0]);
+ 		exit(1);
+ 	}
+@@ -306,7 +307,9 @@
+ 	for (allow_local = 0; allow_local < 2; allow_local++) {
+ 		for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
+ 			if (ifa->ifa_addr == NULL || ifa->ifa_name == NULL ||
++#ifdef IFF_UP
+ 			    (ifa->ifa_flags & IFF_UP) == 0 ||
++#endif
+ 			    ifa->ifa_addr->sa_family != af ||
+ 			    strcmp(ifa->ifa_name, options.bind_interface) != 0)
+ 				continue;
+@@ -1657,7 +1660,7 @@
+ 	if (pid == 0) {
+ 		ssh_signal(SIGPIPE, SIG_DFL);
+ 		debug3("Executing %s -c \"%s\"", shell, args);
+-		execl(shell, shell, "-c", args, (char *)NULL);
++		execlp(shell, shell, "-c", args, (char *)NULL);
+ 		error("Couldn't execute %s -c \"%s\": %s",
+ 		    shell, args, strerror(errno));
+ 		_exit(1);
+diff -Paur --no-dereference -- ssh.upstream/sshd.8 ssh/sshd.8
+--- ssh.upstream/sshd.8
++++ ssh/sshd.8
+@@ -63,8 +63,8 @@
+ .Pp
+ .Nm
+ listens for connections from clients.
+-It is normally started at boot from
+-.Pa /etc/rc .
++It is normally started at boot by
++.Xr init 8 .
+ It forks a new
+ daemon for each incoming connection.
+ The forked daemons handle
+@@ -81,7 +81,7 @@
+ rereads its configuration file when it receives a hangup signal,
+ .Dv SIGHUP ,
+ by executing itself with the name and options it was started with, e.g.\&
+-.Pa /usr/sbin/sshd .
++.Pa /sbin/sshd .
+ .Pp
+ The options are as follows:
+ .Bl -tag -width Ds
+diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
+--- ssh.upstream/sshd.c
++++ ssh/sshd.c
+@@ -129,6 +129,15 @@
+ #include "srclimit.h"
+ #include "dh.h"
+ 
++#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS__)
++static inline int setgroups(size_t size, const gid_t *list)
++{
++	(void)size;
++	(void)list;
++	return 0;
++}
++#endif
++
+ /* Re-exec fds */
+ #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
+ #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
+@@ -234,7 +243,11 @@
+ static int startup_pipe = -1;		/* in child */
+ 
+ /* variables used for privilege separation */
++#if defined(__sortix__) && !defined(__SORTIX_HAS_WORKING_PRIVSEP__)
++int use_privsep = 0; /* Needs shared memory and fd passing and security. */
++#else
+ int use_privsep = -1;
++#endif
+ struct monitor *pmonitor = NULL;
+ int privsep_is_preauth = 1;
+ static int privsep_chroot = 1;
+@@ -460,8 +473,8 @@
+ 			fatal("chdir(\"/\"): %s", strerror(errno));
+ 
+ 		/* Drop our privileges */
+-		debug3("privsep user:group %u:%u", (u_int)privsep_pw->pw_uid,
+-		    (u_int)privsep_pw->pw_gid);
++		debug3("privsep user:group %ju:%ju", (uintmax_t)privsep_pw->pw_uid,
++		    (uintmax_t)privsep_pw->pw_gid);
+ 		gidset[0] = privsep_pw->pw_gid;
+ 		if (setgroups(1, gidset) == -1)
+ 			fatal("setgroups: %.100s", strerror(errno));
+@@ -1581,6 +1594,10 @@
+ 	/* Initialize configuration options to their default values. */
+ 	initialize_server_options(&options);
+ 
++	/* PATCH: Use /etc/default for the default configuration. */
++	if (access(config_file_name, F_OK) < 0)
++		config_file_name = _PATH_SERVER_CONFIG_DEFAULT;
++
+ 	/* Parse command-line arguments. */
+ 	while ((opt = getopt(ac, av,
+ 	    "C:E:b:c:f:g:h:k:o:p:u:46DQRTdeiqrt")) != -1) {
+@@ -1694,10 +1711,32 @@
+ 		rexec_flag = 0;
+ 	if (!test_flag && rexec_flag && !path_absolute(av[0]))
+ 		fatal("sshd re-exec requires execution with an absolute path");
+-	if (rexeced_flag)
+-		closefrom(REEXEC_MIN_FREE_FD);
+-	else
+-		closefrom(REEXEC_DEVCRYPTO_RESERVED_FD);
++	/*
++	 * Close unexpected file descriptors, taking care to preserve the 
++	 * readiness file descriptor if any.
++	 */
++	if (getenv("READYFD")) {
++		int readyfd = atoi(getenv("READYFD"));
++		int lastfd = (rexeced_flag ?
++		              REEXEC_MIN_FREE_FD :
++		              REEXEC_DEVCRYPTO_RESERVED_FD);
++		if (readyfd != lastfd) {
++			char str[sizeof(int) * 3];
++			if (dup2(readyfd, lastfd) < 0)
++				fatal("dup2: %.200s", strerror(errno));
++			close(readyfd);
++			readyfd = lastfd;
++			snprintf(str, sizeof(str), "%i", readyfd);
++			if (setenv("READYFD", str, 1) < 0)
++				fatal("setenv: %.200s", strerror(errno));
++		}
++		closefrom(lastfd + 1);
++	} else {
++		if (rexeced_flag)
++			closefrom(REEXEC_MIN_FREE_FD);
++		else
++			closefrom(REEXEC_DEVCRYPTO_RESERVED_FD);
++	}
+ 
+ 	/* If requested, redirect the logs to the specified logfile. */
+ 	if (logfile != NULL)
+@@ -2064,7 +2103,8 @@
+ 		 * Write out the pid file after the sigterm handler
+ 		 * is setup and the listen sockets are bound
+ 		 */
+-		if (options.pid_file != NULL && !debug_flag) {
++		/* PATCH: Sortix daemons don't write out pid files. */
++		if (options.pid_file != NULL && !debug_flag && !no_daemon_flag) {
+ 			FILE *f = fopen(options.pid_file, "w");
+ 
+ 			if (f == NULL) {
+@@ -2076,6 +2116,15 @@
+ 			}
+ 		}
+ 
++		/* Notify the parent process that we're up and running. */
++		if (getenv("READYFD")) {
++			int readyfd = atoi(getenv("READYFD"));
++			char c = '\n';
++			write(readyfd, &c, 1);
++			close(readyfd);
++			unsetenv("READYFD");
++		}
++
+ 		/* Accept a connection and return in a forked child */
+ 		server_accept_loop(&sock_in, &sock_out,
+ 		    &newsock, config_s);
+@@ -2431,10 +2480,10 @@
+ 		do_cleanup(the_active_state, the_authctxt);
+ 		if (use_privsep && privsep_is_preauth &&
+ 		    pmonitor != NULL && pmonitor->m_pid > 1) {
+-			debug("Killing privsep child %d", pmonitor->m_pid);
++			debug("Killing privsep child %jd", (intmax_t)pmonitor->m_pid);
+ 			if (kill(pmonitor->m_pid, SIGKILL) != 0 &&
+ 			    errno != ESRCH) {
+-				error_f("kill(%d): %s", pmonitor->m_pid,
++				error_f("kill(%jd): %s", (intmax_t)pmonitor->m_pid,
+ 				    strerror(errno));
+ 			}
+ 		}
+diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.1 ssh/ssh-keygen.1
+--- ssh.upstream/ssh-keygen.1
++++ ssh/ssh-keygen.1
+@@ -214,7 +214,7 @@
+ .Pa ~/.ssh/id_rsa .
+ Additionally, the system administrator may use this to generate host keys,
+ as seen in
+-.Pa /etc/rc .
++.Xr init 8 .
+ .Pp
+ Normally this program generates the key and asks for a file in which
+ to store the private key.
+@@ -280,7 +280,7 @@
+ has also been specified, its argument is used as a prefix to the
+ default path for the resulting host key files.
+ This is used by
+-.Pa /etc/rc
++.Xr init 8
+ to generate new host keys.
+ .It Fl a Ar rounds
+ When saving a private key, this option specifies the number of KDF
+diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
+--- ssh.upstream/ssh-keygen.c
++++ ssh/ssh-keygen.c
+@@ -825,7 +825,7 @@
+ 	}
+ 	sshkey_free(prv);
+ 	free(comment);
+-	exit(0);
++	return;
+ }
+ 
+ static void
+@@ -983,7 +983,7 @@
+ 			free(line);
+ 			fclose(f);
+ 			fingerprint_private(path);
+-			exit(0);
++			return;
+ 		}
+ 
+ 		/*
+@@ -1031,7 +1031,7 @@
+ 
+ 	if (invalid)
+ 		fatal("%s is not a public key file.", path);
+-	exit(0);
++	return;
+ }
+ 
+ static void
+@@ -1072,14 +1072,32 @@
+ 
+ 		/* Check whether private key exists and is not zero-length */
+ 		if (stat(prv_file, &st) == 0) {
+-			if (st.st_size != 0)
++			/* PATCH: ssh-keygen -Al lists the generated host keys. */
++			if (st.st_size != 0) {
++				if (print_fingerprint || print_bubblebabble) {
++					char saved[sizeof(identity_file)];
++					memcpy(saved, identity_file, sizeof(identity_file));
++					if (strlcpy(identity_file, key_types[i].path,
++						sizeof(identity_file)) >= sizeof(identity_file))
++						fatal("Identity filename too long");
++					if (strlcat(identity_file, ".pub",
++						sizeof(identity_file)) >= sizeof(identity_file))
++						fatal("Identity filename too long");
++					have_identity = 1;
++					do_fingerprint(pw);
++					memcpy(identity_file, saved, sizeof(identity_file));
++				}
+ 				goto next;
++			}
+ 		} else if (errno != ENOENT) {
+-			error("Could not stat %s: %s", key_types[i].path,
+-			    strerror(errno));
++			error("Could not stat %s (actually '%s'): %s", key_types[i].path,
++			    prv_file, strerror(errno));
+ 			goto failnext;
+ 		}
+ 
++		if (print_fingerprint || print_bubblebabble)
++				goto next;
++
+ 		/*
+ 		 * Private key doesn't exist or is invalid; proceed with
+ 		 * key generation.
+@@ -3281,7 +3299,7 @@
+ 	/* we need this for the home * directory.  */
+ 	pw = getpwuid(getuid());
+ 	if (!pw)
+-		fatal("No user exists for uid %lu", (u_long)getuid());
++		fatal("No user exists for uid %ju", (uintmax_t)getuid());
+ 	pw = pwcopy(pw);
+ 	if (gethostname(hostname, sizeof(hostname)) == -1)
+ 		fatal("gethostname: %s", strerror(errno));
+@@ -3638,8 +3656,10 @@
+ 		}
+ 		return do_download_sk(sk_provider, sk_device);
+ 	}
+-	if (print_fingerprint || print_bubblebabble)
++	if ((print_fingerprint || print_bubblebabble) && !gen_all_hostkeys) {
+ 		do_fingerprint(pw);
++		return (0);
++	}
+ 	if (change_passphrase)
+ 		do_change_passphrase(pw);
+ 	if (change_comment)
+diff -Paur --no-dereference -- ssh.upstream/ssh-keyscan.c ssh/ssh-keyscan.c
+--- ssh.upstream/ssh-keyscan.c
++++ ssh/ssh-keyscan.c
+@@ -35,6 +35,11 @@
+ #include <string.h>
+ #include <unistd.h>
+ 
++#if defined(__sortix__) && !defined(timercmp)
++#define timercmp(s,t,op) ((s)->tv_sec == (t)->tv_sec ? \
++	(s)->tv_usec op (t)->tv_usec : (s)->tv_sec op (t)->tv_sec)
++#endif
++
+ #include "xmalloc.h"
+ #include "ssh.h"
+ #include "sshbuf.h"
+@@ -53,6 +58,14 @@
+ #include "ssh_api.h"
+ #include "dns.h"
+ 
++#if defined(__sortix__) && !defined(timerclear)
++static inline void timerclear(struct timeval *tvp)
++{
++	tvp->tv_sec = 0;
++	tvp->tv_usec = 0;
++}
++#endif
++
+ /* Flag indicating whether IPv4 or IPv6.  This can be set on the command line.
+    Default value is AF_UNSPEC means both IPv4 and IPv6. */
+ int IPv4or6 = AF_UNSPEC;
+diff -Paur --no-dereference -- ssh.upstream/ssh-keysign.c ssh/ssh-keysign.c
+--- ssh.upstream/ssh-keysign.c
++++ ssh/ssh-keysign.c
+@@ -186,6 +186,7 @@
+ 	u_char *signature, *data, rver;
+ 	char *host, *fp, *pkalg;
+ 	size_t slen, dlen;
++	const char* host_config_file = _PATH_HOST_CONFIG_FILE;
+ 
+ 	if (pledge("stdio rpath getpw dns id", NULL) != 0)
+ 		fatal("%s: pledge: %s", __progname, strerror(errno));
+@@ -219,12 +220,15 @@
+ 
+ 	/* verify that ssh-keysign is enabled by the admin */
+ 	initialize_options(&options);
+-	(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw, "", "",
++	/* PATCH: Use /etc/default for the default configuration. */
++	if (access(host_config_file, F_OK) < 0)
++		host_config_file = _PATH_HOST_CONFIG_DEFAULT;
++	(void)read_config_file(host_config_file, pw, "", "",
+ 	    &options, 0, NULL);
+ 	(void)fill_default_options(&options);
+ 	if (options.enable_ssh_keysign != 1)
+ 		fatal("ssh-keysign not enabled in %s",
+-		    _PATH_HOST_CONFIG_FILE);
++		    host_config_file);
+ 
+ 	if (pledge("stdio dns", NULL) != 0)
+ 		fatal("%s: pledge: %s", __progname, strerror(errno));
+diff -Paur --no-dereference -- ssh.upstream/sshpty.c ssh/sshpty.c
+--- ssh.upstream/sshpty.c
++++ ssh/sshpty.c
+@@ -194,12 +194,12 @@
+ 		if (chown(tty, pw->pw_uid, gid) == -1) {
+ 			if (errno == EROFS &&
+ 			    (st.st_uid == pw->pw_uid || st.st_uid == 0))
+-				debug("chown(%.100s, %u, %u) failed: %.100s",
+-				    tty, (u_int)pw->pw_uid, (u_int)gid,
++				debug("chown(%.100s, %ju, %ju) failed: %.100s",
++				    tty, (uintmax_t)pw->pw_uid, (uintmax_t)gid,
+ 				    strerror(errno));
+ 			else
+-				fatal("chown(%.100s, %u, %u) failed: %.100s",
+-				    tty, (u_int)pw->pw_uid, (u_int)gid,
++				fatal("chown(%.100s, %ju, %ju) failed: %.100s",
++				    tty, (uintmax_t)pw->pw_uid, (uintmax_t)gid,
+ 				    strerror(errno));
+ 		}
+ 	}
+diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
+--- ssh.upstream/uidswap.c
++++ ssh/uidswap.c
+@@ -28,6 +28,35 @@
+ #include "uidswap.h"
+ #include "xmalloc.h"
+ 
++#if defined(__sortix__) && !defined(__SORTIX_HAS_UID_SECURITY__)
++#define NO_UID_RESTORATION_TEST
++#endif
++
++#if defined(__sortix__) && !defined(__SORTIX_HAS_INITGROUPS__)
++static inline int initgroups(const char *user, gid_t group)
++{
++	(void)user;
++	(void)group;
++	return 0;
++}
++#endif
++#if defined(__sortix__) && !defined(__SORTIX_HAS_GETGROUPS__)
++static inline int getgroups(int size, gid_t list[])
++{
++	(void)size;
++	(void)list;
++	return 0;
++}
++#endif
++#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS__)
++static inline int setgroups(size_t size, const gid_t *list)
++{
++	(void)size;
++	(void)list;
++	return 0;
++}
++#endif
++
+ /*
+  * Note: all these functions must work in all of the following cases:
+  *    1. euid=0, ruid=0
+@@ -64,9 +93,9 @@
+ #ifdef SAVED_IDS_WORK_WITH_SETEUID
+ 	saved_euid = geteuid();
+ 	saved_egid = getegid();
+-	debug("temporarily_use_uid: %u/%u (e=%u/%u)",
+-	    (u_int)pw->pw_uid, (u_int)pw->pw_gid,
+-	    (u_int)saved_euid, (u_int)saved_egid);
++	debug("temporarily_use_uid: %ju/%ju (e=%ju/%ju)",
++	    (uintmax_t)pw->pw_uid, (uintmax_t)pw->pw_gid,
++	    (uintmax_t)saved_euid, (uintmax_t)saved_egid);
+ #ifndef HAVE_CYGWIN
+ 	if (saved_euid != 0) {
+ 		privileged = 0;
+@@ -122,16 +151,16 @@
+ #ifndef SAVED_IDS_WORK_WITH_SETEUID
+ 	/* Propagate the privileged gid to all of our gids. */
+ 	if (setgid(getegid()) == -1)
+-		debug("setgid %u: %.100s", (u_int) getegid(), strerror(errno));
++		debug("setgid %ju: %.100s", (uintmax_t) getegid(), strerror(errno));
+ 	/* Propagate the privileged uid to all of our uids. */
+ 	if (setuid(geteuid()) == -1)
+-		debug("setuid %u: %.100s", (u_int) geteuid(), strerror(errno));
++		debug("setuid %ju: %.100s", (uintmax_t) geteuid(), strerror(errno));
+ #endif /* SAVED_IDS_WORK_WITH_SETEUID */
+ 	if (setegid(pw->pw_gid) == -1)
+-		fatal("setegid %u: %.100s", (u_int)pw->pw_gid,
++		fatal("setegid %ju: %.100s", (uintmax_t)pw->pw_gid,
+ 		    strerror(errno));
+ 	if (seteuid(pw->pw_uid) == -1)
+-		fatal("seteuid %u: %.100s", (u_int)pw->pw_uid,
++		fatal("seteuid %ju: %.100s", (uintmax_t)pw->pw_uid,
+ 		    strerror(errno));
+ }
+ 
+@@ -150,12 +179,12 @@
+ 		fatal("restore_uid: temporarily_use_uid not effective");
+ 
+ #ifdef SAVED_IDS_WORK_WITH_SETEUID
+-	debug("restore_uid: %u/%u", (u_int)saved_euid, (u_int)saved_egid);
++	debug("restore_uid: %ju/%ju", (uintmax_t)saved_euid, (uintmax_t)saved_egid);
+ 	/* Set the effective uid back to the saved privileged uid. */
+ 	if (seteuid(saved_euid) == -1)
+-		fatal("seteuid %u: %.100s", (u_int)saved_euid, strerror(errno));
++		fatal("seteuid %ju: %.100s", (uintmax_t)saved_euid, strerror(errno));
+ 	if (setegid(saved_egid) == -1)
+-		fatal("setegid %u: %.100s", (u_int)saved_egid, strerror(errno));
++		fatal("setegid %ju: %.100s", (uintmax_t)saved_egid, strerror(errno));
+ #else /* SAVED_IDS_WORK_WITH_SETEUID */
+ 	/*
+ 	 * We are unable to restore the real uid to its unprivileged value.
+@@ -189,11 +218,11 @@
+ 		fatal("permanently_set_uid: no user given");
+ 	if (temporarily_use_uid_effective)
+ 		fatal("permanently_set_uid: temporarily_use_uid effective");
+-	debug("permanently_set_uid: %u/%u", (u_int)pw->pw_uid,
+-	    (u_int)pw->pw_gid);
++	debug("permanently_set_uid: %ju/%ju", (uintmax_t)pw->pw_uid,
++	    (uintmax_t)pw->pw_gid);
+ 
+ 	if (setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) == -1)
+-		fatal("setresgid %u: %.100s", (u_int)pw->pw_gid, strerror(errno));
++		fatal("setresgid %ju: %.100s", (uintmax_t)pw->pw_gid, strerror(errno));
+ 
+ #ifdef __APPLE__
+ 	/*
+@@ -201,12 +230,12 @@
+ 	 * memberd support for >16 supplemental groups.
+ 	 */
+ 	if (initgroups(pw->pw_name, pw->pw_gid) == -1)
+-		fatal("initgroups %.100s %u: %.100s",
+-		    pw->pw_name, (u_int)pw->pw_gid, strerror(errno));
++		fatal("initgroups %.100s %ju: %.100s",
++		    pw->pw_name, (uintmax_t)pw->pw_gid, strerror(errno));
+ #endif
+ 
+ 	if (setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid) == -1)
+-		fatal("setresuid %u: %.100s", (u_int)pw->pw_uid, strerror(errno));
++		fatal("setresuid %ju: %.100s", (uintmax_t)pw->pw_uid, strerror(errno));
+ 
+ #ifndef NO_UID_RESTORATION_TEST
+ 	/* Try restoration of GID if changed (test clearing of saved gid) */
+@@ -217,9 +246,9 @@
+ 
+ 	/* Verify GID drop was successful */
+ 	if (getgid() != pw->pw_gid || getegid() != pw->pw_gid) {
+-		fatal("%s: egid incorrect gid:%u egid:%u (should be %u)",
+-		    __func__, (u_int)getgid(), (u_int)getegid(),
+-		    (u_int)pw->pw_gid);
++		fatal("%s: egid incorrect gid:%ju egid:%ju (should be %ju)",
++		    __func__, (uintmax_t)getgid(), (uintmax_t)getegid(),
++		    (uintmax_t)pw->pw_gid);
+ 	}
+ 
+ #ifndef NO_UID_RESTORATION_TEST
+@@ -231,8 +260,8 @@
+ 
+ 	/* Verify UID drop was successful */
+ 	if (getuid() != pw->pw_uid || geteuid() != pw->pw_uid) {
+-		fatal("%s: euid incorrect uid:%u euid:%u (should be %u)",
+-		    __func__, (u_int)getuid(), (u_int)geteuid(),
+-		    (u_int)pw->pw_uid);
++		fatal("%s: euid incorrect uid:%ju euid:%ju (should be %ju)",
++		    __func__, (uintmax_t)getuid(), (uintmax_t)geteuid(),
++		    (uintmax_t)pw->pw_uid);
+ 	}
+ }

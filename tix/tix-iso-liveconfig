@@ -23,6 +23,15 @@ directory=
 hostname=
 kblayout=
 operand=1
+root_ssh_authorized_keys=
+root_ssh_config=
+root_ssh_keygen=false
+root_ssh_known_hosts=
+ssh_config=
+sshd_config=
+sshd_keygen=false
+sshd_key_known_hosts_file=
+sshd_key_known_hosts_hosts=
 videomode=
 
 dashdash=
@@ -48,6 +57,22 @@ for argument do
   --hostname) previous_option=hostname ;;
   --kblayout=*) kblayout=$parameter ;;
   --kblayout) previous_option=kblayout ;;
+  --root-ssh-authorized-keys=*) root_ssh_authorized_keys=$parameter ;;
+  --root-ssh-authorized-keys) previous_option=root_ssh_authorized_keys ;;
+  --root-ssh-config=*) root_ssh_config=$parameter ;;
+  --root-ssh-config) previous_option=root_ssh_config ;;
+  --root-ssh-keygen) root_ssh_keygen=true ;;
+  --root-ssh-known-hosts=*) root_ssh_known_hosts=$parameter ;;
+  --root-ssh-known-hosts) previous_option=root_ssh_known_hosts ;;
+  --ssh-config=*) ssh_config=$parameter ;;
+  --ssh-config) previous_option=ssh_config ;;
+  --sshd-config=*) sshd_config=$parameter ;;
+  --sshd-config) previous_option=sshd_config ;;
+  --sshd-keygen) sshd_keygen=true ;;
+  --sshd-key-known-hosts-file=*) sshd_key_known_hosts_file=$parameter ;;
+  --sshd-key-known-hosts-file) previous_option=sshd_key_known_hosts_file ;;
+  --sshd-key-known-hosts-hosts=*) sshd_key_known_hosts_hosts=$parameter ;;
+  --sshd-key-known-hosts-hosts) previous_option=sshd_key_known_hosts_hosts ;;
   --videomode=*) videomode=$parameter ;;
   --videomode) previous_option=videomode ;;
   -*) echo "$0: unrecognized option $argument" >&2
@@ -100,4 +125,73 @@ fi
 if [ -n "$videomode" ]; then
   mkdir -p -- "$directory/etc"
   printf "%s\n" "$videomode" > "$directory/etc/videomode"
+fi
+
+if [ -n "$ssh_config" ]; then
+  mkdir -p -- "$directory/etc"
+  cp -- "$ssh_config" "$directory/etc/ssh_config"
+fi
+
+if [ -n "$sshd_config" ]; then
+  mkdir -p -- "$directory/etc"
+  cp -- "$sshd_config" "$directory/etc/sshd_config"
+fi
+
+if $sshd_keygen; then
+  mkdir -p -- "$directory/etc"
+  for keytype in rsa dsa ecdsa ed25519; do
+    if [ ! -e "$directory/etc/ssh_host_${keytype}_key" ]; then
+      ssh-keygen -t $keytype -f "$directory/etc/ssh_host_${keytype}_key" -N "" \
+                 -C "root@$hostname"
+    fi
+  done
+  for keytype in rsa dsa ecdsa ed25519; do
+    ssh-keygen -l -f "$directory/etc/ssh_host_${keytype}_key"
+  done
+fi
+
+if [ -n "$sshd_key_known_hosts_file" ]; then
+  known_hosts_tmp=$(mktemp)
+  for host in $sshd_key_known_hosts_hosts; do
+    for keytype in rsa dsa ecdsa ed25519; do
+      if [ ! -e "$directory/etc/ssh_host_${keytype}_key.pub" ]; then
+        continue
+      fi
+      (printf '%s ' "$host" &&
+       sed -E 's/^([^ ]* [^ ]*).*/\1/' \
+         "$directory/etc/ssh_host_${keytype}_key.pub") \
+      >> "$known_hosts_tmp"
+    done
+  done
+  # TODO: ssh-keygen needs a standalone way to make such a hash.
+  ssh-keygen -H -f "$known_hosts_tmp" 1>/dev/null 2>/dev/null
+  cat -- "$known_hosts_tmp" >> "$sshd_key_known_hosts_file"
+  rm -f "$known_hosts_tmp"
+  rm -f "$known_hosts_tmp.old"
+fi
+
+if [ -n "$root_ssh_authorized_keys" ]; then
+  mkdir -p -- "$directory/root"
+  mkdir -p -m 700 -- "$directory/root/.ssh"
+  cp -- "$root_ssh_authorized_keys" "$directory/root/.ssh/authorized_keys"
+fi
+
+if [ -n "$root_ssh_config" ]; then
+  mkdir -p -- "$directory/root"
+  mkdir -p -m 700 -- "$directory/root/.ssh"
+  cp -- "$root_ssh_config" "$directory/root/.ssh/config"
+fi
+
+if [ -n "$root_ssh_known_hosts" ]; then
+  mkdir -p -- "$directory/root"
+  mkdir -p -m 700 -- "$directory/root/.ssh"
+  cp -- "$root_ssh_known_hosts" "$directory/root/.ssh/known_hosts"
+fi
+
+if $root_ssh_keygen; then
+  mkdir -p -- "$directory/root"
+  mkdir -p -m 700 -- "$directory/root/.ssh"
+  if [ ! -e "$directory/root/.ssh/id_rsa"]; then
+    ssh-keygen -t rsa -f "$directory/root/.ssh/id_rsa" -N "" -C "root@$hostname"
+  fi
 fi

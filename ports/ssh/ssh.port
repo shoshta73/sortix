@@ -1,0 +1,13 @@
+NAME=ssh
+BUILD_LIBRARIES='libz libssl'
+VERSION=9.0p1
+DISTNAME=openssh-$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=03974302161e9ecce32153cfa10012f1e65c8f3750f573a73ab1befd5972a28a
+UPSTREAM_SITE=https://ftp.openbsd.org/pub/OpenBSD/OpenSSH/portable
+UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE='SSH-OpenSSH AND BSD-2-Clause AND BSD-3-Clause AND ISC AND MIT'
+# TODO: Finish this port. Comb through the configure output.
+BUILD_SYSTEM=configure
+VERSION_REGEX='([0-9]+\.[0-9]+p[0-9]+)'

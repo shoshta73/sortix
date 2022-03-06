@@ -25,6 +25,7 @@ enable_append_title=true
 enable_dhclient=
 enable_network_drivers=
 enable_src=
+enable_sshd=
 liveconfig=
 operand=1
 random_seed=false
@@ -56,10 +57,12 @@ for argument do
   --disable-dhclient) enable_dhclient=false ;;
   --disable-network-drivers) enable_network_drivers=false ;;
   --disable-src) enable_src=false ;;
+  --disable-sshd) enable_sshd=false ;;
   --enable-append-title) enable_append_title=true ;;
   --enable-dhclient) enable_dhclient=true ;;
   --enable-network-drivers) enable_network_drivers=true ;;
   --enable-src) enable_src=true ;;
+  --enable-sshd) enable_sshd=true ;;
   --liveconfig=*) liveconfig=$parameter ;;
   --liveconfig) previous_option=liveconfig ;;
   --random-seed) random_seed=true ;;
@@ -142,6 +145,7 @@ mkdir -p -- "$directory/boot/grub"
  print_enable_default_bool "$enable_dhclient" dhclient dhclient
  print_enable_default "$enable_network_drivers" network_drivers network-drivers
  print_enable_default_bool "$enable_src" src src
+ print_enable_default_bool "$enable_sshd" sshd sshd
  if $enable_append_title; then
    printf "base_menu_title=\"\$base_menu_title - \"'%s'\n" \
           "$(printf '%s\n' "$append_title" | sed "s/'/'\\\\''/g")"
