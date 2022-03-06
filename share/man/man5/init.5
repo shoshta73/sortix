@@ -189,8 +189,9 @@ The system provides a default implementation that does nothing, as the base
 system does not contain a daemon that obtains the current date and time.
 The system administrator is meant to override the daemon in
 .Pa /etc/init/time
-by depending on a daemon that obtains the current date and time and sets the
-system time.
+by depending on a daemon such as
+.Xr ntpd 8
+that obtains the current date and time and sets the system time.
 Daemons can depend on this daemon if they need the current date and time to have
 been established before they start.
 .El

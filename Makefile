@@ -455,8 +455,10 @@ $(LIVE_INITRD): sysroot
 	echo require single-user exit-code > $(LIVE_INITRD).d/etc/init/default
 	echo "root::0:0:root:/root:sh" > $(LIVE_INITRD).d/etc/passwd
 	echo "www::1:1:www:/var/www:sh" >> $(LIVE_INITRD).d/etc/passwd
+	echo "_ntp::2:2:_ntp:/var/empty:sh" >> $(LIVE_INITRD).d/etc/passwd
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
 	echo "www::1:www" >> $(LIVE_INITRD).d/etc/group
+	echo "_ntp::2:_ntp" >> $(LIVE_INITRD).d/etc/group
 	mkdir -p $(LIVE_INITRD).d/home
 	mkdir -p $(LIVE_INITRD).d/root -m 700
 	cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root

@@ -1,0 +1,648 @@
+diff -Paur --no-dereference -- ntpd.upstream/compat/bsd-setresuid.c ntpd/compat/bsd-setresuid.c
+--- ntpd.upstream/compat/bsd-setresuid.c
++++ ntpd/compat/bsd-setresuid.c
+@@ -44,6 +44,7 @@
+ 		return -1;
+ # endif
+ 
++#if !defined(__sortix__)
+ 	/*
+ 	 * When real, effective and saved uids are the same and we have
+ 	 * changed uids, sanity check that we cannot restore the old uid.
+@@ -62,6 +63,7 @@
+ 		errno = EACCES;
+ 		return -1;
+ 	}
++#endif
+ 
+ 	return ret;
+ }
+diff -Paur --no-dereference -- ntpd.upstream/compat/imsg-buffer.c ntpd/compat/imsg-buffer.c
+--- ntpd.upstream/compat/imsg-buffer.c
++++ ntpd/compat/imsg-buffer.c
+@@ -27,6 +27,10 @@
+ #include <string.h>
+ #include <unistd.h>
+ 
++#if defined(__sortix__) && !defined(IOV_MAX)
++#include <sortix/limits.h>
++#endif
++
+ #include "imsg.h"
+ 
+ int	ibuf_realloc(struct ibuf *, size_t);
+@@ -252,7 +256,7 @@
+ 	msg.msg_iovlen = i;
+ 
+ 	if (buf != NULL && buf->fd != -1) {
+-		msg.msg_control = (caddr_t)&cmsgbuf.buf;
++		msg.msg_control = (char*)&cmsgbuf.buf;
+ 		msg.msg_controllen = sizeof(cmsgbuf.buf);
+ 		cmsg = CMSG_FIRSTHDR(&msg);
+ 		cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+diff -Paur --no-dereference -- ntpd.upstream/include/imsg.h ntpd/include/imsg.h
+--- ntpd.upstream/include/imsg.h
++++ ntpd/include/imsg.h
+@@ -21,6 +21,8 @@
+ #ifndef _IMSG_H_
+ #define _IMSG_H_
+ 
++typedef unsigned char u_char;
++
+ #define IBUF_READ_SIZE		65535
+ #define IMSG_HEADER_SIZE	sizeof(struct imsg_hdr)
+ #define MAX_IMSGSIZE		16384
+diff -Paur --no-dereference -- ntpd.upstream/include/machine/endian.h ntpd/include/machine/endian.h
+--- ntpd.upstream/include/machine/endian.h
++++ ntpd/include/machine/endian.h
+@@ -33,7 +33,7 @@
+ #include <sys/endian.h>
+ 
+ #else
+-#include_next <machine/endian.h>
++#include <endian.h>
+ 
+ #endif
+ 
+diff -Paur --no-dereference -- ntpd.upstream/src/client.c ntpd/src/client.c
+--- ntpd.upstream/src/client.c
++++ ntpd/src/client.c
+@@ -124,7 +124,9 @@
+ int
+ client_query(struct ntp_peer *p)
+ {
++#ifdef IPTOS_LOWDELAY
+ 	int	val;
++#endif
+ 
+ 	if (p->addr == NULL && client_nextaddr(p) == -1) {
+ 		set_next(p, MAXIMUM(SETTIME_TIMEOUT,
+@@ -159,10 +161,12 @@
+ 			} else
+ 				fatal("client_query connect");
+ 		}
++#ifdef IPTOS_LOWDELAY
+ 		val = IPTOS_LOWDELAY;
+ 		if (p->addr->ss.ss_family == AF_INET && setsockopt(p->query->fd,
+ 		    IPPROTO_IP, IP_TOS, &val, sizeof(val)) == -1)
+ 			log_warn("setsockopt IPTOS_LOWDELAY");
++#endif
+ #ifdef SO_TIMESTAMP
+ 		val = 1;
+ 		if (setsockopt(p->query->fd, SOL_SOCKET, SO_TIMESTAMP,
+@@ -231,7 +235,10 @@
+ 	somsg.msg_controllen = sizeof(cmsgbuf.buf);
+ 
+ 	if ((size = recvmsg(p->query->fd, &somsg, 0)) == -1) {
+-		if (errno == EHOSTUNREACH || errno == EHOSTDOWN ||
++		if (errno == EHOSTUNREACH ||
++#ifdef EHOSTDOWN
++		    errno == EHOSTDOWN ||
++#endif
+ 		    errno == ENETUNREACH || errno == ENETDOWN ||
+ 		    errno == ECONNREFUSED || errno == EADDRNOTAVAIL ||
+ 		    errno == ENOPROTOOPT || errno == ENOENT) {
+@@ -345,10 +352,11 @@
+ 	if (p->reply[p->shift].delay < 0) {
+ 		interval = error_interval();
+ 		set_next(p, interval);
+-		log_info("reply from %s: negative delay %fs, "
++		log_info("reply from %s: negative delay %llims, "
+ 		    "next query %llds",
+ 		    log_sockaddr((struct sockaddr *)&p->addr->ss),
+-		    p->reply[p->shift].delay, (long long)interval);
++		    (long long)(p->reply[p->shift].delay * 1000.0),
++		    (long long)interval);
+ 		return (0);
+ 	}
+ 	p->reply[p->shift].error = (T2 - T1) - (T3 - T4);
+@@ -398,10 +406,11 @@
+ 		p->trustlevel++;
+ 	}
+ 
+-	log_debug("reply from %s: offset %f delay %f, "
++	log_debug("reply from %s: offset %llims delay %llims, "
+ 	    "next query %llds",
+ 	    log_sockaddr((struct sockaddr *)&p->addr->ss),
+-	    p->reply[p->shift].offset, p->reply[p->shift].delay,
++	    (long long)(p->reply[p->shift].offset * 1000.0),
++        (long long)(p->reply[p->shift].delay * 1000.0),
+ 	    (long long)interval);
+ 
+ 	client_update(p);
+diff -Paur --no-dereference -- ntpd.upstream/src/constraint.c ntpd/src/constraint.c
+--- ntpd.upstream/src/constraint.c
++++ ntpd/src/constraint.c
+@@ -44,6 +44,10 @@
+ 
+ #include "ntpd.h"
+ 
++#if defined(__sortix__)
++#define setgroups(a, b) ((void) (a), (void) (b), 0)
++#endif
++
+ int	 constraint_addr_init(struct constraint *);
+ struct constraint *
+ 	 constraint_byid(u_int32_t);
+@@ -907,12 +911,20 @@
+ 		 * or ANSI C's asctime() - the latter doesn't include
+ 		 * the timezone which is required here.
+ 		 */
++#if defined(__sortix__)
++		if (1) {
++			log_warnx("strptime is not supported");
++			free(line);
++			return (-1);
++		}
++#else
+ 		if (strptime(p, "%a, %d %h %Y %T GMT",
+ 		    &httpsdate->tls_tm) == NULL) {
+ 			log_warnx("unsupported date format");
+ 			free(line);
+ 			return (-1);
+ 		}
++#endif
+ 
+ 		free(line);
+ 		break;
+diff -Paur --no-dereference -- ntpd.upstream/src/control.c ntpd/src/control.c
+--- ntpd.upstream/src/control.c
++++ ntpd/src/control.c
+@@ -71,10 +71,12 @@
+ 	umask(old_umask);
+ 
+ 	if (chmod(path, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP) == -1) {
++#if !defined(__sortix__)
+ 		log_warn("control_init: chmod");
+ 		close(fd);
+ 		(void)unlink(path);
+ 		return (-1);
++#endif
+ 	}
+ 
+ 	session_socket_nonblockmode(fd);
+diff -Paur --no-dereference -- ntpd.upstream/src/init/ntpd ntpd/src/init/ntpd
+--- ntpd.upstream/src/init/ntpd
++++ ntpd/src/init/ntpd
+@@ -0,0 +1,4 @@
++require network
++#program=ntpd
++#exec $program -ds
++exec ntpd -ds
+diff -Paur --no-dereference -- ntpd.upstream/src/Makefile.in ntpd/src/Makefile.in
+--- ntpd.upstream/src/Makefile.in
++++ ntpd/src/Makefile.in
+@@ -972,6 +972,8 @@
+ info-am:
+ 
+ install-data-am: install-man
++	mkdir -p $(DESTDIR)$(datadir)/init
++	cp init/ntpd $(DESTDIR)$(datadir)/init/ntpd
+ 
+ install-dvi: install-dvi-am
+ 
+diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
+--- ntpd.upstream/src/ntp.c
++++ ntpd/src/ntp.c
+@@ -20,6 +20,7 @@
+ #include <sys/types.h>
+ #include <sys/time.h>
+ #include <sys/stat.h>
++#include <sys/wait.h>
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <paths.h>
+@@ -35,6 +36,10 @@
+ 
+ #include "ntpd.h"
+ 
++#if defined(__sortix__)
++#define setgroups(a, b) ((void) (a), (void) (b), 0)
++#endif
++
+ #define	PFD_PIPE_MAIN	0
+ #define	PFD_PIPE_DNS	1
+ #define	PFD_SOCK_CTL	2
+@@ -78,7 +83,9 @@
+ 	u_int			 ctl_cnt;
+ 	pid_t			 pid;
+ 	struct pollfd		*pfd = NULL;
++#if !defined(__sortix__)
+ 	struct servent		*se;
++#endif
+ 	struct listen_addr	*la;
+ 	struct ntp_peer		*p;
+ 	struct ntp_peer		**idx2peer = NULL;
+@@ -108,8 +115,10 @@
+ 	}
+ 	log_procinit("ntp");
+ 
++#if !defined(__sortix__)
+ 	if ((se = getservbyname("ntp", "udp")) == NULL)
+ 		fatal("getservbyname");
++#endif
+ 
+ 	if ((nullfd = open("/dev/null", O_RDWR, 0)) == -1)
+ 		fatal(NULL);
+@@ -117,7 +126,7 @@
+ 	close(pipe_prnt[0]);
+ 	if (socketpair(AF_UNIX, SOCK_STREAM, PF_UNSPEC, pipe_dns) == -1)
+ 		fatal("socketpair");
+-	ntp_dns(pipe_dns, nconf, pw);
++	pid_t dns_pid = ntp_dns(pipe_dns, nconf, pw);
+ 	close(pipe_dns[1]);
+ 
+ 	if (stat(pw->pw_dir, &stb) == -1) {
+@@ -142,14 +151,20 @@
+ 	setproctitle("ntp engine");
+ 
+ 	conf = nconf;
++#if defined(__sortix__)
++	setup_listeners(NULL, conf, &listener_cnt);
++#else
+ 	setup_listeners(se, conf, &listener_cnt);
++#endif
+ 
+ 	if (setgroups(1, &pw->pw_gid) ||
+ 	    setresgid(pw->pw_gid, pw->pw_gid, pw->pw_gid) ||
+ 	    setresuid(pw->pw_uid, pw->pw_uid, pw->pw_uid))
+ 		fatal("can't drop privileges");
+ 
++#if !defined(__sortix__)
+ 	endservent();
++#endif
+ 
+ 	/* The ntp process will want to open NTP client sockets -> "inet" */
+ 	if (pledge("stdio inet", NULL) == -1)
+@@ -421,6 +436,9 @@
+ 	msgbuf_clear(&ibuf_dns->w);
+ 	free(ibuf_dns);
+ 
++	kill(dns_pid, SIGTERM);
++	waitpid(dns_pid, NULL, 0);
++
+ 	log_info("ntp engine exiting");
+ 	_exit(0);
+ }
+diff -Paur --no-dereference -- ntpd.upstream/src/ntpd.c ntpd/src/ntpd.c
+--- ntpd.upstream/src/ntpd.c
++++ ntpd/src/ntpd.c
+@@ -38,6 +38,107 @@
+ 
+ #include "ntpd.h"
+ 
++#if defined(__sortix__)
++#include <timespec.h>
++
++int adjtime(const struct timeval *delta, struct timeval *olddelta)
++{
++	if (delta) {
++		struct timespec deltats = {
++			.tv_sec = delta->tv_sec,
++			.tv_nsec = delta->tv_usec * 1000
++		};
++		struct timespec oldnow;
++		if (clock_gettime(CLOCK_REALTIME, &oldnow) < 0)
++			return -1;
++		struct timespec newnow = timespec_add(oldnow, deltats);
++		if (clock_settime(CLOCK_REALTIME, &newnow) < 0)
++			return -1;
++	}
++	if (olddelta) {
++		olddelta->tv_sec = 0;
++		olddelta->tv_usec = 0;
++	}
++	return 0;
++}
++
++/*
++From musl:
++
++Copyright © 2005-2014 Rich Felker, et al.
++
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of this software and associated documentation files (the
++"Software"), to deal in the Software without restriction, including
++without limitation the rights to use, copy, modify, merge, publish,
++distribute, sublicense, and/or sell copies of the Software, and to
++permit persons to whom the Software is furnished to do so, subject to
++the following conditions:
++
++The above copyright notice and this permission notice shall be
++included in all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
++IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
++CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
++TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
++SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++*/
++int daemon(int nochdir, int noclose)
++{
++	if (!nochdir && chdir("/"))
++		return -1;
++	if (!noclose) {
++		int fd, failed = 0;
++		if ((fd = open("/dev/null", O_RDWR)) < 0) return -1;
++		if (dup2(fd, 0) < 0 || dup2(fd, 1) < 0 || dup2(fd, 2) < 0)
++			failed++;
++		if (fd > 2) close(fd);
++		if (failed) return -1;
++	}
++
++	switch(fork()) {
++	case 0: break;
++	case -1: return -1;
++	default: _exit(0);
++	}
++
++	if (setsid() < 0) return -1;
++
++	switch(fork()) {
++	case 0: break;
++	case -1: return -1;
++	default: _exit(0);
++	}
++
++	return 0;
++}
++
++int
++adjfreq(const int64_t *freq, int64_t *oldfreq)
++{
++	(void) freq;
++	(void) oldfreq;
++	//log_warnx("adjfreq is not implemented");
++	if (oldfreq)
++		*oldfreq = 0;
++	return 0;
++}
++
++/*
++ * The RTC is only updated if the clock is not marked as unsynced.
++ */
++
++void
++update_time_sync_status(int synced)
++{
++	(void) synced;
++	//log_warnx("update_time_sync_status is not implemented");
++}
++#endif
++
+ void		sighdlr(int);
+ __dead void	usage(void);
+ int		main(int, char *[]);
+@@ -62,6 +163,7 @@
+ volatile sig_atomic_t	 sigchld = 0;
+ struct imsgbuf		*ibuf;
+ int			 timeout = INFTIM;
++int			 readyfd = -1;
+ 
+ extern u_int		 constraint_cnt;
+ 
+@@ -100,6 +202,17 @@
+ 	}
+ }
+ 
++void
++ready(void)
++{
++	if (0 <= readyfd) {
++		char c = '\n';
++		write(readyfd, &c, 1);
++		close(readyfd);
++		readyfd = -1;
++	}
++}
++
+ __dead void
+ usage(void)
+ {
+@@ -194,6 +307,12 @@
+ 		}
+ 	}
+ 
++	if (getenv("READYFD")) {
++		readyfd = atoi(getenv("READYFD"));
++		unsetenv("READYENV");
++		fcntl(readyfd, F_SETFD, O_CLOEXEC | O_CLOFORK);
++	}
++
+ 	/* log to stderr until daemonized */
+ 	log_init(lconf.debug ? lconf.debug : 1, LOG_DAEMON);
+ 
+@@ -272,6 +391,10 @@
+ 		err(1, "pledge");
+ #endif
+ 
++	if (!lconf.settime) {
++		ready();
++	}
++
+ 	while (quit == 0) {
+ 		new_cnt = PFD_MAX + constraint_cnt;
+ 		if (new_cnt > pfd_elms) {
+@@ -317,6 +440,7 @@
+ 					fatal("daemon");
+ 				writepid(&lconf);
+ 			}
++			ready();
+ 		}
+ 
+ 		if (nfds > 0 && (pfd[PFD_PIPE].revents & POLLOUT))
+@@ -451,6 +575,7 @@
+ 			}
+ 			lconf->settime = 0;
+ 			timeout = INFTIM;
++			ready();
+ 			break;
+ 		case IMSG_CONSTRAINT_QUERY:
+ 			priv_constraint_msg(imsg.hdr.peerid,
+@@ -471,9 +596,8 @@
+ void
+ reset_adjtime(void)
+ {
+-	struct timeval	tv;
++	struct timeval	tv = { .tv_sec = 0, .tv_usec = 0 };
+ 
+-	timerclear(&tv);
+ 	if (adjtime(&tv, NULL) == -1)
+ 		log_warn("reset adjtime failed");
+ }
+@@ -488,9 +612,9 @@
+ 	d += getoffset();
+ 	if (d >= (double)LOG_NEGLIGIBLE_ADJTIME / 1000 ||
+ 	    d <= -1 * (double)LOG_NEGLIGIBLE_ADJTIME / 1000)
+-		log_info("adjusting local clock by %fs", d);
++		log_info("adjusting local clock by %llims", (long long)(d * 1000.0));
+ 	else
+-		log_debug("adjusting local clock by %fs", d);
++		log_debug("adjusting local clock by %llims", (long long)(d * 1000.0));
+ 	d_to_tv(d, &tv);
+ 	if (adjtime(&tv, &olddelta) == -1)
+ 		log_warn("adjtime failed");
+@@ -552,14 +676,26 @@
+ 	curtime.tv_sec += tv.tv_sec - 1 + (curtime.tv_usec / 1000000);
+ 	curtime.tv_usec %= 1000000;
+ 
++#if defined(__sortix__)
++	struct timespec ts =
++	{
++		.tv_sec = curtime.tv_sec,
++		.tv_nsec = curtime.tv_usec * 1000
++	};
++	if (clock_settime(CLOCK_REALTIME, &ts) == -1) {
++		log_warn("settimeofday");
++		return;
++	}
++#else
+ 	if (settimeofday(&curtime, NULL) == -1) {
+ 		log_warn("settimeofday");
+ 		return;
+ 	}
++#endif
+ 	tval = curtime.tv_sec;
+ 	strftime(buf, sizeof(buf), "%a %b %e %H:%M:%S %Z %Y",
+ 	    localtime(&tval));
+-	log_info("set local clock to %s (offset %fs)", buf, d);
++	log_info("set local clock to %s (offset %llims)", buf, (long long)(d * 1000.0));
+ }
+ 
+ static FILE *freqfp;
+diff -Paur --no-dereference -- ntpd.upstream/src/ntpd.h ntpd/src/ntpd.h
+--- ntpd.upstream/src/ntpd.h
++++ ntpd/src/ntpd.h
+@@ -23,7 +23,9 @@
+ #include <sys/queue.h>
+ #include <sys/time.h>
+ #include <netinet/in.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ #include <arpa/inet.h>
+ #include <netdb.h>
+ #include <pwd.h>
+@@ -31,6 +33,11 @@
+ #include <poll.h>
+ #include <imsg.h>
+ 
++typedef unsigned char u_char;
++typedef unsigned short u_short;
++typedef unsigned int u_int;
++typedef unsigned long u_long;
++
+ #include "ntp.h"
+ 
+ #define MAXIMUM(a, b)	((a) > (b) ? (a) : (b))
+diff -Paur --no-dereference -- ntpd.upstream/src/ntp_dns.c ntpd/src/ntp_dns.c
+--- ntpd.upstream/src/ntp_dns.c
++++ ntpd/src/ntp_dns.c
+@@ -32,6 +32,10 @@
+ 
+ #include "ntpd.h"
+ 
++#if defined(__sortix__)
++#define setgroups(a, b) ((void) (a), (void) (b), 0)
++#endif
++
+ volatile sig_atomic_t	 quit_dns = 0;
+ struct imsgbuf		*ibuf_dns;
+ 
+diff -Paur --no-dereference -- ntpd.upstream/src/ntp_msg.c ntpd/src/ntp_msg.c
+--- ntpd.upstream/src/ntp_msg.c
++++ ntpd/src/ntp_msg.c
+@@ -53,7 +53,11 @@
+ 	n = sendto(fd, msg, sizeof(*msg), 0, sa, sa_len);
+ 	if (n == -1) {
+ 		if (errno == ENOBUFS || errno == EHOSTUNREACH ||
+-		    errno == ENETDOWN || errno == EHOSTDOWN) {
++		    errno == ENETDOWN
++#ifdef EHOSTDOWN
++		    || errno == EHOSTDOWN
++#endif
++		    ) {
+ 			/* logging is futile */
+ 			return (-1);
+ 		}
+diff -Paur --no-dereference -- ntpd.upstream/src/server.c ntpd/src/server.c
+--- ntpd.upstream/src/server.c
++++ ntpd/src/server.c
+@@ -41,7 +41,9 @@
+ 	u_int8_t		*a6;
+ 	size_t			 sa6len = sizeof(struct in6_addr);
+ 	u_int			 new_cnt = 0;
++#ifdef IPTOS_LOWDELAY
+ 	int			 tos = IPTOS_LOWDELAY;
++#endif
+ #ifdef IPV6_V6ONLY
+ 	int			 on = 1;
+ #endif
+@@ -109,12 +111,20 @@
+ 		case AF_INET:
+ 			if (((struct sockaddr_in *)&la->sa)->sin_port == 0)
+ 				((struct sockaddr_in *)&la->sa)->sin_port =
++#if defined(__sortix__)
++				    123;
++#else
+ 				    se->s_port;
++#endif
+ 			break;
+ 		case AF_INET6:
+ 			if (((struct sockaddr_in6 *)&la->sa)->sin6_port == 0)
+ 				((struct sockaddr_in6 *)&la->sa)->sin6_port =
++#if defined(__sortix__)
++				    123;
++#else
+ 				    se->s_port;
++#endif
+ 			break;
+ 		case AF_UNSPEC:
+ 			nla = TAILQ_NEXT(la, entry);
+@@ -133,9 +143,11 @@
+ 		if ((la->fd = socket(la->sa.ss_family, SOCK_DGRAM, 0)) == -1)
+ 			fatal("socket");
+ 
++#ifdef IPTOS_LOWDELAY
+ 		if (la->sa.ss_family == AF_INET && setsockopt(la->fd,
+ 		    IPPROTO_IP, IP_TOS, &tos, sizeof(tos)) == -1)
+ 			log_warn("setsockopt IPTOS_LOWDELAY");
++#endif
+ 
+ #ifdef IPV6_V6ONLY
+ 		if (la->sa.ss_family == AF_INET6 && setsockopt(la->fd,
+@@ -183,7 +195,10 @@
+ 	fsa_len = sizeof(fsa);
+ 	if ((size = recvfrom(fd, &buf, sizeof(buf), 0,
+ 	    (struct sockaddr *)&fsa, &fsa_len)) == -1) {
+-		if (errno == EHOSTUNREACH || errno == EHOSTDOWN ||
++		if (errno == EHOSTUNREACH ||
++#ifdef EHOSTDOWN
++		    errno == EHOSTDOWN ||
++#endif
+ 		    errno == ENETUNREACH || errno == ENETDOWN) {
+ 			log_warn("recvfrom %s",
+ 			    log_sockaddr((struct sockaddr *)&fsa));
+diff -Paur --no-dereference -- ntpd.upstream/src/util.c ntpd/src/util.c
+--- ntpd.upstream/src/util.c
++++ ntpd/src/util.c
+@@ -22,6 +22,8 @@
+ 
+ #include "ntpd.h"
+ 
++int adjtime(const struct timeval *delta, struct timeval *olddelta);
++
+ double
+ gettime_corrected(void)
+ {
+diff -Paur --no-dereference -- ntpd.upstream/TODO.sortix ntpd/TODO.sortix
+--- ntpd.upstream/TODO.sortix
++++ ntpd/TODO.sortix
+@@ -0,0 +1,5 @@
++- nptd is unaware of leap seconds but Sortix is aware of them to the clock doesn't actually get synced correctly.
++- Sortix needs `adjtime` or the time adjustments can be jarring.
++- Sortix needs `strptime`.
++- Sortix needs `getservbyname` but worked around by hard-coding the ntp port.
++- The dns process wasn't being properly killed and awaited when exiting.
