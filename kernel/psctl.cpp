@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -127,6 +127,17 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		kthread_mutex_lock(&process->nicelock);
 		psst.nice = process->nice;
 		kthread_mutex_unlock(&process->nicelock);
+		kthread_mutex_lock(&process->segment_lock);
+		// TODO: Cache these.
+		for ( size_t i = 0; i < process->segments_used; i++ )
+		{
+			const struct segment* segment = &process->segments[i];
+			psst.pss += segment->size;
+			psst.rss += segment->size;
+			psst.uss += segment->size;
+			psst.vms += segment->size;
+		}
+		kthread_mutex_unlock(&process->segment_lock);
 		// Note: It is safe to access the clocks in this manner as each of them
 		//       are locked by disabling interrupts. This is perhaps not
 		//       SMP-ready, but it will do for now.

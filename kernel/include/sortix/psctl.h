@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -88,6 +88,10 @@ struct psctl_stat
 	int status;
 	int nice;
 	struct tmns tmns;
+	size_t pss;
+	size_t rss;
+	size_t uss;
+	size_t vms;
 };
 
 #define PSCTL_PROGRAM_PATH __PSCTL(psctl_program_path, 4)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #include <err.h>
 #include <errno.h>
 #include <locale.h>
+#include <memusage.h>
 #include <psctl.h>
 #include <pwd.h>
 #include <stdbool.h>
@@ -29,6 +30,30 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+static char* format_bytes_amount(uintmax_t num_bytes, int unit, bool raw)
+{
+	uintmax_t value = num_bytes;
+	uintmax_t value_fraction = 0;
+	uintmax_t exponent = 1024;
+	char suffixes[] = { 'B', 'K', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' };
+	size_t num_suffixes = sizeof(suffixes) / sizeof(suffixes[0]);
+	size_t suffix_index = 0;
+	while ( (unit < 0 ? exponent <= value : (int) suffix_index < unit) &&
+	        suffix_index + 1 < num_suffixes )
+	{
+		value_fraction = value % exponent;
+		value /= exponent;
+		suffix_index++;
+	}
+	char suffix_char = raw ? 0 : suffixes[suffix_index];
+	char value_fraction_char = '0' + (value_fraction / (1024 / 10 + 1)) % 10;
+	char decimals[3] = {suffix_index ? '.' : 0, value_fraction_char, 0};
+	char* result;
+	if ( asprintf(&result, "%ju%s%c", value, decimals, suffix_char) < 0 )
+		return NULL;
+	return result;
+}
 
 static char* get_program_path_of_pid(pid_t pid)
 {
@@ -103,6 +128,7 @@ int main(int argc, char* argv[])
 	bool select_all = false;
 	bool show_full = false;
 	bool show_long = false;
+	bool show_memory = false;
 
 	const char* argv0 = argv[0];
 	for ( int i = 1; i < argc; i++ )
@@ -126,12 +152,15 @@ int main(int argc, char* argv[])
 			//case 'g': break;
 			//case 'G': break;
 			case 'l': show_long = true; break;
+			case 'm': show_long = true; break;
 			//case 'n': break;
 			//case 'o': break;
 			//case 'p': break;
 			//case 't': break;
 			//case 'u': break;
 			//case 'U': break;
+			// TODO: -o or some better more standard design for this.
+			case 'v': show_memory = true; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
@@ -155,6 +184,10 @@ int main(int argc, char* argv[])
 	if ( 1 < argc )
 		errx(1, "extra operand: %s", argv[1]);
 
+	size_t total_memory = MEMUSAGE_TOTAL;
+	if ( show_memory && memusage(&total_memory, 1) < 0 )
+		err(1, "memusage");
+
 	if ( show_full || show_long )
 		printf("UID\t");
 	printf("PID\t");
@@ -167,7 +200,12 @@ int main(int argc, char* argv[])
 	if ( show_long )
 		printf("NI\t");
 	printf("TTY\t");
-	printf("TIME\t   ");
+	printf("TIME\t  ");
+	if ( show_memory )
+	{
+		printf("%%MEM\t");
+		printf("VMS\t");
+	}
 	printf("CMD\n");
 	pid_t pid = 0;
 	while ( true )
@@ -215,6 +253,16 @@ int main(int argc, char* argv[])
 		int minutes = (time / 60) % 60;
 		int seconds = (time / 1) % 60;
 		printf("%02i:%02i:%02i  ", hours, minutes, seconds);
+		if ( show_memory )
+		{
+			unsigned percent = ((uintmax_t) psst.vms * 100) / total_memory;
+			printf("%3u%%\t", percent);
+			char* usage = format_bytes_amount(psst.vms, -1, false);
+			if ( !usage )
+				err(1, "malloc");
+			printf("%s\t", usage);
+			free(usage);
+		}
 		char* program_path = get_program_path_of_pid(pid);
 		// TODO: Strip special characters from the process name lest an attacker
 		//       do things to the user's terminal.

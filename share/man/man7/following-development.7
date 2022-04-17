@@ -108,6 +108,19 @@ and the
 .Sy extract-ports
 makefile target should be invoked on another system in order to bootstrap the
 new version.
+.Ss Add memory statistics to struct psctl_stat
+The
+.Xr psctl 2
+now provides per-process memory statistics in
+.Vt struct psctl_stat
+via the new members
+.Fa pss ,
+.Fa rss ,
+.Fa uss ,
+and
+.Fa vms .
+.Pp
+This is an incompatible ABI change.
 .Ss Add memusage(2)
 The
 .Xr memusage 2
