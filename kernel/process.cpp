@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1165,7 +1165,7 @@ static bool sys_execve_alloc(addralloc_t* alloc, size_t size)
 {
 	if ( !AllocateKernelAddress(alloc, size) )
 		return false;
-	if ( !Memory::MapRange(alloc->from, alloc->size, PROT_KREAD | PROT_KWRITE, PAGE_USAGE_EXECUTE) )
+	if ( !Memory::MapRange(alloc->from, alloc->size, PROT_KREAD | PROT_KWRITE, PAGE_USAGE_EXECVE) )
 		return FreeKernelAddress(alloc), false;
 	Memory::Flush();
 	return true;
@@ -1173,7 +1173,7 @@ static bool sys_execve_alloc(addralloc_t* alloc, size_t size)
 
 static void sys_execve_free(addralloc_t* alloc)
 {
-	Memory::UnmapRange(alloc->from, alloc->size, PAGE_USAGE_EXECUTE);
+	Memory::UnmapRange(alloc->from, alloc->size, PAGE_USAGE_EXECVE);
 	Memory::Flush();
 	FreeKernelAddress(alloc);
 }

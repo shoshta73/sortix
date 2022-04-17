@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2017, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -220,14 +220,20 @@ void Init(multiboot_info_t* bootinfo)
 	}
 }
 
-void Statistics(size_t* amountused, size_t* totalmem)
+void Statistics(size_t* used, size_t* total, size_t* purposes)
 {
+	ScopedLock lock(&Page::pagelock);
 	size_t memfree = (Page::stackused - Page::stackreserved) << 12UL;
 	size_t memused = Page::totalmem - memfree;
-	if ( amountused )
-		*amountused = memused;
-	if ( totalmem )
-		*totalmem = Page::totalmem;
+	if ( used )
+		*used = memused;
+	if ( total )
+		*total = Page::totalmem;
+	if ( purposes )
+	{
+		for ( size_t i = 0; i < PAGE_USAGE_NUM_KINDS; i++ )
+			purposes[i] = Page::page_usage_counts[i] << 12UL;
+	}
 }
 
 } // namespace Memory

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -90,7 +90,7 @@ int common_statvfs(ioctx_t* ctx, struct statvfs* stvfs, dev_t dev)
 {
 	size_t memory_used;
 	size_t memory_total;
-	Memory::Statistics(&memory_used, &memory_total);
+	Memory::Statistics(&memory_used, &memory_total, NULL);
 	struct statvfs retstvfs;
 	memset(&retstvfs, 0, sizeof(retstvfs));
 	retstvfs.f_bsize = Page::Size();

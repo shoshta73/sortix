@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -117,6 +117,7 @@ int sys_linkat(int, const char*, int, const char*, int);
 int sys_listen(int, int);
 off_t sys_lseek(int, off_t, int);
 int sys_memstat(size_t*, size_t*);
+int sys_memusage(size_t*, size_t);
 int sys_mkdirat(int, const char*, mode_t);
 int sys_mkpartition(int, off_t, off_t, int);
 int sys_mkpty(int*, int*, int);

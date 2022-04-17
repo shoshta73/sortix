@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sortix/memusage.h>
 #include <sortix/mman.h>
 #include <sortix/seek.h>
 
@@ -39,15 +40,56 @@
 
 namespace Sortix {
 
+// TODO: After releasing Sortix 1.1, remove this deprecated system call retained
+//       for backwards compatibility with Sortix 1.0's xz port.
 int sys_memstat(size_t* memused, size_t* memtotal)
 {
 	size_t used;
 	size_t total;
-	Memory::Statistics(&used, &total);
+	Memory::Statistics(&used, &total, NULL);
 	if ( memused && !CopyToUser(memused, &used, sizeof(used)) )
 		return -1;
 	if ( memtotal && !CopyToUser(memtotal, &total, sizeof(total)) )
 		return -1;
+	return 0;
+}
+
+int sys_memusage(size_t* user_counters, size_t num_counters)
+{
+	size_t used;
+	size_t total;
+	size_t purposes[PAGE_USAGE_NUM_KINDS];
+	Memory::Statistics(&used, &total, purposes);
+	for ( size_t start = 0; start < num_counters; )
+	{
+		const size_t BLOCK = 32;
+		size_t counters[BLOCK];
+		size_t amount = num_counters - start;
+		if ( BLOCK < amount )
+			amount = BLOCK;
+		if ( !CopyFromUser(counters, user_counters + start,
+		                   amount * sizeof(size_t)) )
+			return -1;
+		for ( size_t i = 0; i < amount; i++ )
+		{
+			size_t counter = counters[i];
+			size_t count;
+			if ( counter ==  MEMUSAGE_TOTAL )
+				count = total;
+			else if ( counter == MEMUSAGE_USED )
+				count = used;
+			else if ( MEMUSAGE_PURPOSE_FIRST <= counter &&
+			          counter <= MEMUSAGE_PURPOSE_LAST )
+				count = purposes[counter - MEMUSAGE_PURPOSE_FIRST];
+			else
+				return errno = EINVAL, -1;
+			counters[i] = count;
+		}
+		if ( !CopyToUser(user_counters + start, counters,
+		                 amount * sizeof(size_t)) )
+			return -1;
+		start += amount;
+	}
 	return 0;
 }
 

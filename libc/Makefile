@@ -393,6 +393,7 @@ langinfo/nl_langinfo_l.o \
 langinfo/nl_langinfo.o \
 locale/localeconv.o \
 locale/setlocale.o \
+memusage/memusage.o \
 msr/rdmsr.o \
 msr/wrmsr.o \
 netdb/endnetent.o \

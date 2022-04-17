@@ -108,6 +108,11 @@ and the
 .Sy extract-ports
 makefile target should be invoked on another system in order to bootstrap the
 new version.
+.Ss Add memusage(2)
+The
+.Xr memusage 2
+system call has been added, which provides detailed system memory statistics.
+This is a minor compatible ABI change.
 .Ss Implement file descriptor passing
 The
 .Dv SCM_RIGHTS

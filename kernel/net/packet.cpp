@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015 Meisaka Yukara.
- * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -79,7 +79,7 @@ Ref<Packet> GetPacket()
 	else
 	{
 		size_t total_memory;
-		Memory::Statistics(NULL, &total_memory);
+		Memory::Statistics(NULL, &total_memory, NULL);
 		size_t total_pages = total_memory / Page::Size();
 		size_t max_packets = total_pages / MAX_PACKET_FRACTION;
 		if ( max_packets <= packet_count )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2017, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,13 +33,12 @@ class Process;
 
 enum page_usage
 {
-	PAGE_USAGE_OTHER,
 	PAGE_USAGE_PHYSICAL,
 	PAGE_USAGE_PAGING_OVERHEAD,
 	PAGE_USAGE_KERNEL_HEAP,
 	PAGE_USAGE_FILESYSTEM_CACHE,
 	PAGE_USAGE_USER_SPACE,
-	PAGE_USAGE_EXECUTE,
+	PAGE_USAGE_EXECVE,
 	PAGE_USAGE_DRIVER,
 	PAGE_USAGE_NETWORK_PACKET,
 	PAGE_USAGE_NUM_KINDS,
@@ -110,7 +109,7 @@ void PageProtectAdd(addr_t mapto, int protection);
 void PageProtectSub(addr_t mapto, int protection);
 bool MapRange(addr_t where, size_t bytes, int protection, enum page_usage usage);
 bool UnmapRange(addr_t where, size_t bytes, enum page_usage usage);
-void Statistics(size_t* amountused, size_t* totalmem);
+void Statistics(size_t* used, size_t* total, size_t* purposes);
 addr_t GetKernelStack();
 size_t GetKernelStackSize();
 void GetKernelVirtualArea(addr_t* from, size_t* size);
