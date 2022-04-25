@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,6 +38,16 @@ void free(void* addr)
 
 	// Retrieve the chunk that contains this allocation.
 	struct heap_chunk* chunk = heap_data_to_chunk((uint8_t*) addr);
+
+#ifdef __TRACE_ALLOCATION_SITES
+	if ( MAGIC_IS_ALLOCATION_SITE(chunk->chunk_magic) )
+	{
+		struct __allocation_site* allocation_site =
+			ALLOCATION_SITE_OF_MAGIC(chunk->chunk_magic);
+		allocation_site->current_size -= chunk->chunk_size;
+		allocation_site->allocations--;
+	}
+#endif
 
 	// Return the chunk to the heap.
 	heap_insert_chunk(chunk);

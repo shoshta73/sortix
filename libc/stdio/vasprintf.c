@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,9 @@ struct vasprintf
 	char* buffer;
 	size_t used;
 	size_t size;
+#ifdef __TRACE_ALLOCATION_SITES
+	struct __allocation_site* allocation_site;
+#endif
 };
 
 static size_t vasprintf_callback(void* ctx, const char* string, size_t length)
@@ -39,7 +42,12 @@ static size_t vasprintf_callback(void* ctx, const char* string, size_t length)
 		size_t new_size = 2 * state->size;
 		if ( new_size < needed_size )
 			new_size = needed_size;
+#ifdef __TRACE_ALLOCATION_SITES
+		char* new_buffer = (char*) realloc_trace(state->allocation_site,
+		                                         state->buffer, new_size);
+#else
 		char* new_buffer = (char*) realloc(state->buffer, new_size);
+#endif
 		if ( !new_buffer )
 		{
 			free(state->buffer);
@@ -54,14 +62,26 @@ static size_t vasprintf_callback(void* ctx, const char* string, size_t length)
 	return length;
 }
 
+#ifdef __TRACE_ALLOCATION_SITES
+int vasprintf_trace(struct __allocation_site* allocation_site,
+                    char** restrict result_ptr,
+                    const char* restrict format,
+                    va_list list)
+#else
 int vasprintf(char** restrict result_ptr,
               const char* restrict format,
               va_list list)
+#endif
 {
 	struct vasprintf state;
 	state.used = 0;
 	state.size = 32;
+#ifdef __TRACE_ALLOCATION_SITES
+	state.allocation_site = allocation_site;
+	if ( !(state.buffer = (char*) malloc_trace(allocation_site, state.size)) )
+#else
 	if ( !(state.buffer = (char*) malloc(state.size)) )
+#endif
 		return -1;
 	int result = vcbprintf(&state, vasprintf_callback, format, list);
 	if ( !state.buffer )

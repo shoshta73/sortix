@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,6 +34,37 @@ typedef uintptr_t addr_t;
 
 #if !defined(CPU) && defined(__x86_64__)
 	#define CPU X64
+#endif
+
+#ifdef __TRACE_ALLOCATION_SITES
+
+struct kernel_allocation_site
+{
+	struct __allocation_site allocation_site;
+	struct kernel_allocation_site* next;
+	bool registered;
+};
+
+extern struct kernel_allocation_site* first_kernel_allocation_site;
+
+#undef ALLOCATION_SITE
+#define ALLOCATION_SITE \
+({ \
+	static struct kernel_allocation_site site = \
+		{ { __FILE__, __LINE__, __func__, 0, 0 }, NULL, false }; \
+	if ( !site.registered ) \
+	{ \
+		site.registered = true; \
+		site.next = first_kernel_allocation_site; \
+		first_kernel_allocation_site = &site; \
+	} \
+	&site.allocation_site; \
+})
+
+#include <stddef.h>
+void* operator new(size_t size, struct __allocation_site* allocation_site);
+void* operator new[](size_t size, struct __allocation_site* allocation_site);
+#define new new (ALLOCATION_SITE)
 #endif
 
 #endif

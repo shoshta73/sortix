@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,10 +31,20 @@
 
 #if !defined(HEAP_GUARD_DEBUG)
 
+#ifdef __TRACE_ALLOCATION_SITES
+void* realloc_trace(struct __allocation_site* new_allocation_site,
+                    void* ptr,
+                    size_t requested_size)
+#else
 void* realloc(void* ptr, size_t requested_size)
+#endif
 {
 	if ( !ptr )
+#ifdef __TRACE_ALLOCATION_SITES
+		return malloc_trace(new_allocation_site, requested_size);
+#else
 		return malloc(requested_size);
+#endif
 
 	if ( !heap_size_has_bin(requested_size) )
 		return errno = ENOMEM, (void*) NULL;
@@ -55,7 +65,14 @@ void* realloc(void* ptr, size_t requested_size)
 	// Retrieve the chunk that contains this allocation.
 	struct heap_chunk* chunk = heap_data_to_chunk((uint8_t*) ptr);
 
-	assert(chunk->chunk_magic == HEAP_CHUNK_MAGIC);
+#ifdef __TRACE_ALLOCATION_SITES
+	assert(MAGIC_IS_ALLOCATION_SITE(chunk->chunk_magic));
+	struct __allocation_site* allocation_site =
+		ALLOCATION_SITE_OF_MAGIC(chunk->chunk_magic);
+#endif
+
+	assert(chunk->chunk_magic == HEAP_CHUNK_MAGIC ||
+	       MAGIC_IS_ALLOCATION_SITE(chunk->chunk_magic));
 	assert(heap_chunk_to_post(chunk)->chunk_magic == HEAP_CHUNK_MAGIC);
 	assert(heap_chunk_to_post(chunk)->chunk_size == chunk->chunk_size);
 
@@ -72,8 +89,17 @@ void* realloc(void* ptr, size_t requested_size)
 	if ( requested_chunk_size < chunk->chunk_size )
 	{
 		assert(requested_chunk_size <= chunk->chunk_size);
+#ifdef __TRACE_ALLOCATION_SITES
+		allocation_site->current_size -= chunk->chunk_size;
+		allocation_site->allocations--;
+#endif
 		if ( heap_can_split_chunk(chunk, requested_chunk_size) )
 			heap_split_chunk(chunk, requested_chunk_size);
+#ifdef __TRACE_ALLOCATION_SITES
+		allocation_site->current_size += chunk->chunk_size;
+		allocation_site->allocations++;
+		chunk->chunk_magic = MAGIC_OF_ALLOCATION_SITE(allocation_site);
+#endif
 		__heap_verify();
 		__heap_unlock();
 		return heap_chunk_to_data(chunk);
@@ -88,11 +114,20 @@ void* realloc(void* ptr, size_t requested_size)
 	     !heap_chunk_is_used(right) &&
 	     requested_chunk_size <= chunk->chunk_size + right->chunk_size )
 	{
+#ifdef __TRACE_ALLOCATION_SITES
+		allocation_site->current_size -= chunk->chunk_size;
+		allocation_site->allocations--;
+#endif
 		heap_remove_chunk(right);
 		heap_chunk_format((uint8_t*) chunk, chunk->chunk_size + right->chunk_size);
 		assert(requested_chunk_size <= chunk->chunk_size);
 		if ( heap_can_split_chunk(chunk, requested_chunk_size) )
 			heap_split_chunk(chunk, requested_chunk_size);
+#ifdef __TRACE_ALLOCATION_SITES
+		allocation_site->current_size += chunk->chunk_size;
+		allocation_site->allocations++;
+		chunk->chunk_magic = MAGIC_OF_ALLOCATION_SITE(allocation_site);
+#endif
 		__heap_verify();
 		__heap_unlock();
 		return heap_chunk_to_data(chunk);
@@ -108,7 +143,11 @@ void* realloc(void* ptr, size_t requested_size)
 
 	assert(orignal_ptr_size < requested_size);
 
+#ifdef __TRACE_ALLOCATION_SITES
+	void* result = malloc_trace(allocation_site, requested_size);
+#else
 	void* result = malloc(requested_size);
+#endif
 	if ( !result )
 		return (void*) NULL;
 
