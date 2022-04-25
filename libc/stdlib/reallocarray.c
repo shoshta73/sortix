@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,9 +21,18 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#ifdef __TRACE_ALLOCATION_SITES
+void* reallocarray_trace(struct __allocation_site* allocation_site,
+                         void* ptr, size_t nmemb, size_t size)
+#else
 void* reallocarray(void* ptr, size_t nmemb, size_t size)
+#endif
 {
 	if ( size && nmemb && SIZE_MAX / size < nmemb )
 		return errno = ENOMEM, (void*) NULL;
+#ifdef __TRACE_ALLOCATION_SITES
+	return realloc_trace(allocation_site, ptr, nmemb * size);
+#else
 	return realloc(ptr, nmemb * size);
+#endif
 }

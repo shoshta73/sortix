@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -115,6 +115,16 @@ struct heap_alloc
 #define HEAP_CHUNK_MAGIC 0xDEADDEADDEADDEAD
 #else
 #warning "You need to implement HEAP_CHUNK_MAGIC for your native word width"
+#endif
+
+#ifdef __TRACE_ALLOCATION_SITES
+#define MAGIC_IS_ALLOCATION_SITE(magic)( (((size_t) (magic)) & 0x3) == 0x2)
+#define ALLOCATION_SITE_OF_MAGIC(magic) ((struct __allocation_site*) ((magic) & ~0x3UL))
+#define MAGIC_OF_ALLOCATION_SITE(magic) (((size_t) (magic)) | 0x2)
+#else
+#define MAGIC_IS_ALLOCATION_SITE(magic) 0
+#define ALLOCATION_SITE_OF_MAGIC(magic) NULL
+#define MAGIC_OF_ALLOCATION_SITE(magic) NULL
 #endif
 
 /* The heap is split into a number of parts that each consists of a number of
@@ -346,7 +356,8 @@ bool heap_chunk_is_used(struct heap_chunk* chunk)
 {
 	assert(HEAP_IS_POINTER_ALIGNED(chunk, chunk->chunk_size));
 
-	return chunk->chunk_magic == HEAP_CHUNK_MAGIC;
+	return chunk->chunk_magic == HEAP_CHUNK_MAGIC ||
+	       MAGIC_IS_ALLOCATION_SITE(chunk->chunk_magic);
 }
 
 /* Returns the trailing structure following the given chunk. */

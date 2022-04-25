@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,7 +31,12 @@
 
 #if !defined(HEAP_GUARD_DEBUG)
 
+#ifdef __TRACE_ALLOCATION_SITES
+void* malloc_trace(struct __allocation_site* allocation_site,
+                   size_t original_size)
+#else
 void* malloc(size_t original_size)
+#endif
 {
 	if ( !heap_size_has_bin(original_size) )
 		return errno = ENOMEM, (void*) NULL;
@@ -88,6 +93,12 @@ void* malloc(size_t original_size)
 	// return it to the heap for further allocation.
 	if ( heap_can_split_chunk(result_chunk, chunk_size) )
 		heap_split_chunk(result_chunk, chunk_size);
+
+#ifdef __TRACE_ALLOCATION_SITES
+	allocation_site->current_size += result_chunk->chunk_size;
+	allocation_site->allocations++;
+	result_chunk->chunk_magic = MAGIC_OF_ALLOCATION_SITE(allocation_site);
+#endif
 
 	__heap_verify();
 	__heap_unlock();

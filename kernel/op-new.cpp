@@ -24,6 +24,19 @@
 #warning "security: -fcheck-new might not work on clang"
 #endif
 
+#ifdef __TRACE_ALLOCATION_SITES
+#undef new
+
+void* operator new(size_t size, struct __allocation_site* allocation_site)
+{
+	return malloc_trace(allocation_site, size);
+}
+
+void* operator new[](size_t size, struct __allocation_site* allocation_site)
+{
+	return malloc_trace(allocation_site, size);
+}
+#else
 void* operator new(size_t size)
 {
 	return malloc(size);
@@ -33,6 +46,7 @@ void* operator new[](size_t size)
 {
 	return malloc(size);
 }
+#endif
 
 void operator delete(void* addr)
 {

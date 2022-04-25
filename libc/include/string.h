@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014, 2017, 2024, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2017, 2022, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,7 +82,12 @@ void* memccpy(void* __restrict, const void* __restrict, int, size_t);
 
 /* Functions from XOPEN 420 gone into POSIX 2008. */
 #if __USE_SORTIX || 420 <= __USE_XOPEN || 200809L <= __USE_POSIX
+#ifdef __TRACE_ALLOCATION_SITES
+char* strdup_trace(struct __allocation_site*, const char*);
+#define strdup(a) strdup_trace(ALLOCATION_SITE, (a))
+#else
 char* strdup(const char*);
+#endif
 #endif
 
 /* Functions from POSIX 2001. */
@@ -97,7 +102,12 @@ char* stpcpy(char* __restrict, const char* __restrict);
 char* stpncpy(char* __restrict, const char* __restrict, size_t);
 int strcoll_l(const char*, const char*, locale_t);
 char* strerror_l(int, locale_t);
+#ifdef __TRACE_ALLOCATION_SITES
+char* strndup_trace(struct __allocation_site*, const char*, size_t);
+#define strndup(a, b) strndup_trace(ALLOCATION_SITE, (a), (b))
+#else
 char* strndup(const char*, size_t);
+#endif
 size_t strnlen(const char*, size_t);
 char* strsignal(int);
 size_t strxfrm_l(char* __restrict, const char* __restrict, size_t, locale_t);

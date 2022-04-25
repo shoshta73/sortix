@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2015, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -240,10 +240,19 @@ int vdprintf(int, const char* __restrict, __gnuc_va_list)
 
 /* Functions from POSIX 2024. */
 #if __USE_SORTIX || 202405L <= __USE_POSIX
+#ifdef __TRACE_ALLOCATION_SITES
+int asprintf_trace(struct __allocation_site*, char** __restrict, const char* __restrict, ...)
+	__attribute__((__format__ (printf, 3, 4)));
+#define asprintf(a, ...) asprintf_trace(ALLOCATION_SITE, (a), __VA_ARGS__)
+int vasprintf_trace(struct __allocation_site*, char** __restrict, const char* __restrict, __gnuc_va_list)
+	__attribute__((__format__ (printf, 3, 0)));
+#define vasprintf(a, ...) vasprintf_trace(ALLOCATION_SITE, (a), __VA_ARGS__)
+#else
 int asprintf(char** __restrict, const char* __restrict, ...)
 	__attribute__((__format__ (printf, 2, 3)));
 int vasprintf(char** __restrict, const char* __restrict, __gnuc_va_list)
 	__attribute__((__format__ (printf, 2, 0)));
+#endif
 #endif
 
 /* Functions copied from elsewhere. */

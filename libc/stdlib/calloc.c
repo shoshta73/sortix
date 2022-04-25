@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,12 +22,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __TRACE_ALLOCATION_SITES
+void* calloc_trace(struct __allocation_site* allocation_site,
+                   size_t nmemb, size_t size)
+#else
 void* calloc(size_t nmemb, size_t size)
+#endif
 {
 	if ( size && nmemb && SIZE_MAX / size < nmemb )
 		return errno = ENOMEM, (void*) NULL;
 	size_t total = nmemb * size;
+#ifdef __TRACE_ALLOCATION_SITES
+	void* result = malloc_trace(allocation_site, total);
+#else
 	void* result = malloc(total);
+#endif
 	if ( !result )
 		return NULL;
 	memset(result, 0, total);
