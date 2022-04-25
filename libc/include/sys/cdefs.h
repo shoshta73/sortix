@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -135,5 +135,25 @@
 /* TODO: Define when getservbyname(3) is implemented and works. Remove when ssh
          is updated to not rely on this macro. */
 #undef __SORTIX_HAS_GETSERVBYNAME__
+
+#if (defined(__is_sortix_libk) || defined(__is_sortix_kernel)) && \
+    defined(__TRACE_KMALLOC)
+#undef __TRACE_ALLOCATION_SITES
+#define __TRACE_ALLOCATION_SITES
+#endif
+
+#ifdef __TRACE_ALLOCATION_SITES
+#include <stddef.h>
+struct __allocation_site
+{
+	const char* file;
+	size_t line;
+	const char* function;
+	size_t current_size;
+	size_t allocations;
+};
+#define __TRACE_ALLOCATION_SITES
+#define ALLOCATION_SITE 0
+#endif
 
 #endif

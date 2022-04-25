@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,13 +20,24 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#ifdef __TRACE_ALLOCATION_SITES
+int asprintf_trace(struct __allocation_site* allocation_site,
+                   char** restrict result_ptr,
+                   const char* restrict format,
+                   ...)
+#else
 int asprintf(char** restrict result_ptr,
              const char* restrict format,
              ...)
+#endif
 {
 	va_list list;
 	va_start(list, format);
+#ifdef __TRACE_ALLOCATION_SITES
+	int result = vasprintf_trace(allocation_site, result_ptr, format, list);
+#else
 	int result = vasprintf(result_ptr, format, list);
+#endif
 	va_end(list);
 	return result;
 }

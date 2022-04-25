@@ -50,6 +50,51 @@ ssize_t sys_kernelinfo(const char* user_req, char* user_resp, size_t resplen)
 	char* req = GetStringFromUser(user_req);
 	if ( !req )
 		return -1;
+#ifdef __TRACE_ALLOCATION_SITES
+	if ( !strcmp(req, "allocations") )
+	{
+		delete[] req;
+		bool exhausted = false;
+		size_t total_needed = 0;
+		for ( struct kernel_allocation_site* site = first_kernel_allocation_site;
+			  site;
+			  site = site->next )
+		{
+			char str[256];
+			snprintf(str, sizeof(str), "%20zu B %zu allocations %s:%zu %s %c",
+			         site->allocation_site.current_size,
+			         site->allocation_site.allocations,
+			         site->allocation_site.file,
+			         site->allocation_site.line,
+			         site->allocation_site.function,
+			         site->next ? '\n' : '\0');
+			size_t stringlen = strlen(str);
+			total_needed += stringlen;
+			if ( exhausted )
+				continue;
+			if ( resplen < stringlen )
+			{
+				exhausted = true;
+				continue;
+			}
+			if ( !CopyToUser(user_resp, str, sizeof(char) * stringlen) )
+				return -1;
+			user_resp += stringlen;
+			resplen -= stringlen;
+		}
+		if ( !exhausted && !resplen )
+			exhausted = true;
+		if ( !exhausted )
+		{
+			char zero = '\0';
+			if ( !CopyToUser(user_resp, &zero, 1) )
+				return -1;
+		}
+		if ( exhausted )
+			return errno = ERANGE, (ssize_t) total_needed;
+		return 0;
+	}
+#endif
 	const char* str = KernelInfo(req);
 	delete[] req;
 	if ( !str )

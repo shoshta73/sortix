@@ -102,6 +102,8 @@
 #include "x86-family/vbox.h"
 #endif
 
+struct kernel_allocation_site* first_kernel_allocation_site = NULL;
+
 // Keep the stack size aligned with $CPU/boot.s
 const size_t STACK_SIZE = 64*1024;
 extern "C" { __attribute__((aligned(16))) size_t stack[STACK_SIZE / sizeof(size_t)]; }

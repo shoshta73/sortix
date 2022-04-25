@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -242,8 +242,14 @@ int vdprintf(int fildes, const char* __restrict format, __gnuc_va_list ap)
 
 /* Functions copied from elsewhere. */
 #if __USE_SORTIX
+#ifdef __TRACE_ALLOCATION_SITES
+int asprintf_trace(struct __allocation_site*, char** __restrict, const char* __restrict, ...)
+	__attribute__((__format__ (printf, 3, 4)));
+#define asprintf(a, ...) asprintf_trace(ALLOCATION_SITE, (a), __VA_ARGS__)
+#else
 int asprintf(char** __restrict, const char* __restrict, ...)
 	__attribute__((__format__ (printf, 2, 3)));
+#endif
 void clearerr_unlocked(FILE* stream);
 int feof_unlocked(FILE* stream);
 int ferror_unlocked(FILE* stream);
@@ -255,8 +261,14 @@ int fputc_unlocked(int c, FILE* stream);
 int fputs_unlocked(const char* __restrict, FILE* __restrict stream);
 size_t fread_unlocked(void* __restrict ptr, size_t size, size_t nitems, FILE* __restrict stream);
 size_t fwrite_unlocked(const void* __restrict ptr, size_t size, size_t nitems, FILE* __restrict stream);
+#ifdef __TRACE_ALLOCATION_SITES
+int vasprintf_trace(struct __allocation_site*, char** __restrict, const char* __restrict, __gnuc_va_list)
+	__attribute__((__format__ (printf, 3, 0)));
+#define vasprintf(a, ...) vasprintf_trace(ALLOCATION_SITE, (a), __VA_ARGS__)
+#else
 int vasprintf(char** __restrict, const char* __restrict, __gnuc_va_list)
 	__attribute__((__format__ (printf, 2, 0)));
+#endif
 #endif
 
 /* Functions that are Sortix extensions. */

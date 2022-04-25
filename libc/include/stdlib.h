@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -88,7 +88,12 @@ double atof(const char* value);
 int atoi(const char*);
 long atol(const char*);
 void* bsearch(const void*, const void*, size_t, size_t, int (*)(const void*, const void*));
+#ifdef __TRACE_ALLOCATION_SITES
+void* calloc_trace(struct __allocation_site*, size_t, size_t);
+#define calloc(a, b) calloc_trace(ALLOCATION_SITE, (a), (b))
+#else
 void* calloc(size_t, size_t);
+#endif
 char* canonicalize_file_name(const char* path);
 char* canonicalize_file_name_at(int dirfd, const char* path);
 int clearenv(void);
@@ -99,7 +104,12 @@ void free(void*);
 char* getenv(const char*);
 long labs(long);
 ldiv_t ldiv(long, long);
+#ifdef __TRACE_ALLOCATION_SITES
+void* malloc_trace(struct __allocation_site*, size_t);
+#define malloc(a) malloc_trace(ALLOCATION_SITE, (a))
+#else
 void* malloc(size_t);
+#endif
 int mblen(const char*, size_t);
 size_t mbstowcs(wchar_t* __restrict, const char* __restrict, size_t);
 int mbtowc(wchar_t *__restrict, const char* __restrict, size_t);
@@ -116,7 +126,12 @@ void qsort_r(void*, size_t, size_t, int (*)(const void*, const void*, void*), vo
 __attribute__((__warning__("rand() isn't random, use arc4random()")))
 #endif
 int rand(void);
+#ifdef __TRACE_ALLOCATION_SITES
+void* realloc_trace(struct __allocation_site*, void*, size_t);
+#define realloc(a, b) realloc_trace(ALLOCATION_SITE, (a), (b))
+#else
 void* realloc(void*, size_t);
+#endif
 char* realpath(const char* __restrict, char* __restrict);
 int setenv(const char*, const char*, int);
 #if !defined(__is_sortix_libc) /* not a warning inside libc */
@@ -189,7 +204,12 @@ int posix_openpt(int);
 uint32_t arc4random(void);
 void arc4random_buf(void*, size_t);
 uint32_t arc4random_uniform(uint32_t);
+#ifdef __TRACE_ALLOCATION_SITES
+void* reallocarray_trace(struct __allocation_site*, void*, size_t, size_t);
+#define reallocarray(a, b, c) reallocarray_trace(ALLOCATION_SITE, (a), (b), (c))
+#else
 void* reallocarray(void*, size_t, size_t);
+#endif
 int ptsname_r(int, char*, size_t);
 #endif
 
