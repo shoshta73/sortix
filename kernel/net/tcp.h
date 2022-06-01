@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,6 +34,7 @@ void HandleIP(Ref<Packet> pkt,
               const struct in_addr* dst,
               bool dst_broadcast);
 Ref<Inode> Socket(int af);
+ssize_t Info(char* user_resp, size_t resplen);
 
 } // namespace TCP
 } // namespace Sortix
