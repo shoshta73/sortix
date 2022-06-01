@@ -25,6 +25,7 @@
 #include <sortix/kernel/syscall.h>
 
 #include "kernelinfo.h"
+#include "net/tcp.h"
 
 #ifndef VERSIONSTR
 #define VERSIONSTR "unknown"
@@ -52,6 +53,12 @@ ssize_t sys_kernelinfo(const char* user_req, char* user_resp, size_t resplen)
 	char* req = GetStringFromUser(user_req);
 	if ( !req )
 		return -1;
+	// DEBUG
+	if ( !strcmp(req, "tcp") )
+	{
+		delete[] req;
+		return TCP::Info(user_resp, resplen);
+	}
 #ifdef __TRACE_ALLOCATION_SITES
 	if ( !strcmp(req, "allocations") )
 	{
