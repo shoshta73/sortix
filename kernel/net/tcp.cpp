@@ -45,6 +45,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 
+#include <arpa/inet.h>
 #include <assert.h>
 #include <endian.h>
 #include <errno.h>
@@ -130,6 +131,9 @@ static kthread_mutex_t tcp_lock = KTHREAD_MUTEX_INITIALIZER;
 
 static TCPSocket** bindings_v4;
 static TCPSocket** bindings_v6;
+
+static TCPSocket* all_first_socket;
+static TCPSocket* all_last_socket;
 
 void Init()
 {
@@ -229,6 +233,7 @@ public:
 	int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 
 public:
+	size_t Describe(char* buf, size_t buflen);
 	void Unreference();
 	void ProcessPacket(Ref<Packet> pkt, union tcp_sockaddr* pkt_src,
 	                   union tcp_sockaddr* pkt_dst);
@@ -289,6 +294,12 @@ public:
 
 	// The listening socket this socket is in the listening queue for.
 	TCPSocket* connecting_parent;
+
+	// DEBUG: The previous socket of all sockets.
+	TCPSocket* all_prev_socket;
+
+	// DEBUG: The next socket of all sockets.
+	TCPSocket* all_next_socket;
 
 	// Condition variable that is signaled when new data can be received.
 	kthread_cond_t receive_cond;
@@ -471,7 +482,7 @@ void TCPSocket__OnTimer(Clock* /*clock*/, Timer* /*timer*/, void* user)
 	((TCPSocket*) user)->OnTimer();
 }
 
-TCPSocket::TCPSocket(int af)
+TCPSocket::TCPSocket(int af) // DEBUG: tcp_lock taken
 {
 	prev_socket = NULL;
 	next_socket = NULL;
@@ -526,9 +537,15 @@ TCPSocket::TCPSocket(int af)
 	timer_armed = false;
 	memset(incoming, 0, sizeof(incoming));
 	memset(outgoing, 0, sizeof(outgoing));
+	// DEBUG
+	all_prev_socket = all_last_socket;
+	all_next_socket = NULL;
+	(all_last_socket ?
+	 all_last_socket->all_next_socket : all_first_socket) = this;
+	all_last_socket = this;
 }
 
-TCPSocket::~TCPSocket()
+TCPSocket::~TCPSocket() // DEBUG: tcp_lock taken
 {
 	assert(state == TCP_STATE_CLOSED || state == TCP_STATE_LISTEN);
 	assert(!bound);
@@ -541,6 +558,52 @@ TCPSocket::~TCPSocket()
 	assert(!connecting_next);
 	assert(!connecting_parent);
 	assert(!is_referenced);
+	// DEBUG
+	(all_prev_socket ?
+	 all_prev_socket->all_next_socket : all_first_socket) = all_next_socket;
+	(all_next_socket ?
+	 all_next_socket->all_prev_socket : all_last_socket) = all_prev_socket;
+	all_prev_socket = NULL;
+	all_next_socket = NULL;
+}
+
+// DEBUG
+size_t TCPSocket::Describe(char* buf, size_t buflen) // tcp_lock taken
+{
+	const char* const STATE_NAMES[] =
+	{
+		"CLOSED",
+		"LISTEN",
+		"SYN_SENT",
+		"SYN_RECV",
+		"ESTAB",
+		"FIN_WAIT_1",
+		"CLOSE_WAIT",
+		"FIN_WAIT_2",
+		"CLOSING",
+		"LAST_ACK",
+		"TIME_WAIT",
+	};
+	const char* state_name = STATE_NAMES[state];
+	char local_str[INET_ADDRSTRLEN];
+	char remote_str[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &local.in.sin_addr, local_str, sizeof(local_str));
+	inet_ntop(AF_INET, &remote.in.sin_addr, remote_str, sizeof(remote_str));
+	char timeout[64] = "none";
+	if ( timer_armed )
+	{
+		struct itimerspec its;
+		timer.Get(&its);
+		snprintf(timeout, sizeof(timeout), "%ji.%09li",
+		         (intmax_t) its.it_value.tv_sec, its.it_value.tv_nsec);
+	}
+	return snprintf(buf, buflen,
+	                "%s %s %u -> %s %u"
+	                " timeout=%s resends=%u sockerr=%i transmit=%i refed=%i\n",
+	                state_name, local_str, be16toh(local.in.sin_port),
+	                remote_str, be16toh(remote.in.sin_port), timeout,
+	                retransmissions, sockerr, transmit_scheduled,
+	                is_referenced);
 }
 
 void TCPSocket::Unreference()
@@ -2558,6 +2621,7 @@ Ref<Inode> Socket(int af)
 {
 	if ( !IsSupportedAddressFamily(af) )
 		return errno = EAFNOSUPPORT, Ref<Inode>(NULL);
+	ScopedLock lock(&tcp_lock); // DEBUG
 	TCPSocket* socket = new TCPSocket(af);
 	if ( !socket )
 		return Ref<Inode>();
@@ -2565,6 +2629,46 @@ Ref<Inode> Socket(int af)
 	if ( !result )
 		return delete socket, Ref<Inode>();
 	return result;
+}
+
+// DEBUG
+ssize_t Info(char* user_resp, size_t resplen)
+{
+	ScopedLock lock(&tcp_lock); // DEBUG
+	bool exhausted = false;
+	size_t total_needed = 0;
+	for ( TCPSocket* socket = all_first_socket;
+	      socket;
+	      socket = socket->all_next_socket )
+	{
+		char str[256];
+		size_t stringlen = socket->Describe(str, sizeof(str));
+		if ( !socket->all_next_socket && stringlen )
+			stringlen--;
+		total_needed += stringlen;
+		if ( exhausted )
+			continue;
+		if ( resplen < stringlen )
+		{
+			exhausted = true;
+			continue;
+		}
+		if ( !CopyToUser(user_resp, str, sizeof(char) * stringlen) )
+			return -1;
+		user_resp += stringlen;
+		resplen -= stringlen;
+	}
+	if ( !exhausted && !resplen )
+		exhausted = true;
+	if ( !exhausted )
+	{
+		char zero = '\0';
+		if ( !CopyToUser(user_resp, &zero, 1) )
+			return -1;
+	}
+	if ( exhausted )
+		return errno = ERANGE, (ssize_t) total_needed;
+	return 0;
 }
 
 } // namespace TCP
