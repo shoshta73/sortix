@@ -167,7 +167,14 @@ int sub_leap_seconds(time_t*);
 int add_leap_seconds(time_t*);
 #endif
 
+#if __USE_XOPEN || __USE_SORTIX
+extern int daylight;
+extern long timezone;
+#endif
+
+#if __USE_POSIX || __USE_SORTIX
 extern char* tzname[2];
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
