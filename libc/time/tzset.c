@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+int daylight = 0;
+long timezone = 0;
 char* tzname[2] = { (char*) "UTC", (char*) "UTC" };
 
 void tzset(void)

@@ -166,6 +166,8 @@ int clock_settimeres(clockid_t, const struct timespec*, const struct timespec*);
 int timens(struct tmns* tmns);
 #endif
 
+extern int daylight;
+extern long timezone;
 extern char* tzname[2];
 
 #ifdef __cplusplus
