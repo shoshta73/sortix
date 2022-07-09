@@ -1,157 +1,144 @@
-diff -Paur --no-dereference -- nano.upstream/config.sub nano/config.sub
---- nano.upstream/config.sub
-+++ nano/config.sub
-@@ -1373,7 +1373,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* | -plan9* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -Paur --no-dereference -- nano.upstream/configure nano/configure
 --- nano.upstream/configure
 +++ nano/configure
-@@ -8675,6 +8675,7 @@
+@@ -43510,6 +43510,7 @@
    # Extract the first word of "${ac_tool_prefix}ncursesw5-config", so it can be a program name with args.
  set dummy ${ac_tool_prefix}ncursesw5-config; ac_word=$2
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
 +ac_cv_prog_NCURSESW_CONFIG=false
- $as_echo_n "checking for $ac_word... " >&6; }
- if ${ac_cv_prog_NCURSESW_CONFIG+:} false; then :
-   $as_echo_n "(cached) " >&6
+ printf %s "checking for $ac_word... " >&6; }
+ if test ${ac_cv_prog_NCURSESW_CONFIG+y}
+ then :
 diff -Paur --no-dereference -- nano.upstream/src/files.c nano/src/files.c
 --- nano.upstream/src/files.c
 +++ nano/src/files.c
-@@ -1501,10 +1501,12 @@
-     if (tmpdir_env != NULL)
- 	full_tempdir = check_writable_directory(tmpdir_env);
+@@ -1422,8 +1422,10 @@
+ 	if (env_dir != NULL)
+ 		tempdir = check_writable_directory(env_dir);
  
 +#ifdef P_tmpdir
-     /* If $TMPDIR is unset, empty, or not a writable directory, and
-      * full_tempdir is NULL, try P_tmpdir instead. */
-     if (full_tempdir == NULL)
- 	full_tempdir = check_writable_directory(P_tmpdir);
+ 	if (tempdir == NULL)
+ 		tempdir = check_writable_directory(P_tmpdir);
 +#endif
  
-     /* if P_tmpdir is NULL, use /tmp. */
-     if (full_tempdir == NULL)
-diff -Paur --no-dereference -- nano.upstream/src/Makefile.in nano/src/Makefile.in
---- nano.upstream/src/Makefile.in
-+++ nano/src/Makefile.in
-@@ -559,6 +559,7 @@
- distclean: distclean-am
- 	-rm -rf ./$(DEPDIR)
- 	-rm -f Makefile
-+	-rm -f revision.h
- distclean-am: clean-am distclean-compile distclean-generic \
- 	distclean-tags
+ 	if (tempdir == NULL)
+ 		tempdir = copy_of("/tmp/");
+diff -Paur --no-dereference -- nano.upstream/src/nano.c nano/src/nano.c
+--- nano.upstream/src/nano.c
++++ nano/src/nano.c
+@@ -329,7 +329,7 @@
  
+ 	if (*filename == '\0') {
+ 		plainname = nmalloc(28);
+-		sprintf(plainname, "nano.%u", getpid());
++		sprintf(plainname, "nano.%ji", (intmax_t)getpid());
+ 	} else
+ 		plainname = copy_of(filename);
+ 
+@@ -2076,8 +2076,7 @@
+ 	}
+ 
+ 	/* Curses needs TERM; if it is unset, try falling back to a VT220. */
+-	if (getenv("TERM") == NULL)
+-		putenv("TERM=vt220");
++	setenv("TERM", "vt220", 0);
+ 
+ 	/* Enter into curses mode.  Abort if this fails. */
+ 	if (initscr() == NULL)
 diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
 --- nano.upstream/src/rcfile.c
 +++ nano/src/rcfile.c
-@@ -23,7 +23,9 @@
+@@ -27,7 +27,9 @@
  
- #include "proto.h"
- 
-+#if defined(__has_include) && __has_include(<glob.h>)
+ #include <ctype.h>
+ #include <errno.h>
++#if __has_include(<glob.h>)
  #include <glob.h>
 +#endif
- #include <stdarg.h>
  #include <string.h>
- #include <stdio.h>
-@@ -223,13 +225,35 @@
-  * null-terminate it, and return a pointer to the /next/ word. */
+ #include <unistd.h>
+ 
+@@ -577,6 +579,11 @@
+  * null-terminate it, and return a pointer to the succeeding text. */
  char *parse_next_regex(char *ptr)
  {
-+    char* outptr = ptr;
-+    int escaped = 0;
-+    char c;
-+    size_t bracket = 0;
++	char* outptr = ptr;
++	int escaped = 0;
++	char c;
++	size_t bracket = 0;
 +
-     assert(ptr != NULL);
+ 	char *starting_point = ptr;
  
--    /* Continue until the end of line, or until a " followed by a
--     * blank character or the end of line. */
--    while (*ptr != '\0' && (*ptr != '"' ||
--		(*(ptr + 1) != '\0' && !isblank(*(ptr + 1)))))
--	ptr++;
-+    /* PATCH: This fixes issues in the nanorc parser because the Sortix regcomp
-+              does not support \" and \' (just use " and ' instead). */
-+    while ((c = *ptr)) {
-+      if (!escaped && !bracket && c == '"' &&
-+          (!ptr[1] || isspace((unsigned char) ptr[1])) )
-+	break;
-+      if (escaped && c != '"' && c != '\'')
-+        *outptr++ = '\\';
-+      if (c == '\\' && !escaped && !bracket)
-+	escaped = 1;
-+      else if (c == '[' && !escaped) {
-+	bracket++;
-+	*outptr++ = c;
-+      } else if (bracket && c == ']' && !escaped) {
-+	bracket--;
-+	*outptr++ = c;
-+      } else {
-+	*outptr++ = c;
-+	escaped = 0;
-+      }
-+      ptr++;
-+    }
+ 	if (*(ptr - 1) != '"') {
+@@ -584,11 +591,28 @@
+ 		return NULL;
+ 	}
  
-     assert(*ptr == '"' || *ptr == '\0');
+-	/* Continue until the end of the line, or until a double quote followed
+-	 * by end-of-line or a blank. */
+-	while (*ptr != '\0' && (*ptr != '"' ||
+-						(ptr[1] != '\0' && !isblank((unsigned char)ptr[1]))))
++	/* PATCH: This fixes issues in the nanorc parser because the Sortix regcomp
++	          does not support \" and \' (just use " and ' instead). */
++	while ((c = *ptr)) {
++		if (!escaped && !bracket && c == '"' &&
++		    (!ptr[1] || isspace((unsigned char) ptr[1])) )
++			break;
++		if (escaped && c != '"' && c != '\'')
++			*outptr++ = '\\';
++		if (c == '\\' && !escaped && !bracket)
++			escaped = 1;
++		else if (c == '[' && !escaped) {
++			bracket++;
++			*outptr++ = c;
++		} else if (bracket && c == ']' && !escaped) {
++			bracket--;
++			*outptr++ = c;
++		} else {
++			*outptr++ = c;
++			escaped = 0;
++		}
+ 		ptr++;
++	}
  
-@@ -240,7 +264,8 @@
-     }
+ 	if (*ptr == '\0') {
+ 		jot_error(N_("Regex strings must begin and end with a \" character"));
+@@ -601,7 +625,8 @@
+ 	}
  
-     /* Null-terminate and advance ptr. */
--    *ptr++ = '\0';
-+    *outptr = '\0';
-+    ptr++;
+ 	/* Null-terminate the regex and skip until the next non-blank. */
+-	*ptr++ = '\0';
++	*outptr = '\0';
++	ptr++;
  
-     while (isblank(*ptr))
- 	ptr++;
-@@ -570,8 +595,11 @@
+ 	while (isblank((unsigned char)*ptr))
+ 		ptr++;
+@@ -966,8 +991,10 @@
  void parse_includes(char *ptr)
  {
-     char *option, *nanorc_save = nanorc, *expanded;
--    size_t lineno_save = lineno, i;
-+    size_t lineno_save = lineno;
-+#if defined(__has_include) && __has_include(<glob.h>)
-+    size_t i;
-     glob_t files;
+ 	char *pattern, *expanded;
++#if __has_include(<glob.h>)
+ 	glob_t files;
+ 	int result;
 +#endif
  
-     option = ptr;
-     if (*option == '"')
-@@ -581,6 +609,7 @@
-     /* Expand tildes first, then the globs. */
-     expanded = real_dir_from_tilde(option);
+ 	check_for_nonempty_syntax();
  
-+#if defined(__has_include) && __has_include(<glob.h>)
-     if (glob(expanded, GLOB_ERR|GLOB_NOSORT, NULL, &files) == 0) {
- 	for (i = 0; i < files.gl_pathc; ++i)
- 	    parse_one_include(files.gl_pathv[i]);
-@@ -589,6 +618,9 @@
- 		strerror(errno));
+@@ -978,6 +1005,7 @@
  
-     globfree(&files);
+ 	/* Expand a tilde first, then try to match the globbing pattern. */
+ 	expanded = real_dir_from_tilde(pattern);
++#if __has_include(<glob.h>)
+ 	result = glob(expanded, GLOB_ERR, NULL, &files);
+ 
+ 	/* If there are matches, process each of them.  Otherwise, only
+@@ -989,6 +1017,9 @@
+ 		jot_error(N_("Error expanding %s: %s"), pattern, strerror(errno));
+ 
+ 	globfree(&files);
 +#else
-+    parse_one_include(expanded);
++	parse_one_include(expanded);
 +#endif
-     free(expanded);
+ 	free(expanded);
+ }
  
-     /* We're done with the included file(s).  Restore the original
-diff -Paur --no-dereference -- nano.upstream/src/winio.c nano/src/winio.c
---- nano.upstream/src/winio.c
-+++ nano/src/winio.c
-@@ -2274,7 +2274,7 @@
-     if (margin > 0) {
- 	wattron(edit, interface_color_pair[LINE_NUMBER]);
- 	if (last_drawn_line != fileptr->lineno || last_line_y >= line)
--	    mvwprintw(edit, line, 0, "%*i", margin - 1, fileptr->lineno);
-+	    mvwprintw(edit, line, 0, "%*zi", margin - 1, fileptr->lineno);
- 	else
- 	    mvwprintw(edit, line, 0, "%*s", margin - 1, " ");
- 	wattroff(edit, interface_color_pair[LINE_NUMBER]);
