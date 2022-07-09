@@ -52,7 +52,7 @@ SORTIX_PORTS_MIRROR?=https://pub.sortix.org/mirror
 
 SORTIX_INCLUDE_SOURCE_GIT_REPO?=$(shell test -d .git && echo "file://`pwd`")
 SORTIX_INCLUDE_SOURCE_GIT_REPO:=$(SORTIX_INCLUDE_SOURCE_GIT_REPO)
-SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=
+SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=https://sortix.org/sortix.git
 SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS?=--single-branch
 SORTIX_INCLUDE_SOURCE_GIT_BRANCHES?=master
 ifneq ($(and $(shell which git 2>/dev/null),$(SORTIX_INCLUDE_SOURCE_GIT_REPO)),)
@@ -249,8 +249,8 @@ ifeq ($(SORTIX_INCLUDE_SOURCE),git)
 	rm -rf "$(SYSROOT)/src"
 	git clone --no-hardlinks $(SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS) -- "$(SORTIX_INCLUDE_SOURCE_GIT_REPO)" "$(SYSROOT)/src"
 	-cd "$(SYSROOT)/src" && for BRANCH in $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES); do \
-	  git fetch origin $$BRANCH && \
-	  (git branch -f $$BRANCH FETCH_HEAD || true) ; \
+	  git fetch origin $$BRANCH:refs/remotes/origin/$$BRANCH && \
+	  (git branch -f $$BRANCH origin/$$BRANCH || true) ; \
 	done
 ifneq ($(SORTIX_INCLUDE_SOURCE_GIT_ORIGIN),)
 	cd "$(SYSROOT)/src" && git remote set-url origin $(SORTIX_INCLUDE_SOURCE_GIT_ORIGIN)
