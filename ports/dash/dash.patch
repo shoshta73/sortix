@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- dash.upstream/src/cd.c dash/src/cd.c
 --- dash.upstream/src/cd.c
 +++ dash/src/cd.c
-@@ -252,7 +252,7 @@
+@@ -268,7 +268,7 @@
  STATIC char *
  getpwd()
  {
@@ -30,7 +30,24 @@ diff -Paur --no-dereference -- dash.upstream/src/exec.c dash/src/exec.c
 +#endif
  }
  
- 
+ static const char *legal_pathopt(const char *opt, const char *term, int magic)
+diff -Paur --no-dereference -- dash.upstream/src/expand.c dash/src/expand.c
+--- dash.upstream/src/expand.c
++++ dash/src/expand.c
+@@ -44,6 +44,13 @@
+ #include <stdio.h>
+ #include <inttypes.h>
+ #include <limits.h>
++/* PATCH: Sortix does not currently have maximum filename or path length */
++#ifndef PATH_MAX
++#define PATH_MAX 4096
++#endif
++#ifndef NAME_MAX
++#define NAME_MAX 255
++#endif
+ #include <string.h>
+ #ifdef HAVE_FNMATCH
+ #include <fnmatch.h>
 diff -Paur --no-dereference -- dash.upstream/src/histedit.c dash/src/histedit.c
 --- dash.upstream/src/histedit.c
 +++ dash/src/histedit.c
@@ -53,7 +70,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  #ifdef BSD
  #include <sys/wait.h>
  #include <sys/time.h>
-@@ -207,7 +206,7 @@
+@@ -212,7 +211,7 @@
  				mflag = on = 0;
  				goto close;
  			}
@@ -62,7 +79,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  				break;
  			killpg(0, SIGTTIN);
  		} while (1);
-@@ -457,7 +456,7 @@
+@@ -461,7 +460,7 @@
  
  	if (mode & SHOW_PGID) {
  		/* just output process (group) id of pipeline */
@@ -71,7 +88,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  		return;
  	}
  
-@@ -470,7 +469,7 @@
+@@ -474,7 +473,7 @@
  		s[col - 2] = '-';
  
  	if (mode & SHOW_PID)
@@ -80,7 +97,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  
  	psend = ps + jp->nprocs;
  
-@@ -490,7 +489,7 @@
+@@ -494,7 +493,7 @@
  
  	do {
  		/* for each process */
@@ -89,31 +106,58 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  
  start:
  		outfmt(
-@@ -1136,7 +1135,7 @@
+@@ -971,7 +970,7 @@
+ 	sigblockall(NULL);
+ 	vforked++;
  
+-	pid = vfork();
++	pid = fork();
+ 
+ 	if (!pid) {
+ 		forkchild(jp, n, FORK_FG);
+@@ -1179,7 +1178,7 @@
  	do {
  		gotsigchld = 0;
--		err = wait3(status, flags, NULL);
-+		err = waitpid(-1, status, flags);
- 		if (err || !block)
- 			break;
+ 		do
+-			err = wait3(status, flags, NULL);
++			err = waitpid(-1, status, flags);
+ 		while (err < 0 && errno == EINTR);
  
+ 		if (err || (err = -!block))
 diff -Paur --no-dereference -- dash.upstream/src/Makefile.in dash/src/Makefile.in
 --- dash.upstream/src/Makefile.in
 +++ dash/src/Makefile.in
-@@ -170,9 +170,9 @@
- AM_CFLAGS = $(COMMON_CFLAGS)
- AM_CPPFLAGS = $(COMMON_CPPFLAGS)
- AM_CFLAGS_FOR_BUILD = -g -O2 $(COMMON_CFLAGS) 
--AM_CPPFLAGS_FOR_BUILD = $(COMMON_CPPFLAGS)
-+AM_CPPFLAGS_FOR_BUILD = -DBSD=1 -DSHELL -DIFS_BROKEN
- COMPILE_FOR_BUILD = \
--	$(CC_FOR_BUILD) $(DEFAULT_INCLUDES) $(AM_CPPFLAGS_FOR_BUILD) \
-+	unset HOST_SYSTEM_ROOT && $(CC_FOR_BUILD) $(DEFAULT_INCLUDES) $(AM_CPPFLAGS_FOR_BUILD) \
- 	$(CPPFLAGS_FOR_BUILD) \
- 	$(AM_CFLAGS_FOR_BUILD) $(CFLAGS_FOR_BUILD) 
- 
-@@ -542,7 +542,11 @@
+@@ -669,12 +669,14 @@
+ 		-rm -f ./$(DEPDIR)/alias.Po
+ 	-rm -f ./$(DEPDIR)/arith_yacc.Po
+ 	-rm -f ./$(DEPDIR)/arith_yylex.Po
++	-rm -f ./$(DEPDIR)/builtins.Po
+ 	-rm -f ./$(DEPDIR)/cd.Po
+ 	-rm -f ./$(DEPDIR)/error.Po
+ 	-rm -f ./$(DEPDIR)/eval.Po
+ 	-rm -f ./$(DEPDIR)/exec.Po
+ 	-rm -f ./$(DEPDIR)/expand.Po
+ 	-rm -f ./$(DEPDIR)/histedit.Po
++	-rm -f ./$(DEPDIR)/init.Po
+ 	-rm -f ./$(DEPDIR)/input.Po
+ 	-rm -f ./$(DEPDIR)/jobs.Po
+ 	-rm -f ./$(DEPDIR)/mail.Po
+@@ -682,11 +684,14 @@
+ 	-rm -f ./$(DEPDIR)/memalloc.Po
+ 	-rm -f ./$(DEPDIR)/miscbltin.Po
+ 	-rm -f ./$(DEPDIR)/mystring.Po
++	-rm -f ./$(DEPDIR)/nodes.Po
+ 	-rm -f ./$(DEPDIR)/options.Po
+ 	-rm -f ./$(DEPDIR)/output.Po
+ 	-rm -f ./$(DEPDIR)/parser.Po
+ 	-rm -f ./$(DEPDIR)/redir.Po
+ 	-rm -f ./$(DEPDIR)/show.Po
++	-rm -f ./$(DEPDIR)/signames.Po
++	-rm -f ./$(DEPDIR)/syntax.Po
+ 	-rm -f ./$(DEPDIR)/system.Po
+ 	-rm -f ./$(DEPDIR)/trap.Po
+ 	-rm -f ./$(DEPDIR)/var.Po
+@@ -709,7 +714,11 @@
  
  info-am:
  
@@ -151,18 +195,18 @@ diff -Paur --no-dereference -- dash.upstream/src/output.c dash/src/output.c
 diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
 --- dash.upstream/src/parser.c
 +++ dash/src/parser.c
-@@ -32,10 +32,6 @@
+@@ -32,10 +32,7 @@
   * SUCH DAMAGE.
   */
  
 -#if HAVE_ALLOCA_H
--#include <alloca.h>
+ #include <alloca.h>
 -#endif
 -
  #include <stdlib.h>
  
  #include "shell.h"
-@@ -1090,10 +1086,12 @@
+@@ -1137,10 +1134,12 @@
  				if (len) {
  					char *str;
  
@@ -176,7 +220,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  				}
  			}
  		}
-@@ -1300,7 +1298,7 @@
+@@ -1373,7 +1372,7 @@
  	str = NULL;
  	savelen = out - (char *)stackblock();
  	if (savelen > 0) {
@@ -185,7 +229,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  		memcpy(str, stackblock(), savelen);
  	}
          if (oldstyle) {
-@@ -1400,6 +1398,7 @@
+@@ -1463,6 +1462,7 @@
  	if (str) {
  		memcpy(out, str, savelen);
  		STADJUST(savelen, out);
