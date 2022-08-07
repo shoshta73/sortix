@@ -57,6 +57,20 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/journal.c e2fsprogs/e2f
  #include <sys/mount.h>
  #define MNT_FL (MS_MGC_VAL | MS_RDONLY)
  #endif
+@@ -635,11 +634,11 @@
+ 	       val + sizeof(struct ext4_fc_dentry_info),
+ 	       darg->dname_len);
+ 	darg->dname[darg->dname_len] = 0;
+-	jbd_debug(1, "%s: %s, ino %lu, parent %lu\n",
++	jbd_debug(1, "%s: %s, ino %ju, parent %ju\n",
+ 		tag == EXT4_FC_TAG_CREAT ? "create" :
+ 		(tag == EXT4_FC_TAG_LINK ? "link" :
+ 		(tag == EXT4_FC_TAG_UNLINK ? "unlink" : "error")),
+-		darg->dname, darg->ino, darg->parent_ino);
++		darg->dname, (uintmax_t) darg->ino, (uintmax_t) darg->parent_ino);
+ 	return 0;
+ }
+ 
 diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/logfile.c e2fsprogs/e2fsck/logfile.c
 --- e2fsprogs.upstream/e2fsck/logfile.c
 +++ e2fsprogs/e2fsck/logfile.c
