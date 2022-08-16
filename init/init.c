@@ -105,7 +105,6 @@ struct dependency
 {
 	struct daemon* source;
 	struct daemon* target;
-	char* target_name; // TODO: Can we avoid this?
 	int flags;
 	// TODO: bool ready, finished, failed?
 };
@@ -113,8 +112,6 @@ struct dependency
 #define DEPENDENCY_FLAG_REQUIRE (1 << 0)
 #define DEPENDENCY_FLAG_AWAIT (1 << 1)
 #define DEPENDENCY_FLAG_EXIT_CODE (1 << 2)
-// TODO: Flag to signal that it's okay if the dependency is restarted / isn't
-//       there all the time.
 
 enum log_method
 {
@@ -187,6 +184,7 @@ struct daemon
 	int exit_code;
 	int readyfd;
 	int outputfd;
+	bool configured;
 	bool need_tty;
 	bool was_ready;
 	bool was_terminated;
@@ -763,7 +761,6 @@ static void log_status(const char* status, const char* format, ...)
 	else
 		fprintf(stderr, "[  ??  ] ");
 	vfprintf(stderr, format, ap);
-	fprintf(stderr, "\n");
 	fflush(stderr);
 	va_end(ap);
 }
@@ -1460,25 +1457,24 @@ static void daemon_change_state_list(struct daemon* daemon,
 	daemon_insert_state_list(daemon);
 }
 
-static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
-                                        const char* netif)
+static struct daemon* daemon_create_unconfigured(const char* name)
 {
 	struct daemon* daemon = add_daemon();
+	if ( !(daemon->name = strdup(name)) )
+		fatal("malloc: %m");
 	daemon->state = DAEMON_STATE_TERMINATED;
 	daemon->readyfd = -1;
 	daemon->outputfd = -1;
 	daemon->log.fd = -1;
 	daemon_insert_state_list(daemon);
-	if ( netif )
-	{
-		if ( asprintf(&daemon->name, "%s.%s", daemon_config->name, netif) < 0 )
-			fatal("asprintf");
-	}
-	else
-	{
-		if ( !(daemon->name = strdup(daemon_config->name)) )
-			fatal("malloc: %m");
-	}
+	return daemon;
+}
+
+static void daemon_configure_sub(struct daemon* daemon,
+                                 struct daemon_config* daemon_config,
+                                 const char* netif)
+{
+	assert(!daemon->configured);
 	daemon->dependencies = (struct dependency**)
 		reallocarray(NULL, daemon_config->dependencies_used,
 		             sizeof(struct dependency*));
@@ -1493,14 +1489,26 @@ static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
 		struct dependency* dependency = calloc(1, sizeof(struct dependency));
 		if ( !dependency )
 			fatal("malloc: %m");
-		if ( !(dependency->target_name = strdup(dependency_config->target)) )
-			fatal("malloc: %m");
+		dependency->source = daemon;
+		// TODO: It's not properly possible to depend on a parameterized daemon.
+		dependency->target = daemon_find_by_name(dependency_config->target);
+		if ( !dependency->target )
+			dependency->target =
+				daemon_create_unconfigured(dependency_config->target);
 		dependency->flags = dependency_config->flags;
 		daemon->dependencies[i] = dependency;
 		// TODO: Either allow multiple dependencies to be exit code or enforce
 		//       that only a single one uses it.
 		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
 			daemon->exit_code_from = dependency;
+		// TODO: Adding a dependency should probably be broken out into a
+		//       utility function.
+		if ( !array_add((void***) &dependency->target->dependents,
+		               &dependency->target->dependents_used,
+		               &dependency->target->dependents_length,
+		               dependency) )
+			fatal("malloc: %m");
+		dependency->target->reference_count++;
 	}
 	if ( daemon_config->cd && !(daemon->cd = strdup(daemon_config->cd)) )
 		fatal("malloc: %m");
@@ -1512,28 +1520,29 @@ static struct daemon* daemon_create_sub(struct daemon_config* daemon_config,
 	if ( !log_initialize(&daemon->log, daemon->name, daemon_config) )
 		fatal("malloc: %m");
 	daemon->need_tty = daemon_config->need_tty;
-	return daemon;
+	daemon->configured = true;
 }
 
-static struct daemon* daemon_create(struct daemon_config* daemon_config)
+static void daemon_configure(struct daemon* daemon,
+                             struct daemon_config* daemon_config)
 {
 	if ( daemon_config->per_if )
 	{
-		struct daemon* daemon = add_daemon();
-		daemon->state = DAEMON_STATE_TERMINATED;
-		daemon->readyfd = -1;
-		daemon->outputfd = -1;
-		daemon->log.fd = -1;
-		daemon_insert_state_list(daemon);
-		if ( !(daemon->name = strdup(daemon_config->name)) )
-			fatal("malloc: %m");
 		struct if_nameindex* ifs = if_nameindex();
 		if ( !ifs )
 			fatal("if_nameindex: %m");
 		for ( size_t i = 0; ifs[i].if_name; i++ )
 		{
+			const char* netif = ifs[i].if_name;
+			char* parameterized_name;
+			if ( asprintf(&parameterized_name, "%s.%s",
+			              daemon_config->name, netif) < 0 )
+				fatal("malloc: %m");
 			struct daemon* parameterized =
-				daemon_create_sub(daemon_config, ifs[i].if_name);
+				daemon_create_unconfigured(parameterized_name);
+			free(parameterized_name);
+			if ( !(parameterized->netif = strdup(netif)) )
+				fatal("malloc: %m");
 			char* name_clone = strdup(parameterized->name);
 			if ( !name_clone )
 				fatal("malloc: %m");
@@ -1541,39 +1550,32 @@ static struct daemon* daemon_create(struct daemon_config* daemon_config)
 				calloc(1, sizeof(struct dependency));
 			if ( !dependency )
 				fatal("malloc: %m");
-			dependency->target_name = name_clone;
+			dependency->source = daemon;
+			dependency->target = parameterized;
 			dependency->flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
 			if ( !array_add((void***) &daemon->dependencies,
 			                &daemon->dependencies_used,
 			                &daemon->dependencies_length,
 			                dependency) )
 				fatal("malloc: %m");
+			if ( !array_add((void***) &dependency->target->dependents,
+				           &dependency->target->dependents_used,
+				           &dependency->target->dependents_length,
+				           dependency) )
+				fatal("malloc: %m");
+			dependency->target->reference_count++;
+			daemon_configure_sub(parameterized, daemon_config, netif);
 		}
 		if_freenameindex(ifs);
-		return daemon;
 	}
-	struct daemon* daemon = daemon_create_sub(daemon_config, NULL);
-	if ( !daemon )
-		fatal("malloc: %m");
-	return daemon;
+	else
+		daemon_configure_sub(daemon, daemon_config, NULL);
 }
 
-static struct daemon* daemon_load_config_and_create(const char* name)
+static struct daemon* daemon_create(struct daemon_config* daemon_config)
 {
-	struct daemon_config* daemon_config = daemon_config_load(name);
-	if ( !daemon_config )
-	{
-		warning("failed to load daemon configuration: %s: %m", name);
-		return NULL;
-	}
-	struct daemon* daemon = daemon_create(daemon_config);
-	if ( !daemon )
-	{
-		warning("failed to create daemon: %s: %m", name);
-		daemon_config_free(daemon_config);
-		return NULL;
-	}
-	daemon_config_free(daemon_config);
+	struct daemon* daemon = daemon_create_unconfigured(daemon_config->name);
+	daemon_configure(daemon, daemon_config);
 	return daemon;
 }
 
@@ -1752,6 +1754,12 @@ static void daemon_on_finished(struct daemon* daemon)
 	daemon_mark_finished(daemon);
 }
 
+static void daemon_on_startup_error(struct daemon* daemon)
+{
+	assert(daemon->state != DAEMON_STATE_FINISHED);
+	daemon_mark_finished(daemon);
+}
+
 static void daemon_register_pollfd(struct daemon* daemon,
                                    int fd,
                                    size_t* out_index,
@@ -1794,48 +1802,32 @@ static void daemon_unregister_pollfd(struct daemon* daemon, size_t index)
 
 static void daemon_schedule(struct daemon* daemon)
 {
+	if ( !daemon->configured )
+	{
+		struct daemon_config* daemon_config = daemon_config_load(daemon->name);
+		if ( !daemon_config )
+		{
+			log_status("failed", "Failed to load configuration for %s.\n",
+			           daemon->name);
+			// TODO: Should this vary with exit_code_meaning?
+			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
+			daemon_on_startup_error(daemon);
+			return NULL;
+		}
+		daemon_configure(daemon, daemon_config);
+		daemon_config_free(daemon_config);
+		return;
+	}
 	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
 	{
 		// TODO: Require the dependency graph to be an directed acylic graph.
 		struct dependency* dependency = daemon->dependencies[i];
-		dependency->source = daemon;
-		dependency->target = daemon_find_by_name(dependency->target_name);
-		if ( !dependency->target )
-		{
-			// TODO: It's not possible to depend on a parameterized
-			//       daemon.
-			dependency->target =
-				daemon_load_config_and_create(dependency->target_name);
-			if ( !dependency->target )
-			{
-				// TODO: What should print this error message?
-				log_status("failed", "%s could not load %s: %m\n",
-				           daemon->name, dependency->target_name);
-				if ( dependency->flags & DEPENDENCY_FLAG_REQUIRE )
-				{
-					// TODO: However, such a dependency hasn't been made below,
-					//       so it can be higher than dependents_used.
-					// TODO: This causes the daemon to fail, but it doesn't set
-					// the exit code.
-					daemon->dependencies_failed++;
-				}
-				else
-				{
-					// TODO: A null target has been left in this dependency. We
-					//       should probably avoid that or take care everywhere
-					//       else. This is probably not a good and tested state.
-				}
-				continue;
-			}
-		}
+		assert(dependency->source == daemon);
+		assert(dependency->target);
 		// TODO: This may already have been done if it has already run before.
 		// TODO: Don't add as dependent if failed?
-		if ( !array_add((void***) &dependency->target->dependents,
-		               &dependency->target->dependents_used,
-		               &dependency->target->dependents_length,
-		               dependency) )
-			fatal("malloc: %m");
-		dependency->target->reference_count++;
+		// TODO: Move this to daemon_configure.
+
 		if ( daemon->exit_code_from == dependency  )
 			daemon->exit_code_meaning =
 				daemon->exit_code_from->target->exit_code_meaning;
@@ -1909,11 +1901,11 @@ static void daemon_start(struct daemon* daemon)
 	//       if certain key dependencies fail.
 	if ( 0 < daemon->dependencies_failed )
 	{
-		// TODO: daemon_on_finished also makes a message.
-		log_status("failed", "Failed to start %s.\n", daemon->name);
+		log_status("failed", "Failed to start %s due to failed dependencies.\n",
+		           daemon->name);
 		// TODO: Should this vary with exit_code_meaning?
 		daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
-		daemon_on_finished(daemon);
+		daemon_on_startup_error(daemon);
 		return;
 	}
 	log_status("starting", "Starting %s...\n", daemon->name);
@@ -3244,7 +3236,7 @@ int main(int argc, char* argv[])
 	// The default daemon should depend on exactly one top level daemon.
 	const char* first_requirement =
 		1 <= default_daemon->dependencies_used ?
-		default_daemon->dependencies[0]->target_name :
+		default_daemon->dependencies[0]->target->name :
 		"";
 
 	// Make sure that we have a /tmp directory.
