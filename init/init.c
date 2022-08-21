@@ -376,50 +376,6 @@ static int exit_code_to_exit_status(int exit_code)
 		return 1;
 }
 
-// TODO: Connect these to the init log.
-
-__attribute__((noreturn))
-__attribute__((format(printf, 1, 2)))
-static void fatal(const char* format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	fprintf(stderr, "%s: fatal: ", program_invocation_name);
-	vfprintf(stderr, format, ap);
-	fprintf(stderr, "\n");
-	fflush(stderr);
-	va_end(ap);
-	if ( getpid() == main_pid )
-		exit(2);
-	_exit(2);
-}
-
-// TODO: error
-
-__attribute__((format(printf, 1, 2)))
-static void warning(const char* format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	fprintf(stderr, "%s: warning: ", program_invocation_name);
-	vfprintf(stderr, format, ap);
-	fprintf(stderr, "\n");
-	fflush(stderr);
-	va_end(ap);
-}
-
-__attribute__((format(printf, 1, 2)))
-static void note(const char* format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	fprintf(stderr, "%s: ", program_invocation_name);
-	vfprintf(stderr, format, ap);
-	fprintf(stderr, "\n");
-	fflush(stderr);
-	va_end(ap);
-}
-
 static void log_close(struct log* log)
 {
 	if ( 0 <= log->fd )
@@ -428,6 +384,8 @@ static void log_close(struct log* log)
 	free(log->buffer);
 	log->buffer = 0;
 }
+
+// TODO: warn() calls should go to the init log unless about the init log.
 
 static bool log_open(struct log* log)
 {
@@ -448,13 +406,13 @@ static bool log_open(struct log* log)
 			// TODO: Warn once about /var/log being read-only.
 			return true;
 		}
-		warning("%s: %m", log->path);
+		warn("%s", log->path);
 		return false;
 	}
 	struct stat st;
 	if ( fstat(log->fd, &st) < 0 )
 	{
-		warning("stat: %s: %m", log->path);
+		warn("stat: %s", log->path);
 		close(log->fd);
 		log->fd = -1;
 		return false;
@@ -495,7 +453,7 @@ static bool log_rotate(struct log* log)
 				// used to truncate an arbitrary file, which is avoided here.
 				int fd = open(log->path_dst, O_WRONLY | O_NOFOLLOW);
 				if ( fd < 0 )
-					warning("archiving: opening: %s", log->path_dst);
+					warn("archiving: opening: %s", log->path_dst);
 				else
 				{
 					if ( ftruncate(fd, 0) < 0 )
@@ -505,7 +463,7 @@ static bool log_rotate(struct log* log)
 							// TODO: Warn once about /var/log being read-only.
 						}
 						else
-							warning("archiving: truncate: %s", log->path_dst);
+							warn("archiving: truncate: %s", log->path_dst);
 					}
 					close(fd);
 				}
@@ -516,11 +474,11 @@ static bool log_rotate(struct log* log)
 						// TODO: Warn once about /var/log being read-only.
 					}
 					else
-						warning("archiving: unlink: %s", log->path_dst);
+						warn("archiving: unlink: %s", log->path_dst);
 				}
 			}
 			else if ( errno != ENOENT )
-				warning("archiving: %s", log->path_dst);
+				warn("archiving: %s", log->path_dst);
 		}
 		if ( rename(log->path_src, log->path_dst) < 0 )
 		{
@@ -593,7 +551,7 @@ static void log_data_to_buffer(struct log* log, const char* data, size_t length)
 		{
 			if ( 1048576 <= log->buffer_size )
 			{
-				warning("%s: in-memory buffer exhausted", log->path);
+				warnx("%s: in-memory buffer exhausted", log->path);
 				log->skipped += length;
 				return;
 			}
@@ -601,7 +559,7 @@ static void log_data_to_buffer(struct log* log, const char* data, size_t length)
 			char* new_buffer = realloc(log->buffer, new_size);
 			if ( !new_buffer )
 			{
-				warning("%s: expanding in-memory buffer: %m", log->path);
+				warn("%s: expanding in-memory buffer", log->path);
 				log->skipped += length;
 				return;
 			}
@@ -686,7 +644,7 @@ static void log_data(struct log* log, const char* data, size_t length)
 		if ( amount < 0 )
 		{
 			// TODO: Don't spam here.
-			warning("writing log: %s: %m", log->path);
+			warn("writing log: %s", log->path);
 			// TODO: Always rotate on error if non-empty?
 			// TODO: Handle skipped data?
 			//log->skipped += length - sofar;
@@ -833,6 +791,60 @@ static void log_status(const char* status, const char* format, ...)
 		fprintf(stderr, "[  ??  ] ");
 	vfprintf(stderr, format, ap);
 	fflush(stderr);
+	va_end(ap);
+}
+
+__attribute__((noreturn))
+__attribute__((format(printf, 1, 2)))
+static void fatal(const char* format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	fprintf(stderr, "%s: fatal: ", program_invocation_name);
+	vfprintf(stderr, format, ap);
+	fprintf(stderr, "\n");
+	fflush(stderr);
+	va_end(ap);
+	va_start(ap, format);
+	vcbprintf(&init_log, log_callback, format, ap);
+	log_formatted(&init_log, "\n", 1);
+	va_end(ap);
+	if ( getpid() == main_pid )
+		exit(2);
+	_exit(2);
+}
+
+// TODO: error
+
+__attribute__((format(printf, 1, 2)))
+static void warning(const char* format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	fprintf(stderr, "%s: warning: ", program_invocation_name);
+	vfprintf(stderr, format, ap);
+	fprintf(stderr, "\n");
+	fflush(stderr);
+	va_end(ap);
+	va_start(ap, format);
+	vcbprintf(&init_log, log_callback, format, ap);
+	log_formatted(&init_log, "\n", 1);
+	va_end(ap);
+}
+
+__attribute__((format(printf, 1, 2)))
+static void note(const char* format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	fprintf(stderr, "%s: ", program_invocation_name);
+	vfprintf(stderr, format, ap);
+	fprintf(stderr, "\n");
+	fflush(stderr);
+	va_end(ap);
+	va_start(ap, format);
+	vcbprintf(&init_log, log_callback, format, ap);
+	log_formatted(&init_log, "\n", 1);
 	va_end(ap);
 }
 
