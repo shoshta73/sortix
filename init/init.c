@@ -1270,11 +1270,11 @@ static bool daemon_config_load_search(struct daemon_config* daemon_config,
 		}
 		if ( !daemon_config_load_from_path(daemon_config, path, i + 1) )
 		{
+			free(path);
 			// TODO: Ensure ENOENT is not set recursively when using
 			//       furthermore and the next file doesn't exist.
 			if ( errno == ENOENT )
 				continue;
-			free(path);
 			return NULL;
 		}
 		free(path);
@@ -1567,6 +1567,7 @@ static void daemon_configure(struct daemon* daemon,
 			daemon_configure_sub(parameterized, daemon_config, netif);
 		}
 		if_freenameindex(ifs);
+		daemon->configured = true;
 	}
 	else
 		daemon_configure_sub(daemon, daemon_config, NULL);
