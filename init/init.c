@@ -137,12 +137,16 @@ struct log
 	bool rotate_on_start;
 	size_t max_rotations;
 	size_t max_line_size;
+	size_t skipped;
 	off_t max_size;
 	char* path;
 	char* path_src;
 	char* path_dst;
 	size_t path_number_offset;
 	size_t path_number_size;
+	char* buffer;
+	size_t buffer_used;
+	size_t buffer_size;
 	off_t size;
 	int fd;
 	bool line_terminated;
@@ -372,6 +376,8 @@ static int exit_code_to_exit_status(int exit_code)
 		return 1;
 }
 
+// TODO: Connect these to the init log.
+
 __attribute__((noreturn))
 __attribute__((format(printf, 1, 2)))
 static void fatal(const char* format, ...)
@@ -414,13 +420,13 @@ static void note(const char* format, ...)
 	va_end(ap);
 }
 
-// TODO: Log fsck and such early logging? What about chain booting?
-
 static void log_close(struct log* log)
 {
 	if ( 0 <= log->fd )
 		close(log->fd);
 	log->fd = -1;
+	free(log->buffer);
+	log->buffer = 0;
 }
 
 static bool log_open(struct log* log)
@@ -536,15 +542,6 @@ static bool log_rotate(struct log* log)
 	return log_open(log);
 }
 
-static bool log_begin(struct log* log)
-{
-	if ( log->method == LOG_METHOD_NONE )
-		return true;
-	if ( log->method == LOG_METHOD_ROTATE && log->rotate_on_start )
-		return log_rotate(log);
-	return log_open(log);
-}
-
 static bool log_initialize(struct log* log,
                            const char* name,
                            struct daemon_config* daemon_config)
@@ -571,10 +568,64 @@ static bool log_initialize(struct log* log,
 	return true;
 }
 
+static bool log_begin_buffer(struct log* log)
+{
+	log->buffer_used = 0;
+	log->buffer_size = 4096;
+	log->buffer = malloc(log->buffer_size);
+	if ( !log->buffer )
+		return false;
+	return true;
+}
+
+static void log_data_to_buffer(struct log* log, const char* data, size_t length)
+{
+	assert(log->buffer);
+	if ( log->skipped )
+	{
+		log->skipped += length;
+		return;
+	}
+	while ( length )
+	{
+		size_t available = log->buffer_size - log->buffer_used;
+		if ( !available )
+		{
+			if ( 1048576 <= log->buffer_size )
+			{
+				warning("%s: in-memory buffer exhausted", log->path);
+				log->skipped += length;
+				return;
+			}
+			size_t new_size = 2 * log->buffer_size;
+			char* new_buffer = realloc(log->buffer, new_size);
+			if ( !new_buffer )
+			{
+				warning("%s: expanding in-memory buffer: %m", log->path);
+				log->skipped += length;
+				return;
+			}
+			log->buffer = new_buffer;
+			log->buffer_size = new_size;
+			available = log->buffer_size - log->buffer_used;
+		}
+		size_t amount = length < available ? length : available;
+		memcpy(log->buffer + log->buffer_used, data, amount);
+		data += amount;
+		length -= amount;
+		log->buffer_used += amount;
+	}
+}
+
 static void log_data(struct log* log, const char* data, size_t length)
 {
 	if ( log->method == LOG_METHOD_NONE )
 		return;
+	if ( log->fd < 0 && log->buffer )
+	{
+		log_data_to_buffer(log, data, length);
+		return;
+	}
 	// TODO: Support for infinitely sized chunks / OFF_MAX chunks?
 	// TODO: Ensure log->max_line_size <= log->max_size.
 	const off_t chunk_cut_offset = log->max_size - log->max_line_size;
@@ -591,7 +642,7 @@ static void log_data(struct log* log, const char* data, size_t length)
 		// another line of the maximum length, otherwise cut if the chunk is
 		// full.
 		if ( log->method == LOG_METHOD_ROTATE &&
-		      (log->line_terminated ?
+		     (log->line_terminated ?
 		      chunk_cut_offset :
 		      log->max_size) <= log->size )
 		{
@@ -718,6 +769,30 @@ static size_t log_callback(void* ctx, const char* str, size_t len)
 {
 	log_formatted((struct log*) ctx, str, len);
 	return len;
+}
+
+static bool log_begin(struct log* log)
+{
+	if ( log->method == LOG_METHOD_NONE )
+		return true;
+	bool opened;
+	if ( log->method == LOG_METHOD_ROTATE && log->rotate_on_start )
+		opened = log_rotate(log);
+	else
+		opened = log_open(log);
+	if ( !opened )
+		return false;
+	if ( log->buffer )
+	{
+		log_data(log, log->buffer, log->buffer_used);
+		free(log->buffer);
+		log->buffer = NULL;
+		log->buffer_used = 0;
+		log->buffer_size = 0;
+		// TODO: Warn about skipped data.
+		log->skipped = 0;
+	}
+	return true;
 }
 
 __attribute__((format(printf, 2, 3)))
@@ -3092,6 +3167,7 @@ static void niht(void)
 	write_random_seed();
 
 	// Stop logging when unmounting the filesystems.
+	cbprintf(&init_log, log_callback, "Finished operating system.\n");
 	log_close(&init_log);
 
 	if ( chain_location_dev_made )
@@ -3236,6 +3312,13 @@ int main(int argc, char* argv[])
 		default_daemon->dependencies[0]->target->name :
 		"";
 
+	// Log to memory until the log directory has been mounted.
+	if ( !log_initialize(&init_log, "init", &default_config) )
+		fatal("malloc: %m");
+	if ( !log_begin_buffer(&init_log) )
+		fatal("malloc: %m");
+	cbprintf(&init_log, log_callback, "Initializing operating system...\n");
+
 	// Make sure that we have a /tmp directory.
 	umask(0000);
 	mkdir("/tmp", 01777);
@@ -3303,6 +3386,7 @@ int main(int argc, char* argv[])
 			fatal("mount: `%s' onto `%s': %m", "/dev", chain_location_dev);
 		close(new_dev_fd);
 		close(old_dev_fd);
+		// TODO: Forward the early init log to the chain init.
 		// Run the chain booted operating system.
 		pid_t child_pid = fork();
 		if ( child_pid < 0 )
@@ -3362,9 +3446,8 @@ int main(int argc, char* argv[])
 	     access("/var/log", F_OK) < 0 )
 		mkdir("/var/log", 0755);
 
-	// Logging works now that the filesystems have been mounted.
-	if ( !log_initialize(&init_log, "init", &default_config) )
-		fatal("malloc: %m");
+	// Logging works now that the filesystems have been mounted. Reopen the init
+	// log and write the contents buffered up in memory.
 	log_begin(&init_log);
 
 	// Update the random seed in case the system fails before it can be written
