@@ -49,18 +49,15 @@ bool array_add(void*** array_ptr,
 
 	if ( *used_ptr == *length_ptr )
 	{
-		// TODO: Avoid overflow.
-		size_t new_length = 2 * *length_ptr;
-		if ( !new_length )
-			new_length = 16;
-		// TODO: Avoid overflow and use reallocarray.
-		size_t new_size = new_length * sizeof(void*);
-		void** new_array = (void**) realloc(array, new_size);
+		size_t length = *length_ptr;
+		if ( !length )
+			length = 4;
+		void** new_array = reallocarray(array, length, 2 * sizeof(void*));
 		if ( !new_array )
 			return false;
 		array = new_array;
 		memcpy(array_ptr, &array, sizeof(array)); // Strict aliasing.
-		*length_ptr = new_length;
+		*length_ptr = length * 2;
 	}
 
 	memcpy(array + (*used_ptr)++, &value, sizeof(value)); // Strict aliasing.
