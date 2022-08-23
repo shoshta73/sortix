@@ -152,6 +152,7 @@ struct log
 	int last_errno;
 	bool line_terminated;
 	bool line_begun;
+	mode_t file_mode;
 };
 
 struct daemon
@@ -222,6 +223,7 @@ struct daemon_config
 	size_t log_rotations;
 	size_t log_line_size;
 	off_t log_size;
+	mode_t log_file_mode;
 };
 
 static pid_t main_pid;
@@ -239,6 +241,7 @@ static struct daemon_config default_config =
 	.log_rotations = 3,
 	.log_line_size = 4096,
 	.log_size = 1048576,
+	.log_file_mode = 0644,
 };
 
 static struct log init_log = { .fd = -1 };
@@ -407,8 +410,7 @@ static bool log_open(struct log* log)
 		logflags |= O_TRUNC;
 	if ( 0 <= log->fd )
 		close(log->fd);
-	// TODO: Allow daemons to have non-public logs.
-	log->fd = open(log->path, logflags, 0644);
+	log->fd = open(log->path, logflags, log->file_mode);
 	if ( log->fd < 0 )
 	{
 		log_error(log, "", NULL);
@@ -422,6 +424,16 @@ static bool log_open(struct log* log)
 		close(log->fd);
 		log->fd = -1;
 		return false;
+	}
+	if ( (st.st_mode & 07777) != log->file_mode )
+	{
+		if ( fchmod(log->fd, log->file_mode) < 0 )
+		{
+			log_error(log, "fchmod: ", NULL);
+			close(log->fd);
+			log->fd = -1;
+			return false;
+		}
 	}
 	log->size = st.st_size;
 	log->line_terminated = true;
@@ -505,6 +517,7 @@ static bool log_initialize(struct log* log,
 	log->max_rotations = daemon_config->log_rotations;
 	log->max_line_size = daemon_config->log_line_size;
 	log->max_size = daemon_config->log_size;
+	log->file_mode = daemon_config->log_file_mode;
 	if ( asprintf(&log->path, "/var/log/%s.log", name) < 0 )
 		return false;
 	// Preallocate the paths used when renaming log files so there's no error
@@ -941,6 +954,17 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 			warning("%s:%ji: unknown %s: %s",
 			        path, (intmax_t) line_number, operation, parameter);
 	}
+	else if ( !strcmp(operation, "log-file-mode") )
+	{
+		char* end;
+		errno = 0;
+		uintmax_t value = strtoumax(parameter, &end, 8);
+		if ( parameter == end || errno || value != (value & 07777) )
+			warning("%s:%ji: invalid %s: %s",
+			        path, (intmax_t) line_number, operation, parameter);
+		else
+			daemon_config->log_file_mode = (mode_t) value;
+	}
 	else if ( !strcmp(operation, "log-format") )
 	{
 		if ( !strcmp(parameter, "none") )
@@ -1136,6 +1160,8 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 		else if ( !strcmp(operation, "log-control-messages") )
 			daemon_config->log_control_messages =
 				default_config.log_control_messages;
+		else if ( !strcmp(operation, "log-file-mode") )
+			daemon_config->log_file_mode = default_config.log_file_mode;
 		else if ( !strcmp(operation, "log-format") )
 			daemon_config->log_format = default_config.log_format;
 		else if ( !strcmp(operation, "log-line-size") )
@@ -1369,6 +1395,7 @@ static void daemon_config_initialize(struct daemon_config* daemon_config)
 	daemon_config->log_rotations = default_config.log_rotations;
 	daemon_config->log_line_size = default_config.log_line_size;
 	daemon_config->log_size = default_config.log_size;
+	daemon_config->log_file_mode = default_config.log_file_mode;
 }
 
 static struct daemon_config* daemon_config_load(const char* name)
