@@ -149,6 +149,7 @@ struct log
 	size_t buffer_size;
 	off_t size;
 	int fd;
+	int last_errno;
 	bool line_terminated;
 	bool line_begun;
 };
@@ -385,7 +386,17 @@ static void log_close(struct log* log)
 	log->buffer = 0;
 }
 
-// TODO: warn() calls should go to the init log unless about the init log.
+
+static void log_error(struct log* log, const char* prefix, const char* path)
+{
+	// TODO: warn() calls should go to the init log unless about the init log.
+	// TODO: Maybe warn only once globally about /var/log being read-only?
+	if ( !errno )
+		warnx("%s%s", prefix, path ? path : log->path);
+	else if ( errno != log->last_errno )
+		warn("%s%s", prefix, path ? path : log->path);
+	log->last_errno = errno;
+}
 
 static bool log_open(struct log* log)
 {
@@ -400,19 +411,14 @@ static bool log_open(struct log* log)
 	log->fd = open(log->path, logflags, 0644);
 	if ( log->fd < 0 )
 	{
-		// Don't let read-only filesystems block daemons from trying to start.
-		if ( errno == EROFS )
-		{
-			// TODO: Warn once about /var/log being read-only.
-			return true;
-		}
-		warn("%s", log->path);
-		return false;
+		log_error(log, "", NULL);
+		// Don't block daemon startup on read-only filesystems.
+		return errno == EROFS;
 	}
 	struct stat st;
 	if ( fstat(log->fd, &st) < 0 )
 	{
-		warn("stat: %s", log->path);
+		log_error(log, "stat: ", NULL);
 		close(log->fd);
 		log->fd = -1;
 		return false;
@@ -447,53 +453,39 @@ static bool log_rotate(struct log* log)
 				// file is truncated to zero size to avoid disk space remaining
 				// temporarily in use that way, although the inode itself does
 				// remain open temporarily.
-				// TODO: Handle EROFS.
 				// TODO: truncateat should have a flags parameter, to not follow
 				// symbolic links. Otherwise a symlink in /var/log could be
 				// used to truncate an arbitrary file, which is avoided here.
 				int fd = open(log->path_dst, O_WRONLY | O_NOFOLLOW);
 				if ( fd < 0 )
-					warn("archiving: opening: %s", log->path_dst);
+				{
+					// Don't rotate logs on read-only filesystems.
+					if ( errno == EROFS )
+						break;
+					log_error(log, "archiving: opening: ", log->path_dst);
+				}
 				else
 				{
 					if ( ftruncate(fd, 0) < 0 )
-					{
-						if ( errno == EROFS )
-						{
-							// TODO: Warn once about /var/log being read-only.
-						}
-						else
-							warn("archiving: truncate: %s", log->path_dst);
-					}
+						log_error(log, "archiving: truncate: ", log->path_dst);
 					close(fd);
 				}
 				if ( unlink(log->path_dst) < 0 )
-				{
-					if ( errno == EROFS )
-					{
-						// TODO: Warn once about /var/log being read-only.
-					}
-					else
-						warn("archiving: unlink: %s", log->path_dst);
-				}
+					log_error(log, "archiving: unlink: ", log->path_dst);
 			}
 			else if ( errno != ENOENT )
-				warn("archiving: %s", log->path_dst);
+				log_error(log, "archiving: ", log->path_dst);
 		}
 		if ( rename(log->path_src, log->path_dst) < 0 )
 		{
-			if ( errno == ENOENT )
+			// Don't rotate logs on read-only filesystems.
+			if ( errno == EROFS )
+				break;
+			// Ignore non-existent logs.
+			if ( errno != ENOENT )
 			{
-				// Ignore non-existent logs.
-			}
-			else if ( errno == EROFS )
-			{
-				// TODO: Warn once about /var/log being read-only.
-			}
-			else
-			{
-				// TODO: Should an error message be printed here or elsewhere?
-				return false;
+				log_error(log, "archiving: ", log->path_src);
+				return errno == EROFS;
 			}
 		}
 	}
@@ -551,7 +543,8 @@ static void log_data_to_buffer(struct log* log, const char* data, size_t length)
 		{
 			if ( 1048576 <= log->buffer_size )
 			{
-				warnx("%s: in-memory buffer exhausted", log->path);
+				errno = 0;
+				log_error(log, "in-memory buffer exhausted: ", NULL);
 				log->skipped += length;
 				return;
 			}
@@ -559,7 +552,7 @@ static void log_data_to_buffer(struct log* log, const char* data, size_t length)
 			char* new_buffer = realloc(log->buffer, new_size);
 			if ( !new_buffer )
 			{
-				warn("%s: expanding in-memory buffer", log->path);
+				log_error(log, "expanding in-memory buffer: ", NULL);
 				log->skipped += length;
 				return;
 			}
@@ -643,16 +636,15 @@ static void log_data(struct log* log, const char* data, size_t length)
 		ssize_t amount = write(log->fd, next_data, next_length);
 		if ( amount < 0 )
 		{
-			// TODO: Don't spam here.
-			warn("writing log: %s", log->path);
-			// TODO: Always rotate on error if non-empty?
-			// TODO: Handle skipped data?
+			log_error(log, "writing: ", NULL);
+			// TODO: Handle skipped data.
 			//log->skipped += length - sofar;
 			return;
 		}
 		sofar += amount;
 		log->size += amount;
 		log->line_terminated = next_data[amount - 1] == '\n';
+		log->last_errno = 0;
 	}
 }
 
