@@ -3405,7 +3405,8 @@ int main(int argc, char* argv[])
 		// Additionally bind the /dev filesystem inside the root filesystem.
 		snprintf(chain_location_dev, sizeof(chain_location_dev), "%s/dev",
 			     chain_location);
-		if ( mkdir(chain_location_dev, 0755) < 0 && errno != EEXIST )
+		if ( mkdir(chain_location_dev, 0755) < 0 &&
+		     errno != EEXIST && errno != EROFS )
 			fatal("mkdir: %s: %m", chain_location_dev);
 		int old_dev_fd = open("/dev", O_DIRECTORY | O_RDONLY);
 		if ( old_dev_fd < 0 )
