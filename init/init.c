@@ -79,6 +79,13 @@ struct mountpoint
 	char* absolute;
 };
 
+enum verbosity
+{
+	VERBOSITY_SILENT,
+	VERBOSITY_QUIET,
+	VERBOSITY_VERBOSE,
+};
+
 enum exit_code_meaning
 {
 	EXIT_CODE_MEANING_DEFAULT,
@@ -247,6 +254,8 @@ static struct daemon_config default_config =
 };
 
 static struct log init_log = { .fd = -1 };
+
+static enum verbosity verbosity = VERBOSITY_QUIET;
 
 static struct harddisk** hds = NULL;
 static size_t hds_used = 0;
@@ -771,8 +780,9 @@ static void log_status(const char* status, const char* format, ...)
 	va_start(ap, format);
 	vcbprintf(&init_log, log_callback, format, ap);
 	va_end(ap);
-	// TODO: Verbose logging mode.
-	if ( strcmp(status, "failed") != 0 )
+	if ( verbosity == VERBOSITY_SILENT ||
+	     (verbosity == VERBOSITY_QUIET &&
+	      strcmp(status, "failed") != 0) )
 		return;
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
@@ -3258,10 +3268,19 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'q': verbosity = VERBOSITY_QUIET; break;
+			case 's': verbosity = VERBOSITY_SILENT; break;
+			case 'v': verbosity = VERBOSITY_VERBOSE; break;
 			default:
 				errx(2, "unknown option -- '%c'", c);
 			}
 		}
+		else if ( !strcmp(arg, "--quiet") )
+			verbosity = VERBOSITY_QUIET;
+		else if ( !strcmp(arg, "--silent") )
+			verbosity = VERBOSITY_SILENT;
+		else if ( !strcmp(arg, "--verbose") )
+			verbosity = VERBOSITY_VERBOSE;
 		else if ( !strncmp(arg, "--target=", strlen("--target=")) )
 			target_name = arg + strlen("--target=");
 		else if ( !strcmp(arg, "--target") )
@@ -3441,19 +3460,21 @@ int main(int argc, char* argv[])
 				fatal("chdir: %s: %m", chain_location);
 			unsetenv("INIT_PID");
 			const char* program = next_argv[0];
+			char verbose_opt[] = {'-', "sqv"[verbosity], '\0'};
 			// Chain boot the operating system upgrade if needed.
 			if ( !strcmp(first_requirement, "chain-merge") )
 			{
 				program = "/sysmerge/sbin/init";
 				// TODO: Concat next_argv onto this argv_next, so the arguments
-				//       can be passed to the final make.
+				//       can be passed to the final init.
 				next_argv =
-					(char*[]) { (char*) program, "--target=merge", NULL };
+					(char*[]) { (char*) program, "--target=merge",
+					            verbose_opt, NULL };
 			}
 			else if ( next_argc < 1 )
 			{
 				program = "/sbin/init";
-				next_argv = (char*[]) { "init", NULL };
+				next_argv = (char*[]) { "init", verbose_opt, NULL };
 			}
 			execvp(program, (char* const*) next_argv);
 			fatal("Failed to chain load init: %s: %m", next_argv[0]);

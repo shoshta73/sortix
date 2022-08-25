@@ -6,6 +6,7 @@
 .Nd system initialization
 .Sh SYNOPSIS
 .Nm init
+.Op Fl qsv
 .Op Fl \-target Ns "=" Ns Ar default-daemon
 .Op Fl \-
 .Op Ar chain-init ...
@@ -34,6 +35,23 @@ made with
 that will search for the actual root filesystem and chain init it.
 The next stage init will recognize itself as the intended system and complete
 the system startup.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl q , \-quiet
+Write status updates to the terminal only about failed daemons.
+This behavior is the default.
+.It Fl s , \-silent
+Never write status updates about daemons to the terminal.
+.It Fl \-target Ns "=" Ns Ar default-daemon
+Boot
+.Ar default-daemon
+instead of the
+.Sy default
+daemon.
+.It Fl v , \-verbose
+Write all status updates about daemons starting and stopping to the terminal
+.El
 .Ss Cleanup of /tmp and /var/run
 .Nm
 deletes everything inside of
