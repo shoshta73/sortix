@@ -131,6 +131,8 @@ enum log_format
 
 struct log
 {
+	char* name;
+	pid_t pid;
 	enum log_method method;
 	enum log_format format;
 	bool control_messages;
@@ -386,9 +388,8 @@ static void log_close(struct log* log)
 		close(log->fd);
 	log->fd = -1;
 	free(log->buffer);
-	log->buffer = 0;
+	log->buffer = NULL;
 }
-
 
 static void log_error(struct log* log, const char* prefix, const char* path)
 {
@@ -520,14 +521,17 @@ static bool log_initialize(struct log* log,
 	if ( log->max_size < log->max_line_size )
 		log->max_line_size = log->max_size;
 	log->file_mode = daemon_config->log_file_mode;
-	if ( asprintf(&log->path, "/var/log/%s.log", name) < 0 )
+	log->name = strdup(name);
+	if ( !log->name )
 		return false;
+	if ( asprintf(&log->path, "/var/log/%s.log", name) < 0 )
+		return free(log->name), false;
 	// Preallocate the paths used when renaming log files so there's no error
 	// conditions when cycling logs.
 	if ( asprintf(&log->path_src, "%s.%i", log->path, INT_MAX) < 0 )
-		return free(log->path), false;
+		return free(log->path), free(log->name), false;
 	if ( asprintf(&log->path_dst, "%s.%i", log->path, INT_MAX) < 0 )
-		return free(log->path_src), free(log->path), false;
+		return free(log->path_src), free(log->path), free(log->name), false;
 	log->path_number_offset = strlen(log->path);
 	log->path_number_size = strlen(log->path_dst) + 1 - log->path_number_offset;
 	return true;
@@ -670,11 +674,7 @@ static void log_formatted(struct log* log, const char* string, size_t length)
 		log_data(log, string, length);
 		return;
 	}
-	// TODO: This information should be part of struct log.
-	const char* log_name = log->path;
-	if ( strrchr(log_name, '/') )
-		log_name = strrchr(log_name, '/') + 1;
-	size_t log_name_length = strlen(log_name) - 4 /* .log */;
+	size_t log_name_length = strlen(log->name);
 	for ( size_t i = 0; i < length; )
 	{
 		size_t fragment = 1;
@@ -716,11 +716,15 @@ static void log_formatted(struct log* log, const char* string, size_t length)
 			     log->format == LOG_FORMAT_SYSLOG )
 			{
 				log_data(log, " ", 1);
-				log_data(log, log_name, log_name_length);
+				log_data(log, log->name, log_name_length);
 			}
-			// TODO: Pid of the daemon instead.
 			if ( log->format == LOG_FORMAT_SYSLOG )
-				log_data(log, " - - - ", strlen(" - 1 - "));
+			{
+				pid_t pid = 0 < log->pid ? log->pid : getpid();
+				char part[64];
+				snprintf(part, sizeof(part), " %ji - - ", (intmax_t) pid);
+				log_data(log, part, strlen(part));
+			}
 			else
 				log_data(log, ": ", 2);
 		}
@@ -2091,7 +2095,7 @@ static void daemon_start(struct daemon* daemon)
 	     setenv("SHELL", shell, 1) < 0 )
 		fatal("setenv");
 	// TODO: If argv is empty
-	daemon->pid = fork();
+	daemon->pid = daemon->log.pid = fork();
 	if ( daemon->pid < 0 )
 		fatal("fork: %m");
 	if ( daemon->need_tty )
@@ -3352,6 +3356,7 @@ int main(int argc, char* argv[])
 		fatal("malloc: %m");
 	if ( !log_begin_buffer(&init_log) )
 		fatal("malloc: %m");
+	init_log.pid = getpid();
 	cbprintf(&init_log, log_callback, "Initializing operating system...\n");
 
 	// Make sure that we have a /tmp directory.

@@ -329,11 +329,11 @@ Each line is prefixed with a timestamp with nanosecond precision and the
 timezone offset followed
 by the hostname and name of the daemon.
 .It Sy syslog
-"<ppp>1 YYYY-dd-mmTHH:MM:SS.uuuuuuZ hostname daemon - - - "
+"<ppp>1 YYYY-dd-mmTHH:MM:SS.uuuuuuZ hostname daemon pid - - "
 .Pp
 Each line is prefixed in the RFC 5424 syslog version 1 format with the priority,
 the timestamp with microsecond precision and the timezone offset, the hostname,
-and the daemon name.
+the daemon name, and the process id.
 .El
 .Pp
 The default format is
