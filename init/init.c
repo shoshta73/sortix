@@ -136,7 +136,7 @@ struct log
 	bool control_messages;
 	bool rotate_on_start;
 	size_t max_rotations;
-	size_t max_line_size;
+	off_t max_line_size;
 	size_t skipped;
 	off_t max_size;
 	char* path;
@@ -221,7 +221,7 @@ struct daemon_config
 	bool log_control_messages;
 	bool log_rotate_on_start;
 	size_t log_rotations;
-	size_t log_line_size;
+	off_t log_line_size;
 	off_t log_size;
 	mode_t log_file_mode;
 };
@@ -517,6 +517,8 @@ static bool log_initialize(struct log* log,
 	log->max_rotations = daemon_config->log_rotations;
 	log->max_line_size = daemon_config->log_line_size;
 	log->max_size = daemon_config->log_size;
+	if ( log->max_size < log->max_line_size )
+		log->max_line_size = log->max_size;
 	log->file_mode = daemon_config->log_file_mode;
 	if ( asprintf(&log->path, "/var/log/%s.log", name) < 0 )
 		return false;
@@ -590,8 +592,6 @@ static void log_data(struct log* log, const char* data, size_t length)
 		log_data_to_buffer(log, data, length);
 		return;
 	}
-	// TODO: Support for infinitely sized chunks / OFF_MAX chunks?
-	// TODO: Ensure log->max_line_size <= log->max_size.
 	const off_t chunk_cut_offset = log->max_size - log->max_line_size;
 	size_t sofar = 0;
 	while ( sofar < length )
@@ -987,12 +987,12 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 	{
 		char* end;
 		errno = 0;
-		uintmax_t value = strtoumax(parameter, &end, 10);
-		if ( parameter == end || errno || value != (size_t) value )
+		intmax_t value = strtoimax(parameter, &end, 10);
+		if ( parameter == end || errno || value != (off_t) value || value < 0 )
 			warning("%s:%ji: invalid %s: %s",
 			        path, (intmax_t) line_number, operation, parameter);
 		else
-			daemon_config->log_line_size = (size_t) value;
+			daemon_config->log_line_size = (off_t) value;
 	}
 	else if ( !strcmp(operation, "log-method") )
 	{
@@ -1019,7 +1019,7 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 		char* end;
 		errno = 0;
 		intmax_t value = strtoimax(parameter, &end, 10);
-		if ( parameter == end || errno || value != (off_t) value )
+		if ( parameter == end || errno || value != (off_t) value || value < 0 )
 			warning("%s:%ji: invalid %s: %s",
 			        path, (intmax_t) line_number, operation, parameter);
 		else
@@ -3012,6 +3012,7 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 			if ( fs->flags & FILESYSTEM_FLAG_FSCK_MUST )
 			{
 				warning("%s: Mandatory repair failed: fork: %m", bdev_path);
+				// TODO: Try to mount as read-only if supported.
 				return false;
 			}
 			warning("%s: Skipping filesystem check: fork: %m:", bdev_path);
@@ -3049,6 +3050,7 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 			else
 				warning("%s: Mandatory repair failed: %s: %s", bdev_path,
 				        fs->fsck, "Filesystem checker was unsuccessful");
+			// TODO: Try to mount as read-only if supported.
 			return false;
 		}
 		else
