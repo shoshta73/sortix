@@ -592,14 +592,18 @@ static void log_data(struct log* log, const char* data, size_t length)
 		log_data_to_buffer(log, data, length);
 		return;
 	}
+	if ( log->skipped )
+	{
+		// TODO: Try to log a mesage about how many bytes were skipped and
+		//       resume logging if that worked. For now, let's just lose data.
+	}
 	const off_t chunk_cut_offset = log->max_size - log->max_line_size;
 	size_t sofar = 0;
 	while ( sofar < length )
 	{
 		if ( log->fd < 0 )
 		{
-			// TODO: Handle skipped data?
-			//log->skipped += length - sofar;
+			log->skipped += length - sofar;
 			return;
 		}
 		// If the data is currently line terminated, then cut if we can't add
@@ -612,8 +616,7 @@ static void log_data(struct log* log, const char* data, size_t length)
 		{
 			if ( !log_rotate(log) )
 			{
-				// TODO: Handle skipped data?
-				//log->skipped += length - sofar;
+				log->skipped += length - sofar;
 				return;
 			}
 		}
@@ -650,8 +653,7 @@ static void log_data(struct log* log, const char* data, size_t length)
 		if ( amount < 0 )
 		{
 			log_error(log, "writing: ", NULL);
-			// TODO: Handle skipped data.
-			//log->skipped += length - sofar;
+			log->skipped += length - sofar;
 			return;
 		}
 		sofar += amount;
@@ -752,7 +754,7 @@ static bool log_begin(struct log* log)
 		log->buffer = NULL;
 		log->buffer_used = 0;
 		log->buffer_size = 0;
-		// TODO: Warn about skipped data.
+		// TODO: Warn about any skipped data.
 		log->skipped = 0;
 	}
 	return true;
