@@ -1,7 +1,7 @@
 require base no-await
 require local no-await
 
-tty tty0
+tty tty1
 need tty
 
 exit-code-meaning poweroff-reboot

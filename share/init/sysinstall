@@ -1,11 +1,8 @@
 require base no-await
 require local no-await
 
-tty tty0
+tty tty1
 need tty
 
-# TODO:
-#program=sysinstall
-#exec "$program"
 exec sysinstall
 exit-code-meaning poweroff-reboot

@@ -218,9 +218,6 @@ struct daemon_config
 	struct dependency_config** dependencies;
 	size_t dependencies_used;
 	size_t dependencies_length;
-	char** variables;
-	size_t variables_used;
-	size_t variables_length;
 	char* cd;
 	int argc;
 	char** argv;
@@ -996,9 +993,6 @@ static void daemon_config_free(struct daemon_config* daemon_config)
 		free(daemon_config->dependencies[i]);
 	}
 	free(daemon_config->dependencies);
-	for ( size_t i = 0; i < daemon_config->variables_used; i++ )
-		free(daemon_config->variables[i]);
-	free(daemon_config->variables);
 	free(daemon_config->cd);
 	for ( int i = 0; i < daemon_config->argc; i++ )
 		free(daemon_config->argv[i]);
@@ -3632,8 +3626,8 @@ int main(int argc, char* argv[])
 	}
 
 	// TODO: Use the arguments to specify additional things the default daemon
-	//       should depend on, as well as a blacklist of things not to start
-	//       even if in default's dependencies. Alternatively the blacklist can
+	//       should depend on, as well as a denylist of things not to start
+	//       even if in default's dependencies. Alternatively the denylist can
 	//       be done with variables (that could be cleaner, if more flexible)?
 
 	// Request the default daemon be run.
