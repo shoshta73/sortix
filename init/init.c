@@ -1642,6 +1642,39 @@ static struct daemon* daemon_create_unconfigured(const char* name)
 	return daemon;
 }
 
+static bool daemon_add_dependency(struct daemon* daemon,
+                                  struct daemon* target,
+                                  int flags)
+{
+	struct dependency* dependency = calloc(1, sizeof(struct dependency));
+	if ( !dependency )
+		return false;
+	dependency->source = daemon;
+	dependency->target = target;
+	dependency->flags = flags;
+	if ( !array_add((void***) &daemon->dependencies,
+	               &daemon->dependencies_used,
+	               &daemon->dependencies_length,
+	               dependency) )
+	{
+		free(dependency);
+		return false;
+	}
+	if ( !array_add((void***) &target->dependents,
+	               &target->dependents_used,
+	               &target->dependents_length,
+	               dependency) )
+	{
+		daemon->dependencies_used--;
+		free(dependency);
+		return false;
+	}
+	if ( flags & DEPENDENCY_FLAG_EXIT_CODE )
+		daemon->exit_code_from = dependency;
+	target->reference_count++;
+	return true;
+}
+
 static void daemon_configure_sub(struct daemon* daemon,
                                  struct daemon_config* daemon_config,
                                  const char* netif)
@@ -1652,33 +1685,24 @@ static void daemon_configure_sub(struct daemon* daemon,
 		             sizeof(struct dependency*));
 	if ( !daemon->dependencies )
 		fatal("malloc: %m");
-	daemon->dependencies_used = daemon_config->dependencies_used;
+	daemon->dependencies_used = 0;
 	daemon->dependencies_length = daemon_config->dependencies_length;
 	for ( size_t i = 0; i < daemon_config->dependencies_used; i++ )
 	{
 		struct dependency_config* dependency_config =
 			daemon_config->dependencies[i];
-		struct dependency* dependency = calloc(1, sizeof(struct dependency));
-		if ( !dependency )
+		struct daemon* target = daemon_find_by_name(dependency_config->target);
+		if ( !target )
+			target = daemon_create_unconfigured(dependency_config->target);
+		if ( target->netif )
+		{
+			// daemon_find_by_name cannot create daemons per if.
+			warning("%s cannot depend on parameterized daemon %s",
+			        daemon->name, target->name);
+			continue;
+		}
+		if ( !daemon_add_dependency(daemon, target, dependency_config->flags) )
 			fatal("malloc: %m");
-		dependency->source = daemon;
-		// TODO: It's not properly possible to depend on a parameterized daemon.
-		dependency->target = daemon_find_by_name(dependency_config->target);
-		if ( !dependency->target )
-			dependency->target =
-				daemon_create_unconfigured(dependency_config->target);
-		dependency->flags = dependency_config->flags;
-		daemon->dependencies[i] = dependency;
-		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
-			daemon->exit_code_from = dependency;
-		// TODO: Adding a dependency should probably be broken out into a
-		//       utility function.
-		if ( !array_add((void***) &dependency->target->dependents,
-		               &dependency->target->dependents_used,
-		               &dependency->target->dependents_length,
-		               dependency) )
-			fatal("malloc: %m");
-		dependency->target->reference_count++;
 	}
 	if ( daemon_config->cd && !(daemon->cd = strdup(daemon_config->cd)) )
 		fatal("malloc: %m");
@@ -1735,24 +1759,9 @@ static void daemon_configure(struct daemon* daemon,
 			char* name_clone = strdup(parameterized->name);
 			if ( !name_clone )
 				fatal("malloc: %m");
-			struct dependency* dependency =
-				calloc(1, sizeof(struct dependency));
-			if ( !dependency )
+			int flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
+			if ( !daemon_add_dependency(daemon, parameterized, flags) )
 				fatal("malloc: %m");
-			dependency->source = daemon;
-			dependency->target = parameterized;
-			dependency->flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
-			if ( !array_add((void***) &daemon->dependencies,
-			                &daemon->dependencies_used,
-			                &daemon->dependencies_length,
-			                dependency) )
-				fatal("malloc: %m");
-			if ( !array_add((void***) &dependency->target->dependents,
-				           &dependency->target->dependents_used,
-				           &dependency->target->dependents_length,
-				           dependency) )
-				fatal("malloc: %m");
-			dependency->target->reference_count++;
 			daemon_configure_sub(parameterized, daemon_config, netif);
 		}
 		if_freenameindex(ifs);
