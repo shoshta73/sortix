@@ -826,16 +826,17 @@ static void fatal(const char* format, ...)
 	fprintf(stderr, "\n");
 	fflush(stderr);
 	va_end(ap);
-	va_start(ap, format);
-	vcbprintf(&init_log, log_callback, format, ap);
-	log_formatted(&init_log, "\n", 1);
-	va_end(ap);
+	if ( getpid() == main_pid )
+	{
+		va_start(ap, format);
+		vcbprintf(&init_log, log_callback, format, ap);
+		log_formatted(&init_log, "\n", 1);
+		va_end(ap);
+	}
 	if ( getpid() == main_pid )
 		exit(2);
 	_exit(2);
 }
-
-// TODO: error
 
 __attribute__((format(printf, 1, 2)))
 static void warning(const char* format, ...)
@@ -847,10 +848,13 @@ static void warning(const char* format, ...)
 	fprintf(stderr, "\n");
 	fflush(stderr);
 	va_end(ap);
-	va_start(ap, format);
-	vcbprintf(&init_log, log_callback, format, ap);
-	log_formatted(&init_log, "\n", 1);
-	va_end(ap);
+	if ( getpid() == main_pid )
+	{
+		va_start(ap, format);
+		vcbprintf(&init_log, log_callback, format, ap);
+		log_formatted(&init_log, "\n", 1);
+		va_end(ap);
+	}
 }
 
 __attribute__((format(printf, 1, 2)))
@@ -863,10 +867,13 @@ static void note(const char* format, ...)
 	fprintf(stderr, "\n");
 	fflush(stderr);
 	va_end(ap);
-	va_start(ap, format);
-	vcbprintf(&init_log, log_callback, format, ap);
-	log_formatted(&init_log, "\n", 1);
-	va_end(ap);
+	if ( getpid() == main_pid )
+	{
+		va_start(ap, format);
+		vcbprintf(&init_log, log_callback, format, ap);
+		log_formatted(&init_log, "\n", 1);
+		va_end(ap);
+	}
 }
 
 static void daemon_config_free(struct daemon_config* daemon_config)
