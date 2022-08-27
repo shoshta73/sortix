@@ -1065,7 +1065,7 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 		if ( INT_MAX - 1 < argc - 1 )
 		{
 			warning("%s:%ji: too many arguments: %s",
-				    path, (intmax_t) line_number, argv[0]);
+			        path, (intmax_t) line_number, argv[0]);
 			return false;
 		}
 		int new_argc = argc - 1;
@@ -1313,7 +1313,7 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 				        (intmax_t) line_number, argv[0], argv[1], argv[2]);
 			daemon_config->per_if = false;
 		}
-		else if ( !strcmp(argv[1], "need tty") )
+		else if ( !strcmp(argv[1], "need") )
 		{
 			daemon_config->need_tty = false;
 			if ( argc < 3 )
