@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2017, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <poll.h>
 #include <pthread.h>
 #include <pty.h>
+#include <pwd.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -147,7 +148,7 @@ static bool draw_cursor = true;
 static void scrollback_resize(size_t new_rows, size_t new_columns)
 {
 	// TODO: Recover gracefully if the scrollback fails.
-	// TODO: Overfow.
+	// TODO: Overflow.
 	struct entry* new_scrollback =
 		calloc(sizeof(struct entry), new_rows * new_columns);
 	if ( !new_scrollback )
@@ -1168,6 +1169,12 @@ int main(int argc, char* argv[])
 		if ( argc <= 1 )
 		{
 			const char* program = "sh";
+			uid_t uid = getuid();
+			struct passwd* pwd = getpwuid(uid);
+			if ( !pwd )
+				warn("getpwuid: %ju", (uintmax_t) uid);
+			else
+				program = pwd->pw_shell;
 			execlp(program, program, (const char*) NULL);
 		}
 		else

@@ -1,10 +1,9 @@
 require base no-await
 require local no-await
 
-tty tty0
+tty tty1
 need tty
 
 cd "$HOME"
 exit-code-meaning poweroff-reboot
-# TODO: $SHELL?
-exec display terminal sh
+exec display terminal
