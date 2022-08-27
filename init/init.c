@@ -1448,6 +1448,8 @@ static bool daemon_config_load_from_path(struct daemon_config* daemon_config,
 		{
 			fclose(fp);
 			free(line);
+			if ( errno == ENOENT )
+				errno = EINVAL;
 			return false;
 		}
 	}
@@ -1486,8 +1488,6 @@ static bool daemon_config_load_search(struct daemon_config* daemon_config,
 		if ( !daemon_config_load_from_path(daemon_config, path, i + 1) )
 		{
 			free(path);
-			// TODO: Ensure ENOENT is not set recursively when using
-			//       furthermore and the next file doesn't exist.
 			if ( errno == ENOENT )
 				continue;
 			return NULL;
@@ -1540,22 +1540,12 @@ static struct daemon_config* daemon_config_load(const char* name)
 // TODO: Replace with better data structure.
 static struct daemon* add_daemon(void)
 {
-	if ( daemons_used == daemons_length )
-	{
-		size_t new_length = 2 * daemons_length;
-		if ( new_length == 0 )
-			new_length = 16;
-		struct daemon** new_daemons =
-			reallocarray(daemons, sizeof(struct daemon*), new_length);
-		if ( !new_daemons )
-			fatal("malloc: %m");
-		daemons = new_daemons;
-		daemons_length = new_length;
-	}
 	struct daemon* daemon = calloc(1, sizeof(struct daemon));
 	if ( !daemon )
 		fatal("malloc: %m");
-	daemons[daemons_used++] = daemon;
+	if ( !array_add((void***) &daemons, &daemons_used, &daemons_length,
+	                daemon) )
+		fatal("malloc: %m");
 	return daemon;
 }
 
