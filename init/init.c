@@ -2072,7 +2072,7 @@ static void daemon_start(struct daemon* daemon)
 			if ( target->state == DAEMON_STATE_FINISHED )
 			{
 				daemon->exit_code = target->exit_code;
-				daemon->exit_code_meaining = target->exit_code_meaining;
+				daemon->exit_code_meaning = target->exit_code_meaning;
 				daemon_on_finished(daemon);
 			}
 		}
