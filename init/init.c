@@ -1861,7 +1861,6 @@ static void daemon_on_dependency_ready(struct dependency* dependency)
 
 static void daemon_mark_ready(struct daemon* daemon)
 {
-	// TODO: Right place to do it?
 	daemon_change_state_list(daemon, DAEMON_STATE_RUNNING);
 	daemon->was_ready = true;
 	for ( size_t i = 0; i < daemon->dependents_used; i++ )
@@ -1897,10 +1896,10 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 	}
 	else if ( daemon->exit_code_from )
 	{
-		// TODO: Require exit_code_from to be a dependency.
 		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
 		{
 			daemon->exit_code = target->exit_code;
+			daemon->exit_code_meaning = target->exit_code_meaning;
 			// TODO: Recursion.
 			daemon_on_finished(daemon);
 		}
@@ -1914,7 +1913,7 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 		//       finished, maybe have a kind of virtual daemon that finished on
 		//       first error?
 		if ( failed )
-			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
+			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
 		if ( daemon->dependencies_finished == daemon->dependencies_used )
 		{
 			// TODO: Recursion.
@@ -1927,12 +1926,7 @@ static void daemon_mark_finished(struct daemon* daemon)
 {
 	assert(daemon->state != DAEMON_STATE_FINISHED);
 	if ( !daemon->was_ready )
-	{
-		// TODO: Does this have unintended consequences? Can/should we do a
-		//       special transition bypassing the ready logic?
 		daemon_mark_ready(daemon);
-	}
-	// TODO: Right place to do it?
 	daemon_change_state_list(daemon, DAEMON_STATE_FINISHED);
 	for ( size_t i = 0; i < daemon->dependents_used; i++ )
 		daemon_on_dependency_finished(daemon->dependents[i]);
@@ -2006,14 +2000,12 @@ static void daemon_schedule(struct daemon* daemon)
 		{
 			log_status("failed", "Failed to load configuration for %s.\n",
 			           daemon->name);
-			// TODO: Should this vary with exit_code_meaning?
-			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
+			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
 			daemon_on_startup_error(daemon);
 			return NULL;
 		}
 		daemon_configure(daemon, daemon_config);
 		daemon_config_free(daemon_config);
-		return;
 	}
 	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
 	{
@@ -2025,9 +2017,6 @@ static void daemon_schedule(struct daemon* daemon)
 		// TODO: Don't add as dependent if failed?
 		// TODO: Move this to daemon_configure.
 
-		if ( daemon->exit_code_from == dependency  )
-			daemon->exit_code_meaning =
-				daemon->exit_code_from->target->exit_code_meaning;
 		if ( dependency->target->state == DAEMON_STATE_TERMINATED )
 		{
 			schedule_daemon(dependency->target);
@@ -2100,8 +2089,7 @@ static void daemon_start(struct daemon* daemon)
 	{
 		log_status("failed", "Failed to start %s due to failed dependencies.\n",
 		           daemon->name);
-		// TODO: Should this vary with exit_code_meaning?
-		daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 2, 0);
+		daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
 		daemon_on_startup_error(daemon);
 		return;
 	}
@@ -2224,7 +2212,7 @@ static void daemon_start(struct daemon* daemon)
 			closefrom(4);
 		}
 		// TODO: This is a hack.
-		if ( !strcmp(daemon->argv[0], "SHELL") )
+		if ( !strcmp(daemon->argv[0], "$SHELL") )
 			daemon->argv[0] = (char*) shell;
 		execvp(daemon->argv[0], daemon->argv);
 		// TODO: Use a pipe to send the errno back.
@@ -2344,7 +2332,8 @@ static void schedule(void)
 				log_status("stopped", "Halting...\n");
 			else
 				log_status("stopped", "Exiting %i...\n", caught_exit_signal);
-			daemon_mark_finished(default_daemon);
+			if ( default_daemon->state != DAEMON_STATE_FINISHED )
+				daemon_mark_finished(default_daemon);
 			default_daemon_exit_code =
 				WCONSTRUCT(WNATURE_EXITED, caught_exit_signal, 0);
 		}
