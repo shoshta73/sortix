@@ -188,8 +188,9 @@ struct daemon
 	size_t pfd_outputfd_index;
 	struct dependency* exit_code_from;
 	char* cd;
-	char* exec;
 	char* netif;
+	int argc;
+	char** argv;
 	struct termios oldtio;
 	struct log log;
 	pid_t pid;
@@ -221,7 +222,8 @@ struct daemon_config
 	size_t variables_used;
 	size_t variables_length;
 	char* cd;
-	char* exec;
+	int argc;
+	char** argv;
 	enum exit_code_meaning exit_code_meaning;
 	bool per_if;
 	bool need_tty;
@@ -876,6 +878,115 @@ static void note(const char* format, ...)
 	}
 }
 
+static char** tokenize(size_t* out_tokens_used, const char* string)
+{
+	size_t tokens_used = 0;
+	size_t tokens_length = 0;
+	char** tokens = malloc(sizeof(char*));
+	if ( !tokens )
+		return NULL;
+	bool failed = false;
+	bool invalid = false;
+	while ( *string )
+	{
+		if ( isspace((unsigned char) *string) )
+		{
+			string++;
+			continue;
+		}
+		if ( *string == '#' )
+			break;
+		char* token;
+		size_t token_size;
+		FILE* fp = open_memstream(&token, &token_size);
+		if ( !fp )
+		{
+			failed = true;
+			break;
+		}
+		bool singly = false;
+		bool doubly = false;
+		bool escaped = false;
+		for ( char c = *string++; c; c = *string++ )
+		{
+			if ( !escaped && !singly && !doubly && isspace((unsigned char) c) )
+				break;
+			if ( !escaped && !doubly && c == '\'' )
+			{
+				singly = !singly;
+				continue;
+			}
+			if ( !escaped && !singly && c == '"' )
+			{
+				doubly = !doubly;
+				continue;
+			}
+			if ( !singly && !escaped && c == '\\' )
+			{
+				escaped = true;
+				continue;
+			}
+			if ( escaped )
+			{
+				switch ( c )
+				{
+				case 'a': c = '\a'; break;
+				case 'b': c = '\b'; break;
+				case 'e': c = '\e'; break;
+				case 'f': c = '\f'; break;
+				case 'n': c = '\n'; break;
+				case 'r': c = '\r'; break;
+				case 't': c = '\t'; break;
+				case 'v': c = '\v'; break;
+				default: break;
+				};
+			}
+			escaped = false;
+			if ( fputc((unsigned char) c, fp) == EOF )
+			{
+				failed = true;
+				break;
+			}
+		}
+		if ( singly || doubly || escaped )
+		{
+			fclose(fp);
+			free(token);
+			invalid = true;
+			break;
+		}
+		if ( fflush(fp) == EOF )
+		{
+			fclose(fp);
+			free(token);
+			failed = true;
+			break;
+		}
+		fclose(fp);
+		if ( !array_add((void***) &tokens, &tokens_used, &tokens_length,
+		                token) )
+		{
+			free(token);
+			failed = true;
+			break;
+		}
+	}
+	if ( failed || invalid )
+	{
+		for ( size_t i = 0; i < tokens_used; i++ )
+			free(tokens[i]);
+		free(tokens);
+		if ( invalid )
+			errno = 0;
+		return NULL;
+	}
+	char** new_tokens = reallocarray(tokens, tokens_used, sizeof(char*));
+	if ( new_tokens )
+		tokens = new_tokens;
+	*out_tokens_used = tokens_used;
+	return tokens;
+}
+
 static void daemon_config_free(struct daemon_config* daemon_config)
 {
 	free(daemon_config->name);
@@ -889,68 +1000,29 @@ static void daemon_config_free(struct daemon_config* daemon_config)
 		free(daemon_config->variables[i]);
 	free(daemon_config->variables);
 	free(daemon_config->cd);
-	free(daemon_config->exec);
+	for ( int i = 0; i < daemon_config->argc; i++ )
+		free(daemon_config->argv[i]);
+	free(daemon_config->argv);
 	free(daemon_config);
 }
 
 static bool daemon_config_load_search(struct daemon_config* daemon_config,
                                       size_t next_search_path_index);
 
-static bool daemon_process_line(struct daemon_config* daemon_config,
-                                const char* path,
-                                char* line,
-                                off_t line_number,
-                                size_t next_search_path_index)
+static bool daemon_process_command(struct daemon_config* daemon_config,
+                                   const char* path,
+                                   size_t argc,
+                                   const char* const* argv,
+                                   off_t line_number,
+                                   size_t next_search_path_index)
 {
-	// TODO: export foo="bar"
-	char* input = line;
-	while ( isspace((unsigned char) input[0]) )
-		input++;
-	if ( !input[0] || input[0] == '#' )
+	if ( !argc )
 		return true;
-	char* operation = input;
-	size_t operation_length = 0;
-	while ( operation[operation_length] &&
-	        !isspace((unsigned char) operation[operation_length]) )
-		operation_length++;
-	char* parameter = operation + operation_length;
-	while ( isspace((unsigned char) parameter[0]) )
-		parameter++;
-	operation[operation_length] = '\0';
-	if ( !strcmp(operation, "cd") )
+	if ( !strcmp(argv[0], "furthermore") )
 	{
-		free(daemon_config->cd);
-		if ( !(daemon_config->cd = strdup(parameter)) )
-		{
-			warning("strdup: %m");
-			return false;
-		}
-	}
-	else if ( !strcmp(operation, "exec") )
-	{
-		free(daemon_config->exec);
-		if ( !(daemon_config->exec = strdup(parameter)) )
-		{
-			warning("strdup: %m");
-			return false;
-		}
-	}
-	else if ( !strcmp(operation, "exit-code-meaning") )
-	{
-		if ( !strcmp(parameter, "default") )
-			daemon_config->exit_code_meaning = EXIT_CODE_MEANING_DEFAULT;
-		else if ( !strcmp(parameter, "poweroff-reboot") )
-			daemon_config->exit_code_meaning =
-				EXIT_CODE_MEANING_POWEROFF_REBOOT;
-		else
-			warning("%s:%ji: unknown %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
-	}
-	else if ( !strcmp(operation, "furthermore") )
-	{
-		if ( parameter[0] )
+		if ( 2 <= argc )
 			warning("%s:%ji: unexpected parameter to %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 		// TODO: Only once per search path level.
 		// TODO: How about requiring it to be the first statement?
 		if ( !daemon_config_load_search(daemon_config, next_search_path_index) )
@@ -966,118 +1038,170 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 				warning("%s: while processing 'furthermore': %m", path);
 			return false;
 		}
+		return true;
 	}
-	else if ( !strcmp(operation, "log-control-messages") )
+	if ( argc == 1 )
 	{
-		if ( !strcmp(parameter, "true") )
+		warning("%s:%ji: expected parameter: %s",
+		        path, (intmax_t) line_number, argv[0]);
+		return false;
+	}
+	if ( !strcmp(argv[0], "cd") )
+	{
+		free(daemon_config->cd);
+		if ( !(daemon_config->cd = strdup(argv[1])) )
+		{
+			warning("strdup: %m");
+			return false;
+		}
+	}
+	else if ( !strcmp(argv[0], "exec") )
+	{
+		for ( int i = 0; i < daemon_config->argc; i++ )
+			free(daemon_config->argv[i]);
+		free(daemon_config->argv);
+		daemon_config->argc = 0;
+		daemon_config->argv = NULL;
+		if ( INT_MAX - 1 < argc - 1 )
+		{
+			warning("%s:%ji: too many arguments: %s",
+				    path, (intmax_t) line_number, argv[0]);
+			return false;
+		}
+		int new_argc = argc - 1;
+		char** new_argv = calloc(new_argc + 1, sizeof(char*));
+		if ( !new_argv )
+		{
+			warning("malloc: %m");
+			return false;
+		}
+		for ( int i = 0; i < new_argc; i++ )
+		{
+			size_t n = 1 + (size_t) i;
+			if ( !(new_argv[i] = strdup(argv[n])) )
+			{
+				warning("malloc: %m");
+				for ( int j = 0; i < j; j++ )
+					free(new_argv[j]);
+				free(new_argv);
+				return false;
+			}
+		}
+		daemon_config->argc = new_argc;
+		daemon_config->argv = new_argv;
+	}
+	else if ( !strcmp(argv[0], "exit-code-meaning") )
+	{
+		if ( !strcmp(argv[1], "default") )
+			daemon_config->exit_code_meaning = EXIT_CODE_MEANING_DEFAULT;
+		else if ( !strcmp(argv[1], "poweroff-reboot") )
+			daemon_config->exit_code_meaning =
+				EXIT_CODE_MEANING_POWEROFF_REBOOT;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, argv[0], argv[1]);
+	}
+	// TODO: export foo="bar"
+	else if ( !strcmp(argv[0], "log-control-messages") )
+	{
+		if ( !strcmp(argv[1], "true") )
 			daemon_config->log_control_messages = true;
-		else if ( !strcmp(parameter, "false") )
+		else if ( !strcmp(argv[1], "false") )
 			daemon_config->log_control_messages = false;
 		else
 			warning("%s:%ji: unknown %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
-	else if ( !strcmp(operation, "log-file-mode") )
+	else if ( !strcmp(argv[0], "log-file-mode") )
 	{
 		char* end;
 		errno = 0;
-		uintmax_t value = strtoumax(parameter, &end, 8);
-		if ( parameter == end || errno || value != (value & 07777) )
+		uintmax_t value = strtoumax(argv[1], &end, 8);
+		if ( argv[1] == end || errno || value != (value & 07777) )
 			warning("%s:%ji: invalid %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 		else
 			daemon_config->log_file_mode = (mode_t) value;
 	}
-	else if ( !strcmp(operation, "log-format") )
+	else if ( !strcmp(argv[0], "log-format") )
 	{
-		if ( !strcmp(parameter, "none") )
+		if ( !strcmp(argv[1], "none") )
 			daemon_config->log_format = LOG_FORMAT_NONE;
-		else if ( !strcmp(parameter, "seconds") )
+		else if ( !strcmp(argv[1], "seconds") )
 			daemon_config->log_format = LOG_FORMAT_SECONDS;
-		else if ( !strcmp(parameter, "nanoseconds") )
+		else if ( !strcmp(argv[1], "nanoseconds") )
 			daemon_config->log_format = LOG_FORMAT_NANOSECONDS;
-		else if ( !strcmp(parameter, "basic") )
+		else if ( !strcmp(argv[1], "basic") )
 			daemon_config->log_format = LOG_FORMAT_BASIC;
-		else if ( !strcmp(parameter, "full") )
+		else if ( !strcmp(argv[1], "full") )
 			daemon_config->log_format = LOG_FORMAT_FULL;
-		else if ( !strcmp(parameter, "syslog") )
+		else if ( !strcmp(argv[1], "syslog") )
 			daemon_config->log_format = LOG_FORMAT_SYSLOG;
 		else
 			warning("%s:%ji: unknown %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
-	else if ( !strcmp(operation, "log-line-size") )
+	else if ( !strcmp(argv[0], "log-line-size") )
 	{
 		char* end;
 		errno = 0;
-		intmax_t value = strtoimax(parameter, &end, 10);
-		if ( parameter == end || errno || value != (off_t) value || value < 0 )
+		intmax_t value = strtoimax(argv[1], &end, 10);
+		if ( argv[1] == end || errno || value != (off_t) value || value < 0 )
 			warning("%s:%ji: invalid %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 		else
 			daemon_config->log_line_size = (off_t) value;
 	}
-	else if ( !strcmp(operation, "log-method") )
+	else if ( !strcmp(argv[0], "log-method") )
 	{
-		if ( !strcmp(parameter, "append") )
+		if ( !strcmp(argv[1], "append") )
 			daemon_config->log_method = LOG_METHOD_APPEND;
-		else if ( !strcmp(parameter, "rotate") )
+		else if ( !strcmp(argv[1], "rotate") )
 			daemon_config->log_method = LOG_METHOD_ROTATE;
 		else
 			warning("%s:%ji: unknown %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
-	else if ( !strcmp(operation, "log-rotate-on-start") )
+	else if ( !strcmp(argv[0], "log-rotate-on-start") )
 	{
-		if ( !strcmp(parameter, "true") )
+		if ( !strcmp(argv[1], "true") )
 			daemon_config->log_rotate_on_start = true;
-		else if ( !strcmp(parameter, "false") )
+		else if ( !strcmp(argv[1], "false") )
 			daemon_config->log_rotate_on_start = false;
 		else
 			warning("%s:%ji: unknown %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
-	else if ( !strcmp(operation, "log-size") )
+	else if ( !strcmp(argv[0], "log-size") )
 	{
 		char* end;
 		errno = 0;
-		intmax_t value = strtoimax(parameter, &end, 10);
-		if ( parameter == end || errno || value != (off_t) value || value < 0 )
+		intmax_t value = strtoimax(argv[1], &end, 10);
+		if ( argv[1] == end || errno || value != (off_t) value || value < 0 )
 			warning("%s:%ji: invalid %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 		else
 			daemon_config->log_size = (off_t) value;
 	}
-	else if ( !strcmp(operation, "per") )
+	else if ( !strcmp(argv[0], "per") )
 	{
-		if ( !strcmp(parameter, "if") )
+		if ( !strcmp(argv[1], "if") )
 			daemon_config->per_if = true;
 		else
 			warning("%s:%ji: unknown %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
-	else if ( !strcmp(operation, "need") )
+	else if ( !strcmp(argv[0], "need") )
 	{
-		if ( !strcmp(parameter, "tty") )
+		if ( !strcmp(argv[1], "tty") )
 			daemon_config->need_tty = true;
 		else
 			warning("%s:%ji: unknown %s: %s",
-			        path, (intmax_t) line_number, operation, parameter);
+			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
-	else if ( !strcmp(operation, "require") )
+	else if ( !strcmp(argv[0], "require") )
 	{
-		// TODO: Better tokenization.
-		size_t target_name_length = 0;
-		while ( parameter[target_name_length] &&
-		        !isspace((unsigned char) parameter[target_name_length]) )
-			target_name_length++;
-		if ( !target_name_length )
-		{
-			warning("%s:%ji: error: No dependency was named: %s",
-			        path, (intmax_t) line_number, line);
-			return true;
-		}
-		char* target = strndup(parameter, target_name_length);
+		char* target = strdup(argv[1]);
 		if ( !target )
 		{
 			warning("strdup: %m");
@@ -1085,42 +1209,20 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 		}
 		int negated_flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
 		int flags = negated_flags;
-		size_t flag_index = target_name_length;
-		while ( parameter[flag_index] )
+		for ( size_t i = 2; i < argc; i++ )
 		{
-			while ( isspace((unsigned char) parameter[flag_index]) )
-				flag_index++;
-			if ( !parameter[flag_index] )
-				break;
-			char* flag = parameter + flag_index;
-			size_t flag_length = 0;
-			while ( flag[flag_length] &&
-			        !isspace((unsigned char) flag[flag_length]) )
-				flag_length++;
-			flag_index += flag_length;
-			if ( flag_length == strlen("optional") &&
-			     !memcmp(flag, "optional", strlen("optional")) )
-			{
+			if ( !strcmp(argv[i], "optional") )
 				flags &= ~DEPENDENCY_FLAG_REQUIRE;
-			}
-			else if ( flag_length == strlen("no-await") &&
-			          !memcmp(flag, "no-await", strlen("no-await")) )
-			{
+			else if ( !strcmp(argv[i], "no-await") )
 				flags &= ~DEPENDENCY_FLAG_AWAIT;
-			}
-			else if ( flag_length == strlen("exit-code") &&
-			          !memcmp(flag, "exit-code", strlen("exit-code")) )
+			else if ( !strcmp(argv[i], "exit-code") )
 			{
 				// TODO: Warning if multiple requirements use exit-code.
 				flags |= DEPENDENCY_FLAG_EXIT_CODE;
 			}
 			else
-			{
-				warning("%s:%ji: error: Unsupported flag '%.*s' (%zu): %s",
-				        path, (intmax_t) line_number, (int) flag_length, flag,
-				        flag_length, line);
-				// TODO: Error handling?
-			}
+				warning("%s:%ji: %s %s: unknown flag: %s", path,
+				        (intmax_t) line_number, argv[0], argv[1], argv[i]);
 		}
 		// TODO: Linear time lookup.
 		struct dependency_config* dependency = NULL;
@@ -1162,81 +1264,85 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 			}
 		}
 	}
-	else if ( !strcmp(operation, "tty") )
+	else if ( !strcmp(argv[0], "tty") )
 	{
 		// TODO: Implement.
 	}
-	else if ( !strcmp(operation, "unset") )
+	else if ( !strcmp(argv[0], "unset") )
 	{
-		if ( !strcmp(parameter, "cd") )
+		if ( !strcmp(argv[1], "cd") )
 		{
 			free(daemon_config->cd);
 			daemon_config->cd = NULL;
 		}
-		else if ( !strcmp(parameter, "exec") )
+		else if ( !strcmp(argv[1], "exec") )
 		{
-			free(daemon_config->exec);
-			daemon_config->exec = NULL;
+			for ( int i = 0; i < daemon_config->argc; i++ )
+				free(daemon_config->argv[i]);
+			free(daemon_config->argv);
+			daemon_config->argc = 0;
+			daemon_config->argv = NULL;
 		}
-		else if ( !strcmp(parameter, "exit-code-meaning") )
+		else if ( !strcmp(argv[1], "exit-code-meaning") )
 			daemon_config->exit_code_meaning = EXIT_CODE_MEANING_DEFAULT;
-		else if ( !strcmp(operation, "log-control-messages") )
+		else if ( !strcmp(argv[1], "log-control-messages") )
 			daemon_config->log_control_messages =
 				default_config.log_control_messages;
-		else if ( !strcmp(operation, "log-file-mode") )
+		else if ( !strcmp(argv[1], "log-file-mode") )
 			daemon_config->log_file_mode = default_config.log_file_mode;
-		else if ( !strcmp(operation, "log-format") )
+		else if ( !strcmp(argv[1], "log-format") )
 			daemon_config->log_format = default_config.log_format;
-		else if ( !strcmp(operation, "log-line-size") )
+		else if ( !strcmp(argv[1], "log-line-size") )
 			daemon_config->log_line_size = default_config.log_line_size;
-		else if ( !strcmp(operation, "log-method") )
+		else if ( !strcmp(argv[1], "log-method") )
 			daemon_config->log_method = default_config.log_method;
-		else if ( !strcmp(operation, "log-rotate-on-start") )
+		else if ( !strcmp(argv[1], "log-rotate-on-start") )
 			daemon_config->log_rotate_on_start =
 				default_config.log_rotate_on_start;
-		else if ( !strcmp(operation, "log-size") )
+		else if ( !strcmp(argv[1], "log-size") )
 			daemon_config->log_line_size = default_config.log_line_size;
-		// TODO: Proper tokenzation.
-		else if ( !strcmp(parameter, "per if") )
+		else if ( !strcmp(argv[1], "per") )
 		{
+			if ( argc < 3 )
+				warning("%s:%ji: expected parameter: %s: %s",
+					    path, (intmax_t) line_number, argv[0], argv[1]);
+			else if ( !strcmp(argv[2], "if") )
+				daemon_config->per_if = false;
+			else
+				warning("%s:%ji: %s %s: unknown: %s", path,
+				        (intmax_t) line_number, argv[0], argv[1], argv[2]);
 			daemon_config->per_if = false;
 		}
-		// TODO: Proper tokenzation.
-		else if ( !strcmp(parameter, "need tty") )
+		else if ( !strcmp(argv[1], "need tty") )
 		{
 			daemon_config->need_tty = false;
+			if ( argc < 3 )
+				warning("%s:%ji: expected parameter: %s: %s",
+					    path, (intmax_t) line_number, argv[0], argv[1]);
+			else if ( !strcmp(argv[2], "tty") )
+				daemon_config->need_tty = false;
+			else
+				warning("%s:%ji: %s %s: unknown: %s", path,
+				        (intmax_t) line_number, argv[0], argv[1], argv[2]);
+			daemon_config->per_if = false;
 		}
-		// TODO: Better tokenzation.
 		// TODO: Fully test this implementation.
-		else if ( !strncmp(parameter, "require", strlen("require")) &&
-		          isspace((unsigned char) parameter[strlen("require")]) )
+		else if ( !strcmp(argv[1], "require") )
 		{
-			parameter += strlen("require");
-			while ( isspace((unsigned char) parameter[0]) )
-				parameter++;
-			// TODO: Better tokenization.
-			size_t target_name_length = 0;
-			while ( parameter[target_name_length] &&
-				    !isspace((unsigned char) parameter[target_name_length]) )
-				target_name_length++;
-			if ( !target_name_length )
+			if ( argc < 3 )
 			{
 				// TODO: Instead delete all dependencies?
-				// TODO: Proper error handling.
-				warning("%s:%ji: error: No dependency was named: %s",
-				        path, (intmax_t) line_number, line);
+				warning("%s:%ji: expected parameter: %s %s",
+				        path, (intmax_t) line_number, argv[0], argv[1]);
 				return true;
 			}
+			const char* target = argv[2];
 			// TODO: Linear time lookup.
 			struct dependency_config* dependency = NULL;
 			size_t i;
 			for ( i = 0; i < daemon_config->dependencies_used; i++ )
 			{
-				if ( !strncmp(daemon_config->dependencies[i]->target,
-				              parameter,
-				              target_name_length) &&
-				      !daemon_config->dependencies[i]->target[
-				          target_name_length] )
+				if ( !strcmp(daemon_config->dependencies[i]->target, target) )
 				{
 					dependency = daemon_config->dependencies[i];
 					break;
@@ -1244,17 +1350,12 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 			}
 			if ( !dependency )
 			{
-				// TODO: Proper error handling.
-				warning("%s:%ji: error: Dependency wasn't already required: %s",
-				        path, (intmax_t) line_number, line);
+				warning("%s:%ji: dependency wasn't already required: %s",
+				        path, (intmax_t) line_number, target);
 				return true;
 			}
-			parameter += target_name_length;
-			while ( isspace((unsigned char) parameter[0]) )
-				parameter++;
-			if ( !parameter[0] )
+			if ( argc <= 3 )
 			{
-				// TODO: Shrink array.
 				free(daemon_config->dependencies[i]->target);
 				size_t last = daemon_config->dependencies_used - 1;
 				if ( i != last )
@@ -1264,72 +1365,58 @@ static bool daemon_process_line(struct daemon_config* daemon_config,
 					daemon_config->dependencies[last] = NULL;
 				}
 				daemon_config->dependencies_used--;
-				return true;
 			}
-			size_t flag_index = target_name_length;
-			while ( parameter[flag_index] )
+			else for ( size_t i = 3; i < argc; i++ )
 			{
-				while ( isspace((unsigned char) parameter[flag_index]) )
-					flag_index++;
-				if ( !parameter[flag_index] )
-					break;
-				char* flag = parameter + flag_index;
-				size_t flag_length = 0;
-				while ( flag[flag_length] &&
-					    !isspace((unsigned char) flag[flag_length]) )
-					flag_length++;
-				flag_index += flag_length;
-				if ( flag_length == strlen("optional") &&
-				     !memcmp(flag, "optional", strlen("optional")) )
-				{
-					if ( dependency->flags & DEPENDENCY_FLAG_REQUIRE )
-						warning("%s:%ji: error: "
-						        "Dependency wasn't already optional: %s",
-						        path, (intmax_t) line_number, line);
-					else
-						dependency->flags |= DEPENDENCY_FLAG_REQUIRE;
-				}
-				else if ( flag_length == strlen("no-await") &&
-				          !memcmp(flag, "no-await", strlen("no-await")) )
-				{
-					if ( dependency->flags & DEPENDENCY_FLAG_AWAIT )
-						warning("%s:%ji: error: "
-						        "Dependency wasn't already no-await: %s",
-						        path, (intmax_t) line_number, line);
-					else
-						dependency->flags |= DEPENDENCY_FLAG_AWAIT;
-				}
-				else if ( flag_length == strlen("exit-code") &&
-				          !memcmp(flag, "exit-code", strlen("exit-code")) )
-				{
-					if ( !(dependency->flags & DEPENDENCY_FLAG_EXIT_CODE) )
-						warning("%s:%ji: error: "
-						        "Dependency wasn't already exit-code: %s",
-						        path, (intmax_t) line_number, line);
-					else
-						dependency->flags &= ~DEPENDENCY_FLAG_EXIT_CODE;
-				}
+				if ( !strcmp(argv[i], "optional") )
+					dependency->flags |= DEPENDENCY_FLAG_REQUIRE;
+				else if ( !strcmp(argv[i], "no-await") )
+					dependency->flags |= DEPENDENCY_FLAG_AWAIT;
+				else if ( !strcmp(argv[i], "exit-code") )
+					dependency->flags &= ~DEPENDENCY_FLAG_EXIT_CODE;
 				else
-				{
-					warning("%s:%ji: error: Unsupported flag '%.*s' (%zu): %s",
-					        path, (intmax_t) line_number, (int) flag_length,
-					        flag, flag_length, line);
-					// TODO: Error handling?
-				}
+					warning("%s:%ji: %s %s %s: unknown flag: %s",
+					        path, (intmax_t) line_number, argv[0], argv[1],
+					        argv[2], argv[i]);
 			}
 		}
-		else if ( !strcmp(parameter, "tty") )
+		else if ( !strcmp(argv[1], "tty") )
 		{
 			// TODO: Implement.
 		}
 		else
 			warning("%s:%ji: unknown unset operation: %s",
-			        path, (intmax_t) line_number, operation);
+			        path, (intmax_t) line_number, argv[0]);
 	}
 	else
 		warning("%s:%ji: unknown operation: %s",
-		        path, (intmax_t) line_number, operation);
+		        path, (intmax_t) line_number, argv[0]);
 	return true;
+}
+
+static bool daemon_process_line(struct daemon_config* daemon_config,
+                                const char* path,
+                                char* line,
+                                off_t line_number,
+                                size_t next_search_path_index)
+{
+	size_t argc;
+	char** argv = tokenize(&argc, line);
+	if ( !argv )
+	{
+		if ( !errno )
+			warning("%s:%ji: syntax error", path, (intmax_t) line_number);
+		else
+			warning("%s: %m", path);
+		return false;
+	}
+	bool result = daemon_process_command(daemon_config, path, argc,
+	                                     (const char* const*) argv, line_number,
+	                                     next_search_path_index);
+	for ( size_t i = 0; i < argc; i++ )
+		free(argv[i]);
+	free(argv);
+	return result;
 }
 
 static bool daemon_config_load_from_path(struct daemon_config* daemon_config,
@@ -1444,40 +1531,6 @@ static struct daemon_config* daemon_config_load(const char* name)
 		return NULL;
 	}
 	return daemon_config;
-}
-
-static char** generate_argv(const char* command, const char* netif)
-{
-	char** argv = NULL;
-	size_t argv_used = 0;
-	size_t argv_length = 0;
-	// TODO: Proper shell quote expander and parser.
-	while ( command[0] )
-	{
-		size_t length = strcspn(command, "\t\n ");
-		if ( length == 0 )
-		{
-			command++;
-			continue;
-		}
-		char* arg = strndup(command, length);
-		if ( !arg )
-			fatal("malloc: %m");
-		if ( !array_add((void***) &argv, &argv_used, &argv_length, arg) )
-			fatal("malloc: %m");
-		command += length;
-	}
-	if ( netif )
-	{
-		char* arg = strdup(netif);
-		if ( !arg )
-			fatal("malloc: %m");
-		if ( !array_add((void***) &argv, &argv_used, &argv_length, arg) )
-			fatal("malloc: %m");
-	}
-	if ( !array_add((void***) &argv, &argv_used, &argv_length, NULL) )
-		fatal("malloc: %m");
-	return argv;
 }
 
 // TODO: Replace with better data structure.
@@ -1637,8 +1690,27 @@ static void daemon_configure_sub(struct daemon* daemon,
 	}
 	if ( daemon_config->cd && !(daemon->cd = strdup(daemon_config->cd)) )
 		fatal("malloc: %m");
-	if ( daemon_config->exec && !(daemon->exec = strdup(daemon_config->exec)) )
-		fatal("malloc: %m");
+	if ( daemon_config->argv )
+	{
+		daemon->argc = daemon_config->argc;
+		if ( netif )
+		{
+			if ( INT_MAX - 1 <= daemon->argc )
+			{
+				errno = ENOMEM;
+				fatal("malloc: %m");
+			}
+			daemon->argc++;
+		}
+		daemon->argv = calloc(daemon->argc, sizeof(char*));
+		if ( !daemon->argv )
+			fatal("malloc: %m");
+		for ( int i = 0; i < daemon_config->argc; i++ )
+			if ( !(daemon->argv[i] = strdup(daemon_config->argv[i])) )
+				fatal("malloc: %m");
+		if ( netif && !(daemon->argv[daemon_config->argc] = strdup(netif)) )
+			fatal("malloc: %m");
+	}
 	daemon->exit_code_meaning = daemon_config->exit_code_meaning;
 	if ( netif && !(daemon->netif = strdup(netif)) )
 		fatal("malloc: %m");
@@ -1815,7 +1887,7 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 	              daemon_is_failed(target);
 	if ( failed )
 		daemon->dependencies_failed++;
-	if ( daemon->exec )
+	if ( daemon->argv )
 	{
 		if ( failed )
 		{
@@ -2005,7 +2077,7 @@ static void daemon_schedule(struct daemon* daemon)
 static void daemon_start(struct daemon* daemon)
 {
 	assert(daemon->state == DAEMON_STATE_SATISFIED);
-	if ( !daemon->exec )
+	if ( !daemon->argv )
 	{
 		daemon_on_ready(daemon);
 		if ( daemon->exit_code_from )
@@ -2044,15 +2116,8 @@ static void daemon_start(struct daemon* daemon)
 	const char* shell = pwd->pw_shell[0] ? pwd->pw_shell : "sh";
 	const char* cd = daemon->cd ? daemon->cd : "/";
 	// TODO: This is a hack.
-	if ( !strcmp(cd, "\"$HOME\"") )
+	if ( !strcmp(cd, "$HOME") )
 		cd = home;
-	const char* exec = daemon->exec;
-	// TODO: This is a hack.
-	if ( !strcmp(exec, "\"$SHELL\"") )
-		exec = shell;
-	char** argv = generate_argv(exec, daemon->netif);
-	if ( !argv )
-		fatal("malloc: %m");
 	int outputfds[2];
 	int readyfds[2];
 	if ( !daemon->need_tty )
@@ -2111,7 +2176,6 @@ static void daemon_start(struct daemon* daemon)
 	     setenv("HOME", home, 1) < 0 ||
 	     setenv("SHELL", shell, 1) < 0 )
 		fatal("setenv");
-	// TODO: If argv is empty
 	daemon->pid = daemon->log.pid = fork();
 	if ( daemon->pid < 0 )
 		fatal("fork: %m");
@@ -2160,9 +2224,12 @@ static void daemon_start(struct daemon* daemon)
 			dup2(readyfds[1], 3);
 			closefrom(4);
 		}
-		execvp(argv[0], argv);
+		// TODO: This is a hack.
+		if ( !strcmp(daemon->argv[0], "SHELL") )
+			daemon->argv[0] = (char*) shell;
+		execvp(daemon->argv[0], daemon->argv);
 		// TODO: Use a pipe to send the errno back.
-		warning("%s: %m", argv[0]);
+		warning("%s: %m", daemon->argv[0]);
 		_exit(127);
 	}
 	if ( !daemon->need_tty )
@@ -2179,9 +2246,6 @@ static void daemon_start(struct daemon* daemon)
 	unsetenv("USER");
 	unsetenv("HOME");
 	unsetenv("SHELL");
-	for ( size_t i = 0; argv[i]; i++ )
-		free(argv[i]);
-	free(argv);
 	if ( daemon->need_tty )
 		daemon_on_ready(daemon);
 	else
