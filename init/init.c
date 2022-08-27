@@ -1993,6 +1993,7 @@ static void daemon_unregister_pollfd(struct daemon* daemon, size_t index)
 
 static void daemon_schedule(struct daemon* daemon)
 {
+	assert(daemon->state == DAEMON_STATE_SCHEDULED);
 	if ( !daemon->configured )
 	{
 		struct daemon_config* daemon_config = daemon_config_load(daemon->name);
@@ -2013,9 +2014,6 @@ static void daemon_schedule(struct daemon* daemon)
 		struct dependency* dependency = daemon->dependencies[i];
 		assert(dependency->source == daemon);
 		assert(dependency->target);
-		// TODO: This may already have been done if it has already run before.
-		// TODO: Don't add as dependent if failed?
-		// TODO: Move this to daemon_configure.
 
 		if ( dependency->target->state == DAEMON_STATE_TERMINATED )
 		{
@@ -2074,6 +2072,7 @@ static void daemon_start(struct daemon* daemon)
 			if ( target->state == DAEMON_STATE_FINISHED )
 			{
 				daemon->exit_code = target->exit_code;
+				daemon->exit_code_meaining = target->exit_code_meaining;
 				daemon_on_finished(daemon);
 			}
 		}
@@ -2370,7 +2369,6 @@ static void schedule(void)
 				daemon_on_exit(daemon, exit_code);
 			timeout = timespec_make(0, 0);
 		}
-		// TODO: Use kqueue or such.
 		// Set a dummy SIGCHLD handler to ensure we get EINTR during ppoll(2).
 		struct sigaction sa = { 0 };
 		sa.sa_handler = signal_handler;
@@ -3268,7 +3266,8 @@ static void niht(void)
 	if ( getpid() != main_pid )
 		return;
 
-	// TODO: Unify with new daemon system?
+	// TODO: Unify with new daemon system? At least it needs to recursively kill
+	//       all processes. Ideally fatal wouldn't be called for daemons.
 
 	// TODO: Don't do this unless all the mountpoints were mounted (not for
 	//       chain init).
@@ -3621,8 +3620,8 @@ int main(int argc, char* argv[])
 
 	// TODO: Use the arguments to specify additional things the default daemon
 	//       should depend on, as well as a denylist of things not to start
-	//       even if in default's dependencies. Alternatively the denylist can
-	//       be done with variables (that could be cleaner, if more flexible)?
+	//       even if in default's dependencies. The easiest thing is probably to
+	//       be able to inject require and unset require lines into default.
 
 	// Request the default daemon be run.
 	schedule_daemon(default_daemon);
