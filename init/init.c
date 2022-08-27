@@ -1209,21 +1209,22 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 			else if ( !strcmp(argv[i], "no-await") )
 				flags &= ~DEPENDENCY_FLAG_AWAIT;
 			else if ( !strcmp(argv[i], "exit-code") )
-			{
-				// TODO: Warning if multiple requirements use exit-code.
 				flags |= DEPENDENCY_FLAG_EXIT_CODE;
-			}
 			else
 				warning("%s:%ji: %s %s: unknown flag: %s", path,
 				        (intmax_t) line_number, argv[0], argv[1], argv[i]);
 		}
+		bool had_exit_code = false;
 		// TODO: Linear time lookup.
 		struct dependency_config* dependency = NULL;
 		for ( size_t i = 0; i < daemon_config->dependencies_used; i++ )
 		{
-			if ( !strcmp(daemon_config->dependencies[i]->target, target) )
+			struct dependency_config* dep = daemon_config->dependencies[i];
+			if ( dep->flags & DEPENDENCY_FLAG_EXIT_CODE )
+				had_exit_code = true;
+			if ( !strcmp(dep->target, target) )
 			{
-				dependency = daemon_config->dependencies[i];
+				dependency = dep;
 				break;
 			}
 		}
@@ -1235,6 +1236,12 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 		}
 		else
 		{
+			if ( (flags & DEPENDENCY_FLAG_EXIT_CODE) && had_exit_code )
+			{
+				warning("%s:%ji: %s %s: exit-code had already been set",
+				        path, (intmax_t) line_number, argv[0], argv[1]);
+				dependency->flags &= ~DEPENDENCY_FLAG_EXIT_CODE;
+			}
 			dependency = (struct dependency_config*)
 				calloc(1, sizeof(struct dependency_config));
 			if ( !dependency )
@@ -1672,8 +1679,6 @@ static void daemon_configure_sub(struct daemon* daemon,
 				daemon_create_unconfigured(dependency_config->target);
 		dependency->flags = dependency_config->flags;
 		daemon->dependencies[i] = dependency;
-		// TODO: Either allow multiple dependencies to be exit code or enforce
-		//       that only a single one uses it.
 		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
 			daemon->exit_code_from = dependency;
 		// TODO: Adding a dependency should probably be broken out into a
@@ -1893,8 +1898,6 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 	}
 	else if ( daemon->exit_code_from )
 	{
-		// TODO: Either 1) enforce that only a single dependency can be exit
-		//       code, or 2) specifically allow this and support it.
 		// TODO: Require exit_code_from to be a dependency.
 		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
 		{
