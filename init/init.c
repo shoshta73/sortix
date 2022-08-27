@@ -1095,7 +1095,6 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 			warning("%s:%ji: unknown %s: %s",
 			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
-	// TODO: export foo="bar"
 	else if ( !strcmp(argv[0], "log-control-messages") )
 	{
 		if ( !strcmp(argv[1], "true") )
@@ -1320,14 +1319,18 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 				        (intmax_t) line_number, argv[0], argv[1], argv[2]);
 			daemon_config->per_if = false;
 		}
-		// TODO: Fully test this implementation.
 		else if ( !strcmp(argv[1], "require") )
 		{
 			if ( argc < 3 )
 			{
-				// TODO: Instead delete all dependencies?
-				warning("%s:%ji: expected parameter: %s %s",
-				        path, (intmax_t) line_number, argv[0], argv[1]);
+				for ( size_t i = 0; i < daemon_config->dependencies_used; i++ )
+				{
+					free(daemon_config->dependencies[i]->target);
+					free(daemon_config->dependencies[i]);
+				}
+				free(daemon_config->dependencies);
+				daemon_config->dependencies_used = 0;
+				daemon_config->dependencies = NULL;
 				return true;
 			}
 			const char* target = argv[2];
