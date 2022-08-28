@@ -1893,32 +1893,23 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 		{
 			// TODO: If still waiting for dependencies to start, fail early.
 		}
+		return;
 	}
-	else if ( daemon->exit_code_from )
+	else if ( daemon->exit_code_from &&
+	          (dependency->flags & DEPENDENCY_FLAG_EXIT_CODE) )
 	{
-		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
-		{
-			daemon->exit_code = target->exit_code;
-			daemon->exit_code_meaning = target->exit_code_meaning;
-			// TODO: Recursion.
-			daemon_on_finished(daemon);
-		}
-		// TODO: This ignores the exit code from other dependencies. Make it
-		//       possible to still fail early if a key dependency fails, even
-		//       if we want the exit code from a particular dependency.
+		daemon->exit_code = target->exit_code;
+		daemon->exit_code_meaning = target->exit_code_meaning;
+		// TODO: Recursion.
+		daemon_on_finished(daemon);
+		return;
 	}
-	else
+	if ( failed )
+		daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
+	if ( failed || daemon->dependencies_finished == daemon->dependencies_used )
 	{
-		// TODO: This gathers all the exit codes before the virtual daemon
-		//       finished, maybe have a kind of virtual daemon that finished on
-		//       first error?
-		if ( failed )
-			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
-		if ( daemon->dependencies_finished == daemon->dependencies_used )
-		{
-			// TODO: Recursion.
-			daemon_on_finished(daemon);
-		}
+		// TODO: Recursion.
+		daemon_on_finished(daemon);
 	}
 }
 
