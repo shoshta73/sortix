@@ -1,2 +1,2 @@
-require network
-require time
+require network optional
+require time optional
