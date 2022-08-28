@@ -1718,7 +1718,7 @@ static void daemon_configure_sub(struct daemon* daemon,
 			}
 			daemon->argc++;
 		}
-		daemon->argv = calloc(daemon->argc, sizeof(char*));
+		daemon->argv = calloc(daemon->argc + 1, sizeof(char*));
 		if ( !daemon->argv )
 			fatal("malloc: %m");
 		for ( int i = 0; i < daemon_config->argc; i++ )
