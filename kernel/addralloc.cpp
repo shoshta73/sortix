@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 namespace Sortix {
 
 size_t aux_allocated = 0;
+size_t aux_leaked = 0;
 size_t heap_allocated = 0;
 kthread_mutex_t alloc_lock = KTHREAD_MUTEX_INITIALIZER;
 
@@ -69,6 +70,8 @@ void FreeKernelAddress(addralloc_t* alloc)
 	addr_t aux_reached = kmem_from + kmem_size - aux_allocated;
 	if ( alloc->from == aux_reached )
 		aux_allocated -= alloc->size;
+	else
+		aux_leaked += alloc->size;
 
 	alloc->from = 0;
 	alloc->size = 0;
@@ -96,6 +99,17 @@ void ShrinkHeap(size_t decrease)
 	ScopedLock lock(&alloc_lock);
 	assert(decrease <= heap_allocated);
 	heap_allocated -= decrease;
+}
+
+void KernelAddressStatistics(size_t* heap, size_t* aux, size_t* leaked,
+                             size_t* total)
+{
+	ScopedLock lock(&alloc_lock);
+	addr_t kmem_from;
+	Memory::GetKernelVirtualArea(&kmem_from, total);
+	*heap = heap_allocated;
+	*aux = aux_allocated - aux_leaked;
+	*leaked = aux_leaked;
 }
 
 // No need for locks in these three functions, since only the heap calls these

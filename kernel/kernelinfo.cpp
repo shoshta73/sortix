@@ -54,6 +54,26 @@ ssize_t sys_kernelinfo(const char* user_req, char* user_resp, size_t resplen)
 	if ( !req )
 		return -1;
 	// DEBUG
+	if ( !strcmp(req, "virtual-usage") )
+	{
+		delete[] req;
+		size_t heap;
+		size_t aux;
+		size_t leaked;
+		size_t total;
+		KernelAddressStatistics(&heap, &aux, &leaked, &total);
+		char str[4 * (20 + 3 * sizeof(size_t) + 1 + 8)];
+		snprintf(str, sizeof(str),
+		         "%20zu B heap\n%20zu B aux\n%20zu B leaked\n%20zu B total",
+		         heap, aux, leaked, total);
+		size_t stringlen = strlen(str);
+		if ( resplen < stringlen + 1 )
+			return errno = ERANGE, (ssize_t) stringlen;
+		if ( !CopyToUser(user_resp, str, sizeof(char) * (stringlen + 1)) )
+			return -1;
+		return 0;
+	}
+	// DEBUG
 	if ( !strcmp(req, "tcp") )
 	{
 		delete[] req;
