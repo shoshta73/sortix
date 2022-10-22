@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,6 +39,7 @@ void ShrinkHeap(size_t decrease);
 addr_t GetHeapLower();
 addr_t GetHeapUpper();
 size_t GetHeapSize();
+void KernelAddressStatistics(size_t* heap, size_t* aux, size_t* leaked, size_t* total);
 
 } // namespace Sortix
 
