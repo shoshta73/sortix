@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2022 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,11 +49,17 @@ static unsigned long AllocateDiskNumber()
 	return InterlockedIncrement(&next_disk_number).o;
 }
 
-static void sleep_400_nanoseconds()
+static void sleep_400_nanoseconds(uint16_t port_base)
 {
+	// TODO: The clock granularity of 10 ms slows down the early boot.
+#if 0
 	struct timespec delay = timespec_make(0, 400);
 	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	clock->SleepDelay(delay);
+#else
+	for ( int i = 0; i < 14; i++ )
+		inport8(port_base + REG_STATUS);
+#endif
 }
 
 Channel::Channel()
@@ -105,7 +111,7 @@ void Channel::SelectDrive(unsigned int drive_index) // hw_lock locked
 	outport8(port_base + REG_DRIVE_SELECT, value);
 	//outport8(port_control, value); // TODO: Or is it port_control we use?
 
-	sleep_400_nanoseconds();
+	sleep_400_nanoseconds(port_base);
 
 	// TODO: Do we need to wait for non-busy now? Can this operation fail?
 
@@ -229,7 +235,7 @@ bool Channel::Initialize(Ref<Descriptor> dev, const char* devpath)
 
 	busmaster_base = busmasterbar.addr() + 8 * channel_index;
 
-	current_drive = (unsigned int) -1; // We don't know.
+	current_drive = (inport8(port_base + REG_DRIVE_SELECT) >> 4) & 1;
 
 	for ( unsigned int i = 0; i < 2; i++ )
 	{
