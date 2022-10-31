@@ -78,9 +78,7 @@ static const uint8_t DEVICE_CMD_RESET = 0xFF;
 
 static const size_t DEVICE_RETRIES = 5;
 
-// TODO: This is entirely a guess. I don't actually know what timeout is
-//       suitable. GRUB seems to use 20 ms. I'll pick 50 ms to be safe.
-static const unsigned int TIMEOUT_MS = 50;
+static const unsigned int TIMEOUT_MS = 20;
 
 static bool WaitInput()
 {
