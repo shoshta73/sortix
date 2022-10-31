@@ -57,11 +57,17 @@ static void copy_ata_string(char* dest, const char* src, size_t length)
 	dest[length] = '\0';
 }
 
-static void sleep_400_nanoseconds()
+static void sleep_400_nanoseconds(uint16_t port_base)
 {
+	// TODO: The clock granularity of 10 ms slows down the early boot.
+#if 0
 	struct timespec delay = timespec_make(0, 400);
 	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
 	clock->SleepDelay(delay);
+#else
+	for ( int i = 0; i < 14; i++ )
+		inport8(port_base + REG_STATUS);
+#endif
 }
 
 Port::Port(Channel* channel, unsigned int port_index)
@@ -177,7 +183,7 @@ retry_identify_packet:
 	outport8(channel->port_base + REG_COMMAND,
 	         is_packet_interface ? CMD_IDENTIFY_PACKET : CMD_IDENTIFY);
 
-	sleep_400_nanoseconds();
+	sleep_400_nanoseconds(channel->port_base);
 
 	// TODO: The status polling logic should be double-checked against some
 	//       formal specification telling how this should properly be done.
