@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2018, 2022, 2023, 2024 Jonas 'Sortie' Termansen.
+# Copyright (c) 2018, 2022, 2023, 2024, 2025 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -23,8 +23,9 @@ set -e
 this=$(which -- "$0")
 thisdir=$(dirname -- "$this")
 
-platform=
 directory=
+mount=false
+platform=
 version=
 
 dashdash=
@@ -44,6 +45,7 @@ for argument do
 
   case $dashdash$argument in
   --) dashdash=yes ;;
+  --mount) mount=true ;;
   --platform=*) platform=$parameter ;;
   --platform) previous_option=platform ;;
   --version=*) version=$parameter ;;
@@ -62,14 +64,10 @@ fi
 if test -z "$platform"; then
   echo "$0: platform wasn't set with --platform" >&2
   exit 1
-fi
-
-if test -z "$version"; then
+elif test -z "$version"; then
   echo "$0: version wasn't set with --version" >&2
   exit 1
-fi
-
-if test -z "$directory"; then
+elif test -z "$directory"; then
   echo "$0: no directory operand supplied" >&2
   exit 1
 fi
@@ -130,17 +128,28 @@ list_set() {
 
 cd "$directory"
 
-sets=$(grep -Ev '^all$' repository/sets.list || true)
 
 kernel=$(maybe_compressed boot/sortix.bin)
-live_initrd=$(maybe_compressed boot/live.tar)
-overlay_initrd=$(maybe_compressed boot/overlay.tar)
-src_initrd=$(maybe_compressed boot/src.tar)
-system_initrd=$(maybe_compressed repository/system.tix.tar)
-ports=$(ls repository |
-        grep -E '\.tix\.tar\.xz$' |
-        sed -E 's/\.tix\.tar\.xz$//' |
-        (grep -Ev '^system$' || true))
+if $mount; then
+  initrd=$(maybe_compressed boot/sortix.initrd)
+  initrds=$initrd
+  sets=
+else
+  live_initrd=$(maybe_compressed boot/live.tar)
+  overlay_initrd=$(maybe_compressed boot/overlay.tar)
+  src_initrd=$(maybe_compressed boot/src.tar)
+  system_initrd=$(maybe_compressed repository/system.tix.tar)
+  initrds="$system_initrd $src_initrd $live_initrd $overlay_initrd"
+  sets=$(grep -Ev '^all$' repository/sets.list || true)
+fi
+if $mount; then
+  ports=
+else
+  ports=$(ls repository |
+          grep -E '\.tix\.tar\.xz$' |
+          sed -E 's/\.tix\.tar\.xz$//' |
+          (grep -Ev '^system$' || true))
+fi
 
 mkdir -p boot/grub
 mkdir -p boot/grub/init
@@ -210,6 +219,12 @@ find . | grep -Eq '\.xz$' && echo "insmod xzio"
 cat << EOF
 set version="$version"
 set machine="$machine"
+set mount=$mount
+if \$mount; then
+  chain='-- /sbin/init --target=chain'
+else
+  chain=
+fi
 set base_menu_title="Sortix \$version for \$machine"
 set menu_title="\$base_menu_title"
 set title_single_user='live environment'
@@ -234,6 +249,8 @@ set serial_console=--console=com1
 
 export version
 export machine
+export mount
+export chain
 export base_menu_title
 export menu_title
 export title_single_user
@@ -337,9 +354,10 @@ esac
 cat << EOF
   hook_kernel_pre
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot /$kernel \$console --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers \$kernel_options "\$@"
+  multiboot /$kernel \$console --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers \$kernel_options \$chain "\$@"
   echo done
   hook_kernel_post
+  # TODO: Injecting configuration doesn't work for mounted cdroms.
   if ! \$enable_dhclient; then
     echo -n "Disabling dhclient ... "
     module /boot/grub/init/furthermore --create-to /etc/init/network
@@ -364,7 +382,7 @@ cat << EOF
     echo done
   fi
 EOF
-for initrd in $system_initrd $src_initrd $live_initrd $overlay_initrd; do
+for initrd in $initrds; do
   if [ "$initrd" = "$src_initrd" ]; then
     cat << EOF
   if \$enable_src; then
@@ -462,9 +480,11 @@ menuentry "\$title_sysupgrade" '-- /sbin/init --target=sysupgrade'
 
 cat << EOF
 
+if ! $mount; then
 menuentry "Select ports..." {
   configfile /boot/grub/ports.cfg
 }
+fi
 
 menuentry "Advanced..." {
   configfile /boot/grub/advanced.cfg
@@ -509,6 +529,7 @@ else
   }
 fi
 
+if ! $mount; then
 if "\$enable_src"; then
   menuentry "Disable loading source code" {
     enable_src=false
@@ -519,6 +540,7 @@ else
     enable_src=true
     configfile /boot/grub/advanced.cfg
   }
+fi
 fi
 
 if [ "\$enable_network_drivers" = --disable-network-drivers ]; then
@@ -533,6 +555,7 @@ else
   }
 fi
 
+if ! $mount; then
 if \$enable_dhclient; then
   menuentry "Disable DHCP client" {
     enable_dhclient=false
@@ -572,6 +595,7 @@ fi
 menuentry "Select binary packages..." {
   configfile /boot/grub/tix.cfg
 }
+fi
 
 hook_advanced_menu_post
 EOF

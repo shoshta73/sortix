@@ -93,14 +93,19 @@ else
   SORTIX_INCLUDE_SOURCE?=yes
 endif
 
+ISO_MOUNT?=no
+ISO_VOLSET_ID?=`uuidgen`
+
 include build-aux/dirs.mak
 
 BUILD_NAME:=sortix-$(RELEASE)-$(MACHINE)
 
+CHAIN_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).chain.tar
 LIVE_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).live.tar
 OVERLAY_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).overlay.tar
 SRC_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).src.tar
 SYSTEM_INITRD:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).system.tix.tar
+ISO_VOLSET_ID_FILE:=$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).volset
 
 .PHONY: all
 all: sysroot
@@ -536,6 +541,25 @@ release-all-archs:
 
 # Initial ramdisk
 
+$(ISO_VOLSET_ID_FILE):
+	mkdir -p `dirname $@`
+	echo "$(ISO_VOLSET_ID)" > $@
+
+$(CHAIN_INITRD): $(ISO_VOLSET_ID_FILE) sysroot
+	mkdir -p `dirname $(CHAIN_INITRD)`
+	rm -rf $(CHAIN_INITRD).d
+	mkdir -p $(CHAIN_INITRD).d
+	mkdir -p $(CHAIN_INITRD).d/etc
+	echo "VOLUME_SET_ID=`cat $(ISO_VOLSET_ID_FILE)` / iso9660 ro 0 1" > $(CHAIN_INITRD).d/etc/fstab
+	mkdir -p $(CHAIN_INITRD).d/etc/init
+	echo require chain exit-code > $(CHAIN_INITRD).d/etc/init/default
+	mkdir -p $(CHAIN_INITRD).d/sbin
+	cp "$(SYSROOT)/sbin/init" $(CHAIN_INITRD).d/sbin
+	cp "$(SYSROOT)/sbin/iso9660fs" $(CHAIN_INITRD).d/sbin
+	LC_ALL=C ls -A $(CHAIN_INITRD).d | \
+	tar -cf $(CHAIN_INITRD) -C $(CHAIN_INITRD).d --numeric-owner --owner=0 --group=0 -T -
+	rm -rf $(CHAIN_INITRD).d
+
 $(LIVE_INITRD): sysroot
 	mkdir -p `dirname $(LIVE_INITRD)`
 	rm -rf $(LIVE_INITRD).d
@@ -585,10 +609,36 @@ $(SORTIX_BUILDS_DIR):
 
 # Bootable images
 
-$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(LIVE_INITRD) $(OVERLAY_INITRD) $(SRC_INITRD) $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)
+ifeq ($(SORTIX_ISO_COMPRESSION),xz)
+  GRUB_COMPRESSION=--compress=xz
+else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
+  GRUB_COMPRESSION=--compress=gz
+else # none
+  GRUB_COMPRESSION=
+endif
+
+ifeq ($(ISO_MOUNT),yes)
+  ISO_DEPS:=$(CHAIN_INITRD)
+  ISO_GRUB_CFG_OPTIONS=--mount
+  ISO_INPUT=$(SYSROOT)
+else
+  ISO_DEPS:=$(OVERLAY_INITRD) $(SRC_INITRD) $(SYSTEM_INITRD)
+  ISO_GRUB_CFG_OPTIONS=
+  ISO_INPUT=
+endif
+
+$(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(LIVE_INITRD) $(ISO_DEPS) $(ISO_VOLSET_ID_FILE) $(SORTIX_BUILDS_DIR)
 	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot
+ifeq ($(ISO_MOUNT),yes)
+	tar -C $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso -xf $(LIVE_INITRD)
+	cp "$(SYSROOT)/boot/sortix.bin" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin
+	cp $(CHAIN_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.initrd
+	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc
+	echo "VOLUME_SET_ID=`cat $(ISO_VOLSET_ID_FILE)` / iso9660 ro 0 1" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/fstab
+	if [ -d "$(SYSROOT_OVERLAY)" ]; then cp -RT "$(SYSROOT_OVERLAY)" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso; fi
+else
 	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository
 	SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
 	SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
@@ -602,8 +652,6 @@ ifeq ($(SORTIX_ISO_COMPRESSION),xz)
 	xz -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.xz
 	xz -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.xz
 	xz -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar.xz
-	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
-	grub-mkrescue --compress=xz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso -- -volid SORTIX -publisher SORTIX.ORG
 else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
 	gzip -c "$(SYSROOT)/boot/sortix.bin" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin.gz
 	gzip -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar.gz
@@ -611,8 +659,6 @@ else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
 	gzip -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.gz
 	gzip -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.gz
 	gzip -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar.gz
-	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
-	grub-mkrescue --compress=gz -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso -- -volid SORTIX -publisher SORTIX.ORG
 else # none
 	cp "$(SYSROOT)/boot/sortix.bin" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin
 	cp $(LIVE_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar
@@ -620,9 +666,10 @@ else # none
 	cp $(OVERLAY_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar
 	cp $(SRC_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar
 	cp $(SYSTEM_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar
-	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
-	grub-mkrescue -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso -- -volid SORTIX -publisher SORTIX.ORG
 endif
+endif
+	build-aux/iso-grub-cfg.sh --platform $(HOST) --version $(VERSION) $(ISO_GRUB_CFG_OPTIONS) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
+	grub-mkrescue $(GRUB_COMPRESSION) -o $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso $(ISO_INPUT) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso -- -volid SORTIX -publisher SORTIX.ORG -volset_id `cat $(ISO_VOLSET_ID_FILE)`
 	rm -rf $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso
 
 .PHONY: iso
