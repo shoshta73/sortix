@@ -50,6 +50,7 @@ LineBuffer::~LineBuffer()
 
 bool LineBuffer::Push(uint32_t unicode)
 {
+	// TODO: An infinite line buffer seems like a bad idea.
 	// Check if we need to allocate or resize the circular queue.
 	if ( bufferused == bufferlength )
 	{
