@@ -477,6 +477,8 @@ private:
 	size_t output_offset;
 	size_t output_used;
 	static const size_t output_size = 4096;
+	// TODO: This is not safe because ^W can produce unbounded output.
+	static const size_t output_probably_safe = 2048;
 	uint8_t output[output_size];
 	int ptynum;
 
@@ -538,6 +540,16 @@ ssize_t PTY::master_write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 	ScopedLockSignal lock(&termlock);
 	if ( !lock.IsAcquired() )
 		return errno = EINTR, -1;
+	// TODO: Work around deadlock by refusing writes when the buffer is starting
+	//       to be too full. This can block / "deadlock" too if the caller
+	//       didn't try to read the data written by a previous call.
+	while ( output_probably_safe <= output_used )
+	{
+		if ( ctx->dflags & O_NONBLOCK )
+			return errno = EWOULDBLOCK, -1;
+		if ( !kthread_cond_wait_signal(&output_possible_cond, &termlock) )
+			return errno = EINTR, -1;
+	}
 	size_t sofar = 0;
 	while ( sofar < count )
 	{
@@ -550,9 +562,13 @@ ssize_t PTY::master_write(ioctx_t* ctx, const uint8_t* buf, size_t count)
 		{
 			if ( Signal::IsPending() )
 				return sofar ? (ssize_t) sofar : (errno = EINTR, -1);
+			// TODO: Unfortunately sequences like ^W can cause an unbounded
+			//       number of tty_output data causing a deadlock.
 			ProcessByte(input[i]);
+			sofar++;
+			if ( output_probably_safe <= output_used )
+				return (ssize_t) sofar;
 		}
-		sofar += amount;
 	}
 	return (ssize_t) sofar;
 }
@@ -605,7 +621,7 @@ short PTY::PollMasterEventStatus()
 	short status = 0;
 	if ( output_used )
 		status |= POLLIN | POLLRDNORM;
-	if ( true /* can always write */ )
+	if ( output_used < output_probably_safe )
 		status |= POLLOUT | POLLWRNORM;
 	return status;
 }
