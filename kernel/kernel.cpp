@@ -32,7 +32,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sortix/clock.h>
 #include <sortix/fcntl.h>
 #include <sortix/mman.h>
 #include <sortix/stat.h>
@@ -452,70 +451,6 @@ static void SystemIdleThread(void* /*user*/)
 	}
 }
 
-kthread_mutex_t driver_threads_lock = KTHREAD_MUTEX_INITIALIZER;
-kthread_cond_t driver_threads_cond = KTHREAD_COND_INITIALIZER;
-size_t driver_threads_done = 0;
-size_t driver_threads_total = 0;
-
-// Parallelize the initialization of slow drivers.
-static void RunDriverThread(void (*entry)(void*), void* user, const char* name)
-{
-	kthread_mutex_lock(&driver_threads_lock);
-	driver_threads_total++;
-	kthread_mutex_unlock(&driver_threads_lock);
-	if ( !RunKernelThread(entry, user, name) )
-		PanicF("RunKernelThread: %s", name);
-}
-
-static void FinishedDriverThread()
-{
-	ScopedLock lock(&driver_threads_lock);
-	driver_threads_done++;
-	kthread_cond_broadcast(&driver_threads_cond);
-}
-
-struct PS2ThreadCtx
-{
-	PS2Keyboard* keyboard;
-	PS2Mouse* mouse;
-};
-
-static void PS2Thread(void* user)
-{
-	struct PS2ThreadCtx* ctx = (struct PS2ThreadCtx*) user;
-	PS2::Init(ctx->keyboard, ctx->mouse);
-	FinishedDriverThread();
-}
-
-struct DevCtx
-{
-	Ref<Descriptor> dev;
-};
-
-static void AHCIThread(void* user)
-{
-	AHCI::Init("/dev", ((struct DevCtx*) user)->dev);
-	FinishedDriverThread();
-}
-
-static void ATAThread(void* user)
-{
-	ATA::Init("/dev", ((struct DevCtx*) user)->dev);
-	FinishedDriverThread();
-}
-
-static void BGAThread(void* /*user*/)
-{
-	BGA::Init();
-	FinishedDriverThread();
-}
-
-static void EMThread(void* user)
-{
-	EM::Init("/dev", ((struct DevCtx*) user)->dev);
-	FinishedDriverThread();
-}
-
 static void BootThread(void* /*user*/)
 {
 	//
@@ -597,7 +532,6 @@ static void BootThread(void* /*user*/)
 	Ref<Descriptor> slashdev = droot->open(&ctx, "dev", O_READ | O_DIRECTORY);
 	if ( !slashdev )
 		Panic("Unable to create descriptor for RAM filesystem /dev directory.");
-	struct DevCtx dev_ctx = { slashdev };
 
 	// Initialize the keyboard.
 	PS2Keyboard* keyboard = new PS2Keyboard(ps2_scancode_set);
@@ -615,8 +549,7 @@ static void BootThread(void* /*user*/)
 		Panic("Could not allocate PS2 Mouse driver");
 
 	// Initialize the PS/2 controller.
-	struct PS2ThreadCtx ps2_context = { keyboard, mouse };
-	RunDriverThread(PS2Thread, &ps2_context, "ps2");
+	PS2::Init(keyboard, mouse);
 
 	// Register /dev/tty as the current-terminal factory.
 	Ref<Inode> tty(new DevTTY(slashdev->dev, 0666, 0, 0));
@@ -707,13 +640,13 @@ static void BootThread(void* /*user*/)
 #endif
 
 	// Initialize AHCI devices.
-	RunDriverThread(AHCIThread, &dev_ctx, "ahci");
+	AHCI::Init("/dev", slashdev);
 
 	// Initialize ATA devices.
-	RunDriverThread(ATAThread, &dev_ctx, "ata");
+	ATA::Init("/dev", slashdev);
 
 	// Initialize the BGA driver.
-	RunDriverThread(BGAThread, NULL, "bga");
+	BGA::Init();
 
 	// Initialize the filesystem network.
 	NetFS::Init();
@@ -735,14 +668,8 @@ static void BootThread(void* /*user*/)
 	{
 		// Initialize the EM driver.
 		if ( enable_em )
-			RunDriverThread(EMThread, &dev_ctx, "em");
+			EM::Init("/dev", slashdev);
 	}
-
-	// Await the drivers initialized in the background threads.
-	kthread_mutex_lock(&driver_threads_lock);
-	while ( driver_threads_done != driver_threads_total )
-		kthread_cond_wait(&driver_threads_cond, &driver_threads_lock);
-	kthread_mutex_unlock(&driver_threads_lock);
 
 	//
 	// Stage 6. Executing Hosted Environment ("User-Space")
