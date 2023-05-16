@@ -1,0 +1,60 @@
+.Dd May 16, 2023
+.Dt KERNELINFO 2
+.Os
+.Sh NAME
+.Nm kernelinfo
+.Nd gets information about the system
+.Sh SYNOPSIS
+.In sys/kernelinfo.h
+.Ft ssize_t
+.Fn kernelinfo "const char *request" "char *response" "size_t resplen"
+.Sh DESCRIPTION
+.Fn kernelinfo
+queries information about the currently running system, storing up to
+.Fa resplen
+bytes in
+.Fa response .
+.Pp
+.Fa request
+points to a NUL-terminated string specifying the requested information.
+It can be one of the following:
+.Bl -tag -offset 2 -width Qq
+.It Qq name
+The kernel's name, e.g. "Sortix".
+.It Qq version
+The kernel's version, e.g. "1.1dev".
+.It Qq tagline
+The kernel's tagline, e.g. "\\"Self-Hosting & Installable\\"".
+.It Qq builddate
+The date when the kernel was built, e.g. "Feb 13 2009".
+.It Qq buildtime
+The time when the kernel was built, e.g. "23:31:30".
+.It Qq firmware
+The system's firmware, e.g. "bios".
+.El
+.Sh RETURN VALUES
+On success, zero is returned.
+On error,
+.Va errno
+is set, and nothing is written to
+.Fa response .
+The return value depends on the error.
+.Sh ERRORS
+.Bl -tag -width Er
+.It Er EINVAL
+.Fa *request
+doesn't point to a supported request string.
+The return value is -1.
+.It Er ERANGE
+.Fa resplen
+is too small to contain the entire output.
+The return value is the expected size.
+.El
+.Sh SEE ALSO
+.Xr kernelinfo 1 ,
+.Xr uname 1 ,
+.Xr uname 2
+.Sh HISTORY
+The
+.Nm
+syscall originally appeared in Sortix 0.6.
