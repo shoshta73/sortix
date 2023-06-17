@@ -28,6 +28,7 @@ iso9660 \
 kblayout \
 kblayout-compiler \
 login \
+nyan \
 ping \
 regress \
 rw \
