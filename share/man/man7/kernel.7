@@ -6,12 +6,16 @@
 .Nd operating system kernel
 .Sh SYNOPSIS
 .Pa /boot/sortix.bin
+.Op Fl \-console Ns = Ns Ar terminal
 .Op Fl \-disable-em
-.Op Fl \-enable-em
 .Op Fl \-disable-network-drivers
+.Op Fl \-disable-logo
+.Op Fl \-enable-em
 .Op Fl \-enable-network-drivers
+.Op Fl \-enable-logo
 .Op Fl \-firmware Ns = Ns Oo Sy bios "|" Sy efi "|" pc Oc
 .Op Fl \-no-random-seed
+.Op Fl \-term Ns = Ns Ar terminal
 .Op Fl \-
 .Op Ar init ...
 .Sh DESCRIPTION
@@ -51,10 +55,57 @@ otherwise.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
+.It Fl \-console Ns = Ns Ar terminal
+Use the
+.Ar terminal
+as the console and the session for
+.Xr init 8
+along with options for initializing the terminal.
+The choices are:
+.Bl -tag -width "12345678"
+.It Sy com Ns Ar n Ns Oo , Ns Oo BBBBPN Oc Ns Oo Ns , Ns Ar columns Ns Sy x Ns Ar rows Oc Oc
+Use the
+.Xr com 4
+serial line; optionally initializing it with the speed
+.Ar BBBB ,
+with the parity
+.Ar P
+being either
+.Sy n
+for no parity,
+.Sy o
+for odd parity,
+or
+.Sy e
+for even parity, and
+.Ar N
+is the number of bits per character;
+and optionally initializing the terminal window size to the selected
+.Ar columns
+and
+.Ar rows
+or 80x25 by default.
+The
+.Fl \-term
+option is useful to select the
+.Ev TERM
+environment variable.
+.Pp
+This choice currently disables the
+.Sy tty1
+terminal because its logterminal driver needs a major restructuring.
+.It Sy tty1
+Use the
+.Sy tty1
+virtual terminal as the console.
+This terminal is the default console.
+.El
 .It Fl \-disable-em
 Don't initialize the
 .Xr em 4
 driver.
+.It Fl \-disable-logo
+Don't display the operating system boot on the console during boot.
 .It Fl \-disable-network-drivers
 Don't initialize any network drivers.
 This option ensures the booted system is not networked.
@@ -62,6 +113,9 @@ This option ensures the booted system is not networked.
 Do initialize the
 .Xr em 4
 driver.
+.It Fl \-enable-logo
+Display the operating system boot on the console during boot.
+This is the default behavior.
 .It Fl \-enable-network-drivers
 Do initialize network drivers.
 This is the default behavior.
@@ -77,6 +131,17 @@ value is a synonym for
 Don't warn if no random seed file was loaded by the bootloader (usually from
 .Pa /boot/random.seed ) .
 This option is useful for live environments where this situation is unavoidable.
+.It Fl \-term Ns = Ns Ar terminal
+Set the
+.Ev TERM
+environment variable to the selected
+.Ar terminal .
+This option is useful in combination with selecting a serial line as the
+.Fl \-console.
+The default
+.Ev TERM
+is
+.Sy sortix .
 .El
 .Pp
 The kernel accepts multiboot modules from the bootloader, which are processed

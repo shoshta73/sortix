@@ -153,6 +153,16 @@ echo "require sshd optional" > boot/grub/init/local-sshd
 
 exec > boot/grub/grub.cfg
 
+cat << EOF
+function hook_initialize_terminal {
+  insmod all_video
+  if loadfont unicode; then
+    insmod gfxterm
+    terminal_output gfxterm
+  fi
+}
+EOF
+
 for hook in \
 advanced_menu_post \
 advanced_menu_pre \
@@ -198,12 +208,6 @@ find . | grep -Eq '\.gz$' && echo "insmod gzio"
 find . | grep -Eq '\.xz$' && echo "insmod xzio"
 
 cat << EOF
-insmod all_video
-if loadfont unicode; then
-  insmod gfxterm
-  terminal_output gfxterm
-fi
-
 set version="$version"
 set machine="$machine"
 set base_menu_title="Sortix \$version for \$machine"
@@ -213,6 +217,7 @@ set title_sysinstall='new installation'
 set title_sysupgrade='upgrade existing installation'
 set timeout=10
 set default="0"
+set console=
 if [ -e /boot/random.seed ]; then
   no_random_seed=
 else
@@ -224,6 +229,8 @@ set enable_dhclient=true
 set enable_gui=true
 set enable_ntpd=false
 set enable_sshd=false
+set kernel_options=
+set serial_console=--console=com1
 
 export version
 export machine
@@ -234,6 +241,7 @@ export title_sysinstall
 export title_sysupgrade
 export timeout
 export default
+export console
 export no_random_seed
 export enable_src
 export enable_network_drivers
@@ -241,6 +249,8 @@ export enable_dhclient
 export enable_gui
 export enable_ntpd
 export enable_sshd
+export kernel_options
+export serial_console
 EOF
 
 if [ -n "$ports" ]; then
@@ -327,7 +337,7 @@ esac
 cat << EOF
   hook_kernel_pre
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot /$kernel --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers "\$@"
+  multiboot /$kernel \$console --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers \$kernel_options "\$@"
   echo done
   hook_kernel_post
   if ! \$enable_dhclient; then
@@ -418,6 +428,8 @@ if [ -e /boot/grub/hooks.cfg ]; then
   . /boot/grub/hooks.cfg
 fi
 
+hook_initialize_terminal
+
 . /boot/grub/main.cfg
 EOF
 
@@ -480,6 +492,19 @@ if "\$enable_gui"; then
 else
   menuentry "Enable GUI" {
     enable_gui=true
+    configfile /boot/grub/advanced.cfg
+  }
+fi
+
+if [ "\$console" = "\$serial_console" ]; then
+  menuentry "Disable serial console" {
+    console=
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "Enable serial console" {
+    console="$serial_console"
+    enable_gui=false
     configfile /boot/grub/advanced.cfg
   }
 fi

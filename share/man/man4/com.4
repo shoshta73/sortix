@@ -1,0 +1,23 @@
+.Dd December 16, 2024
+.Dt COM 4
+.Os
+.Sh NAME
+.Nm com
+.Nd uart 8250 serial port terminal driver
+.Sh SYNOPSIS
+.Nm /dev/com Ns Ar X
+.Sh DESCRIPTION
+.Nm
+is a terminal driver for the UART 8250 serial port and compatible devices.
+.Pp
+The serial ports are detected using the BIOS Data Area.
+.Pp
+.Nm
+supports being the
+.Xr kernel 7
+console as described in its
+.Fl \-console
+option.
+.Sh SEE ALSO
+.Xr tty 4 ,
+.Xr kernel 7

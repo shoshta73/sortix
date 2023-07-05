@@ -536,6 +536,22 @@ tix-iso-liveconfig --autoinstall=autoupgrade.conf liveconfig
 tix-iso-bootconfig --liveconfig=liveconfig --default=2 bootconfig
 tix-iso-add sortix.iso bootconfig
 .Ed
+.Ss Boot to Console Instead of GUI By Default
+To customize a release so it boots to a console instead of the GUI:
+.Bd -literal
+tix-iso-bootconfig --disable-gui bootconfig
+tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Boot to Serial Console using Qemu
+To boot to a serial terminal with a custom serial settings and a custom terminal
+window size of 118 colums by 256 rows and a specific
+.Ev TERM
+variable inside the qemu virtual machine:
+.Bd -literal
+tix-iso-bootconfig --serial="com1,9600n8,118x56 --term=xterm-256color" bootconfig
+tix-iso-add sortix.iso bootconfig
+qemu-system-x86_64 -serial mon:stdio -cdrom sortix.iso
+.Ed
 .Sh SEE ALSO
 .Xr xorriso 1 ,
 .Xr development 7 ,

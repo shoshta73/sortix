@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +18,7 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <stddef.h>
 #include <string.h>
 
@@ -29,6 +30,7 @@
 #include <sortix/kernel/pci-mmio.h>
 #include <sortix/kernel/textbuffer.h>
 
+#include "com.h"
 #include "lfbtextbuffer.h"
 #include "multiboot.h"
 #include "textterminal.h"
@@ -36,6 +38,8 @@
 
 namespace Sortix {
 namespace Log {
+
+char console_tty[TTY_NAME_MAX+1];
 
 uint8_t* fallback_framebuffer = NULL;
 size_t fallback_framebuffer_bpp = 0;
@@ -260,6 +264,17 @@ void CancelReplace()
 void FinishReplace(TextBuffer* textbuf)
 {
 	((TextTerminal*) Log::device_pointer)->FinishReplace(textbuf);
+}
+
+void InitializeConsole(const char* console)
+{
+	if ( !strcmp(console, "tty1") )
+		snprintf(console_tty, sizeof(console_tty), "/dev/%s", console);
+	else if ( !strncmp(console, "com", 3) &&
+	          isdigit((unsigned char) console[3]) )
+		COM::InitializeConsole(console);
+	else
+		PanicF("Unknown console: %s", console);
 }
 
 } // namespace Log

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021, 2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -465,6 +465,7 @@ public:
 
 protected:
 	virtual void tty_output(const unsigned char* buffer, size_t length);
+	virtual bool Reconfigure(const struct termios* new_tio);
 
 private:
 	short PollMasterEventStatus();
@@ -592,6 +593,12 @@ void PTY::tty_output(const unsigned char* buffer, size_t length) // termlock hel
 		kthread_cond_broadcast(&output_ready_cond);
 		master_poll_channel.Signal(POLLIN | POLLRDNORM);
 	}
+}
+
+bool PTY::Reconfigure(const struct termios* new_tio) // termlock held
+{
+	(void) new_tio;
+	return true;
 }
 
 short PTY::PollMasterEventStatus()

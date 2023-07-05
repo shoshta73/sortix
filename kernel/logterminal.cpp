@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2016, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -155,6 +155,12 @@ void LogTerminal::tty_output(const unsigned char* buffer, size_t length)
 			CommitLineBuffer();
 		}
 	}
+}
+
+bool LogTerminal::Reconfigure(const struct termios* new_tio) // termlock held
+{
+	(void) new_tio;
+	return true;
 }
 
 int LogTerminal::sync(ioctx_t* /*ctx*/)

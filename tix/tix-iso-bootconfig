@@ -19,6 +19,7 @@
 set -e
 
 append_title="modified by $(id -un)@$(hostname)"
+console=
 default=
 directory=
 enable_append_title=true
@@ -28,8 +29,12 @@ enable_network_drivers=
 enable_ntpd=
 enable_src=
 enable_sshd=
+grub_serial=
+kernel_options=
 init_target=
 liveconfig=
+serial=
+serial_console=
 operand=1
 random_seed=false
 timeout=
@@ -53,6 +58,8 @@ for argument do
   --) dashdash=yes ;;
   --append-title=*) append_title=$parameter ;;
   --append-title) previous_option=append_title ;;
+  --console=*) console=$parameter ;;
+  --console) previous_option=console ;;
   --default=*) default=$parameter ;;
   --default) previous_option=default ;;
   --disable-append-title) enable_append_title=false ;;
@@ -69,11 +76,19 @@ for argument do
   --enable-ntpd) enable_ntpd=true ;;
   --enable-src) enable_src=true ;;
   --enable-sshd) enable_sshd=true ;;
+  --grub-serial=*) grub_serial=$parameter ;;
+  --grub-serial) previous_option=grub_serial ;;
+  --kernel-options=*) kernel_options=$parameter ;;
+  --kernel-options) previous_option=kernel_options ;;
   --init-target=*) init_target=$parameter ;;
   --init-target) previous_option=init_target ;;
   --liveconfig=*) liveconfig=$parameter ;;
   --liveconfig) previous_option=liveconfig ;;
   --random-seed) random_seed=true ;;
+  --serial=*) serial=$parameter ;;
+  --serial) previous_option=serial ;;
+  --serial-console=*) serial_console=$parameter ;;
+  --serial-console) previous_option=serial_console ;;
   --timeout=*) timeout=$parameter ;;
   --timeout) previous_option=timeout ;;
   -*) echo "$0: unrecognized option $argument" >&2
@@ -95,6 +110,13 @@ if test -n "$previous_option"; then
   exit 1
 fi
 
+if test -n "$serial"; then
+  enable_gui=false
+  console="$serial"
+  grub_serial="$serial"
+  serial_console="$serial"
+fi
+
 if test -z "$directory"; then
   echo "$0: No directory was specified" >&2
   exit 1
@@ -107,17 +129,17 @@ human_size() {
 
 print_enable_default() {
   if [ "$1" = true ]; then
-    printf "  enable_%s=--enable-%s\n" "$2" "$3"
+    printf "enable_%s=--enable-%s\n" "$2" "$3"
   elif [ "$1" = false ]; then
-    printf "  enable_%s=--disable-%s\n" "$2" "$3"
+    printf "enable_%s=--disable-%s\n" "$2" "$3"
   fi
 }
 
 print_enable_default_bool() {
   if [ "$1" = true ]; then
-    printf "  enable_%s=true\n" "$2"
+    printf "enable_%s=true\n" "$2"
   elif [ "$1" = false ]; then
-    printf "  enable_%s=false\n" "$2"
+    printf "enable_%s=false\n" "$2"
   fi
 }
 
@@ -152,8 +174,14 @@ mkdir -p -- "$directory/boot/grub"
 (if [ -e "$directory/boot/liveconfig.tar.xz" ]; then
    printf 'insmod xzio\n'
  fi
+ if [ -n "$console" ]; then
+   printf 'console="--console=%s"\n' "$console"
+ fi
  if [ -n "$default" ]; then
    printf 'default="%s"\n' "$default"
+ fi
+ if [ -n "$serial_console" ]; then
+   printf 'serial_console="--console=%s"\n' "$serial_console"
  fi
  if [ -n "$timeout" ]; then
    printf 'timeout="%s"\n' "$timeout"
@@ -170,9 +198,29 @@ mkdir -p -- "$directory/boot/grub"
  print_enable_default_bool "$enable_src" src src
  print_enable_default_bool "$enable_sshd" sshd sshd
  print_enable_default_bool "$enable_ntpd" ntpd ntpd
+ if [ -n "$kernel_options" ]; then
+   printf 'kernel_options="%s"\n' "$kernel_options"
+ fi
  if $enable_append_title; then
    printf "base_menu_title=\"\$base_menu_title - \"'%s'\n" \
           "$(printf '%s\n' "$append_title" | sed "s/'/'\\\\''/g")"
+ fi
+ if [ -n "$grub_serial" ]; then
+   device=$(expr "X$grub_serial" : 'Xcom\([0-9]\+\).*' || true)
+   device=$(expr "$device" - 1 || true)
+   settings=$(expr "X$grub_serial" : 'Xcom[0-9]\+,\([^,]*\)\(,.*\)\?' || true)
+   speed=$(expr "X$settings" : 'X\([0-9]*\)[noe][5678]' || true)
+   parity=$(expr "X$settings" : 'X[0-9]*\([noe]\)[5678]' || true)
+   case "$parity" in n) parity=no;; o) parity=odd;; e) parity=even;; esac
+   bits=$(expr "X$settings" : 'X[0-9]*[noe]\([5678]\)' || true)
+cat << EOF
+function hook_initialize_terminal {
+  serial --unit=$device ${speed+--speed=$speed} ${parity+--parity=$parity} \
+         ${bits+--word=$bits}
+  terminal_input serial
+  terminal_output serial
+}
+EOF
  fi
  if [ -n "$init_target" ]; then
    printf 'function hook_menu_pre {\n'

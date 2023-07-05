@@ -117,8 +117,10 @@ static void SystemIdleThread(void* user);
 static int argc;
 static char** argv;
 static multiboot_info_t* bootinfo;
+static const char* console = "tty1";
 static bool enable_em = true;
 static bool enable_network_drivers = true;
+static char* term = (char*) "TERM=sortix";
 
 static char* cmdline_tokenize(char** saved)
 {
@@ -198,10 +200,6 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// Initialize the kernel log.
 	Log::Init(bootinfo);
 
-	// Display the logo.
-	Log::PrintF("\e[37;41m\e[2J");
-	Log::Center(BRAND_LOGO);
-
 	char* cmdline = NULL;
 	if ( bootinfo->flags & MULTIBOOT_INFO_CMDLINE && bootinfo->cmdline )
 	{
@@ -265,6 +263,7 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	argv[argc] = NULL;
 
 	// Add new once-only options to sysinstall's normalize_kernel_options.
+	bool enable_logo = true;
 	bool no_random_seed = false;
 	for ( int i = 0; i < argc; i++ )
 	{
@@ -285,10 +284,16 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 				HaltKernel();
 			}
 		}
+		else if ( !strncmp(arg, "--console=", strlen("--console=")) )
+			console = arg + strlen("--console=");
 		else if ( !strcmp(arg, "--disable-em") )
 			enable_em = false;
 		else if ( !strcmp(arg, "--enable-em") )
 			enable_em = true;
+		else if ( !strcmp(arg, "--disable-logo") )
+			enable_logo = false;
+		else if ( !strcmp(arg, "--enable-logo") )
+			enable_logo = true;
 		else if ( !strcmp(arg, "--disable-network-drivers") )
 			enable_network_drivers = false;
 		else if ( !strcmp(arg, "--enable-network-drivers") )
@@ -309,6 +314,12 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 				PanicF("Unsupported firmware option: %s", firmware);
 			}
 		}
+		else if ( !strncmp(arg, "--term=", strlen("--term=")) )
+		{
+			const char* value = arg + strlen("--term=");
+			if ( asprintf(&term, "TERM=%s", value) < 0 )
+				Panic("malloc");
+		}
 		else
 		{
 			Log::PrintF("\r\e[J");
@@ -323,6 +334,16 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	{
 		argv[argc++] = (char*) "/sbin/init";
 		argv[argc] = NULL;
+	}
+
+	// Initialize the console.
+	Log::InitializeConsole(console);
+
+	// Display the logo.
+	if ( enable_logo )
+	{
+		Log::PrintF("\e[37;41m\e[J");
+		Log::Center(BRAND_LOGO);
 	}
 
 	// Initialize the interrupt handler table and enable interrupts.
@@ -556,12 +577,15 @@ static void BootThread(void* /*user*/)
 		Panic("Could not symlink /dev/ptmx -> pts/ptmx");
 
 	// Register the kernel terminal as /dev/tty1.
-	Ref<Inode> tty1(new LogTerminal(slashdev->dev, 0666, 0, 0,
-	                keyboard, kblayout, "tty1"));
-	if ( !tty1 )
-		Panic("Could not allocate a kernel terminal");
-	if ( LinkInodeInDir(&ctx, slashdev, "tty1", tty1) != 0 )
-		Panic("Unable to link /dev/tty1 to kernel terminal.");
+	if ( !strcmp(Log::console_tty, "/dev/tty1") )
+	{
+		Ref<Inode> tty1(new LogTerminal(slashdev->dev, 0666, 0, 0,
+			            keyboard, kblayout, "tty1"));
+		if ( !tty1 )
+			Panic("Could not allocate a kernel terminal");
+		if ( LinkInodeInDir(&ctx, slashdev, "tty1", tty1) != 0 )
+			Panic("Unable to link /dev/tty1 to kernel terminal.");
+	}
 
 	// Register the mouse as /dev/mouse.
 	Ref<Inode> mousedev(new PS2MouseDevice(slashdev->dev, 0666, 0, 0, mouse));
@@ -737,12 +761,12 @@ static void InitThread(void* /*user*/)
 
 	Ref<DescriptorTable> dtable = process->GetDTable();
 
-	Ref<Descriptor> tty1 = root->open(&ctx, "/dev/tty1", O_READ | O_WRITE);
-	if ( !tty1 )
-		PanicF("/dev/tty1: %m");
-	if ( tty1->ioctl(&ctx, TIOCSCTTY, 0) < 0 )
-		PanicF("/dev/tty1: ioctl: TIOCSCTTY: %m");
-	tty1.Reset();
+	Ref<Descriptor> tty = root->open(&ctx, Log::console_tty, O_READ | O_WRITE);
+	if ( !tty )
+		PanicF("%s: %m", Log::console_tty);
+	if ( tty->ioctl(&ctx, TIOCSCTTY, 0) < 0 )
+		PanicF("%s: ioctl: TIOCSCTTY: %m", Log::console_tty);
+	tty.Reset();
 
 	Ref<Descriptor> tty_stdin = root->open(&ctx, "/dev/tty", O_READ);
 	if ( !tty_stdin || dtable->Allocate(tty_stdin, 0) != 0 )
@@ -787,7 +811,7 @@ static void InitThread(void* /*user*/)
 	Log::PrintF("\r\e[m\e[J");
 
 	int envc = 1;
-	const char* envp[] = { "TERM=sortix", NULL };
+	const char* envp[] = { term, NULL };
 	struct thread_registers regs;
 	assert((((uintptr_t) &regs) & (alignof(regs)-1)) == 0);
 

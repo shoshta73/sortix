@@ -230,13 +230,17 @@ int TTY::settermmode(ioctx_t* /*ctx*/, unsigned int termmode)
 		new_oflag |= OCRNL;
 	else
 		new_oflag &= ~OCRNL;
-	bool oldnoutf8 = old_lflag & ISORTIX_32BIT;
-	bool newnoutf8 = new_lflag & ISORTIX_32BIT;
-	if ( oldnoutf8 != newnoutf8 )
+	bool old_no_utf8 = old_lflag & ISORTIX_32BIT;
+	bool new_no_utf8 = new_lflag & ISORTIX_32BIT;
+	struct termios new_tio = tio;
+	new_tio.c_cflag = new_cflag;
+	new_tio.c_lflag = new_lflag;
+	new_tio.c_oflag = new_oflag;
+	if ( !Reconfigure(&new_tio) )
+		return -1;
+	tio = new_tio;
+	if ( old_no_utf8 != new_no_utf8 )
 		memset(&read_ps, 0, sizeof(read_ps));
-	tio.c_cflag = new_cflag;
-	tio.c_lflag = new_lflag;
-	tio.c_oflag = new_oflag;
 	if ( !(tio.c_lflag & ICANON) )
 		CommitLineBuffer();
 	return 0;
@@ -822,7 +826,7 @@ int TTY::tcsetattr(ioctx_t* ctx, int actions, const struct termios* io_tio)
 {
 	ScopedLock lock(&termlock);
 	if ( hungup )
-		return errno = EIO, -1;
+		return -1;
 	if ( !RequireForeground(SIGTTOU) )
 		return -1;
 	switch ( actions )
@@ -830,15 +834,17 @@ int TTY::tcsetattr(ioctx_t* ctx, int actions, const struct termios* io_tio)
 	case TCSANOW: break;
 	case TCSADRAIN: break;
 	case TCSAFLUSH: linebuffer.Flush(); break;
-	default: return errno = EINVAL, -1;
+	default: return -1;
 	}
-	tcflag_t old_lflag = tio.c_lflag;
-	if ( !ctx->copy_from_src(&tio, io_tio, sizeof(tio)) )
+	struct termios new_tio;
+	if ( !ctx->copy_from_src(&new_tio, io_tio, sizeof(new_tio)) )
 		return -1;
-	tcflag_t new_lflag = tio.c_lflag;
-	bool oldnoutf8 = old_lflag & ISORTIX_32BIT;
-	bool newnoutf8 = new_lflag & ISORTIX_32BIT;
-	if ( oldnoutf8 != newnoutf8 )
+	bool old_no_utf8 = tio.c_lflag & ISORTIX_32BIT;
+	bool new_no_utf8 = new_tio.c_lflag & ISORTIX_32BIT;
+	if ( !Reconfigure(&new_tio) )
+		return -1;
+	tio = new_tio;
+	if ( old_no_utf8 != new_no_utf8 )
 		memset(&read_ps, 0, sizeof(read_ps));
 	if ( !(tio.c_lflag & ICANON) )
 		CommitLineBuffer();

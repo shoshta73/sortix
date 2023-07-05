@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2012, 2014-2016, 2023-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,10 +17,16 @@
  * Handles communication to COM serial ports.
  */
 
+#include <sys/ioctl.h>
+
+#include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <termios.h>
 
 #include <sortix/fcntl.h>
 #include <sortix/stat.h>
@@ -38,6 +44,7 @@
 #include <sortix/kernel/thread.h>
 
 #include "com.h"
+#include "tty.h"
 
 extern "C" unsigned char nullpage[4096];
 
@@ -90,6 +97,10 @@ static const uint8_t IER_LOW_POWER = 1 << 5;
 
 static const unsigned BASE_BAUD = 1843200 / 16;
 
+static const speed_t DEFAULT_SPEED = B38400;
+static const size_t DEFAULT_COLUMNS = 80;
+static const size_t DEFAULT_ROWS = 25;
+
 static const unsigned int UART_8250 = 1;
 static const unsigned int UART_16450 = 2;
 static const unsigned int UART_16550 = 3;
@@ -136,17 +147,78 @@ static inline bool CanWriteByte(uint16_t port)
 	return inport8(port + LSR) & LSR_THRE;
 }
 
-class DevCOMPort : public AbstractInode
+static bool IsValidSpeed(speed_t speed)
+{
+	return speed && speed <= 115200 && !(115200 % speed);
+}
+
+static void ConfigurePort(uint16_t port, const struct termios* tio,
+                          bool enable_interrupts)
+{
+	uint16_t divisor = 115200 / tio->c_ispeed;
+	outport8(port + FCR, 0);
+	outport8(port + LCR, LCR_DLAB);
+	outport8(port + DLL, divisor & 0xFF);
+	outport8(port + DLM, divisor >> 8);
+	uint8_t lcr = 0;
+	if ( (tio->c_cflag & CSIZE) == CS5 )
+		lcr |= LCR_WLEN5;
+	else if ( (tio->c_cflag & CSIZE) == CS6 )
+		lcr |= LCR_WLEN6;
+	else if ( (tio->c_cflag & CSIZE) == CS7 )
+		lcr |= LCR_WLEN7;
+	else if ( (tio->c_cflag & CSIZE) == CS8 )
+		lcr |= LCR_WLEN8;
+	if ( tio->c_cflag & CSTOPB )
+		lcr |= LCR_STOP;
+	if ( tio->c_cflag & PARENB )
+		lcr |= LCR_PARITY;
+	if ( tio->c_cflag & PARENB )
+	{
+		lcr |= LCR_PARITY;
+		if ( !(tio->c_cflag & PARODD) )
+			lcr |= LCR_EPAR;
+	}
+	outport8(port + LCR, lcr);
+	uint8_t mcr = 0x2 /* RTS */;
+	if ( tio->c_cflag & CREAD )
+		mcr |= 0x1 /* DTR */;
+	outport8(port + MCR, mcr);
+	uint8_t ier = enable_interrupts ? 1 : 0;
+	outport8(port + IER, ier);
+}
+
+class DevCOMPort : public TTY
 {
 public:
-	DevCOMPort(dev_t dev, uid_t owner, gid_t group, mode_t mode, uint16_t port);
+	DevCOMPort(dev_t dev, uid_t owner, gid_t group, mode_t mode, uint16_t port,
+	           const char* name);
 	virtual ~DevCOMPort();
+	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 	virtual int sync(ioctx_t* ctx);
-	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
-	virtual ssize_t write(ioctx_t* ctx, const uint8_t* buf, size_t count);
+	virtual void tty_output(const unsigned char* buffer, size_t length);
+	virtual bool Reconfigure(const struct termios* new_tio);
+
+public:
+	void ImportConsole(const struct termios* console_tio,
+	                   const struct winsize* console_size);
+	bool Initialize(int interrupt);
+	bool EmergencyIsImpaired();
+	bool EmergencyRecoup();
+	void EmergencyReset();
+
+private:
+	static void InterruptHandler(struct interrupt_context*, void*);
+	static void InterruptWorkHandler(void* context);
+	void OnInterrupt();
+	void InterruptWork();
 
 private:
 	kthread_mutex_t port_lock;
+	kthread_mutex_t reconfigure_lock;
+	struct interrupt_handler irq_registration;
+	struct interrupt_work interrupt_work;
+	struct winsize ws;
 	uint16_t port;
 	uint8_t pending_input_byte;
 	bool has_pending_input_byte;
@@ -154,22 +226,96 @@ private:
 };
 
 DevCOMPort::DevCOMPort(dev_t dev, uid_t owner, gid_t group, mode_t mode,
-                       uint16_t port)
+                       uint16_t port, const char* name) : TTY(dev, 0, mode,
+                       owner, group, name)
 {
-	inode_type = INODE_TYPE_STREAM;
 	this->port = port;
 	this->port_lock = KTHREAD_MUTEX_INITIALIZER;
-	this->stat_uid = owner;
-	this->stat_gid = group;
-	this->type = S_IFCHR;
-	this->stat_mode = (mode & S_SETABLE) | this->type;
-	this->dev = dev;
-	this->ino = (ino_t) this;
+	this->reconfigure_lock = KTHREAD_MUTEX_INITIALIZER;
 	this->has_pending_input_byte = false;
+	tio.c_ispeed = DEFAULT_SPEED;
+	tio.c_ospeed = DEFAULT_SPEED;
+	memset(&ws, 0, sizeof(ws));
+	ws.ws_col = DEFAULT_COLUMNS;
+	ws.ws_row = DEFAULT_ROWS;
+	interrupt_work.handler = InterruptWorkHandler;
+	interrupt_work.context = this;
 }
 
 DevCOMPort::~DevCOMPort()
 {
+}
+
+void DevCOMPort::ImportConsole(const struct termios* console_tio,
+                               const struct winsize* console_size)
+{
+	tio.c_cflag = console_tio->c_cflag;
+	tio.c_ispeed = console_tio->c_ispeed;
+	tio.c_ospeed = console_tio->c_ospeed;
+	ws = *console_size;
+}
+
+bool DevCOMPort::Initialize(int interrupt)
+{
+
+	ConfigurePort(port, &tio, true);
+	irq_registration.handler = DevCOMPort::InterruptHandler;
+	irq_registration.context = this;
+	Interrupt::RegisterHandler(interrupt, &irq_registration);
+	return true;
+}
+
+void DevCOMPort::InterruptHandler(struct interrupt_context*, void* user)
+{
+	((DevCOMPort*) user)->OnInterrupt();
+}
+
+void DevCOMPort::OnInterrupt()
+{
+	if ( !IsLineReady(port) )
+		return;
+	Interrupt::ScheduleWork(&interrupt_work);
+}
+
+void DevCOMPort::InterruptWorkHandler(void* context)
+{
+	((DevCOMPort*) context)->InterruptWork();
+}
+
+void DevCOMPort::InterruptWork()
+{
+	ScopedLock lock1(&termlock);
+	ScopedLock lock2(&port_lock);
+	while ( IsLineReady(port) )
+	{
+		unsigned char byte = inport8(port + RXR);
+		if ( tio.c_cflag & CREAD )
+			ProcessByte(byte);
+	}
+}
+
+int DevCOMPort::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
+{
+	ScopedLock lock(&termlock);
+	if ( hungup )
+		return errno = EIO, -1;
+	if ( cmd == TIOCGWINSZ )
+	{
+		struct winsize* user_ws = (struct winsize*) arg;
+		if ( !ctx->copy_to_dest(user_ws, &ws, sizeof(ws)) )
+			return -1;
+		return 0;
+	}
+	else if ( cmd == TIOCSWINSZ )
+	{
+		const struct winsize* user_ws = (const struct winsize*) arg;
+		if ( !ctx->copy_from_src(&ws, user_ws, sizeof(ws)) )
+			return -1;
+		winch();
+		return 0;
+	}
+	lock.Reset();
+	return TTY::ioctl(ctx, cmd, arg);
 }
 
 int DevCOMPort::sync(ioctx_t* /*ctx*/)
@@ -179,57 +325,9 @@ int DevCOMPort::sync(ioctx_t* /*ctx*/)
 	return 0;
 }
 
-ssize_t DevCOMPort::read(ioctx_t* ctx, uint8_t* dest, size_t count)
+void DevCOMPort::tty_output(const unsigned char* buffer, size_t length)
 {
-	ScopedLock lock(&port_lock);
-
-	for ( size_t i = 0; i < count; i++ )
-	{
-		unsigned long attempt = 0;
-		while ( !has_pending_input_byte && !IsLineReady(port) )
-		{
-			attempt++;
-			if ( attempt <= 10 )
-				continue;
-			if ( attempt <= 15 && !(ctx->dflags & O_NONBLOCK) )
-			{
-				kthread_mutex_unlock(&port_lock);
-				kthread_yield();
-				kthread_mutex_lock(&port_lock);
-				continue;
-			}
-			if ( i )
-				return (ssize_t) i;
-			if ( ctx->dflags & O_NONBLOCK )
-				return errno = EWOULDBLOCK, -1;
-			if ( Signal::IsPending() )
-				return errno = EINTR, -1;
-			kthread_mutex_unlock(&port_lock);
-			kthread_yield();
-			kthread_mutex_lock(&port_lock);
-		}
-
-		uint8_t value = has_pending_input_byte ?
-		                pending_input_byte :
-		                inport8(port + RXR);
-		if ( !ctx->copy_to_dest(dest + i, &value, sizeof(value)) )
-		{
-			has_pending_input_byte = true;
-			pending_input_byte = value;
-			return i ? (ssize_t) i : -1;
-		}
-
-		has_pending_input_byte = false;
-	}
-
-	return (ssize_t) count;
-}
-
-ssize_t DevCOMPort::write(ioctx_t* ctx, const uint8_t* src, size_t count)
-{
-	ScopedLock lock(&port_lock);
-
-	for ( size_t i = 0; i < count; i++ )
+	for ( size_t i = 0; i < length; i++ )
 	{
 		unsigned long attempt = 0;
 		while ( !CanWriteByte(port) )
@@ -237,7 +335,7 @@ ssize_t DevCOMPort::write(ioctx_t* ctx, const uint8_t* src, size_t count)
 			attempt++;
 			if ( attempt <= 10 )
 				continue;
-			if ( attempt <= 15 && !(ctx->dflags & O_NONBLOCK) )
+			if ( attempt <= 15 )
 			{
 				kthread_mutex_unlock(&port_lock);
 				kthread_yield();
@@ -245,23 +343,298 @@ ssize_t DevCOMPort::write(ioctx_t* ctx, const uint8_t* src, size_t count)
 				continue;
 			}
 			if ( i )
-				return (ssize_t) i;
-			if ( ctx->dflags & O_NONBLOCK )
-				return errno = EWOULDBLOCK, -1;
+				return;
+			// TODO: This is problematic.
 			if ( Signal::IsPending() )
-				return errno = EINTR, -1;
+			{
+				errno = EINTR;
+				return;
+			}
 		}
-
-		uint8_t value;
-		if ( !ctx->copy_from_src(&value, src + i, sizeof(value)) )
-			return i ? (ssize_t) i : -1;
-		outport8(port + TXR, value);
+		outport8(port + TXR, buffer[i]);
 	}
-
-	return (ssize_t) count;
 }
 
+bool DevCOMPort::Reconfigure(const struct termios* new_tio) // termlock held
+{
+	if ( !IsValidSpeed(new_tio->c_ispeed) || !IsValidSpeed(new_tio->c_ospeed) )
+		return errno = EINVAL, false;
+	if ( new_tio->c_ispeed != new_tio->c_ospeed )
+		return errno = EINVAL, false;
+	if ( tio.c_ispeed != new_tio->c_ispeed ||
+	     tio.c_ospeed != new_tio->c_ospeed ||
+	     tio.c_cflag != new_tio->c_cflag )
+	{
+		// Detect if a panic happens midway.
+		ScopedLock lock(&reconfigure_lock);
+		ConfigurePort(port, new_tio, true);
+	}
+	return true;
+}
+
+bool DevCOMPort::EmergencyIsImpaired()
+{
+	if ( !kthread_mutex_trylock(&termlock) )
+		return true;
+	kthread_mutex_unlock(&termlock);
+	if ( !kthread_mutex_trylock(&port_lock) )
+		return true;
+	kthread_mutex_unlock(&port_lock);
+	if ( !kthread_mutex_trylock(&reconfigure_lock) )
+		return true;
+	kthread_mutex_unlock(&reconfigure_lock);
+	return false;
+}
+
+bool DevCOMPort::EmergencyRecoup()
+{
+	kthread_mutex_trylock(&termlock);
+	kthread_mutex_unlock(&termlock);
+	kthread_mutex_trylock(&port_lock);
+	kthread_mutex_unlock(&port_lock);
+	kthread_mutex_trylock(&reconfigure_lock);
+	kthread_mutex_unlock(&reconfigure_lock);
+	if ( !kthread_mutex_trylock(&reconfigure_lock) )
+		return false;
+	kthread_mutex_unlock(&reconfigure_lock);
+	return true;
+}
+
+void DevCOMPort::EmergencyReset()
+{
+	kthread_mutex_trylock(&termlock);
+	kthread_mutex_unlock(&termlock);
+	kthread_mutex_trylock(&port_lock);
+	kthread_mutex_unlock(&port_lock);
+	kthread_mutex_trylock(&reconfigure_lock);
+	kthread_mutex_unlock(&reconfigure_lock);
+	ConfigurePort(port, &tio, false);
+}
+
+static size_t console_device;
+static struct termios console_tio;
+static uint16_t console_port;
+static kthread_mutex_t console_lock = KTHREAD_MUTEX_INITIALIZER;
+static bool console_imported;
+static struct winsize console_size;
+
 static Ref<DevCOMPort> com_devices[1 + NUM_COM_PORTS];
+
+static void ConsoleWriteByte(unsigned char byte)
+{
+	size_t attempt = 0;
+	while ( !CanWriteByte(console_port) )
+	{
+		attempt++;
+		if ( attempt <= 10 )
+			continue;
+		if ( attempt <= 15 )
+		{
+			kthread_mutex_unlock(&console_lock);
+			kthread_yield();
+			kthread_mutex_lock(&console_lock);
+			continue;
+		}
+	}
+	outport8(console_port + TXR, byte);
+}
+
+static size_t ConsoleWrite(void* /*ctx*/, const char* buf, size_t len)
+{
+	ScopedLock lock(&console_lock);
+	if ( console_imported )
+	{
+		ioctx_t ctx; SetupKernelIOCtx(&ctx);
+		Ref<DevCOMPort> com = com_devices[console_device];
+		const uint8_t* buffer = (const uint8_t*) buf;
+		size_t done = 0;
+		while ( done < len )
+		{
+			ssize_t amount = com->write(&ctx, buffer + done, len - done);
+			if ( amount < 0 )
+				break; // TODO: Block all signals.
+			done += amount;
+		}
+		return done;
+	}
+	for ( size_t i = 0; i < len; i++ )
+	{
+		if ( buf[i] == '\n' )
+			ConsoleWriteByte('\r');
+		ConsoleWriteByte(buf[i]);
+	}
+	return len;
+}
+
+static size_t ConsoleWidth(void* /*ctx*/)
+{
+	if ( console_imported )
+	{
+		ioctx_t ctx; SetupKernelIOCtx(&ctx);
+		Ref<DevCOMPort> com = com_devices[console_device];
+		struct winsize ws;
+		com->ioctl(&ctx, TIOCGWINSZ, (uintptr_t) &ws);
+		return ws.ws_col;
+	}
+	return console_size.ws_col;
+}
+
+static size_t ConsoleHeight(void* /*ctx*/)
+{
+	if ( console_imported )
+	{
+		ioctx_t ctx; SetupKernelIOCtx(&ctx);
+		Ref<DevCOMPort> com = com_devices[console_device];
+		struct winsize ws;
+		com->ioctl(&ctx, TIOCGWINSZ, (uintptr_t) &ws);
+		return ws.ws_row;
+	}
+	return console_size.ws_row;
+}
+
+static void ConsoleGetCursor(void* /*ctx*/, size_t* column, size_t* row)
+{
+	// TODO: Conceptually this does not make sense.
+	*column = 0;
+	*row = 0;
+}
+
+static bool ConsoleSync(void* /*ctx*/)
+{
+	ScopedLock lock(&console_lock);
+	return true;
+}
+
+static void ConsoleInvalidate(void* /*ctx*/)
+{
+	ScopedLock lock(&console_lock);
+}
+
+bool ConsoleEmergencyIsImpaired(void* /*ctx*/)
+{
+	if ( !kthread_mutex_trylock(&console_lock) )
+		return true;
+	kthread_mutex_unlock(&console_lock);
+	if ( console_imported )
+	{
+		Ref<DevCOMPort> com = com_devices[console_device];
+		return com->EmergencyIsImpaired();
+	}
+	return false;
+}
+
+bool ConsoleEmergencyRecoup(void* /*ctx*/)
+{
+	kthread_mutex_trylock(&console_lock);
+	kthread_mutex_unlock(&console_lock);
+	if ( console_imported )
+	{
+		Ref<DevCOMPort> com = com_devices[console_device];
+		return com->EmergencyRecoup();
+	}
+	return true;
+}
+
+void ConsoleEmergencyReset(void* /*ctx*/)
+{
+	kthread_mutex_trylock(&console_lock);
+	kthread_mutex_unlock(&console_lock);
+	if ( console_imported )
+	{
+		Ref<DevCOMPort> com = com_devices[console_device];
+		com->EmergencyReset();
+	}
+}
+
+void InitializeConsole(const char* console)
+{
+	assert(!strncmp(console, "com", 3));
+	assert(isdigit((unsigned char) console[3]));
+	char* end;
+	unsigned long device = strtoul(console + 3, &end, 10);
+	if ( device < 1 || NUM_COM_PORTS < device )
+		PanicF("Invalid console: %s", console);
+	console_device = device;
+	struct termios tio;
+	memset(&tio, 0, sizeof(tio));
+	console_tio.c_ispeed = DEFAULT_SPEED;
+	console_tio.c_cflag = CS8;
+	memset(&console_size, 0, sizeof(console_size));
+	console_size.ws_col = DEFAULT_COLUMNS;
+	console_size.ws_row = DEFAULT_ROWS;
+	if ( *end == ',' )
+	{
+		end++;
+		if ( *end != ',' )
+		{
+			unsigned long value = strtoul(end, &end, 10);
+			if ( !IsValidSpeed(value) )
+				PanicF("Invalid console options: %s", console);
+			console_tio.c_ispeed = value;
+			console_tio.c_cflag = 0;
+			if ( *end == 'o' )
+				console_tio.c_cflag |= PARENB | PARODD;
+			else if ( *end == 'e' )
+				console_tio.c_cflag |= PARENB;
+			else if ( *end != 'n' )
+				PanicF("Invalid console options: %s", console);
+			end++;
+			if ( *end == '5' )
+				console_tio.c_cflag |= CS5;
+			else if ( *end == '6' )
+				console_tio.c_cflag |= CS6;
+			else if ( *end == '7' )
+				console_tio.c_cflag |= CS7;
+			else if ( *end == '8' )
+				console_tio.c_cflag |= CS8;
+			else
+				PanicF("Invalid console options: %s", console);
+			end++;
+		}
+		if ( *end == ',' )
+		{
+			end++;
+			unsigned long width = strtoul(end, &end, 10);
+			if ( !width || *end != 'x' )
+				PanicF("Invalid console options: %s", console);
+			end++;
+			unsigned long height = strtoul(end, &end, 10);
+			if ( !height || *end )
+				PanicF("Invalid console options: %s", console);
+			console_size.ws_col = width;
+			console_size.ws_row = height;
+		}
+	}
+	else if ( *end )
+		PanicF("Invalid console: %s", console);
+	console_tio.c_ospeed = console_tio.c_ispeed;
+
+	const uint16_t* bioscom_ports = (const uint16_t*) (nullpage + 0x400);
+	if ( !(console_port = bioscom_ports[device - 1]) )
+		PanicF("No such hardware device detected: %s", console);
+	outport8(console_port + IER, 0x0);
+	ConfigurePort(console_port, &console_tio, false);
+
+	Log::fallback_framebuffer = NULL;
+	Log::device_callback = ConsoleWrite;
+	Log::device_writeraw = ConsoleWrite;
+	Log::device_width = ConsoleWidth;
+	Log::device_height = ConsoleHeight;
+	Log::device_get_cursor = ConsoleGetCursor;
+	Log::device_sync = ConsoleSync;
+	Log::device_invalidate = ConsoleInvalidate;
+	Log::emergency_device_is_impaired = ConsoleEmergencyIsImpaired;
+	Log::emergency_device_recoup = ConsoleEmergencyRecoup;
+	Log::emergency_device_reset = ConsoleEmergencyReset;
+	Log::emergency_device_callback = ConsoleWrite;
+	Log::emergency_device_writeraw = ConsoleWrite;
+	Log::emergency_device_width = ConsoleWidth;
+	Log::emergency_device_height = ConsoleHeight;
+	Log::emergency_device_get_cursor = ConsoleGetCursor;
+	Log::emergency_device_sync = ConsoleSync;
+
+	snprintf(Log::console_tty, sizeof(Log::console_tty), "/dev/com%lu", device);
+}
 
 void Init(const char* devpath, Ref<Descriptor> slashdev)
 {
@@ -284,33 +657,32 @@ void Init(const char* devpath, Ref<Descriptor> slashdev)
 
 	for ( size_t i = 1; i <= NUM_COM_PORTS; i++ )
 	{
-		uint16_t port = com_ports[i];
-		if ( !port )
-			continue;
-		uint8_t interrupts = 0;
-		outport8(port + FCR, 0);
-		outport8(port + LCR, 0x80);
-		outport8(port + DLL, 0xC);
-		outport8(port + DLM, 0x0);
-		outport8(port + LCR, 0x3); // 8n1
-		outport8(port + MCR, 0x3); // DTR + RTS
-		outport8(port + IER, interrupts);
-	}
-
-	for ( size_t i = 1; i <= NUM_COM_PORTS; i++ )
-	{
 		if ( !com_ports[i] )
 		{
 			com_devices[i] = Ref<DevCOMPort>();
 			continue;
 		}
-		com_devices[i] = Ref<DevCOMPort>(new DevCOMPort(slashdev->dev, 0, 0, 0660, com_ports[i]));
-		if ( !com_devices[i] )
-			PanicF("Unable to allocate device for COM port %zu", i);
-		char name[3 + sizeof(size_t) * 3];
-		snprintf(name, sizeof(name), "com%zu", i);
-		if ( LinkInodeInDir(&ctx, slashdev, name, com_devices[i]) != 0 )
-			PanicF("Unable to link %s/%s to COM port driver.", devpath, name);
+		char ttyname[TTY_NAME_MAX+1];
+		snprintf(ttyname, sizeof(ttyname), "com%zu", i);
+		Ref<DevCOMPort> com(
+			new DevCOMPort(slashdev->dev, 0, 0, 0660, com_ports[i], ttyname));
+		if ( !com )
+			PanicF("Unable to allocate device for %s", ttyname);
+		com_devices[i] = com;
+		if ( i == console_device )
+		{
+			ScopedLock lock(&console_lock);
+			com->ImportConsole(&console_tio, &console_size);
+		}
+		int interrupt = i == 1 || i == 3 ? Interrupt::IRQ4 : Interrupt::IRQ3;
+		com->Initialize(interrupt);
+		if ( i == console_device )
+		{
+			ScopedLock lock(&console_lock);
+			console_imported = true;
+		}
+		if ( LinkInodeInDir(&ctx, slashdev, ttyname, com) != 0 )
+			PanicF("Unable to link %s/%s.", devpath, ttyname);
 	}
 }
 

@@ -7,6 +7,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl \-append-title Ns = Ns Ar text
+.Op Fl \-console Ns = Ns Ar terminal
 .Op Fl \-default Ns = Ns Ar default-boot-menu-option
 .Op Fl \-disable-append-title
 .Op Fl \-disable-dhclient
@@ -22,9 +23,13 @@
 .Op Fl \-enable-ntpd
 .Op Fl \-enable-src
 .Op Fl \-enable-sshd
+.Op Fl \-grub-serial Ns = Ns Ar terminal
+.Op Fl \-kernel-options Ns = Ns Ar options
 .Op Fl \-init-target Ns = Ns Ar target
 .Op Fl \-liveconfig Ns = Ns Ar liveconfig-directory
 .Op Fl \-random-seed
+.Op Fl \-serial Ns = Ns Ar terminal
+.Op Fl \-serial-console Ns = Ns Ar terminal
 .Op Fl \-timeout Ns = Ns Ar boot-menu-timeout
 .Ar output-directory
 .Sh DESCRIPTION
@@ -83,6 +88,20 @@ The bootloader menu title is appended to by default, but can be disabled with
 and re-enabled with
 .Fl \-enable-append-title ,
 whichever comes last takes precedence.
+.It Fl \-console Ns = Ns Ar terminal
+Forward the
+.Fl \-console
+option to the
+.Xr kernel 7
+to select the
+.Ar terminal
+to use as the console and the settings to initialize it.
+.Pp
+The
+.Ev TERM
+variable can be overridden by suffixing the quoted argument with a space
+followed by
+.Fl \-term Ns = Ns Ar terminal .
 .It Fl \-default Ns = Ns Ar default-boot-menu-option
 Select bootloader menu option number
 .Ar default-boot-menu-option
@@ -205,6 +224,18 @@ GRUB variable to
 causing the bootloader to load additional configuration that turns on the
 .Xr sshd 8
 daemon on boot.
+.It Fl \-grub-serial Ns = Ns Ar terminal
+Use the serial
+.Ar terminal
+for GRUB's menu in the format of the
+.Xr kernel 7
+.Fl \-console
+option.
+.It Fl \-kernel-options Ns = Ns Ar options
+Forward these additional
+.Ar options
+to the the
+.Xr kernel 7 .
 .It Fl \-init-target Ns = Ns Ar target
 Add a new first menu entry that boots the
 .Ar target
@@ -277,6 +308,34 @@ If a release .iso has been made from
 it should be securely erased when no longer useful.
 If a release .iso has been burned to a physical media, it should be securely
 erased when no longer useful.
+.It Fl \-serial Ns = Ns Ar terminal
+Boot entirely using the serial
+.Xr terminal
+as specified in the format of the
+.Xr kernel 7
+.Fl \-console option.
+This option is a shorthand equivalent to setting the
+.Fl \-console ,
+.Fl \-grub-console ,
+.Fl \-serial-console ,
+and
+.Fl \-disable-gui
+options.
+.It Fl \-serial-console Ns = Ns Ar terminal
+Whenever the serial console is enabled in the advanced bootloader menu, forward
+this
+.Fl \-console
+option to the
+.Xr kernel 7
+to select the
+.Ar terminal
+to use as the console and the settings to initialize it.
+.Pp
+The
+.Ev TERM
+variable can be overridden by suffixing the quoted argument with a space
+followed by
+.Fl \-term Ns = Ns Ar terminal .
 .It Fl \-timeout Ns = Ns Ar boot-menu-timeout
 Pick the default bootloader menu option after
 .Ar boot-menu-timeout
@@ -377,6 +436,16 @@ To customize a release so it boots to a console instead of the GUI:
 .Bd -literal
 tix-iso-bootconfig --disable-gui bootconfig
 tix-iso-add sortix.iso bootconfig
+.Ed
+.Ss Boot to Serial Console using Qemu
+To boot to a serial terminal with a custom serial settings and a custom terminal
+window size of 118 colums by 256 rows and a specific
+.Ev TERM
+variable inside the qemu virtual machine:
+.Bd -literal
+tix-iso-bootconfig --serial="com1,9600n8,118x56 --term=xterm-256color" bootconfig
+tix-iso-add sortix.iso bootconfig
+qemu-system-x86_64 -serial mon:stdio -cdrom sortix.iso
 .Ed
 .Sh SEE ALSO
 .Xr xorriso 1 ,

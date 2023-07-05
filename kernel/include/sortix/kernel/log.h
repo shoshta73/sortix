@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,6 +26,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <sortix/limits.h>
+
 typedef struct multiboot_info multiboot_info_t;
 
 namespace Sortix {
@@ -37,6 +39,8 @@ class TextBufferHandle;
 
 namespace Sortix {
 namespace Log {
+
+extern char console_tty[TTY_NAME_MAX+1];
 
 extern uint8_t* fallback_framebuffer;
 extern size_t fallback_framebuffer_bpp;
@@ -130,6 +134,7 @@ void Center(const char* string);
 void BeginReplace();
 void CancelReplace();
 void FinishReplace(TextBuffer* textbuf);
+void InitializeConsole(const char* console);
 
 } // namespace Log
 } // namespace Sortix

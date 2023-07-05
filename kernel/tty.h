@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2016, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -86,6 +86,7 @@ protected:
 		tty_output((const unsigned char*) str, strlen(str));
 	}
 	virtual void tty_output(const unsigned char* buffer, size_t length) = 0;
+	virtual bool Reconfigure(const struct termios* new_tio) = 0;
 
 protected:
 	void ProcessUnicode(uint32_t unicode);

@@ -166,6 +166,46 @@ which will instead boot to a plain
 .Pa /dev/tty1
 terminal.
 .Pp
+The kernel console can be changed to the primary serial port terminal by
+selecting
+.Sy Enable serial console .
+You can use the
+.Xr release-iso-modification 7
+procedure to customize the serial port settings (speed, bits, parity), window
+size, and the
+.Ev TERM
+environment variable ahead of time.
+Otherwise it will default to a speed of 38400 with 8 bits and no parity, with a
+80x25 window size, and the default
+.Ev TERM
+variable.
+You can change the settings appropriately after boot using the
+.Xr stty 7
+.Sy ispeed , ospeed , cols ,
+and
+.Sy rows
+commands, followed by
+.Sy export TERM=terminal
+to select your terminal.
+The installation remembers the
+.Xr kernel 7
+.Fl \-console
+and
+.Fl \-term
+options it was booted with.
+If you wish for the installed GRUB bootloader to use the serial line, choose
+the
+.Sy chroot
+option at the end of the installation, and then set the
+.Sy GRUB_SERIAL_COMMAND
+and
+.Sy GRUB_TERMINAL
+variables appropriately per the GRUB documentation in the
+.Pa /etc/grub
+file and run the
+.Xr update-grub 8
+command.
+.Pp
 The network drivers can be disabled by navigating to the advanced menu and
 selecting
 .Sy Disable network drivers .

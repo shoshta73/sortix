@@ -67,6 +67,10 @@ Secondly, it loads
 (if it exists)
 which can take any actions it wants and customize the default configuration.
 .Pp
+Third, the
+.Sy hook_initialize_terminal
+hook is run to initialize the bootloader input and output.
+.Pp
 Finally, it loads
 .Pa /boot/grub/main.cfg
 to display the menu menu.
@@ -256,6 +260,13 @@ The main menu uses this title verbatim, while the other menus will append
 " when constructing
 .Sy menu_title.
 (Default: "Sortix $version for $machine")
+.It Sy console
+Optionally contains
+.Fl \-console
+and
+.Fl \-term
+options to forward to the
+.Xr kernel 7 .
 .It Sy default
 Select this bootloader menu option number by default (counting from 0).
 If the selected menu option itself is a submenu, it can be appended with a
@@ -289,6 +300,9 @@ Whether to start the
 .Xr sshd 8
 daemon.
 (Default: false)
+.It Sy kernel_options
+Optionally contains additional options for the
+.Xr kernel 7 .
 .It Sy machine
 The machine type this release was built for.
 .It Sy menu_title
@@ -312,6 +326,14 @@ and not if set to
 .Sy false .
 (Default:
 .Sy true )
+.It Sy serial_console
+When the serial console is enabled in the advanced menu, this variable contains
+the
+.Fl \-console
+and
+.Fl \-term
+options to forward to the
+.Xr kernel 7 .
 .It Sy timeout
 The time in seconds before the default menu entry (according to the
 .Sy default
@@ -453,6 +475,9 @@ The following hooks are run by the GRUB bootloader configuration:
 After the advanced menu entries have been emitted.
 .It Sy hook_advanced_menu_pre
 Before the advanced menu entries are emitted.
+.It Sy hook_initialize_terminal
+After having loaded the hook configuration file, when it's time to configure
+the bootloader input and output.
 .It Sy hook_initrd_post
 After the initrd is loaded.
 .It Sy hook_kernel_post
