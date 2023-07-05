@@ -272,7 +272,7 @@ int main(int argc, char* argv[])
 	if ( (all || save) && argc != 1 )
 		errx(1, "Cannot both change and display terminal modes");
 
-	// Keep this in sync with kernel/tty.cpp.
+	// Keep this in sync with kernel/tty.cpp, utils/getty.c.
 	struct termios default_tio = { 0 };
 	default_tio.c_iflag = BRKINT | ICRNL | IXANY | IXON;
 	default_tio.c_oflag = OPOST | ONLCR;

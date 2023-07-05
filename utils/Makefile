@@ -90,6 +90,7 @@ wall.1 \
 
 SBINS=\
 chroot \
+getty \
 halt \
 poweroff \
 reboot \
@@ -98,6 +99,7 @@ unmount \
 
 MANPAGES8=\
 chroot.8 \
+getty.8 \
 halt.8 \
 poweroff.8 \
 reboot.8 \

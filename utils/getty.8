@@ -1,0 +1,150 @@
+.Dd December 16, 2024
+.Dt GETTY 8
+.Os
+.Sh NAME
+.Nm getty
+.Nd initialize a terminal session
+.Sh SYNOPSIS
+.Nm
+.Op Fl 5678beflnoR
+.Op Fl h Ar height
+.Op Fl s Ar speed
+.Op Fl t Ar term
+.Op Fl w Ar width
+.Ar terminal
+.Ar program
+.Op Ar arguments ...
+.Sh DESCRIPTION
+.Nm
+creates a new session and executes the specified
+.Ar program
+inside the session.
+.Pp
+The
+.Ar terminal
+argument is a path to a
+.Xr tty 4
+terminal device for the session, which is initialized to its default options (as
+per
+.Xr stty 1
+.Sy sane ) ,
+except the modem control settings are preserved in the
+.Vt struct termios
+.Fa c_cflag
+field (except
+.Dv CREAD )
+as well as the
+.Fa c_ispeed
+and
+.Fa c_ospeed
+fields.
+The
+.Dv CREAD
+bit is enabled in
+.Vt struct termios
+.Fa c_cflag
+to enable receiving data on the terminal.
+The terminal window size is unchanged.
+.Pp
+If the process is already a session leader, then the
+.Ar program
+is executed along with any optional
+.Ar arguments .
+Otherwise
+.Nm
+forks and makes the child a session leader, and the parent waits for the child
+to exit.
+.Pp
+The options are as follows:
+.Bl -tag -width "1234567890"
+.It Fl 5
+Receive 5 bits per word
+.Dv ( CS5
+in
+.Fa c_cflag ) .
+.It Fl 6
+Receive 6 bits per word
+.Dv ( CS6
+in
+.Fa c_cflag ) .
+.It Fl 7
+Receive 7 bits per word
+.Dv ( CS7
+in
+.Fa c_cflag ) .
+.It Fl 8
+Receive 8 bits per word
+.Dv ( CS8
+in
+.Fa c_cflag ) .
+.It Fl b
+Always fork and run the new session in the background without waiting for it to
+exit.
+.It Fl e
+Enable even parity bits
+.Dv ( PARENB
+in
+.Fa c_cflag ) .
+.It Fl f
+Forcefully take ownership of the terminal even if another session already owns
+it.
+.It Fl h Ar height
+Set the terminal window rows to
+.Ar height .
+.It Fl l
+Output the operating system logo before running the program.
+.It Fl n
+Disable parity bits
+.Li ( ~ Ns Dv (PARENB | PARODD)
+in
+.Fa c_cflag ) .
+.It Fl o
+Enable odd parity bits
+.Dv ( PARENB | PARODD
+in
+.Fa c_cflag ) .
+.It Fl R
+Disable receiving data
+.Li ( ~ Ns Dv (CREAD)
+in
+.Fa c_cflag ) .
+This option is useful to prevent a race condition where the user may type
+.Sy ^C
+or
+.Sy ^\\
+to send
+.Dv SIGINT
+or
+.Dv SIGQUIT
+before the program is ready to handle input.
+.It Fl s Ar speed
+Set the terminal input and output speeds to
+.Ar speed .
+.It Fl t Ar term
+Set the
+.Xr TERM
+environment variable to
+.Ar term .
+.It Fl w Ar width
+Set the terminal window columns to
+.Ar width .
+.El
+.Sh EXIT STATUS
+.Nm
+exits as the
+.Ar program
+does on success and non-zero otherwise.
+If
+.Fl b ,
+then
+.Nm
+exits 0 after forking the new session.
+.Sh SEE ALSO
+.Xr sh 1 ,
+.Xr tcsetattr 2 ,
+.Xr tcsetwinsize 2 ,
+.Xr com 4 ,
+.Xr tty 4 ,
+.Xr kernel 7 ,
+.Xr init 8 ,
+.Xr login 8
