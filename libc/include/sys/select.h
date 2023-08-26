@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,6 +50,8 @@ struct timeval
 };
 #endif
 
+#include <sortix/timespec.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -78,9 +80,11 @@ typedef struct
 #define FD_SET(fd, fdsetp) (__FD_ACCESS(fd, fdsetp) |= __FD_MASK(fd))
 #define FD_ZERO(fdsetp) memset(fdsetp, 0, sizeof(fd_set))
 
-/* TODO: pselect */
 int select(int, fd_set* __restrict, fd_set* __restrict, fd_set* __restrict,
            struct timeval* __restrict);
+int pselect(int, fd_set* __restrict, fd_set* __restrict, fd_set* __restrict,
+            const struct timespec* __restrict,
+            const sigset_t* __restrict sigmask);
 
 #ifdef __cplusplus
 } /* extern "C" */
