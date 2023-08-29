@@ -371,14 +371,17 @@ int vcbprintf(void* ctx,
 #endif
 		else if ( *format == 'c' && (format++, true) )
 		{
-			char c;
+			char buf[MB_CUR_MAX];
+			size_t bytes = 1;
 			if ( length == LENGTH_DEFAULT )
-				c = (char) va_arg(parameters, int);
+				buf[0] = (char) va_arg(parameters, int);
 			else if ( length == LENGTH_LONG )
 			{
-				// TODO: Implement wide character printing.
-				(void) va_arg(parameters, wint_t);
-				goto unsupported_conversion;
+				mbstate_t ps = {0};
+				wchar_t wc = (wchar_t) va_arg(parameters, wint_t);
+				bytes = wcrtomb(buf, wc, &ps);
+				if ( bytes == (size_t) -1 )
+					return -1;
 			}
 			else
 				goto incomprehensible_conversion;
@@ -393,9 +396,9 @@ int vcbprintf(void* ctx,
 				}
 			}
 
-			if ( callback(ctx, &c, 1) != 1 )
+			if ( callback(ctx, buf, bytes) != bytes )
 				return -1;
-			written++;
+			written += bytes;
 
 			if ( field_width_is_negative && 1 < abs_field_width )
 			{
