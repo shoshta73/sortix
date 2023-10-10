@@ -1,0 +1,3 @@
+rm -rf -- 'mtools.info'
+rm -rf -- 'mtools.1'
+rm -rf -- 'mtools.5'

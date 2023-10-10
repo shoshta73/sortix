@@ -1,0 +1,136 @@
+diff -Paur --no-dereference -- mtools.upstream/configure mtools/configure
+--- mtools.upstream/configure
++++ mtools/configure
+@@ -3964,17 +3964,11 @@
+ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
+-/* Override any GCC internal prototype to avoid an error.
+-   Use char because int might match the return type of a GCC
+-   builtin and then its argument prototype would still apply.  */
+-#ifdef __cplusplus
+-extern "C"
+-#endif
+-char iconv ();
++#include <iconv.h>
+ int
+ main ()
+ {
+-return iconv ();
++return (int) iconv;
+   ;
+   return 0;
+ }
+diff -Paur --no-dereference -- mtools.upstream/file.c mtools/file.c
+--- mtools.upstream/file.c
++++ mtools/file.c
+@@ -522,7 +522,7 @@
+ 		extern long timezone;
+ #endif
+ 		tzset();
+-		tzone = (long) timezone;
++		tzone = (long) 0;
+ 	}
+ #else
+ 	tzone = 0;
+diff -Paur --no-dereference -- mtools.upstream/mainloop.h mtools/mainloop.h
+--- mtools.upstream/mainloop.h
++++ mtools/mainloop.h
+@@ -18,7 +18,6 @@
+  *  along with Mtools.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
+-#include <sys/param.h>
+ #include "mtoolsDirentry.h"
+ 
+ typedef struct bounded_string {
+diff -Paur --no-dereference -- mtools.upstream/mcopy.c mtools/mcopy.c
+--- mtools.upstream/mcopy.c
++++ mtools/mcopy.c
+@@ -39,28 +39,12 @@
+ static void set_mtime(const char *target, time_t mtime)
+ {
+ 	if (target && strcmp(target, "-") && mtime != 0L) {
+-#ifdef HAVE_UTIMES
+-		struct timeval tv[2];
+-		tv[0].tv_sec = mtime;
+-		tv[0].tv_usec = 0;
+-		tv[1].tv_sec = mtime;
+-		tv[1].tv_usec = 0;
+-		utimes(target, tv);
+-#else
+-#ifdef HAVE_UTIME
+-#ifndef HAVE_UTIMBUF
+-		struct utimbuf {
+-			time_t actime;       /* access time */
+-			time_t modtime;      /* modification time */
+-		};
+-#endif		
+-		struct utimbuf utbuf;
+-
+-		utbuf.actime = mtime;
+-		utbuf.modtime = mtime;
+-		utime(target, &utbuf);
+-#endif
+-#endif
++		struct timespec ts[2];
++		ts[0].tv_sec = mtime;
++		ts[0].tv_nsec = 0;
++		ts[1].tv_sec = mtime;
++		ts[1].tv_nsec = 0;
++		utimens(target, ts);
+ 	}
+ 	return;
+ }
+diff -Paur --no-dereference -- mtools.upstream/plain_io.c mtools/plain_io.c
+--- mtools.upstream/plain_io.c
++++ mtools/plain_io.c
+@@ -145,7 +145,10 @@
+ static int init_geom_with_reg(int fd, struct device *dev,
+ 			      struct device *orig_dev,
+ 			      struct MT_STAT *statbuf) {
++	// TODO: Actually use the geometry but the partition has to report it.
++#ifndef __sortix__
+ 	if(S_ISREG(statbuf->st_mode)) {
++#endif
+ 		/* Regular file (image file) */
+ 		mt_off_t sectors;
+ 		if(statbuf->st_size == 0) {
+@@ -161,10 +164,12 @@
+ 			? UINT32_MAX
+ 			: (uint32_t) sectors;
+ 		return 0;
++#ifndef __sortix__
+ 	} else {
+ 		/* All the rest (devices, etc.) */
+ 		return init_geom(fd, dev, orig_dev, statbuf);
+ 	}
++#endif
+ }
+ 
+ static int file_geom(Stream_t *Stream, struct device *dev,
+diff -Paur --no-dereference -- mtools.upstream/sysincludes.h mtools/sysincludes.h
+--- mtools.upstream/sysincludes.h
++++ mtools/sysincludes.h
+@@ -397,19 +397,11 @@
+ 
+ /* missing functions */
+ #ifndef HAVE_SRANDOM
+-# ifdef OS_mingw32msvc
+-#  define srandom srand
+-# else
+-#  define srandom srand48
+-# endif
++#  define srandom
+ #endif
+ 
+ #ifndef HAVE_RANDOM
+-# ifdef OS_mingw32msvc
+-#  define random (long)rand
+-# else
+-#  define random (long)lrand48
+-# endif
++#  define random (long)arc4random
+ #endif
+ 
+ #ifndef HAVE_STRCHR
