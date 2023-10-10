@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, 2021-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021-2023 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -231,6 +231,13 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 
 	if ( !(kernel_options = strdup(cmdline ? cmdline : "")) )
 		Panic("Failed to allocate kernel command line");
+#if defined(__i386__) || defined(__x86_64__)
+	// TODO: Detect EFI.
+	kernel_firmware = "bios";
+#else
+	#warning "Name your system firmware here"
+	kernel_firmware = "unknown";
+#endif
 
 	int argmax = 1;
 	argv = new char*[argmax + 1];
@@ -286,6 +293,20 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 			enable_network_drivers = true;
 		else if ( !strcmp(arg, "--no-random-seed") )
 			no_random_seed = true;
+		else if ( !strncmp(arg, "--firmware=", strlen("--firmware=")) )
+		{
+			const char* firmware = arg + strlen("--firmware=");
+#if defined(__i386__) || defined(__x86_64__)
+			if ( !strcmp(firmware, "bios") || !strcmp(firmware, "pc") )
+				kernel_firmware = "bios";
+			else if ( !strcmp(firmware, "efi") )
+				kernel_firmware = "efi";
+			else
+#endif
+			{
+				PanicF("Unsupported firmware option: %s", firmware);
+			}
+		}
 		else
 		{
 			Log::PrintF("\r\e[J");

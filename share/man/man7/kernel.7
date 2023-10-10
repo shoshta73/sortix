@@ -10,6 +10,7 @@
 .Op Fl \-enable-em
 .Op Fl \-disable-network-drivers
 .Op Fl \-enable-network-drivers
+.Op Fl \-firmware Ns = Ns Oo Sy bios "|" Sy efi "|" pc Oc
 .Op Fl \-no-random-seed
 .Op Fl \-
 .Op Ar init ...
@@ -64,6 +65,14 @@ driver.
 .It Fl \-enable-network-drivers
 Do initialize network drivers.
 This is the default behavior.
+.It Fl \-firmware Ns = Ns Oo Sy bios "|" Sy efi "|" pc Oc
+Informs the kernel the system is booted using
+.Sy bios or
+.Sy efi .
+The
+.Sy pc
+value is a synonym for
+.Sy bios .
 .It Fl \-no-random-seed
 Don't warn if no random seed file was loaded by the bootloader (usually from
 .Pa /boot/random.seed ) .

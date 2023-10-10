@@ -33,20 +33,17 @@
 namespace Sortix {
 
 char* kernel_options;
+const char* kernel_firmware;
 
 static const char* KernelInfo(const char* req)
 {
-	if ( strcmp(req, "name") == 0 ) { return BRAND_KERNEL_NAME; }
-	if ( strcmp(req, "version") == 0 ) { return VERSIONSTR; }
-	if ( strcmp(req, "tagline") == 0 ) { return BRAND_RELEASE_TAGLINE; }
-	if ( strcmp(req, "options") == 0 ) { return kernel_options; }
-	if ( strcmp(req, "builddate") == 0 ) { return __DATE__; }
-	if ( strcmp(req, "buildtime") == 0 ) { return __TIME__; }
-#if defined(__i386__) || defined(__x86_64__)
-	if ( strcmp(req, "firmware") == 0 ) { return "bios"; }
-#else
-	#warning "Name your system firmware here"
-#endif
+	if ( strcmp(req, "name") == 0 ) return BRAND_KERNEL_NAME;
+	if ( strcmp(req, "version") == 0 ) return VERSIONSTR;
+	if ( strcmp(req, "tagline") == 0 ) return BRAND_RELEASE_TAGLINE;
+	if ( strcmp(req, "options") == 0 ) return kernel_options;
+	if ( strcmp(req, "builddate") == 0 ) return __DATE__;
+	if ( strcmp(req, "buildtime") == 0 ) return __TIME__;
+	if ( strcmp(req, "firmware") == 0 ) return kernel_firmware;
 	return NULL;
 }
 

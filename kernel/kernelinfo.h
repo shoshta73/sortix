@@ -23,6 +23,7 @@
 namespace Sortix {
 
 extern char* kernel_options;
+extern const char* kernel_firmware;
 
 } // namespace Sortix
 

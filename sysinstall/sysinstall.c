@@ -345,6 +345,9 @@ static void grub_hash_password(char* buffer, size_t buffer_size, const char* pw)
 
 static const char* const ignore_kernel_options[] =
 {
+	"--firmware=bios",
+	"--firmware=efi",
+	"--firmware=pc",
 	"--no-random-seed",
 	"--random-seed",
 	NULL,
