@@ -1,0 +1,15 @@
+NAME=irssi
+BUILD_LIBRARIES='libcurses libglib libssl'
+VERSION=1.4.5
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=72a951cb0ad622785a8962801f005a3a412736c7e7e3ce152f176287c52fe062
+UPSTREAM_SITE=https://codeberg.org/irssi/irssi/releases/download/$VERSION
+UPSTREAM_ARCHIVE=$ARCHIVE
+RELEASE_SEARCH_PAGE=https://codeberg.org/irssi/irssi/releases
+BUILD_SYSTEM=configure
+# Perl support in irssi is fundamentally broken for cross-compilation.
+CONFIGURE_ARGS='--enable-true-color --with-perl=no'
+MAKE_VARS=V=1
+LICENSE=GPL-2.0-or-later

@@ -1,0 +1,197 @@
+diff -Paur --no-dereference -- irssi.upstream/Makefile.in irssi/Makefile.in
+--- irssi.upstream/Makefile.in
++++ irssi/Makefile.in
+@@ -426,7 +426,7 @@
+ BUILT_SOURCES = default-config.h default-theme.h irssi-version.h
+ CLEANFILES = default-config.h default-theme.h
+ SUBDIRS = src tests docs scripts themes utils
+-confdir = $(sysconfdir)
++confdir = $(sysconfdir)/examples
+ conf_DATA = irssi.conf
+ pkgconfig_DATA = irssi-1.pc
+ pkginclude_HEADERS = irssi-config.h irssi-version.h
+diff -Paur --no-dereference -- irssi.upstream/configure irssi/configure
+--- irssi.upstream/configure
++++ irssi/configure
+@@ -18236,4 +18236,3 @@
+ 
+ echo
+ echo "If there are any problems, read the INSTALL file."
+-
+diff -Paur --no-dereference -- irssi.upstream/irssi.conf irssi/irssi.conf
+--- irssi.upstream/irssi.conf
++++ irssi/irssi.conf
+@@ -12,6 +12,7 @@
+   { address = "irc.quakenet.org";  chatnet = "QuakeNet";  port = "6667"; },
+   { address = "irc.rizon.net";     chatnet = "Rizon";     port = "6697"; use_tls = "yes"; tls_verify = "yes"; },
+   { address = "silc.silcnet.org";  chatnet = "SILC";      port = "706";  },
++  { address = "irc.sortix.org";    chatnet = "sortix";    port = "6697"; use_tls = "yes"; tls_verify = "yes"; },
+   { address = "irc.undernet.org";  chatnet = "Undernet";  port = "6667"; }
+ );
+ 
+@@ -85,6 +86,9 @@
+   SILC = {
+     type = "SILC";
+   };
++  sortix = {
++    type      = "IRC";
++  };
+   Undernet = {
+     type      = "IRC";
+     max_kicks = "1";
+@@ -103,6 +107,7 @@
+   { name = "#netfuze";   chatnet = "NetFuze";   autojoin = "No"; },
+   { name = "#oftc";      chatnet = "OFTC";      autojoin = "No"; },
+   { name = "silc";       chatnet = "SILC";      autojoin = "No"; }
++  { name = "#sortix";    chatnet = "sortix";    autojoin = "No"; },
+ );
+ 
+ aliases = {
+diff -Paur --no-dereference -- irssi.upstream/src/core/log.c irssi/src/core/log.c
+--- irssi.upstream/src/core/log.c
++++ irssi/src/core/log.c
+@@ -101,7 +101,10 @@
+ int log_start_logging(LOG_REC *log)
+ {
+ 	char *dir;
++/* PATCH: Sortix doesn't implement flock */
++#ifdef F_SETLK
+ 	struct flock lock;
++#endif
+ 
+ 	g_return_val_if_fail(log != NULL, FALSE);
+ 
+@@ -139,6 +142,8 @@
+ 		log->failed = TRUE;
+ 		return FALSE;
+ 	}
++/* PATCH: Sortix doesn't implement flock */
++#ifdef F_SETLK
+         memset(&lock, 0, sizeof(lock));
+ 	lock.l_type = F_WRLCK;
+ 	if (fcntl(log->handle, F_SETLK, &lock) == -1 && errno == EACCES) {
+@@ -148,6 +153,7 @@
+ 		log->failed = TRUE;
+ 		return FALSE;
+ 	}
++#endif
+ 	lseek(log->handle, 0, SEEK_END);
+ 
+ 	log->opened = log->last = time(NULL);
+@@ -162,7 +168,10 @@
+ 
+ void log_stop_logging(LOG_REC *log)
+ {
++/* PATCH: Sortix doesn't implement flock */
++#ifdef F_SETLK
+ 	struct flock lock;
++#endif
+ 
+ 	g_return_if_fail(log != NULL);
+ 
+@@ -175,9 +184,12 @@
+ 			    settings_get_str("log_close_string"),
+ 			    "\n", time(NULL));
+ 
++/* PATCH: Sortix doesn't implement flock */
++#ifdef F_SETLK
+         memset(&lock, 0, sizeof(lock));
+ 	lock.l_type = F_UNLCK;
+ 	fcntl(log->handle, F_SETLK, &lock);
++#endif
+ 
+ 	write_buffer_flush();
+ 	close(log->handle);
+diff -Paur --no-dereference -- irssi.upstream/src/core/net-disconnect.c irssi/src/core/net-disconnect.c
+--- irssi.upstream/src/core/net-disconnect.c
++++ irssi/src/core/net-disconnect.c
+@@ -18,6 +18,8 @@
+     51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+ 
++#include <sys/select.h>
++
+ #include "module.h"
+ #include <irssi/src/core/network.h>
+ 
+diff -Paur --no-dereference -- irssi.upstream/src/core/network.c irssi/src/core/network.c
+--- irssi.upstream/src/core/network.c
++++ irssi/src/core/network.c
+@@ -491,8 +491,6 @@
+ 
+ int net_host2ip(const char *host, IPADDR *ip)
+ {
+-	unsigned long addr;
+-
+ 	if (strchr(host, ':') != NULL) {
+ 		/* IPv6 */
+ 		ip->family = AF_INET6;
+@@ -501,16 +499,8 @@
+ 	} else {
+ 		/* IPv4 */
+ 		ip->family = AF_INET;
+-#ifdef HAVE_INET_ATON
+-		if (inet_aton(host, &ip->ip.s_addr) == 0)
+-			return -1;
+-#else
+-		addr = inet_addr(host);
+-		if (addr == INADDR_NONE)
++		if (inet_pton(AF_INET, host, &ip->ip) == 0)
+ 			return -1;
+-
+-		memcpy(&ip->ip, &addr, 4);
+-#endif
+ 	}
+ 
+ 	return 0;
+diff -Paur --no-dereference -- irssi.upstream/src/core/network.h irssi/src/core/network.h
+--- irssi.upstream/src/core/network.h
++++ irssi/src/core/network.h
+@@ -11,6 +11,11 @@
+ #  include <netdb.h>
+ #  include <arpa/inet.h>
+ 
++/* PATCH: Sortix netdb.h does not define HOST_NOT_FOUND */
++#ifndef HOST_NOT_FOUND
++#define HOST_NOT_FOUND 1
++#endif
++
+ #ifndef AF_INET6
+ #  ifdef PF_INET6
+ #    define AF_INET6 PF_INET6
+diff -Paur --no-dereference -- irssi.upstream/src/core/refstrings.c irssi/src/core/refstrings.c
+--- irssi.upstream/src/core/refstrings.c
++++ irssi/src/core/refstrings.c
+@@ -122,7 +122,7 @@
+ 		mem += sizeof(char) * (strlen(key) + 1) + 2 * sizeof(void *);
+ 	}
+ 
+-	return g_strdup_printf("Shared strings: %ld, %dkB of data", count,
++	return g_strdup_printf("Shared strings: %zu, %dkB of data", count,
+ 	          (int) (mem / 1024));
+ }
+ 
+diff -Paur --no-dereference -- irssi.upstream/src/fe-common/core/fe-exec.c irssi/src/fe-common/core/fe-exec.c
+--- irssi.upstream/src/fe-common/core/fe-exec.c
++++ irssi/src/fe-common/core/fe-exec.c
+@@ -327,7 +327,7 @@
+ 	signal(SIGINT, SIG_IGN);
+ 	signal(SIGQUIT, SIG_DFL);
+ 
+-	putenv("TERM=tty");
++	setenv("TERM", "tty", 1);
+ 
+ 	/* set stdin, stdout and stderr */
+         dup2(in[0], STDIN_FILENO);
+diff -Paur --no-dereference -- irssi.upstream/src/irc/core/irc.c irssi/src/irc/core/irc.c
+--- irssi.upstream/src/irc/core/irc.c
++++ irssi/src/irc/core/irc.c
+@@ -90,7 +90,7 @@
+ 			end = tmp;
+ 
+ 			if (tmp - cmd > MAX_IRC_USER_TAGS_LEN) {
+-				g_warning("irc_send_cmd_full(); tags too long(%ld)", tmp - cmd);
++				g_warning("irc_send_cmd_full(); tags too long(%td)", tmp - cmd);
+ 				while (tmp - cmd > MAX_IRC_USER_TAGS_LEN && cmd != tmp - 1) tmp--;
+ 				while (*tmp != ',' && cmd != tmp - 1) tmp--;
+ 			}
