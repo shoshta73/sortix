@@ -803,6 +803,9 @@ static void TixInfo(struct metainfo* minfo)
 		// TODO: Shell escape the values if needed.
 		fwrite_variable(tixinfo_fp, "TIX_VERSION", "3");
 		fwrite_variable(tixinfo_fp, "NAME", minfo->package_name);
+		const char* edition = metainfo_get(minfo, "EDITION", "pkg.edition");
+		if ( edition )
+			fwrite_variable(tixinfo_fp, "EDITION", edition);
 		const char* version = metainfo_get(minfo, "VERSION", "VERSION");
 		if ( version )
 			fwrite_variable(tixinfo_fp, "VERSION", version);
@@ -821,6 +824,9 @@ static void TixInfo(struct metainfo* minfo)
 			else
 				fwrite_variable(tixinfo_fp, "PREFIX", minfo->prefix);
 		}
+		const char* renames = metainfo_get(minfo, "RENAMES", "pkg.renames");
+		if ( renames )
+			fwrite_variable(tixinfo_fp, "RENAMES", renames);
 	}
 	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
 	else

@@ -1,0 +1,115 @@
+#!/bin/sh
+# Copyright (c) 2023, 2024 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-repository
+# Generate repository metadata.
+
+set -e
+
+generation=3
+
+unset command
+unset repository
+
+operand=1
+dashdash=
+previous_option=
+for argument do
+  if [ -n "$previous_option" ]; then
+    eval $previous_option=\$argument
+    previous_option=
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  --generation=*) generation=$parameter ;;
+  --generation) previous_option=generation ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *)
+    if [ $operand = 1 ]; then
+      command="$argument"
+      operand=2
+    elif [ $operand = 2 ]; then
+      repository="$argument"
+      operand=3
+    else
+      echo "$0: unexpected extra operand $argument" >&2
+      exit 1
+    fi
+    ;;
+  esac
+done
+
+if [ -n "$previous_option" ]; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+if [ -z "$command" ]; then
+  echo "$0: error: No command was specified" >&2
+  exit 1
+fi
+
+if [ -z "$repository" ]; then
+  echo "$0: error: No repository was specified" >&2
+  exit 1
+fi
+
+if [ "$generation" != 3 ]; then
+  echo "$0: error: --generation=$generation is not supported by this version" >&2
+  exit 1
+fi
+
+cd "$repository"
+
+case "$command" in
+metadata)
+  ls |
+  grep -E '\.tix.tar.xz$' |
+  grep -Eo '^[^.]*' |
+  LC_ALL=C sort -o packages.list
+
+  true > dependencies.list
+  true > renames.list
+  true > manifest.list
+
+  for package in $(cat packages.list); do
+    tar -xOf "$package.tix.tar.xz" "tix/tixinfo/$package" > "$package.info"
+    tar -xOf "$package.tix.tar.xz" "tix/manifest/$package" > "$package.manifest"
+    sha256sum "$package.tix.tar.xz" > "$package.tix.tar.xz.sha256sum"
+    tix-vars -d '' "$package.info" RENAMES | tr , '\n' | sed -E '/^$/d' >> renames.list
+    (printf "%s: " "$package" && tix-vars -d '' "$package.info" RUNTIME_DEPS | sed -E 's/ +$//') >> dependencies.list
+    sed -E "s/$/:$package/" "$package.manifest" >> manifest.list
+  done
+
+  LC_ALL=C sort -t: -k1,1 manifest.list -o manifest.list
+
+  find -type f '!' -name 'sha256sum' '!' -name '*.sha256sum' -exec sha256sum '{}' '+' |
+  sed -E 's,  \./,  ,' |
+  LC_ALL=C sort -k 2 > sha256sum
+
+  ;;
+*)
+  echo "$0: error: unknown command: $command" >&2
+  exit 1
+esac

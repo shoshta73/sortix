@@ -178,6 +178,18 @@ number matched in the first subexpression.
 .Sy ARCHIVE
 and
 .Sy VERSION_REGEX )
+.It Sy EDITION
+An increasing number used to distinguish this edition of the package from any previous packages by
+the same name.
+A new pacckage with the same name and a different edition will considered a different package.
+Upgrades will uninstall the old package and will not upgrade to the new edition as if the package
+has stopped existing.
+The
+.Sy RENAMES
+variable can be used in combination with
+.Sy EDITION
+to rename and split packages.
+The default edition is 1.
 .It Sy LICENSE
 Primary license identifier for the installed files from the
 .Lk https://spdx.org/licenses/ "SPDX License List" .
@@ -253,6 +265,19 @@ Locate new upstream versions of the port by searching
 .Sy RELEASE_SEARCH_PAGE
 using this regular expression matching the new version number in the first
 subexpression.
+.It Sy RENAMES
+Comma-separated list of package renames.
+Each rename is expressed as the name of a package followed by a
+.Sq "@"
+and its
+.Sy EDITION ,
+followed by a
+.Sq ":"
+and then a potentially-empty space separated list of replacement packages, each
+taking the form of a replacement package name followed by
+.Sq "@"
+and then the replacement package
+.Sy EDITION .
 .It Sy RUNTIME_DEPS
 Space delimited list of ports needed at run time.
 .It Sy SHA256SUM

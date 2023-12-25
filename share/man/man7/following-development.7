@@ -69,6 +69,25 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add tix-repository(8)
+The new
+.Xr tix-repository 8
+program is used to generate repository metadata in releases.
+The new
+.Sy EDITION
+and
+.Sy RENAMES
+variables in
+.Xr port 5
+are used to rename and split packages and requires a new
+.Xr tix-build 8 .
+.Pp
+Tix must be upgraded:
+.Bd -literal
+    cd /src/tix &&
+    make clean &&
+    make install
+.Ed
 .Ss Add init groups
 The
 .Xr setinit 2

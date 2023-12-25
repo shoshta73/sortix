@@ -31,6 +31,7 @@ tix-iso-add \
 tix-iso-bootconfig \
 tix-iso-liveconfig \
 tix-port \
+tix-repository \
 
 MANPAGES8=\
 tix-build.8 \
@@ -41,6 +42,7 @@ tix-iso-add.8 \
 tix-iso-bootconfig.8 \
 tix-iso-liveconfig.8 \
 tix-port.8 \
+tix-repository.8 \
 tix-rmdiff.8 \
 tix-rmpatch.8 \
 tix-vars.8 \

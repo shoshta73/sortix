@@ -1,0 +1,77 @@
+.Dd November 22, 2024
+.Dt TIX-REPOSITORY 8
+.Os
+.Sh NAME
+.Nm tix-repository
+.Nd manage a tix repository
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-generation Ns = Ns Ar level
+.Sy metadata
+.Ar repository
+.Sh DESCRIPTION
+.Nm
+prepares a tix repository for publication with the appropriate release metadata.
+.Pp
+A top-level release directory contains the
+.Pa sha256sum
+file, along with the
+.Pa repository
+directory with per-platform repository subdirectories named after the platform
+triplets.
+.Pp
+A tix release is prepared for publication by creating the directory structure,
+populating the per-platform
+.Pa repository/$platform
+subdirectories with the
+.Pa .tix.tar.xz
+and
+.Pa .version
+files produced by
+.Xr tix-port 8 ,
+and running the
+.Nm
+.Sy metadata
+command on each platform repository.
+.Pp
+The first operand selects a command to execute:
+.Bl -tag -width "1234"
+.It Sy metadata
+Generate metadata files in the per-platform
+.Ar repository
+subdirectory:
+.Bl -bullet -compact
+.It
+.Pa dependencies.list
+.It
+.Pa manifest.list
+.It
+.Pa packages.list
+.It
+.Pa renames.list
+.It
+.Pa sets.list
+.It
+.Pa sha256sum
+.El
+.El
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-generation Ns = Ns Ar generation
+Select tix metadata generation level
+(Default: 3)
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr port 5 ,
+.Xr tix 8 ,
+.Xr tix-build 8 ,
+.Xr tix-collection 8 ,
+.Xr tix-install 8 ,
+.Xr tix-port 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

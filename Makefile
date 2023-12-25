@@ -680,6 +680,7 @@ release-repository: sysroot $(SYSTEM_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/re
 	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.tix.tar.xz $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST) && \
 	  cp $(SORTIX_REPOSITORY_DIR)/$(HOST)/$$port.version $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST); \
 	done
+	tix-repository --generation=3 metadata $(SORTIX_RELEASE_DIR)/$(RELEASE)/repository/$(HOST)
 
 .PHONY: release-scripts
 release-scripts: \
