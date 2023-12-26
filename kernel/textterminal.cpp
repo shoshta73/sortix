@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -659,8 +660,45 @@ void TextTerminal::RunAnsiCommand(TextBuffer* textbuf, char c)
 		uint32_t fillbg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
 		textbuf->Fill(from, to, TextChar(' ', vgacolor, 0, fillfg, fillbg));
 	} break;
-	// TODO: CSI Ps M  Delete Ps Line(s) (default = 1) (DL).
-	//       (delete those lines and move the rest of the lines upwards).
+	case 'L': // Append lines before current line.
+	{
+		column = 0;
+		unsigned count = 0 < ansiusedparams ? ansiparams[0] : 1;
+		if ( height - line < count )
+			count = height - line;
+		TextPos from(0, line);
+		TextPos move_to(0, line + count);
+		unsigned move_lines = height - (line + count);
+		textbuf->Move(move_to, from, move_lines * width);
+		if ( 0 < count )
+		{
+			TextPos fill_to(width - 1, line + count - 1);
+			uint32_t fill_fg = attr & ATTR_INVERSE ? bgcolor : fgcolor;
+			uint32_t fill_bg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
+			TextChar fill_char(' ', vgacolor, 0, fill_fg, fill_bg);
+			textbuf->Fill(from, fill_to, fill_char);
+		}
+	} break;
+	case 'M': // Delete lines starting from beginning of current line.
+	{
+		column = 0;
+		unsigned count = 0 < ansiusedparams ? ansiparams[0] : 1;
+		if ( height - line < count )
+			count = height - line;
+		TextPos move_from(0, line + count);
+		TextPos move_to(0, line);
+		unsigned move_lines = height - (line + count);
+		textbuf->Move(move_to, move_from, move_lines * width);
+		if ( 0 < count )
+		{
+			TextPos fill_from(0, height - count);
+			TextPos fill_to(width - 1, height - 1);
+			uint32_t fill_fg = attr & ATTR_INVERSE ? bgcolor : fgcolor;
+			uint32_t fill_bg = attr & ATTR_INVERSE ? fgcolor : bgcolor;
+			TextChar fill_char(' ', vgacolor, 0, fill_fg, fill_bg);
+			textbuf->Fill(fill_from, fill_to, fill_char);
+		}
+	} break;
 	// TODO: CSI Ps P  Delete Ps Character(s) (default = 1) (DCH).
 	//       (delete those characters and move the rest of the line leftward).
 	case 'S': // Scroll a line up and place a new line at the buttom.

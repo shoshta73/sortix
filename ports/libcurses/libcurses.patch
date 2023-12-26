@@ -293,7 +293,7 @@ diff -Paur --no-dereference -- libcurses.upstream/netbsd_sys/cdefs.h libcurses/n
 diff -Paur --no-dereference -- libcurses.upstream/terminfo/sortix.terminfo libcurses/terminfo/sortix.terminfo
 --- libcurses.upstream/terminfo/sortix.terminfo
 +++ libcurses/terminfo/sortix.terminfo
-@@ -0,0 +1,230 @@
+@@ -0,0 +1,231 @@
 +# TODO: Decode setab and setaf and see if they are what I want.
 +# TODO: Implement BEL \a and add bel=^G,
 +# TODO: Add blink support and add blink=\E[5m,
@@ -302,12 +302,9 @@ diff -Paur --no-dereference -- libcurses.upstream/terminfo/sortix.terminfo libcu
 +# TODO: Support dch=\E[%p1%dP,
 +# TODO: dch1=\E[P,
 +# TODO: Add faint support and add dim=\E[2m,
-+# TODO: dl1=\E[M,
 +# TODO: ech=\E[%p1%dX,
 +# TODO: hts=\EH,
 +# TODO: ich=\E[%p1%d@,
-+# TODO: il=\E[%p1%dL,
-+# TODO: il1=\E[L,
 +# TODO: invis=\E[8m,
 +# TODO: Some modifiers for the function keys are missing, like control + alt +
 +#       shift + f12, kfxx should probably go up to 96. On the other hand,
@@ -346,12 +343,16 @@ diff -Paur --no-dereference -- libcurses.upstream/terminfo/sortix.terminfo libcu
 +	cup=\E[%i%p1%d;%p2%dH,
 +	cuu1=\E[A,
 +	cuu=\E[%p1%dA,
++	dl1=\E[M,
++	dl=\E[%p1%dM,
 +	ed=\E[J,
 +	el1=\E[1K,
 +	el=\E[K,
 +	home=\E[H,
 +	hpa=\E[%i%p1%dG,
 +	ht=^I,
++	il1=\E[L,
++	il=\E[%p1%dL,
 +	ind=^J,
 +	indn=\E[%p1%dS,
 +	nel=^J,

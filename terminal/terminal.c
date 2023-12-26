@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2017, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -211,6 +212,21 @@ static void fill(size_t from_x, size_t from_y, size_t to_x, size_t to_y,
 		scrollback[i] = with;
 }
 
+static void move(size_t to_x, size_t to_y, size_t from_x, size_t from_y,
+                 size_t num_chars)
+{
+	// TODO: Assert within bounds?
+	size_t from = from_y * columns + from_x;
+	size_t to = to_y * columns + to_x;
+	if ( to < from )
+		for ( size_t i = 0; i < num_chars; i++ )
+			scrollback[to + i] = scrollback[from + i];
+	else if ( from < to )
+		for ( size_t i = 0; i < num_chars; i++ )
+			scrollback[to + num_chars - 1 - i] =
+				scrollback[from + num_chars - 1 - i];
+}
+
 static void scroll(ssize_t offsigned, struct entry with)
 {
 	if ( 0 < offsigned )
@@ -396,8 +412,38 @@ static void run_ansi_command(char c)
 		with.wc = 0;
 		fill(from_x, from_y, to_x, to_y, with);
 	} break;
-	// TODO: CSI Ps M  Delete Ps Line(s) (default = 1) (DL).
-	//       (delete those lines and move the rest of the lines upwards).
+	case 'L': // Append lines before current line.
+	{
+		column = 0;
+		unsigned count = 0 < ansiusedparams ? ansiparams[0] : 1;
+		if ( rows - row < count )
+			count = rows - row;
+		unsigned move_lines = rows - (row + count);
+		move(0, row + count, 0, row, move_lines * columns);
+		struct entry with;
+		with.attr = 0;
+		with.fgcolor = attr & ATTR_INVERSE ? current_bgcolor : current_fgcolor;
+		with.bgcolor = attr & ATTR_INVERSE ? current_fgcolor : current_bgcolor;
+		with.wc = 0;
+		if ( 0 < count )
+			fill(0, row, columns - 1, row + count - 1, with);
+	} break;
+	case 'M': // Delete lines starting from beginning of current line.
+	{
+		column = 0;
+		unsigned count = 0 < ansiusedparams ? ansiparams[0] : 1;
+		if ( rows - row < count )
+			count = rows - row;
+		unsigned move_lines = rows - (row + count);
+		move(0, row, 0, row + count, move_lines * columns);
+		struct entry with;
+		with.attr = 0;
+		with.fgcolor = attr & ATTR_INVERSE ? current_bgcolor : current_fgcolor;
+		with.bgcolor = attr & ATTR_INVERSE ? current_fgcolor : current_bgcolor;
+		with.wc = 0;
+		if ( 0 < count )
+			fill(0, rows - count, columns - 1, rows - 1, with);
+	} break;
 	// TODO: CSI Ps P  Delete Ps Character(s) (default = 1) (DCH).
 	//       (delete those characters and move the rest of the line leftward).
 	case 'S': // Scroll a line up and place a new line at the buttom.
