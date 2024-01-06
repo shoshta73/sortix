@@ -333,18 +333,30 @@ static void push_wchar(wchar_t wc)
 	{
 		if ( incoming_line_width )
 			incoming_line_width--;
-		while ( line->content_used &&
-		        (line->content[line->content_used-1] & 0xC0) == 0x80 )
-			line->content_used--;
-		if ( line->content_used )
+		size_t index = line->content_used;
+		const char* unbold = "\e[22m";
+		if ( strlen(unbold) <= index &&
+		     !memcmp(unbold, line->content + index - strlen(unbold), strlen(unbold)) )
+			index -= strlen(unbold);
+		while ( index && (line->content[index-1] & 0xC0) == 0x80 )
+			index--;
+		const char* bold = "\e[1m";
+		if ( strlen(bold) <= index &&
+		     !memcmp(bold, line->content + index - strlen(bold), strlen(bold)) )
 		{
-			char c = line->content[--line->content_used];
+			index -= strlen(bold);
+			next_bold = true;
+		}
+		if ( index )
+		{
+			char c = line->content[index - 1];
 			if ( c == '_' )
 				next_underline = true;
 			else if ( c == ' ' )
 				next_bold = false;
 			else
 				next_bold = true;
+			line_push_char(line, '\b');
 		}
 		return;
 	}
