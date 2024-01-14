@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2024 Jonas 'Sortie' Termansen.
  * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  * Copyright (c) 2023 dzwdz.
  *
@@ -96,6 +96,8 @@ struct glogin
 	struct check chk;
 	int fd_mouse;
 	struct dispmsg_crtc_mode mode;
+	struct framebuffer wallpaper;
+	size_t wallpaper_size;
 	struct framebuffer fade_from_fb;
 	struct timespec fade_from_begin;
 	struct timespec fade_from_end;
@@ -200,14 +202,8 @@ void render_right_text_if_needed(struct framebuffer fb, const char* str, uint32_
 
 union c { struct { uint8_t b; uint8_t g; uint8_t r; }; uint32_t v; };
 
-static void render_background(struct framebuffer fb)
+static void wallpaper(struct framebuffer fb)
 {
-#if 0
-	uint32_t bg_color = make_color(0x89 * 2/3, 0xc7 * 2/3, 0xff * 2/3);
-	for ( size_t y = 0; y < fb.yres; y++ )
-		for ( size_t x = 0; x < fb.xres; x++ )
-			framebuffer_set_pixel(fb, x, y, bg_color);
-#endif
 	static uint32_t s;
 	static uint32_t t;
 	static bool seeded = false;
@@ -254,6 +250,19 @@ static void render_background(struct framebuffer fb)
 			framebuffer_set_pixel(fb, x, y, c.v);
 		}
 	}
+}
+
+static void render_background(struct framebuffer fb)
+{
+#if 0
+	uint32_t bg_color = make_color(0x89 * 2/3, 0xc7 * 2/3, 0xff * 2/3);
+	for ( size_t y = 0; y < damage_rect.height; y++ )
+		for ( size_t x = 0; x < damage_rect.width; x++ )
+			framebuffer_set_pixel(fb, damage_rect.left + x, damage_rect.top + y,
+			                      bg_color);
+#endif
+
+	framebuffer_copy_to_framebuffer(fb, state.wallpaper);
 }
 
 static void render_pointer(struct framebuffer fb)
@@ -576,6 +585,20 @@ static bool begin_render(struct glogin* state, struct framebuffer* fb)
 	fb->yres = state->mode.view_yres;
 	fb->pitch = state->mode.view_xres;
 	size_t size = sizeof(uint32_t) * fb->xres * fb->yres;
+	if ( state->wallpaper_size != size )
+	{
+		if ( !(state->wallpaper.buffer =
+		       realloc(state->wallpaper.buffer, size)) )
+		{
+			warn("malloc");
+			return false;
+		}
+		state->wallpaper.xres = state->mode.view_xres;
+		state->wallpaper.yres = state->mode.view_yres;
+		state->wallpaper.pitch = state->mode.view_xres;
+		state->wallpaper_size = size;
+		wallpaper(state->wallpaper);
+	}
 	fb->buffer = (uint32_t*) glogin_malloc_fb_buffer(state, size);
 	if ( !fb->buffer )
 	{
