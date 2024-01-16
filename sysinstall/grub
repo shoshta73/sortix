@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2023 Jonas 'Sortie' Termansen.
+# Copyright (c) 2023, 2024 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,14 @@
 # from the grub port.
 
 set -e
+
+# If the new system root doesn't contain the grub port, use the old 10_sortix
+# script instead since we're not upgrading to a new version of the bootloader.
+if [ ! -e /sysmerge/etc/default/grub.d/10_sortix -a \
+     -e /etc/default/grub.d/10_sortix ]; then
+  mkdir -p /sysmerge/etc/default/grub.d
+  cp /etc/default/grub.d/10_sortix /sysmerge/etc/default/grub.d/10_sortix
+fi
 
 # The old system has copied the new kernel and initrd files from /sysmerge/boot
 # to /boot/sysmerge and we need to configure grub to boot them.
