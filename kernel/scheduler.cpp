@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * scheduler.cpp
- * Decides the order to execute threads in and switches between them.
+ * Decides the order to execute threads in and switching between them.
  */
 
 #include <sys/types.h>
@@ -266,7 +266,6 @@ static void SwitchRegisters(struct interrupt_context* intctx,
 
 static Thread* idle_thread;
 static Thread* first_runnable_thread;
-static Thread* first_preempted_thread;
 static Thread* true_current_thread;
 
 static void SwitchThread(struct interrupt_context* intctx,
@@ -322,23 +321,15 @@ static Thread* PopNextThread(bool yielded)
 			return result;
 	}
 
-	// Switch to the next runnable thread that hasn't been preempted.
 	if ( first_runnable_thread )
 	{
 		result = first_runnable_thread;
 		first_runnable_thread = first_runnable_thread->scheduler_list_next;
 	}
-	// If all threads have been preempted, allow them all to run again.
-	else if ( first_preempted_thread )
-	{
-		first_runnable_thread = first_preempted_thread;
-		first_preempted_thread = NULL;
-		result = first_runnable_thread;
-		first_runnable_thread = first_runnable_thread->scheduler_list_next;
-	}
-	// Otherwise there is nothing to run.
 	else
+	{
 		result = idle_thread;
+	}
 
 	return result;
 }
@@ -366,37 +357,6 @@ static void RealSwitch(struct interrupt_context* intctx, bool yielded)
 
 void Switch(struct interrupt_context* intctx)
 {
-	Thread* thread = CurrentThread();
-	if ( thread->state == ThreadState::RUNNABLE )
-	{
-		// Remove the thread from the list of runnable threads.
-		if ( thread == first_runnable_thread )
-		{
-			first_runnable_thread = thread->scheduler_list_next;
-			if ( thread == first_runnable_thread )
-				first_runnable_thread = NULL;
-		}
-		else if ( thread == first_preempted_thread )
-		{
-			first_preempted_thread = thread->scheduler_list_next;
-			if ( thread == first_preempted_thread )
-				first_preempted_thread = NULL;
-		}
-		assert(thread->scheduler_list_prev);
-		assert(thread->scheduler_list_next);
-		thread->scheduler_list_prev->scheduler_list_next = thread->scheduler_list_next;
-		thread->scheduler_list_next->scheduler_list_prev = thread->scheduler_list_prev;
-		thread->scheduler_list_prev = NULL;
-		thread->scheduler_list_next = NULL;
-
-		// Insert the thread into the list of preempted threads.
-		if ( first_preempted_thread == NULL )
-			first_preempted_thread = thread;
-		thread->scheduler_list_prev = first_preempted_thread->scheduler_list_prev;
-		thread->scheduler_list_next = first_preempted_thread;
-		first_preempted_thread->scheduler_list_prev = thread;
-		thread->scheduler_list_prev->scheduler_list_next = thread;
-	}
 	RealSwitch(intctx, false);
 }
 
@@ -465,17 +425,9 @@ void SetThreadState(Thread* thread, ThreadState state, bool wake_only)
 	     state != ThreadState::RUNNABLE )
 	{
 		if ( thread == first_runnable_thread )
-		{
 			first_runnable_thread = thread->scheduler_list_next;
-			if ( thread == first_runnable_thread )
-				first_runnable_thread = NULL;
-		}
-		else if ( thread == first_preempted_thread )
-		{
-			first_preempted_thread = thread->scheduler_list_next;
-			if ( thread == first_preempted_thread )
-				first_preempted_thread = NULL;
-		}
+		if ( thread == first_runnable_thread )
+			first_runnable_thread = NULL;
 		assert(thread->scheduler_list_prev);
 		assert(thread->scheduler_list_next);
 		thread->scheduler_list_prev->scheduler_list_next = thread->scheduler_list_next;
