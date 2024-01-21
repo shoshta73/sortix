@@ -26,7 +26,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  			unix_dg_tmp_socket = unix_dg_tmp_socket_buf;
  		}
  	}
-@@ -1385,7 +1392,8 @@
+@@ -1391,7 +1398,8 @@
  	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
  	memset(&iov, 0, sizeof(iov));
  
@@ -36,7 +36,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	mh.msg_controllen = sizeof(cmsgbuf.buf);
  	cmsg = CMSG_FIRSTHDR(&mh);
  	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-@@ -1422,6 +1430,7 @@
+@@ -1428,6 +1436,7 @@
  void
  atelnet(int nfd, unsigned char *buf, unsigned int size)
  {
@@ -44,7 +44,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	unsigned char *p, *end;
  	unsigned char obuf[4];
  
-@@ -1447,6 +1456,9 @@
+@@ -1453,6 +1462,9 @@
  		if (atomicio(vwrite, nfd, obuf, 3) != 3)
  			warn("Write Error!");
  	}
@@ -54,7 +54,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  }
  
  int
-@@ -1590,16 +1602,20 @@
+@@ -1596,16 +1608,20 @@
  			err(1, NULL);
  	}
  	if (Tflag != -1) {
@@ -77,7 +77,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  			errno = ENOPROTOOPT;
  			err(1, "set IPv6 traffic class not supported");
  		}
-@@ -1617,13 +1633,16 @@
+@@ -1623,13 +1639,16 @@
  	}
  
  	if (ttl != -1) {
@@ -96,7 +96,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	}
  
  	if (minttl != -1) {
-@@ -1661,7 +1680,9 @@
+@@ -1667,7 +1686,9 @@
  		{ "af41",		IPTOS_DSCP_AF41 },
  		{ "af42",		IPTOS_DSCP_AF42 },
  		{ "af43",		IPTOS_DSCP_AF43 },
@@ -106,7 +106,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  		{ "cs0",		IPTOS_DSCP_CS0 },
  		{ "cs1",		IPTOS_DSCP_CS1 },
  		{ "cs2",		IPTOS_DSCP_CS2 },
-@@ -1671,11 +1692,21 @@
+@@ -1677,11 +1698,21 @@
  		{ "cs6",		IPTOS_DSCP_CS6 },
  		{ "cs7",		IPTOS_DSCP_CS7 },
  		{ "ef",			IPTOS_DSCP_EF },
@@ -217,7 +217,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/openssl/s_socket.c libssl/ap
 diff -Paur --no-dereference -- libssl.upstream/configure libssl/configure
 --- libssl.upstream/configure
 +++ libssl/configure
-@@ -11779,6 +11779,10 @@
+@@ -12178,6 +12178,10 @@
  		HOST_OS=midipix
  		CPPFLAGS="$CPPFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
  		;;
@@ -228,6 +228,19 @@ diff -Paur --no-dereference -- libssl.upstream/configure libssl/configure
  	*netbsd*)
  		HOST_OS=netbsd
  		HOST_ABI=elf
+diff -Paur --no-dereference -- libssl.upstream/crypto/Makefile.in libssl/crypto/Makefile.in
+--- libssl.upstream/crypto/Makefile.in
++++ libssl/crypto/Makefile.in
+@@ -1640,7 +1640,8 @@
+ CC = @CC@
+ CCAS = @CCAS@
+ CCASDEPMODE = @CCASDEPMODE@
+-CCASFLAGS = @CCASFLAGS@
++# TODO: sortix-binutils-1.1-rc3 is too old for endbr64.
++CCASFLAGS = @CCASFLAGS@ -Dendbr64=
+ CCDEPMODE = @CCDEPMODE@
+ CFLAGS = @CFLAGS@
+ CPPFLAGS = @CPPFLAGS@
 diff -Paur --no-dereference -- libssl.upstream/crypto/bio/b_sock.c libssl/crypto/bio/b_sock.c
 --- libssl.upstream/crypto/bio/b_sock.c
 +++ libssl/crypto/bio/b_sock.c
@@ -307,8 +320,8 @@ diff -Paur --no-dereference -- libssl.upstream/include/compat/sys/types.h libssl
 diff -Paur --no-dereference -- libssl.upstream/include/compat/unistd.h libssl/include/compat/unistd.h
 --- libssl.upstream/include/compat/unistd.h
 +++ libssl/include/compat/unistd.h
-@@ -64,9 +64,10 @@
- #endif
+@@ -69,9 +69,10 @@
+ #include "getopt.h"
  #endif
  
 -#ifndef HAVE_GETPAGESIZE
@@ -324,7 +337,7 @@ diff -Paur --no-dereference -- libssl.upstream/include/compat/unistd.h libssl/in
 diff -Paur --no-dereference -- libssl.upstream/tls/tls_config.c libssl/tls/tls_config.c
 --- libssl.upstream/tls/tls_config.c
 +++ libssl/tls/tls_config.c
-@@ -721,8 +721,11 @@
+@@ -722,8 +722,11 @@
  	}
  
  	if (sb.st_uid != getuid()) {
