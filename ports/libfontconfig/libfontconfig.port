@@ -1,10 +1,10 @@
 NAME=libfontconfig
 BUILD_LIBRARIES='libiconv libexpat libfreetype libintl? libjson-c?'
-VERSION=2.14.0
+VERSION=2.15.0
 DISTNAME=fontconfig-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=dcbeb84c9c74bbfdb133d535fe1c7bedc9f2221a8daf3914b984c44c520e9bac
+SHA256SUM=63a0658d0e06e0fa886106452b58ef04f21f58202ea02a94c39de0d3335d7c0e
 UPSTREAM_SITE=https://www.freedesktop.org/software/fontconfig/release
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=HPND-sell-variant

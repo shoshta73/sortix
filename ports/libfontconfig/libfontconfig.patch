@@ -1,7 +1,19 @@
+diff -Paur --no-dereference -- libfontconfig.upstream/Makefile.in libfontconfig/Makefile.in
+--- libfontconfig.upstream/Makefile.in
++++ libfontconfig/Makefile.in
+@@ -511,6 +511,8 @@
+ @ENABLE_CACHE_BUILD_TRUE@RUN_FC_CACHE_TEST = test -z "$(DESTDIR)"
+ FC_CONFIGDIR = $(subst $(BASECONFIGDIR)/,,$(CONFIGDIR))
+ DISTCHECK_CONFIGURE_FLAGS = 
++BASECONFIGDIR_ADMIN := $(BASECONFIGDIR)
++BASECONFIGDIR := $(BASECONFIGDIR:/fonts=/default/fonts)
+ all: config.h
+ 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
+ 
 diff -Paur --no-dereference -- libfontconfig.upstream/conf.d/Makefile.in libfontconfig/conf.d/Makefile.in
 --- libfontconfig.upstream/conf.d/Makefile.in
 +++ libfontconfig/conf.d/Makefile.in
-@@ -451,6 +451,8 @@
+@@ -458,6 +458,8 @@
  	80-delicious.conf		\
  	90-synthetic.conf
  
@@ -13,7 +25,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/conf.d/Makefile.in libfont
 diff -Paur --no-dereference -- libfontconfig.upstream/configure libfontconfig/configure
 --- libfontconfig.upstream/configure
 +++ libfontconfig/configure
-@@ -15154,7 +15154,8 @@
+@@ -15296,7 +15296,8 @@
  
  
  
@@ -23,7 +35,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/configure libfontconfig/co
  
    acl_save_prefix="$prefix"
    prefix="$acl_final_prefix"
-@@ -16065,7 +16066,7 @@
+@@ -16207,7 +16208,7 @@
  
  
  
@@ -42,17 +54,60 @@ diff -Paur --no-dereference -- libfontconfig.upstream/fontconfig.pc.in libfontco
 -Libs.private: @ICONV_LIBS@ @PKG_EXPAT_LIBS@
 +Libs.private: @LTLIBINTL@ @ICONV_LIBS@ @PKG_EXPAT_LIBS@
  Cflags: -I${includedir} @ICONV_CFLAGS@ @PKG_EXPAT_CFLAGS@
-diff -Paur --no-dereference -- libfontconfig.upstream/Makefile.in libfontconfig/Makefile.in
---- libfontconfig.upstream/Makefile.in
-+++ libfontconfig/Makefile.in
-@@ -509,6 +509,8 @@
- @ENABLE_CACHE_BUILD_TRUE@RUN_FC_CACHE_TEST = test -z "$(DESTDIR)"
- FC_CONFIGDIR = $(subst $(BASECONFIGDIR)/,,$(CONFIGDIR))
- DISTCHECK_CONFIGURE_FLAGS = 
+diff -Paur --no-dereference -- libfontconfig.upstream/src/Makefile.in libfontconfig/src/Makefile.in
+--- libfontconfig.upstream/src/Makefile.in
++++ libfontconfig/src/Makefile.in
+@@ -465,6 +465,10 @@
+ @OS_WIN32_FALSE@fontconfig_def_dependency = 
+ @OS_WIN32_TRUE@fontconfig_def_dependency = fontconfig.def
+ 
++# PATCH: Install fallback default configuration in /etc/default.
 +BASECONFIGDIR_ADMIN := $(BASECONFIGDIR)
 +BASECONFIGDIR := $(BASECONFIGDIR:/fonts=/default/fonts)
- all: config.h
- 	$(MAKE) $(AM_MAKEFLAGS) all-recursive
++
+ # Microsoft import library install/uninstall
+ @MS_LIB_AVAILABLE_TRUE@noinst_DATA = fontconfig.lib
+ AM_CPPFLAGS = \
+@@ -477,7 +481,7 @@
+ 	$(WARN_CFLAGS)					\
+ 	-DFC_CACHEDIR='"$(FC_CACHEDIR)"'                \
+ 	-DCONFIGDIR='"$(CONFIGDIR)"'			\
+-	-DFONTCONFIG_PATH='"$(BASECONFIGDIR)"'		\
++	-DFONTCONFIG_PATH='"$(BASECONFIGDIR_ADMIN):$(BASECONFIGDIR)"'		\
+ 	-DFC_TEMPLATEDIR='"$(TEMPLATEDIR)"'
+ 
+ LDADD = $(LIBINTL)
+@@ -487,7 +491,7 @@
+ 	../fc-case/fccase.h \
+ 	../fc-lang/fclang.h \
+ 	stamp-fcstdint \
+-	$(builddir)/fcobjshash.h \
++	fcobjshash.h \
+ 	fcobjshash.gperf
+ 
+ libfontconfig_la_SOURCES = \
+@@ -543,7 +547,6 @@
+ CLEANFILES = \
+ 	$(ALIAS_FILES)	\
+ 	fontconfig.def	\
+-	$(builddir)/fcobjshash.h
+ 
+ DISTCLEANFILES = \
+ 	stamp-fcstdint	\
+@@ -1028,9 +1031,11 @@
+ 	' - > $@.tmp && \
+ 	mv -f $@.tmp fcobjshash.gperf && touch $@ || ( $(RM) $@.tmp && false )
+ 
+-$(builddir)/fcobjshash.h: Makefile fcobjshash.gperf
+-	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
+-	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
++# PATCH: Sortix doesn't have gperf at the moment, so this file has been prebuilt
++#        on another operating system.
++#fcobjshash.h: Makefile fcobjshash.gperf
++#	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
++#	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
+ 
+ @ENABLE_SHARED_TRUE@install-data-local: install-ms-import-lib install-libtool-import-lib
  
 diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfig/src/fccache.c
 --- libfontconfig.upstream/src/fccache.c
@@ -104,7 +159,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
  	{
  	    fprintf (stderr, "Unable to revert mtime: %s\n", d);
  	}
-@@ -1642,7 +1645,11 @@
+@@ -1639,7 +1642,11 @@
  #if defined(_WIN32)
  	    if (_locking (fd, _LK_LOCK, 1) == -1)
  		goto bail;
@@ -117,7 +172,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
  	    struct flock fl;
  
  	    fl.l_type = F_WRLCK;
-@@ -1652,17 +1659,21 @@
+@@ -1649,17 +1656,21 @@
  	    fl.l_pid = getpid ();
  	    if (fcntl (fd, F_SETLKW, &fl) == -1)
  		goto bail;
@@ -139,7 +194,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
  }
  
  void
-@@ -1672,7 +1683,10 @@
+@@ -1669,7 +1680,10 @@
      {
  #if defined(_WIN32)
  	_locking (fd, _LK_UNLCK, 1);
@@ -154,7 +209,7 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccache.c libfontconfi
 diff -Paur --no-dereference -- libfontconfig.upstream/src/fccompat.c libfontconfig/src/fccompat.c
 --- libfontconfig.upstream/src/fccompat.c
 +++ libfontconfig/src/fccompat.c
-@@ -182,69 +182,8 @@
+@@ -182,70 +182,8 @@
  int32_t
  FcRandom(void)
  {
@@ -204,8 +259,9 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fccompat.c libfontconf
 -#elif HAVE_LRAND48
 -    result = lrand48 ();
 -#elif HAVE_RAND_R
--    static unsigned int seed = time (NULL);
+-    static unsigned int seed;
 -
+-    seed = time (NULL);
 -    result = rand_r (&seed);
 -#elif HAVE_RAND
 -    static FcBool initialized = FcFalse;
@@ -511,58 +567,3 @@ diff -Paur --no-dereference -- libfontconfig.upstream/src/fcobjshash.h libfontco
 +    }
 +  return 0;
 +}
-diff -Paur --no-dereference -- libfontconfig.upstream/src/Makefile.in libfontconfig/src/Makefile.in
---- libfontconfig.upstream/src/Makefile.in
-+++ libfontconfig/src/Makefile.in
-@@ -463,6 +463,10 @@
- @OS_WIN32_FALSE@fontconfig_def_dependency = 
- @OS_WIN32_TRUE@fontconfig_def_dependency = fontconfig.def
- 
-+# PATCH: Install fallback default configuration in /etc/default.
-+BASECONFIGDIR_ADMIN := $(BASECONFIGDIR)
-+BASECONFIGDIR := $(BASECONFIGDIR:/fonts=/default/fonts)
-+
- # Microsoft import library install/uninstall
- @MS_LIB_AVAILABLE_TRUE@noinst_DATA = fontconfig.lib
- AM_CPPFLAGS = \
-@@ -475,7 +479,7 @@
- 	$(WARN_CFLAGS)					\
- 	-DFC_CACHEDIR='"$(FC_CACHEDIR)"'                \
- 	-DCONFIGDIR='"$(CONFIGDIR)"'			\
--	-DFONTCONFIG_PATH='"$(BASECONFIGDIR)"'		\
-+	-DFONTCONFIG_PATH='"$(BASECONFIGDIR_ADMIN):$(BASECONFIGDIR)"'		\
- 	-DFC_TEMPLATEDIR='"$(TEMPLATEDIR)"'
- 
- LDADD = $(LIBINTL)
-@@ -485,7 +489,7 @@
- 	../fc-case/fccase.h \
- 	../fc-lang/fclang.h \
- 	stamp-fcstdint \
--	$(builddir)/fcobjshash.h \
-+	fcobjshash.h \
- 	fcobjshash.gperf
- 
- libfontconfig_la_SOURCES = \
-@@ -541,7 +545,6 @@
- CLEANFILES = \
- 	$(ALIAS_FILES)	\
- 	fontconfig.def	\
--	$(builddir)/fcobjshash.h
- 
- DISTCLEANFILES = \
- 	stamp-fcstdint	\
-@@ -1026,9 +1029,11 @@
- 	' - > $@.tmp && \
- 	mv -f $@.tmp fcobjshash.gperf && touch $@ || ( $(RM) $@.tmp && false )
- 
--$(builddir)/fcobjshash.h: Makefile fcobjshash.gperf
--	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
--	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
-+# PATCH: Sortix doesn't have gperf at the moment, so this file has been prebuilt
-+#        on another operating system.
-+#fcobjshash.h: Makefile fcobjshash.gperf
-+#	$(AM_V_GEN) $(GPERF) --pic -m 100 fcobjshash.gperf > $@.tmp && \
-+#	mv -f $@.tmp $@ || ( $(RM) $@.tmp && false )
- 
- @ENABLE_SHARED_TRUE@install-data-local: install-ms-import-lib install-libtool-import-lib
- 
