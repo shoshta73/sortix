@@ -1,10 +1,10 @@
 NAME=libcurl
 BUILD_LIBRARIES='libssl libidn? libz? libbrotli? libssh2? librtmp? libmetalink? libpsl? libzstd?'
-VERSION=7.84.0
+VERSION=8.5.0
 DISTNAME=curl-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=2d118b43f547bfe5bae806d8d47b4e596ea5b25a6c1f080aef49fbcd817c5db8
+SHA256SUM=42ab8db9e20d8290a3b633e7fbb3cec15db34df65fd1015ef8ac1e4723750eeb
 UPSTREAM_SITE=https://curl.se/download
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure

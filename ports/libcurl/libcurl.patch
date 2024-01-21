@@ -1,7 +1,32 @@
+diff -Paur --no-dereference -- libcurl.upstream/Makefile.in libcurl/Makefile.in
+--- libcurl.upstream/Makefile.in
++++ libcurl/Makefile.in
+@@ -659,7 +659,7 @@
+  $(VC14_SRCVCXPROJ) $(VC14_10_LIBVCXPROJ) $(VC14_10_SRCVCXPROJ)              \
+  $(VC14_30_LIBVCXPROJ) $(VC14_30_SRCVCXPROJ)
+ 
+-bin_SCRIPTS = curl-config
++bin_SCRIPTS =
+ SUBDIRS = lib src
+ DIST_SUBDIRS = $(SUBDIRS) tests packages scripts include docs
+ pkgconfigdir = $(libdir)/pkgconfig
+@@ -1593,6 +1593,12 @@
+ distclean: distclean-recursive
+ 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
+ 	-rm -f Makefile
++	-rm -f docs/cmdline-opts/Makefile
++	-rm -rf docs/examples/.deps
++	-rm -f docs/examples/Makefile
++	-rm -f docs/libcurl/Makefile
++	-rm -f docs/libcurl/opts/Makefile
++	-rm -f docs/Makefile
+ distclean-am: clean-am distclean-generic distclean-libtool \
+ 	distclean-tags
+ 
 diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 --- libcurl.upstream/configure
 +++ libcurl/configure
-@@ -22313,9 +22313,7 @@
+@@ -23303,9 +23303,7 @@
  
  fi
  
@@ -12,7 +37,7 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
  
  
  curl_includes_winsock2="\
-@@ -37552,11 +37550,8 @@
+@@ -37520,11 +37518,8 @@
  
  int main (void)
  {
@@ -25,121 +50,10 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
  }
  
  
-@@ -49364,107 +49359,9 @@
- 
- 
- 
--## ---------------------------------- ##
--##  Start of distclean amending code  ##
--## ---------------------------------- ##
--
--for xc_subdir in lib src tests/unit tests/server tests/libtest docs/examples
--do
--
--if test ! -f "$xc_subdir/Makefile"; then
--  echo "$xc_msg_err $xc_subdir/Makefile file not found. $xc_msg_abrt" >&2
--  exit 1
--fi
--
--# Fetch dependency tracking file list from Makefile include lines.
--
--xc_inc_lines=`grep '^include .*(DEPDIR)' "$xc_subdir/Makefile" 2>/dev/null`
--xc_cnt_words=`echo "$xc_inc_lines" | wc -w | tr -d "$xc_space$xc_tab"`
--
--# --disable-dependency-tracking might have been used, consequently
--# there is nothing to amend without a dependency tracking file list.
--
--if test $xc_cnt_words -gt 0; then
--
--{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: amending $xc_subdir/Makefile" >&5
--printf "%s\n" "$as_me: amending $xc_subdir/Makefile" >&6;}
--
--# Build Makefile specific patch hunk.
--
--xc_p="$xc_subdir/xc_patch.tmp"
--
--xc_rm_depfiles=`echo "$xc_inc_lines" \
--  | $SED 's%include%	-rm -f%' 2>/dev/null`
--
--xc_dep_subdirs=`echo "$xc_inc_lines" \
--  | $SED 's%include[ ][ ]*%%' 2>/dev/null \
--  | $SED 's%(DEPDIR)/.*%(DEPDIR)%' 2>/dev/null \
--  | sort | uniq`
--
--echo "$xc_rm_depfiles" >$xc_p
--
--for xc_dep_dir in $xc_dep_subdirs; do
--  echo "${xc_tab}@xm_dep_cnt=\`ls $xc_dep_dir | wc -l 2>/dev/null\`; \\"            >>$xc_p
--  echo "${xc_tab}if test \$\$xm_dep_cnt -eq 0 && test -d $xc_dep_dir; then \\"      >>$xc_p
--  echo "${xc_tab}  rm -rf $xc_dep_dir; \\"                                          >>$xc_p
--  echo "${xc_tab}fi"                                                                >>$xc_p
--done
--
--# Build Makefile patching sed scripts.
--
--xc_s1="$xc_subdir/xc_script_1.tmp"
--xc_s2="$xc_subdir/xc_script_2.tmp"
--xc_s3="$xc_subdir/xc_script_3.tmp"
--
--cat >$xc_s1 <<\_EOT
--/^distclean[ ]*:/,/^[^	][^	]*:/{
--  s/^.*(DEPDIR)/___xc_depdir_line___/
--}
--/^maintainer-clean[ ]*:/,/^[^	][^	]*:/{
--  s/^.*(DEPDIR)/___xc_depdir_line___/
--}
--_EOT
--
--cat >$xc_s2 <<\_EOT
--/___xc_depdir_line___$/{
--  N
--  /___xc_depdir_line___$/D
--}
--_EOT
--
--cat >$xc_s3 <<_EOT
--/^___xc_depdir_line___/{
--  r $xc_p
--  d
--}
--_EOT
--
--# Apply patch to Makefile and cleanup.
--
--$SED -f "$xc_s1" "$xc_subdir/Makefile"      >"$xc_subdir/Makefile.tmp1"
--$SED -f "$xc_s2" "$xc_subdir/Makefile.tmp1" >"$xc_subdir/Makefile.tmp2"
--$SED -f "$xc_s3" "$xc_subdir/Makefile.tmp2" >"$xc_subdir/Makefile.tmp3"
--
--if test -f "$xc_subdir/Makefile.tmp3"; then
--  mv -f "$xc_subdir/Makefile.tmp3" "$xc_subdir/Makefile"
--fi
--
--test -f "$xc_subdir/Makefile.tmp1" && rm -f "$xc_subdir/Makefile.tmp1"
--test -f "$xc_subdir/Makefile.tmp2" && rm -f "$xc_subdir/Makefile.tmp2"
--test -f "$xc_subdir/Makefile.tmp3" && rm -f "$xc_subdir/Makefile.tmp3"
--
--test -f "$xc_p"  && rm -f "$xc_p"
--test -f "$xc_s1" && rm -f "$xc_s1"
--test -f "$xc_s2" && rm -f "$xc_s2"
--test -f "$xc_s3" && rm -f "$xc_s3"
--
--fi
--
--done
--
--## -------------------------------- ##
--##  End of distclean amending code  ##
--## -------------------------------- ##
-+# PATCH: Removed cursed distclean patching logic that somehow produces distclean
-+#        targets for me with hundreds of thousands of duplicate rm -f commands.
-+#        The build seems to work fine without it.
- 
- 
- 
 diff -Paur --no-dereference -- libcurl.upstream/docs/Makefile.in libcurl/docs/Makefile.in
 --- libcurl.upstream/docs/Makefile.in
 +++ libcurl/docs/Makefile.in
-@@ -479,10 +479,10 @@
+@@ -484,10 +484,10 @@
  # but distribute it (using the relative file name) in the next variable
  man_MANS = $(abs_builddir)/curl.1
  noinst_man_MANS = curl.1 mk-ca-bundle.1
@@ -157,7 +71,7 @@ diff -Paur --no-dereference -- libcurl.upstream/docs/Makefile.in libcurl/docs/Ma
 diff -Paur --no-dereference -- libcurl.upstream/include/curl/curl.h libcurl/include/curl/curl.h
 --- libcurl.upstream/include/curl/curl.h
 +++ libcurl/include/curl/curl.h
-@@ -67,17 +67,7 @@
+@@ -75,18 +75,7 @@
  #endif
  #endif
  
@@ -165,15 +79,16 @@ diff -Paur --no-dereference -- libcurl.upstream/include/curl/curl.h libcurl/incl
 -   libc5-based Linux systems. Only include it on systems that are known to
 -   require it! */
 -#if defined(_AIX) || defined(__NOVELL_LIBC__) || defined(__NetBSD__) || \
--    defined(__minix) || defined(__SYMBIAN32__) || defined(__INTEGRITY) || \
+-    defined(__minix) || defined(__INTEGRITY) || \
 -    defined(ANDROID) || defined(__ANDROID__) || defined(__OpenBSD__) || \
 -    defined(__CYGWIN__) || defined(AMIGA) || defined(__NuttX__) || \
 -   (defined(__FreeBSD_version) && (__FreeBSD_version < 800000)) || \
--   (defined(__MidnightBSD_version) && (__MidnightBSD_version < 100000))
+-   (defined(__MidnightBSD_version) && (__MidnightBSD_version < 100000)) || \
+-    defined(__sun__) || defined(__serenity__) || defined(__vxworks__)
  #include <sys/select.h>
 -#endif
  
- #if !defined(CURL_WIN32) && !defined(_WIN32_WCE)
+ #if !defined(_WIN32) && !defined(_WIN32_WCE)
  #include <sys/socket.h>
 diff -Paur --no-dereference -- libcurl.upstream/lib/curl_addrinfo.h libcurl/lib/curl_addrinfo.h
 --- libcurl.upstream/lib/curl_addrinfo.h
@@ -194,29 +109,4 @@ diff -Paur --no-dereference -- libcurl.upstream/lib/curl_addrinfo.h libcurl/lib/
 +#endif
  struct Curl_addrinfo *
  Curl_he2ai(const struct hostent *he, int port);
- 
-diff -Paur --no-dereference -- libcurl.upstream/Makefile.in libcurl/Makefile.in
---- libcurl.upstream/Makefile.in
-+++ libcurl/Makefile.in
-@@ -676,7 +676,7 @@
-  $(VC14_SRCVCXPROJ) $(VC14_10_LIBVCXPROJ) $(VC14_10_SRCVCXPROJ)              \
-  $(VC14_30_LIBVCXPROJ) $(VC14_30_SRCVCXPROJ)
- 
--bin_SCRIPTS = curl-config
-+bin_SCRIPTS =
- SUBDIRS = lib src
- DIST_SUBDIRS = $(SUBDIRS) tests packages scripts include docs
- pkgconfigdir = $(libdir)/pkgconfig
-@@ -1581,6 +1581,12 @@
- distclean: distclean-recursive
- 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
- 	-rm -f Makefile
-+	-rm -f docs/cmdline-opts/Makefile
-+	-rm -rf docs/examples/.deps
-+	-rm -f docs/examples/Makefile
-+	-rm -f docs/libcurl/Makefile
-+	-rm -f docs/libcurl/opts/Makefile
-+	-rm -f docs/Makefile
- distclean-am: clean-am distclean-generic distclean-libtool \
- 	distclean-tags
  
