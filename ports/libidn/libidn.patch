@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- libidn.upstream/Makefile.in libidn/Makefile.in
 --- libidn.upstream/Makefile.in
 +++ libidn/Makefile.in
-@@ -1955,6 +1955,8 @@
+@@ -2020,6 +2020,8 @@
  distclean: distclean-recursive
  	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
  	-rm -f Makefile
@@ -10,3 +10,14 @@ diff -Paur --no-dereference -- libidn.upstream/Makefile.in libidn/Makefile.in
  distclean-am: clean-am distclean-generic distclean-hdr \
  	distclean-libtool distclean-tags
  
+diff -Paur --no-dereference -- libidn.upstream/doc/Makefile.in libidn/doc/Makefile.in
+--- libidn.upstream/doc/Makefile.in
++++ libidn/doc/Makefile.in
+@@ -2211,6 +2211,7 @@
+ 
+ distclean: distclean-recursive
+ 	-rm -f Makefile
++	-rm -f libidn.info
+ distclean-am: clean-am distclean-generic distclean-tags
+ 
+ dvi: dvi-recursive

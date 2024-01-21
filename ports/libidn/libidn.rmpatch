@@ -1,4 +1,5 @@
 rm -rf -- 'contrib/doxygen/Doxyfile.orig'
+rm -rf -- 'doc/libidn.info'
 rm -rf -- 'doc/man'
 rm -rf -- 'doc/reference/html'
 rm -rf -- 'doc/reference/libidn-overrides.txt'
