@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- xz.upstream/configure xz/configure
 --- xz.upstream/configure
 +++ xz/configure
-@@ -16527,7 +16527,7 @@
+@@ -17845,7 +17845,7 @@
  
  
  
@@ -10,7 +10,7 @@ diff -Paur --no-dereference -- xz.upstream/configure xz/configure
  
    acl_save_prefix="$prefix"
    prefix="$acl_final_prefix"
-@@ -17470,7 +17470,7 @@
+@@ -18798,7 +18798,7 @@
  
  
  
@@ -19,7 +19,7 @@ diff -Paur --no-dereference -- xz.upstream/configure xz/configure
  
    acl_save_prefix="$prefix"
    prefix="$acl_final_prefix"
-@@ -19269,6 +19269,7 @@
+@@ -20750,6 +20750,7 @@
  
  #if defined(_WIN32) || defined(__CYGWIN__) || defined(__OS2__) \
  		|| defined(__DJGPP__) || defined(__VMS) \
@@ -42,7 +42,7 @@ diff -Paur --no-dereference -- xz.upstream/src/common/tuklib_physmem.c xz/src/co
  #endif
  
  
-@@ -210,6 +215,10 @@
+@@ -228,6 +233,10 @@
  	struct sysinfo si;
  	if (sysinfo(&si) == 0)
  		ret = (uint64_t)si.totalram * si.mem_unit;

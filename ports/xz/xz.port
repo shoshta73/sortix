@@ -1,12 +1,13 @@
 NAME=xz
 BUILD_LIBRARIES='liblzma libiconv? libintl?'
-VERSION=5.2.5
+VERSION=5.4.5
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=3e1e518ffc912f86608a8cb35e4bd41ad1aec210df2a47aaa1f95e7f5576ef56
+SHA256SUM=da9dec6c12cf2ecf269c31ab65b5de18e8e52b96f35d5bcd08c12b43e6878803
 UPSTREAM_SITE=https://tukaani.org/xz
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
+LICENSE=GPL-2.0-or-later
 CONFIGURE_ARGS='--disable-lzmadec --disable-lzmainfo --disable-lzma-links'
 POST_INSTALL=../xz.post-install
