@@ -1,4 +1,0 @@
-rm -rf -- 'COPYING'
-rm -rf -- 'include/libxml/xmlversion.h'
-rm -rf -- 'libxml2.spec'
-rm -rf -- 'python/setup.py'

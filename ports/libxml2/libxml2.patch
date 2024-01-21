@@ -1,104 +1,16 @@
-diff -Paur --no-dereference -- libxml2.upstream/dict.c libxml2/dict.c
---- libxml2.upstream/dict.c
-+++ libxml2/dict.c
-@@ -139,15 +139,6 @@
-  */
- static int xmlDictInitialized = 0;
- 
--#ifdef DICT_RANDOMIZATION
--#ifdef HAVE_RAND_R
--/*
-- * Internal data for random function, protected by xmlDictMutex
-- */
--static unsigned int rand_seed = 0;
--#endif
--#endif
--
- /**
-  * xmlInitializeDict:
-  *
-@@ -181,14 +172,6 @@
-         return(0);
-     xmlRMutexLock(xmlDictMutex);
- 
--#ifdef DICT_RANDOMIZATION
--#ifdef HAVE_RAND_R
--    rand_seed = time(NULL);
--    rand_r(& rand_seed);
--#else
--    srand(time(NULL));
--#endif
--#endif
-     xmlDictInitialized = 1;
-     xmlRMutexUnlock(xmlDictMutex);
-     return(1);
-@@ -196,19 +179,7 @@
- 
- #ifdef DICT_RANDOMIZATION
- int __xmlRandom(void) {
--    int ret;
--
--    if (xmlDictInitialized == 0)
--        __xmlInitializeDict();
--
--    xmlRMutexLock(xmlDictMutex);
--#ifdef HAVE_RAND_R
--    ret = rand_r(& rand_seed);
--#else
--    ret = rand();
--#endif
--    xmlRMutexUnlock(xmlDictMutex);
--    return(ret);
-+    return(arc4random_uniform(INT_MAX));
- }
- #endif
- 
 diff -Paur --no-dereference -- libxml2.upstream/Makefile.in libxml2/Makefile.in
 --- libxml2.upstream/Makefile.in
 +++ libxml2/Makefile.in
-@@ -444,7 +444,7 @@
- am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/config.h.in \
- 	$(srcdir)/libxml-2.0-uninstalled.pc.in \
- 	$(srcdir)/libxml-2.0.pc.in $(srcdir)/libxml.spec.in \
--	$(srcdir)/libxml2-config.cmake.in $(srcdir)/xml2-config.in \
-+	$(srcdir)/libxml2-config.cmake.in \
- 	COPYING NEWS TODO compile config.guess config.sub depcomp \
- 	install-sh ltmain.sh missing
- DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-@@ -728,7 +728,7 @@
+@@ -688,7 +688,7 @@
+ SUBDIRS = include . doc example xstc $(am__append_1) $(am__append_2)
  DIST_SUBDIRS = include . doc example fuzz python xstc
- AM_CPPFLAGS = -I$(top_builddir)/include -I$(srcdir)/include
- AM_CFLAGS = $(EXTRA_CFLAGS) $(THREAD_CFLAGS) $(Z_CFLAGS) $(LZMA_CFLAGS)
+ AM_CPPFLAGS = -I$(top_builddir)/include -I$(srcdir)/include -DSYSCONFDIR='"$(sysconfdir)"'
 -bin_SCRIPTS = xml2-config
 +bin_SCRIPTS =
  lib_LTLIBRARIES = libxml2.la
- libxml2_la_LIBADD = $(ICU_LIBS) $(THREAD_LIBS) $(Z_LIBS) $(LZMA_LIBS) $(ICONV_LIBS) $(M_LIBS) $(WIN32_EXTRA_LIBADD)
- @USE_VERSION_SCRIPT_FALSE@LIBXML2_VERSION_SCRIPT = 
-@@ -756,7 +756,7 @@
- 
- DEPS = $(top_builddir)/libxml2.la
- LDADDS = $(STATIC_BINARIES) $(top_builddir)/libxml2.la $(THREAD_LIBS) $(Z_LIBS) $(LZMA_LIBS) $(ICONV_LIBS) $(M_LIBS) $(WIN32_EXTRA_LIBADD)
--man_MANS = xml2-config.1 libxml.3
-+man_MANS = libxml.3
- m4datadir = $(datadir)/aclocal
- m4data_DATA = libxml.m4
- runtest_SOURCES = runtest.c
-@@ -851,11 +851,11 @@
- runxmlconf_LDFLAGS = 
- runxmlconf_DEPENDENCIES = $(DEPS)
- runxmlconf_LDADD = $(LDADDS)
--CLEANFILES = runxmlconf.log test.out xml2Conf.sh *.gcda *.gcno *.res
-+CLEANFILES = runxmlconf.log test.out *.gcda *.gcno *.res
- DISTCLEANFILES = COPYING missing.lst
- confexecdir = $(libdir)
--confexec_DATA = xml2Conf.sh
--EXTRA_DIST = xml2-config.in xml2Conf.sh.in libxml.spec.in libxml2.spec \
-+confexec_DATA =
-+EXTRA_DIST = libxml.spec.in libxml2.spec \
-              libxml.m4 Copyright check-xml-test-suite.py gentest.py \
- 	     check-relaxng-test-suite.py check-relaxng-test-suite2.py \
- 	     check-xsddata-test-suite.py check-xinclude-test-suite.py \
-@@ -947,8 +947,6 @@
+ libxml2_la_CFLAGS = $(AM_CFLAGS) $(XML_PRIVATE_CFLAGS)
+ libxml2_la_LIBADD = $(XML_PRIVATE_LIBS)
+@@ -852,8 +852,6 @@
  	cd $(top_builddir) && $(SHELL) ./config.status $@
  libxml2-config.cmake: $(top_builddir)/config.status $(srcdir)/libxml2-config.cmake.in
  	cd $(top_builddir) && $(SHELL) ./config.status $@
@@ -107,27 +19,105 @@ diff -Paur --no-dereference -- libxml2.upstream/Makefile.in libxml2/Makefile.in
  install-binPROGRAMS: $(bin_PROGRAMS)
  	@$(NORMAL_INSTALL)
  	@list='$(bin_PROGRAMS)'; test -n "$(bindir)" || list=; \
-@@ -3109,15 +3107,6 @@
- rpm: cleanup cleantar
- 	@(unset CDPATH ; $(MAKE) dist-source dist && rpmbuild -ta $(distdir).tar.gz)
+diff -Paur --no-dereference -- libxml2.upstream/dict.c libxml2/dict.c
+--- libxml2.upstream/dict.c
++++ libxml2/dict.c
+@@ -20,6 +20,7 @@
+ #include "libxml.h"
  
--xml2Conf.sh: xml2Conf.sh.in Makefile
--	sed -e 's?\@XML_LIBDIR\@?$(XML_LIBDIR)?g' \
--	    -e 's?\@XML_INCLUDEDIR\@?$(XML_INCLUDEDIR)?g' \
--	    -e 's?\@VERSION\@?$(VERSION)?g' \
--	    -e 's?\@XML_LIBS\@?$(XML_LIBS)?g' \
--	    -e 's?\@XML_PRIVATE_LIBS\@?$(XML_PRIVATE_LIBS)?g' \
--	       < $(srcdir)/xml2Conf.sh.in > xml2Conf.tmp \
--	&& mv xml2Conf.tmp xml2Conf.sh
+ #include <limits.h>
++#include <stdlib.h>
+ #include <string.h>
+ #include <time.h>
+ 
+@@ -904,69 +905,17 @@
+  * Pseudo-random generator
+  */
+ 
+-static xmlMutex xmlRngMutex;
 -
- install-data-local: 
- 	$(MKDIR_P) $(DESTDIR)$(docdir)
- 	-$(INSTALL) -m 0644 $(srcdir)/Copyright $(DESTDIR)$(docdir)
+-static unsigned globalRngState[2];
+-
+-#ifdef XML_THREAD_LOCAL
+-static XML_THREAD_LOCAL int localRngInitialized = 0;
+-static XML_THREAD_LOCAL unsigned localRngState[2];
+-#endif
+-
+ ATTRIBUTE_NO_SANITIZE_INTEGER
+ void
+ xmlInitRandom(void) {
+-    int var;
+-
+-    xmlInitMutex(&xmlRngMutex);
+-
+-    /* TODO: Get seed values from system PRNG */
+-
+-    globalRngState[0] = (unsigned) time(NULL) ^
+-                        HASH_ROL((unsigned) (size_t) &xmlInitRandom, 8);
+-    globalRngState[1] = HASH_ROL((unsigned) (size_t) &xmlRngMutex, 16) ^
+-                        HASH_ROL((unsigned) (size_t) &var, 24);
+ }
+ 
+ void
+ xmlCleanupRandom(void) {
+-    xmlCleanupMutex(&xmlRngMutex);
+-}
+-
+-ATTRIBUTE_NO_SANITIZE_INTEGER
+-static unsigned
+-xoroshiro64ss(unsigned *s) {
+-    unsigned s0 = s[0];
+-    unsigned s1 = s[1];
+-    unsigned result = HASH_ROL(s0 * 0x9E3779BB, 5) * 5;
+-
+-    s1 ^= s0;
+-    s[0] = HASH_ROL(s0, 26) ^ s1 ^ (s1 << 9);
+-    s[1] = HASH_ROL(s1, 13);
+-
+-    return(result & 0xFFFFFFFF);
+ }
+ 
+ unsigned
+ xmlRandom(void) {
+-#ifdef XML_THREAD_LOCAL
+-    if (!localRngInitialized) {
+-        xmlMutexLock(&xmlRngMutex);
+-        localRngState[0] = xoroshiro64ss(globalRngState);
+-        localRngState[1] = xoroshiro64ss(globalRngState);
+-        localRngInitialized = 1;
+-        xmlMutexUnlock(&xmlRngMutex);
+-    }
+-
+-    return(xoroshiro64ss(localRngState));
+-#else
+-    unsigned ret;
+-
+-    xmlMutexLock(&xmlRngMutex);
+-    ret = xoroshiro64ss(globalRngState);
+-    xmlMutexUnlock(&xmlRngMutex);
+-
+-    return(ret);
+-#endif
++    return(arc4random());
+ }
+ 
+diff -Paur --no-dereference -- libxml2.upstream/doc/Makefile.in libxml2/doc/Makefile.in
+--- libxml2.upstream/doc/Makefile.in
++++ libxml2/doc/Makefile.in
+@@ -476,7 +476,7 @@
+ 	xmlcatalog.html \
+ 	xmllint.html
+ 
+-dist_man_MANS = xml2-config.1 xmllint.1 xmlcatalog.1
++dist_man_MANS = xmllint.1 xmlcatalog.1
+ EXTRA_DIST = \
+ 	apibuild.py \
+ 	libxml2-api.xml \
 diff -Paur --no-dereference -- libxml2.upstream/nanoftp.c libxml2/nanoftp.c
 --- libxml2.upstream/nanoftp.c
 +++ libxml2/nanoftp.c
-@@ -60,6 +60,18 @@
- #include <strings.h>
+@@ -51,6 +51,18 @@
+ #include <sys/socket.h>
  #endif
  
 +#if defined(__sortix__)
@@ -145,15 +135,3 @@ diff -Paur --no-dereference -- libxml2.upstream/nanoftp.c libxml2/nanoftp.c
  #include <libxml/xmlmemory.h>
  #include <libxml/parser.h>
  #include <libxml/xmlerror.h>
-diff -Paur --no-dereference -- libxml2.upstream/nanohttp.c libxml2/nanohttp.c
---- libxml2.upstream/nanohttp.c
-+++ libxml2/nanohttp.c
-@@ -1124,7 +1124,7 @@
- #if defined(HAVE_GETADDRINFO) && defined(SUPPORT_IP6) && !defined(_WIN32)
-     else
- #endif
--#if !defined(HAVE_GETADDRINFO) || !defined(_WIN32)
-+#if !defined(HAVE_GETADDRINFO) || (!defined(_WIN32) && !defined(__sortix__))
-     {
-         struct hostent *h;
-         struct in_addr ia;
