@@ -1,7 +1,28 @@
+diff -Paur --no-dereference -- libdbus.upstream/bus/Makefile.in libdbus/bus/Makefile.in
+--- libdbus.upstream/bus/Makefile.in
++++ libdbus/bus/Makefile.in
+@@ -604,7 +604,8 @@
+ 	sysusers.d/meson.build tmpfiles.d/dbus.conf.in \
+ 	tmpfiles.d/meson.build $(NULL)
+ dbusdata_DATA = session.conf $(am__append_1)
+-legacydbusdata_DATA = legacy-config/session.conf $(am__append_2)
++# PATCH: Don't install empty removable configuration files in /etc.
++legacydbusdata_DATA =
+ examplesdir = ${docdir}/examples
+ examples_DATA = \
+ 	example-system-enable-stats.conf	\
+@@ -1469,7 +1470,6 @@
+ install-data-hook:
+ 	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/session.d
+ 	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/services
+-@DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(runstatedir)/dbus
+ @DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/system.d
+ @DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/system-services
+ # Install dbus.socket as default implementation of a D-Bus stack.
 diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/bus/activation-helper.c
 --- libdbus.upstream/bus/activation-helper.c
 +++ libdbus/bus/activation-helper.c
-@@ -46,6 +46,10 @@
+@@ -48,6 +48,10 @@
  #include <dbus/dbus-marshal-validate.h>
  #include <dbus/dbus-sysdeps-unix.h>
  
@@ -12,7 +33,7 @@ diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/
  static BusDesktopFile *
  desktop_file_for_name (BusConfigParser *parser,
                         const char *name,
-@@ -318,7 +322,7 @@
+@@ -320,7 +324,7 @@
    if (setgid (pw->pw_gid))
      {
        dbus_set_error (error, DBUS_ERROR_SPAWN_SETUP_FAILED,
@@ -21,7 +42,7 @@ diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/
        return FALSE;
      }
  
-@@ -326,7 +330,7 @@
+@@ -328,7 +332,7 @@
    if (setuid (pw->pw_uid) < 0)
      {
        dbus_set_error (error, DBUS_ERROR_SPAWN_SETUP_FAILED,
@@ -30,31 +51,10 @@ diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/
        return FALSE;
      }
  #endif
-diff -Paur --no-dereference -- libdbus.upstream/bus/Makefile.in libdbus/bus/Makefile.in
---- libdbus.upstream/bus/Makefile.in
-+++ libdbus/bus/Makefile.in
-@@ -598,7 +598,8 @@
- 	systemd-user/dbus.socket.in sysusers.d/dbus.conf.in \
- 	tmpfiles.d/dbus.conf.in $(NULL)
- dbusdata_DATA = session.conf $(am__append_1)
--legacydbusdata_DATA = legacy-config/session.conf $(am__append_2)
-+# PATCH: Don't install empty removable configuration files in /etc.
-+legacydbusdata_DATA =
- examplesdir = ${docdir}/examples
- examples_DATA = \
- 	example-system-enable-stats.conf	\
-@@ -1463,7 +1464,6 @@
- install-data-hook:
- 	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/session.d
- 	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/services
--@DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(localstatedir)/run/dbus
- @DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/system.d
- @DBUS_UNIX_TRUE@	$(mkinstalldirs) $(DESTDIR)$(dbusdatadir)/system-services
- # Install dbus.socket as default implementation of a D-Bus stack.
 diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-unix.c libdbus/dbus/dbus-sysdeps-unix.c
 --- libdbus.upstream/dbus/dbus-sysdeps-unix.c
 +++ libdbus/dbus/dbus-sysdeps-unix.c
-@@ -2210,9 +2210,13 @@
+@@ -2234,9 +2234,13 @@
     * we need these assertions to fail as soon as we're wrong about
     * it so we can do the porting fixups
     */
@@ -71,7 +71,7 @@ diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-unix.c libdbus
  
    uid_read = DBUS_UID_UNSET;
    primary_gid_read = DBUS_GID_UNSET;
-@@ -2945,9 +2949,9 @@
+@@ -2969,9 +2973,9 @@
     * we need these assertions to fail as soon as we're wrong about
     * it so we can do the porting fixups
     */
@@ -87,7 +87,7 @@ diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-unix.c libdbus
 diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c libdbus/dbus/dbus-sysdeps-util-unix.c
 --- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c
 +++ libdbus/dbus/dbus-sysdeps-util-unix.c
-@@ -68,6 +68,10 @@
+@@ -67,6 +67,10 @@
  #define O_BINARY 0
  #endif
  
@@ -101,7 +101,7 @@ diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c li
 diff -Paur --no-dereference -- libdbus.upstream/test/Makefile.in libdbus/test/Makefile.in
 --- libdbus.upstream/test/Makefile.in
 +++ libdbus/test/Makefile.in
-@@ -2971,6 +2971,9 @@
+@@ -3163,6 +3163,9 @@
  	-rm -f internals/$(DEPDIR)/sysdeps.Po
  	-rm -f internals/$(DEPDIR)/syslog.Po
  	-rm -f internals/$(DEPDIR)/variant.Po
@@ -114,7 +114,7 @@ diff -Paur --no-dereference -- libdbus.upstream/test/Makefile.in libdbus/test/Ma
 diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-launch.c libdbus/tools/dbus-launch.c
 --- libdbus.upstream/tools/dbus-launch.c
 +++ libdbus/tools/dbus-launch.c
-@@ -756,18 +756,15 @@
+@@ -758,18 +758,15 @@
             int binary_syntax,
             int argc, char **argv, int remaining_args)
  {
@@ -134,7 +134,7 @@ diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-launch.c libdbus/tool
          goto oom;
  
        args[0] = xstrdup (runprog);
-@@ -787,9 +784,7 @@
+@@ -789,9 +786,7 @@
          }
        args[i] = NULL;
  
@@ -145,7 +145,7 @@ diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-launch.c libdbus/tool
  
        execvp (runprog, args);
        fprintf (stderr, "Couldn't exec %s: %s\n", runprog, strerror (errno));
-@@ -808,9 +803,6 @@
+@@ -810,9 +805,6 @@
    close (2);
    exit (0);
  oom:
@@ -158,7 +158,7 @@ diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-launch.c libdbus/tool
 diff -Paur --no-dereference -- libdbus.upstream/tools/dbus-print-message.c libdbus/tools/dbus-print-message.c
 --- libdbus.upstream/tools/dbus-print-message.c
 +++ libdbus/tools/dbus-print-message.c
-@@ -30,7 +30,7 @@
+@@ -31,7 +31,7 @@
  #include <sys/un.h>
  #include <unistd.h>
  #include <netinet/in.h>
