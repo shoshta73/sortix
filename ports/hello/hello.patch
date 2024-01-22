@@ -1,12 +1,24 @@
-diff -Paur --no-dereference -- hello.upstream/build-aux/config.sub hello/build-aux/config.sub
---- hello.upstream/build-aux/config.sub
-+++ hello/build-aux/config.sub
-@@ -1342,7 +1342,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- hello.upstream/Makefile.in hello/Makefile.in
+--- hello.upstream/Makefile.in
++++ hello/Makefile.in
+@@ -1773,7 +1773,7 @@
+ # Subdirectories to descend into.
+ SUBDIRS = po
+ hello_SOURCES = src/hello.c src/system.h
+-hello_LDADD = $(LIBINTL) $(top_builddir)/lib/lib$(PACKAGE).a
++hello_LDADD = $(top_builddir)/lib/lib$(PACKAGE).a $(LIBINTL)
+ CLEANFILES = $(am__append_2) lib/configmake.h lib/configmake.h-t
+ MAINTAINERCLEANFILES = lib/iconv_open-aix.h lib/iconv_open-hpux.h \
+ 	lib/iconv_open-irix.h lib/iconv_open-osf.h \
+diff -Paur --no-dereference -- hello.upstream/src/hello.c hello/src/hello.c
+--- hello.upstream/src/hello.c
++++ hello/src/hello.c
+@@ -163,7 +163,7 @@
+     error (EXIT_FAILURE, errno, _("conversion to a multibyte string failed"));
+ 
+   /* Print greeting message and exit. */
+-  wprintf (L"%ls\n", mb_greeting);
++  printf ("%ls\n", mb_greeting);
+   free(mb_greeting);
+ 
+   exit (EXIT_SUCCESS);

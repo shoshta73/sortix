@@ -1,11 +1,11 @@
 NAME=hello
 BUILD_LIBRARIES='libiconv? libintl?'
-VERSION=2.8
+VERSION=2.12.1
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.gz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=e6b77f81f7cf7daefad4a9f5b65de6cae9c3f13b8cfbaea8cb53bb5ea5460d73
+SHA256SUM=8d99142afd92576f30b0cd7cb42a8dc6809998bc5d607d88761f512e26c7db20
 UPSTREAM_SITE=https://ftp.gnu.org/gnu/hello
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
-CONFIGURE_VARS='gt_cv_locale_fr=false gt_cv_locale_ja=false gt_cv_locale_fr_utf8=false gt_cv_locale_ja_utf8=false gt_cv_locale_tr_utf8=false gt_cv_locale_zh_CN=false'
