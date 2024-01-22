@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- gawk.upstream/builtin.c gawk/builtin.c
 --- gawk.upstream/builtin.c
 +++ gawk/builtin.c
-@@ -1192,10 +1192,18 @@
+@@ -1249,10 +1249,18 @@
  			 * Use snprintf return value to tell if there
  			 * is enough room in the buffer or not.
  			 */
@@ -23,7 +23,7 @@ diff -Paur --no-dereference -- gawk.upstream/builtin.c gawk/builtin.c
 diff -Paur --no-dereference -- gawk.upstream/extension/filefuncs.c gawk/extension/filefuncs.c
 --- gawk.upstream/extension/filefuncs.c
 +++ gawk/extension/filefuncs.c
-@@ -414,8 +414,12 @@
+@@ -418,8 +418,12 @@
  	/* for block and character devices, add rdev, major and minor numbers */
  	if (S_ISBLK(sbuf->st_mode) || S_ISCHR(sbuf->st_mode)) {
  		array_set_numeric(array, "rdev", sbuf->st_rdev);
@@ -51,7 +51,7 @@ diff -Paur --no-dereference -- gawk.upstream/io.c gawk/io.c
 diff -Paur --no-dereference -- gawk.upstream/main.c gawk/main.c
 --- gawk.upstream/main.c
 +++ gawk/main.c
-@@ -984,13 +984,7 @@
+@@ -1063,13 +1063,7 @@
  	update_PROCINFO_num("api_minor", GAWK_API_MINOR_VERSION);
  #endif
  
@@ -69,7 +69,7 @@ diff -Paur --no-dereference -- gawk.upstream/main.c gawk/main.c
 diff -Paur --no-dereference -- gawk.upstream/node.c gawk/node.c
 --- gawk.upstream/node.c
 +++ gawk/node.c
-@@ -860,6 +860,8 @@
+@@ -1005,6 +1005,8 @@
  	n->flags &= ~WSTRCUR;
  }
  
@@ -78,7 +78,7 @@ diff -Paur --no-dereference -- gawk.upstream/node.c gawk/node.c
  static void __attribute__ ((unused))
  dump_wstr(FILE *fp, const wchar_t *str, size_t len)
  {
-@@ -869,6 +871,7 @@
+@@ -1014,6 +1016,7 @@
  	for (; len--; str++)
  		putwc(*str, fp);
  }
@@ -89,7 +89,7 @@ diff -Paur --no-dereference -- gawk.upstream/node.c gawk/node.c
 diff -Paur --no-dereference -- gawk.upstream/support/getopt.c gawk/support/getopt.c
 --- gawk.upstream/support/getopt.c
 +++ gawk/support/getopt.c
-@@ -55,18 +55,9 @@
+@@ -56,18 +56,9 @@
  #ifndef ELIDE_CODE
  
  
