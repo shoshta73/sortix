@@ -1,3 +1,48 @@
+diff -Paur --no-dereference -- e2fsprogs.upstream/MCONFIG.in e2fsprogs/MCONFIG.in
+--- e2fsprogs.upstream/MCONFIG.in
++++ e2fsprogs/MCONFIG.in
+@@ -138,7 +138,7 @@
+ LIBUUID = @LIBUUID@ @SOCKET_LIB@
+ LIBMAGIC = @MAGIC_LIB@
+ LIBFUSE = @FUSE_LIB@
+-LIBSUPPORT = $(LIBINTL) $(LIB)/libsupport@STATIC_LIB_EXT@
++LIBSUPPORT = $(LIB)/libsupport@STATIC_LIB_EXT@ $(LIBINTL)
+ LIBBLKID = @LIBBLKID@ @PRIVATE_LIBS_CMT@ $(LIBUUID)
+ LIBINTL = @LIBINTL@
+ SYSLIBS = @LIBS@ @PTHREAD_LIBS@
+@@ -154,7 +154,7 @@
+ STATIC_LIBE2P = $(LIB)/libe2p@STATIC_LIB_EXT@
+ STATIC_LIBEXT2FS = $(LIB)/libext2fs@STATIC_LIB_EXT@
+ STATIC_LIBUUID = @STATIC_LIBUUID@ @SOCKET_LIB@
+-STATIC_LIBSUPPORT = $(LIBINTL) $(LIBSUPPORT)
++STATIC_LIBSUPPORT = $(LIBSUPPORT) $(LIBINTL)
+ STATIC_LIBBLKID = @STATIC_LIBBLKID@ $(STATIC_LIBUUID)
+ DEPSTATIC_LIBSS = $(LIB)/libss@STATIC_LIB_EXT@
+ DEPSTATIC_LIBCOM_ERR = $(LIB)/libcom_err@STATIC_LIB_EXT@
+@@ -167,7 +167,7 @@
+ PROFILED_LIBE2P = $(LIB)/libe2p@PROFILED_LIB_EXT@
+ PROFILED_LIBEXT2FS = $(LIB)/libext2fs@PROFILED_LIB_EXT@
+ PROFILED_LIBUUID = @PROFILED_LIBUUID@ @SOCKET_LIB@
+-PROFILED_LIBSUPPORT = $(LIBINTL) $(LIB)/libsupport@PROFILED_LIB_EXT@
++PROFILED_LIBSUPPORT = $(LIB)/libsupport@PROFILED_LIB_EXT@ $(LIBINTL)
+ PROFILED_LIBBLKID = @PROFILED_LIBBLKID@ $(PROFILED_LIBUUID)
+ DEPPROFILED_LIBSS = $(LIB)/libss@PROFILED_LIB_EXT@
+ DEPPROFILED_LIBCOM_ERR = $(LIB)/libcom_err@PROFILED_LIB_EXT@
+diff -Paur --no-dereference -- e2fsprogs.upstream/Makefile.in e2fsprogs/Makefile.in
+--- e2fsprogs.upstream/Makefile.in
++++ e2fsprogs/Makefile.in
+@@ -135,6 +135,11 @@
+ 	$(RM) -rf autom4te.cache ext2ed/Makefile po/stamp-po \
+ 		asm_types.h config.log public_config.h parse-types.log
+ 	$(MAKE) distclean-local 
++	$(RM) -f parse-types.log
++	$(RM) -f public_config.h
++	$(RM) -f util/install-symlink
++	$(RM) -f asm_types.h
++	$(RM) -f scrub/Makefile
+ 
+ realclean: realclean-recursive realclean-local
+ 
 diff -Paur --no-dereference -- e2fsprogs.upstream/config/parse-types.sh e2fsprogs/config/parse-types.sh
 --- e2fsprogs.upstream/config/parse-types.sh
 +++ e2fsprogs/config/parse-types.sh
@@ -23,7 +68,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/config/parse-types.sh e2fsprog
 diff -Paur --no-dereference -- e2fsprogs.upstream/debugfs/debugfs.c e2fsprogs/debugfs/debugfs.c
 --- e2fsprogs.upstream/debugfs/debugfs.c
 +++ e2fsprogs/debugfs/debugfs.c
-@@ -1818,7 +1818,11 @@
+@@ -1816,7 +1816,11 @@
  	if (argc != nr)
  		goto usage;
  
@@ -57,17 +102,17 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/journal.c e2fsprogs/e2f
  #include <sys/mount.h>
  #define MNT_FL (MS_MGC_VAL | MS_RDONLY)
  #endif
-@@ -635,11 +634,11 @@
+@@ -634,11 +633,11 @@
  	       val + sizeof(struct ext4_fc_dentry_info),
  	       darg->dname_len);
  	darg->dname[darg->dname_len] = 0;
--	jbd_debug(1, "%s: %s, ino %lu, parent %lu\n",
+-	jbd_debug(1, "%s: %s, ino %u, parent %u\n",
 +	jbd_debug(1, "%s: %s, ino %ju, parent %ju\n",
- 		tag == EXT4_FC_TAG_CREAT ? "create" :
- 		(tag == EXT4_FC_TAG_LINK ? "link" :
- 		(tag == EXT4_FC_TAG_UNLINK ? "unlink" : "error")),
--		darg->dname, darg->ino, darg->parent_ino);
-+		darg->dname, (uintmax_t) darg->ino, (uintmax_t) darg->parent_ino);
+ 		  le16_to_cpu(tl->fc_tag) == EXT4_FC_TAG_CREAT ? "create" :
+ 		  (le16_to_cpu(tl->fc_tag) == EXT4_FC_TAG_LINK ? "link" :
+ 		   (le16_to_cpu(tl->fc_tag) == EXT4_FC_TAG_UNLINK ? "unlink" :
+-		    "error")), darg->dname, darg->ino, darg->parent_ino);
++		    "error")), darg->dname, (uintmax_t)darg->ino, (uintmax_t)darg->parent_ino);
  	return 0;
  }
  
@@ -166,7 +211,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/sigcatcher.c e2fsprogs/
 diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/unix.c e2fsprogs/e2fsck/unix.c
 --- e2fsprogs.upstream/e2fsck/unix.c
 +++ e2fsprogs/e2fsck/unix.c
-@@ -290,7 +290,7 @@
+@@ -291,7 +291,7 @@
  {
  	FILE	*f;
  	DIR	*d;
@@ -175,7 +220,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/unix.c e2fsprogs/e2fsck
  	unsigned int	acflag;
  	struct dirent*	de;
  
-@@ -604,8 +604,6 @@
+@@ -605,8 +605,6 @@
  	return 0;
  }
  
@@ -184,7 +229,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/unix.c e2fsprogs/e2fsck
  /*
   * Make sure 0,1,2 file descriptors are open, so that we don't open
   * the filesystem using the same file descriptor as stdout or stderr.
-@@ -1129,21 +1127,21 @@
+@@ -1130,21 +1128,21 @@
  	if (cflag) {
  		char *oldpath = getenv("PATH");
  		char *newpath;
@@ -223,7 +268,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/e2fsck/util.c e2fsprogs/e2fsck
  	gettimeofday(&track->time_start, 0);
  #ifdef HAVE_GETRUSAGE
  #ifdef sun
-@@ -442,7 +442,7 @@
+@@ -451,7 +451,7 @@
  	} else
  #endif
  	log_out(ctx, _("Memory used: %lluk, "),
@@ -420,51 +465,6 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/blkid/devname.c e2fsprogs/
  /*
   * Find a dev struct in the cache by device name, if available.
   *
-diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/fgetversion.c e2fsprogs/lib/e2p/fgetversion.c
---- e2fsprogs.upstream/lib/e2p/fgetversion.c
-+++ e2fsprogs/lib/e2p/fgetversion.c
-@@ -65,8 +65,6 @@
- 	rc = syscall(SYS_fsctl, name, EXT2_IOC_GETVERSION, &ver, 0);
- # endif /* !APPLE_DARWIN */
- #else /* ! HAVE_EXT2_IOCTLS */
--	extern int errno;
--
- 	errno = EOPNOTSUPP;
- #endif /* ! HAVE_EXT2_IOCTLS */
- 	if (rc == 0)
-diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/fsetversion.c e2fsprogs/lib/e2p/fsetversion.c
---- e2fsprogs.upstream/lib/e2p/fsetversion.c
-+++ e2fsprogs/lib/e2p/fsetversion.c
-@@ -65,7 +65,6 @@
-    return syscall(SYS_fsctl, name, EXT2_IOC_SETVERSION, &ver, 0);
- #endif
- #else /* ! HAVE_EXT2_IOCTLS */
--	extern int errno;
- 	errno = EOPNOTSUPP;
- 	return -1;
- #endif /* ! HAVE_EXT2_IOCTLS */
-diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/getversion.c e2fsprogs/lib/e2p/getversion.c
---- e2fsprogs.upstream/lib/e2p/getversion.c
-+++ e2fsprogs/lib/e2p/getversion.c
-@@ -35,7 +35,6 @@
- 	*version = ver;
- 	return r;
- #else /* ! HAVE_EXT2_IOCTLS */
--	extern int errno;
- 	errno = EOPNOTSUPP;
- 	return -1;
- #endif /* ! HAVE_EXT2_IOCTLS */
-diff -Paur --no-dereference -- e2fsprogs.upstream/lib/e2p/setversion.c e2fsprogs/lib/e2p/setversion.c
---- e2fsprogs.upstream/lib/e2p/setversion.c
-+++ e2fsprogs/lib/e2p/setversion.c
-@@ -34,7 +34,6 @@
- 	ver = (int) version;
- 	return ioctl (fd, EXT2_IOC_SETVERSION, &ver);
- #else /* ! HAVE_EXT2_IOCTLS */
--	extern int errno;
- 	errno = EOPNOTSUPP;
- 	return -1;
- #endif /* ! HAVE_EXT2_IOCTLS */
 diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/bitmaps.c e2fsprogs/lib/ext2fs/bitmaps.c
 --- e2fsprogs.upstream/lib/ext2fs/bitmaps.c
 +++ e2fsprogs/lib/ext2fs/bitmaps.c
@@ -779,8 +779,8 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/tdb.c e2fsprogs/lib
 diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ss/help.c e2fsprogs/lib/ss/help.c
 --- e2fsprogs.upstream/lib/ss/help.c
 +++ e2fsprogs/lib/ss/help.c
-@@ -24,9 +24,7 @@
- extern int errno;
+@@ -22,9 +22,7 @@
+ #include <errno.h>
  #endif
  #include <fcntl.h>
 -#include <sys/param.h>
@@ -803,7 +803,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ss/listen.c e2fsprogs/lib/
 diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ss/pager.c e2fsprogs/lib/ss/pager.c
 --- e2fsprogs.upstream/lib/ss/pager.c
 +++ e2fsprogs/lib/ss/pager.c
-@@ -27,7 +27,6 @@
+@@ -25,7 +25,6 @@
  #include "ss_internal.h"
  #include <stdio.h>
  #include <sys/types.h>
@@ -825,7 +825,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/support/quotaio.c e2fsprog
 diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/gen_uuid.c e2fsprogs/lib/uuid/gen_uuid.c
 --- e2fsprogs.upstream/lib/uuid/gen_uuid.c
 +++ e2fsprogs/lib/uuid/gen_uuid.c
-@@ -101,9 +101,22 @@
+@@ -96,9 +96,22 @@
  #include "uuidP.h"
  #include "uuidd.h"
  
@@ -851,8 +851,8 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/gen_uuid.c e2fsprogs/
  #endif
  
  #ifdef TLS
-@@ -138,94 +151,13 @@
- #endif
+@@ -112,94 +125,13 @@
+ THREAD_LOCAL unsigned short jrand_seed[3];
  #endif
  
 -static int get_random_fd(void)
@@ -947,7 +947,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/gen_uuid.c e2fsprogs/
  }
  
  /*
-@@ -238,7 +170,9 @@
+@@ -212,7 +144,9 @@
   */
  static int get_node_id(unsigned char *node_id)
  {
@@ -958,7 +958,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/gen_uuid.c e2fsprogs/
  	int 		sd;
  	struct ifreq 	ifr, *ifrp;
  	struct ifconf 	ifc;
-@@ -695,14 +629,10 @@
+@@ -669,14 +603,10 @@
  
  /*
   * This is the generic front-end to uuid_generate_random and
@@ -979,7 +979,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/gen_uuid.c e2fsprogs/
 diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/tst_uuid.c e2fsprogs/lib/uuid/tst_uuid.c
 --- e2fsprogs.upstream/lib/uuid/tst_uuid.c
 +++ e2fsprogs/lib/uuid/tst_uuid.c
-@@ -143,9 +143,9 @@
+@@ -137,9 +137,9 @@
  	tv.tv_sec = 0;
  	tv.tv_usec = 0;
  	time_reg = uuid_time(buf, &tv);
@@ -995,7 +995,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/tst_uuid.c e2fsprogs/
 diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/uuid_time.c e2fsprogs/lib/uuid/uuid_time.c
 --- e2fsprogs.upstream/lib/uuid/uuid_time.c
 +++ e2fsprogs/lib/uuid/uuid_time.c
-@@ -165,7 +165,7 @@
+@@ -159,7 +159,7 @@
  		printf("Warning: not a time-based UUID, so UUID time "
  		       "decoding will likely not work!\n");
  	}
@@ -1004,132 +1004,6 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/uuid/uuid_time.c e2fsprogs
  	       ctime(&time_reg));
  
  	return 0;
-diff -Paur --no-dereference -- e2fsprogs.upstream/Makefile.in e2fsprogs/Makefile.in
---- e2fsprogs.upstream/Makefile.in
-+++ e2fsprogs/Makefile.in
-@@ -135,6 +135,11 @@
- 	$(RM) -rf autom4te.cache ext2ed/Makefile po/stamp-po \
- 		asm_types.h config.log public_config.h parse-types.log
- 	$(MAKE) distclean-local 
-+	$(RM) -f parse-types.log
-+	$(RM) -f public_config.h
-+	$(RM) -f util/install-symlink
-+	$(RM) -f asm_types.h
-+	$(RM) -f scrub/Makefile
- 
- realclean: realclean-recursive realclean-local
- 
-diff -Paur --no-dereference -- e2fsprogs.upstream/MCONFIG.in e2fsprogs/MCONFIG.in
---- e2fsprogs.upstream/MCONFIG.in
-+++ e2fsprogs/MCONFIG.in
-@@ -137,7 +137,7 @@
- LIBUUID = @LIBUUID@ @SOCKET_LIB@
- LIBMAGIC = @MAGIC_LIB@
- LIBFUSE = @FUSE_LIB@
--LIBSUPPORT = $(LIBINTL) $(LIB)/libsupport@STATIC_LIB_EXT@
-+LIBSUPPORT = $(LIB)/libsupport@STATIC_LIB_EXT@ $(LIBINTL)
- LIBBLKID = @LIBBLKID@ @PRIVATE_LIBS_CMT@ $(LIBUUID)
- LIBINTL = @LIBINTL@
- SYSLIBS = @LIBS@ @PTHREAD_LIBS@
-@@ -153,7 +153,7 @@
- STATIC_LIBE2P = $(LIB)/libe2p@STATIC_LIB_EXT@
- STATIC_LIBEXT2FS = $(LIB)/libext2fs@STATIC_LIB_EXT@
- STATIC_LIBUUID = @STATIC_LIBUUID@ @SOCKET_LIB@
--STATIC_LIBSUPPORT = $(LIBINTL) $(LIBSUPPORT)
-+STATIC_LIBSUPPORT = $(LIBSUPPORT) $(LIBINTL)
- STATIC_LIBBLKID = @STATIC_LIBBLKID@ $(STATIC_LIBUUID)
- DEPSTATIC_LIBSS = $(LIB)/libss@STATIC_LIB_EXT@
- DEPSTATIC_LIBCOM_ERR = $(LIB)/libcom_err@STATIC_LIB_EXT@
-@@ -166,7 +166,7 @@
- PROFILED_LIBE2P = $(LIB)/libe2p@PROFILED_LIB_EXT@
- PROFILED_LIBEXT2FS = $(LIB)/libext2fs@PROFILED_LIB_EXT@
- PROFILED_LIBUUID = @PROFILED_LIBUUID@ @SOCKET_LIB@
--PROFILED_LIBSUPPORT = $(LIBINTL) $(LIB)/libsupport@PROFILED_LIB_EXT@
-+PROFILED_LIBSUPPORT = $(LIB)/libsupport@PROFILED_LIB_EXT@ $(LIBINTL)
- PROFILED_LIBBLKID = @PROFILED_LIBBLKID@ $(PROFILED_LIBUUID)
- DEPPROFILED_LIBSS = $(LIB)/libss@PROFILED_LIB_EXT@
- DEPPROFILED_LIBCOM_ERR = $(LIB)/libcom_err@PROFILED_LIB_EXT@
-diff -Paur --no-dereference -- e2fsprogs.upstream/misc/badblocks.c e2fsprogs/misc/badblocks.c
---- e2fsprogs.upstream/misc/badblocks.c
-+++ e2fsprogs/misc/badblocks.c
-@@ -331,7 +331,7 @@
- 
- 	if (pattern == (unsigned int) ~0) {
- 		for (ptr = buffer; ptr < buffer + n; ptr++) {
--			(*ptr) = random() % (1 << (8 * sizeof(char)));
-+			(*ptr) = arc4random_uniform(1 << (8 * sizeof(char)));
- 		}
- 		if (s_flag | v_flag)
- 			fputs(_("Testing with random pattern: "), stderr);
-@@ -1076,7 +1076,6 @@
- 	textdomain(NLS_CAT_NAME);
- 	set_com_err_gettext(gettext);
- #endif
--	srandom((unsigned int)time(NULL));  /* simple randomness is enough */
- 	test_func = test_ro;
- 
- 	/* Determine the system page size if possible */
-diff -Paur --no-dereference -- e2fsprogs.upstream/misc/chattr.c e2fsprogs/misc/chattr.c
---- e2fsprogs.upstream/misc/chattr.c
-+++ e2fsprogs/misc/chattr.c
-@@ -31,7 +31,6 @@
- #ifdef HAVE_ERRNO_H
- #include <errno.h>
- #endif
--#include <sys/param.h>
- #include <sys/stat.h>
- #include "ext2fs/ext2_fs.h"
- 
-diff -Paur --no-dereference -- e2fsprogs.upstream/misc/create_inode.c e2fsprogs/misc/create_inode.c
---- e2fsprogs.upstream/misc/create_inode.c
-+++ e2fsprogs/misc/create_inode.c
-@@ -310,6 +310,7 @@
- 	inode.i_atime = inode.i_ctime = inode.i_mtime =
- 		fs->now ? fs->now : time(0);
- 
-+#ifndef __sortix__
- 	if (filetype != S_IFIFO) {
- 		devmajor = major(st_rdev);
- 		devminor = minor(st_rdev);
-@@ -323,6 +324,7 @@
- 					   ((devminor & ~0xff) << 12);
- 		}
- 	}
-+#endif
- 	inode.i_links_count = 1;
- 
- 	retval = ext2fs_write_new_inode(fs, ino, &inode);
-diff -Paur --no-dereference -- e2fsprogs.upstream/misc/e2fuzz.c e2fsprogs/misc/e2fuzz.c
---- e2fsprogs.upstream/misc/e2fuzz.c
-+++ e2fsprogs/misc/e2fuzz.c
-@@ -171,7 +171,7 @@
- 	uint8_t *px = (uint8_t *)&x;
- 
- 	for (i = 0; i < sizeof(x); i++)
--		px[i] = random();
-+		px[i] = arc4random() & 0xff;
- 
- 	return min + (uint64_t)((double)(max - min) *
- 				(x / ((double) UINT64_MAX + 1.0)));
-@@ -259,7 +259,6 @@
- 		perror(fsname);
- 		goto fail;
- 	}
--	srandom(getseed());
- 	hsize = fs->blocksize * ext2fs_blocks_count(fs->super);
- 	if (user_corrupt_bytes > 0)
- 		count = user_corrupt_bytes;
-diff -Paur --no-dereference -- e2fsprogs.upstream/misc/lsattr.c e2fsprogs/misc/lsattr.c
---- e2fsprogs.upstream/misc/lsattr.c
-+++ e2fsprogs/misc/lsattr.c
-@@ -36,7 +36,6 @@
- #include <unistd.h>
- #include <stdlib.h>
- #include <string.h>
--#include <sys/param.h>
- #include <sys/stat.h>
- 
- #include "ext2fs/ext2_fs.h"
 diff -Paur --no-dereference -- e2fsprogs.upstream/misc/Makefile.in e2fsprogs/misc/Makefile.in
 --- e2fsprogs.upstream/misc/Makefile.in
 +++ e2fsprogs/misc/Makefile.in
@@ -1186,6 +1060,87 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/misc/Makefile.in e2fsprogs/mis
  
  install-strip: install
  	$(Q) for i in $(SPROGS); do \
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/badblocks.c e2fsprogs/misc/badblocks.c
+--- e2fsprogs.upstream/misc/badblocks.c
++++ e2fsprogs/misc/badblocks.c
+@@ -331,7 +331,7 @@
+ 
+ 	if (pattern == (unsigned int) ~0) {
+ 		for (ptr = buffer; ptr < buffer + n; ptr++) {
+-			(*ptr) = random() % (1 << (8 * sizeof(char)));
++			(*ptr) = arc4random_uniform(1 << (8 * sizeof(char)));
+ 		}
+ 		if (s_flag | v_flag)
+ 			fputs(_("Testing with random pattern: "), stderr);
+@@ -1079,7 +1079,6 @@
+ 	textdomain(NLS_CAT_NAME);
+ 	set_com_err_gettext(gettext);
+ #endif
+-	srandom((unsigned int)time(NULL));  /* simple randomness is enough */
+ 	test_func = test_ro;
+ 
+ 	/* Determine the system page size if possible */
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/chattr.c e2fsprogs/misc/chattr.c
+--- e2fsprogs.upstream/misc/chattr.c
++++ e2fsprogs/misc/chattr.c
+@@ -31,7 +31,6 @@
+ #ifdef HAVE_ERRNO_H
+ #include <errno.h>
+ #endif
+-#include <sys/param.h>
+ #include <sys/stat.h>
+ #include "ext2fs/ext2_fs.h"
+ 
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/create_inode.c e2fsprogs/misc/create_inode.c
+--- e2fsprogs.upstream/misc/create_inode.c
++++ e2fsprogs/misc/create_inode.c
+@@ -312,6 +312,7 @@
+ 	inode.i_atime = inode.i_ctime = inode.i_mtime =
+ 		fs->now ? fs->now : time(0);
+ 
++#ifndef __sortix__
+ 	if (filetype != S_IFIFO) {
+ 		devmajor = major(st_rdev);
+ 		devminor = minor(st_rdev);
+@@ -325,6 +326,7 @@
+ 					   ((devminor & ~0xff) << 12);
+ 		}
+ 	}
++#endif
+ 	inode.i_links_count = 1;
+ 
+ 	retval = ext2fs_write_new_inode(fs, ino, &inode);
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/e2fuzz.c e2fsprogs/misc/e2fuzz.c
+--- e2fsprogs.upstream/misc/e2fuzz.c
++++ e2fsprogs/misc/e2fuzz.c
+@@ -171,7 +171,7 @@
+ 	uint8_t *px = (uint8_t *)&x;
+ 
+ 	for (i = 0; i < sizeof(x); i++)
+-		px[i] = random();
++		px[i] = arc4random() & 0xff;
+ 
+ 	return min + (uint64_t)((double)(max - min) *
+ 				(x / ((double) UINT64_MAX + 1.0)));
+@@ -259,7 +259,6 @@
+ 		perror(fsname);
+ 		goto fail;
+ 	}
+-	srandom(getseed());
+ 	hsize = fs->blocksize * ext2fs_blocks_count(fs->super);
+ 	if (user_corrupt_bytes > 0)
+ 		count = user_corrupt_bytes;
+diff -Paur --no-dereference -- e2fsprogs.upstream/misc/lsattr.c e2fsprogs/misc/lsattr.c
+--- e2fsprogs.upstream/misc/lsattr.c
++++ e2fsprogs/misc/lsattr.c
+@@ -36,7 +36,6 @@
+ #include <unistd.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <sys/param.h>
+ #include <sys/stat.h>
+ 
+ #include "ext2fs/ext2_fs.h"
 diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.c e2fsprogs/misc/mke2fs.c
 --- e2fsprogs.upstream/misc/mke2fs.c
 +++ e2fsprogs/misc/mke2fs.c
@@ -1207,7 +1162,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.c e2fsprogs/misc/m
  #include <blkid/blkid.h>
  
  #include "ext2fs/ext2_fs.h"
-@@ -709,7 +713,7 @@
+@@ -711,7 +715,7 @@
  	       100.0 *  ext2fs_r_blocks_count(s) / ext2fs_blocks_count(s));
  	printf(_("First data block=%u\n"), s->s_first_data_block);
  	if (root_uid != 0 || root_gid != 0)
@@ -1216,7 +1171,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.c e2fsprogs/misc/m
  	if (s->s_reserved_gdt_blocks)
  		printf(_("Maximum filesystem blocks=%lu\n"),
  		       (s->s_reserved_gdt_blocks + fs->desc_blocks) *
-@@ -792,8 +796,6 @@
+@@ -794,8 +798,6 @@
  	return 1;
  }
  
@@ -1225,7 +1180,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.c e2fsprogs/misc/m
  static void parse_extended_opts(struct ext2_super_block *param,
  				const char *opts)
  {
-@@ -1196,6 +1198,8 @@
+@@ -1220,6 +1222,8 @@
  
  static const char *config_fn[] = { ROOT_SYSCONFDIR "/mke2fs.conf", 0 };
  
@@ -1234,7 +1189,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.c e2fsprogs/misc/m
  static void edit_feature(const char *str, __u32 *compat_array)
  {
  	if (!str)
-@@ -1578,27 +1582,27 @@
+@@ -1603,27 +1607,27 @@
  	int		fs_features_size = 0;
  	int		use_bsize;
  	char		*newpath;
@@ -1267,7 +1222,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mke2fs.c e2fsprogs/misc/m
  
  	/* Determine the system page size if possible */
  #ifdef HAVE_SYSCONF
-@@ -1616,6 +1620,8 @@
+@@ -1644,6 +1648,8 @@
  		config_fn[0] = tmp;
  	profile_set_syntax_err_cb(syntax_err_report);
  	retval = profile_init(config_fn, &profile);
@@ -1301,7 +1256,18 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/misc/mklost+found.c e2fsprogs/
 diff -Paur --no-dereference -- e2fsprogs.upstream/misc/tune2fs.c e2fsprogs/misc/tune2fs.c
 --- e2fsprogs.upstream/misc/tune2fs.c
 +++ e2fsprogs/misc/tune2fs.c
-@@ -3118,7 +3118,7 @@
+@@ -97,6 +97,10 @@
+ #define EXT4_IOC_SETFSUUID	_IOW('f', 44, struct fsuuid)
+ #endif
+ 
++#ifndef PATH_MAX
++#define PATH_MAX 4096
++#endif
++
+ extern int ask_yn(const char *string, int def);
+ 
+ const char *program_name = "tune2fs";
+@@ -3363,7 +3367,7 @@
  	if (c_flag) {
  		if (max_mount_count == 65536)
  			max_mount_count = EXT2_DFL_MAX_MNT_COUNT +
@@ -1409,7 +1375,7 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/resize/resource_track.c e2fspr
  	gettimeofday(&track->time_start, 0);
  #ifdef HAVE_GETRUSAGE
  #ifdef sun
-@@ -85,7 +85,7 @@
+@@ -92,7 +92,7 @@
  		kbytes(malloc_info.uordblks), kbytes(malloc_info.fordblks));
  #else
  	printf("Memory used: %lu, ",
