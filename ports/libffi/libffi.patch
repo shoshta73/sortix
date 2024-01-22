@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- libffi.upstream/configure libffi/configure
 --- libffi.upstream/configure
 +++ libffi/configure
-@@ -20938,7 +20938,7 @@
+@@ -22146,7 +22146,7 @@
        eval "${MAKE-make} -f $tmp/conftemp.mk 2>/dev/null >/dev/null"
        if grep '^REMOVED,,,' "$ac_top_srcdir/Makefile" >/dev/null
        then rm $ac_top_srcdir/Makefile ; fi
@@ -9,8 +9,8 @@ diff -Paur --no-dereference -- libffi.upstream/configure libffi/configure
 +      #cp $tmp/conftemp.mk $ac_top_srcdir/makefiles.mk~      ## DEBUGGING
      fi
      if test ! -f "$ac_top_srcdir/Makefile" ; then
-       { $as_echo "$as_me:${as_lineno-$LINENO}: create top_srcdir/Makefile guessed from local Makefile" >&5
-@@ -21023,7 +21023,7 @@
+       { printf "%s\n" "$as_me:${as_lineno-$LINENO}: create top_srcdir/Makefile guessed from local Makefile" >&5
+@@ -22231,7 +22231,7 @@
  	; echo "\$\$i" | grep "^../" > /dev/null && continue \\\\\\
  	; echo "rm -r \$\$i"; (rm -r "\$\$i") ; done ; rm Makefile
  _EOF
@@ -18,8 +18,8 @@ diff -Paur --no-dereference -- libffi.upstream/configure libffi/configure
 +      #cp "$tmp/conftemp.sed" "$ac_top_srcdir/makefile.sed~"            ## DEBUGGING
        $ax_enable_builddir_sed -f $tmp/conftemp.sed Makefile >$ac_top_srcdir/Makefile
        if test -f "$ac_top_srcdir/Makefile.mk" ; then
-         { $as_echo "$as_me:${as_lineno-$LINENO}: extend top_srcdir/Makefile with top_srcdir/Makefile.mk" >&5
-@@ -21044,8 +21044,8 @@
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: extend top_srcdir/Makefile with top_srcdir/Makefile.mk" >&5
+@@ -22252,8 +22252,8 @@
        # echo "/^$xxxx *$ax_enable_builddir_host /d" >$tmp/conftemp.sed
        echo "s!^$xxxx [^|]* | *$ax_enable_builddir *\$!$xxxx ...... $ax_enable_builddir!" >$tmp/conftemp.sed
        $ax_enable_builddir_sed -f "$tmp/conftemp.sed" "$ac_top_srcdir/Makefile" >$tmp/mkfile.tmp
@@ -28,5 +28,5 @@ diff -Paur --no-dereference -- libffi.upstream/configure libffi/configure
 +        #cp "$tmp/conftemp.sed" "$ac_top_srcdir/makefiles.sed~"         ## DEBUGGING
 +        #cp "$tmp/mkfile.tmp"   "$ac_top_srcdir/makefiles.out~"         ## DEBUGGING
        if cmp -s "$ac_top_srcdir/Makefile" "$tmp/mkfile.tmp" 2>/dev/null ; then
-         { $as_echo "$as_me:${as_lineno-$LINENO}: keeping top_srcdir/Makefile from earlier configure" >&5
- $as_echo "$as_me: keeping top_srcdir/Makefile from earlier configure" >&6;}
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: keeping top_srcdir/Makefile from earlier configure" >&5
+ printf "%s\n" "$as_me: keeping top_srcdir/Makefile from earlier configure" >&6;}
