@@ -1,0 +1,2 @@
+rm -rf -- 'tests/devel/test-add_ssaaaa.c'
+rm -rf -- 'tests/devel/test-sub_ddmmss.c'

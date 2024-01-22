@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- libgmp.upstream/gmp-h.in libgmp/gmp-h.in
 --- libgmp.upstream/gmp-h.in
 +++ libgmp/gmp-h.in
-@@ -250,6 +250,7 @@
+@@ -253,6 +253,7 @@
  /* For reference, "defined(EOF)" cannot be used here.  In g++ 2.95.4,
     <iostream> defines EOF but not FILE.  */
  #if defined (FILE)                                              \
