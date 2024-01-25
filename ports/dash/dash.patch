@@ -1,36 +1,3 @@
-diff -Paur --no-dereference -- dash.upstream/src/Makefile.in dash/src/Makefile.in
---- dash.upstream/src/Makefile.in
-+++ dash/src/Makefile.in
-@@ -670,12 +670,14 @@
- 		-rm -f ./$(DEPDIR)/alias.Po
- 	-rm -f ./$(DEPDIR)/arith_yacc.Po
- 	-rm -f ./$(DEPDIR)/arith_yylex.Po
-+	-rm -f ./$(DEPDIR)/builtins.Po
- 	-rm -f ./$(DEPDIR)/cd.Po
- 	-rm -f ./$(DEPDIR)/error.Po
- 	-rm -f ./$(DEPDIR)/eval.Po
- 	-rm -f ./$(DEPDIR)/exec.Po
- 	-rm -f ./$(DEPDIR)/expand.Po
- 	-rm -f ./$(DEPDIR)/histedit.Po
-+	-rm -f ./$(DEPDIR)/init.Po
- 	-rm -f ./$(DEPDIR)/input.Po
- 	-rm -f ./$(DEPDIR)/jobs.Po
- 	-rm -f ./$(DEPDIR)/mail.Po
-@@ -683,11 +685,14 @@
- 	-rm -f ./$(DEPDIR)/memalloc.Po
- 	-rm -f ./$(DEPDIR)/miscbltin.Po
- 	-rm -f ./$(DEPDIR)/mystring.Po
-+	-rm -f ./$(DEPDIR)/nodes.Po
- 	-rm -f ./$(DEPDIR)/options.Po
- 	-rm -f ./$(DEPDIR)/output.Po
- 	-rm -f ./$(DEPDIR)/parser.Po
- 	-rm -f ./$(DEPDIR)/redir.Po
- 	-rm -f ./$(DEPDIR)/show.Po
-+	-rm -f ./$(DEPDIR)/signames.Po
-+	-rm -f ./$(DEPDIR)/syntax.Po
- 	-rm -f ./$(DEPDIR)/system.Po
- 	-rm -f ./$(DEPDIR)/trap.Po
- 	-rm -f ./$(DEPDIR)/var.Po
 diff -Paur --no-dereference -- dash.upstream/src/cd.c dash/src/cd.c
 --- dash.upstream/src/cd.c
 +++ dash/src/cd.c
@@ -139,7 +106,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  
  start:
  		outfmt(
-@@ -968,7 +967,7 @@
+@@ -971,7 +970,7 @@
  	sigblockall(NULL);
  	vforked++;
  
@@ -148,7 +115,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  
  	if (!pid) {
  		forkchild(jp, n, FORK_FG);
-@@ -1176,7 +1175,7 @@
+@@ -1179,7 +1178,7 @@
  	do {
  		gotsigchld = 0;
  		do
@@ -157,6 +124,39 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  		while (err < 0 && errno == EINTR);
  
  		if (err || (err = -!block))
+diff -Paur --no-dereference -- dash.upstream/src/Makefile.in dash/src/Makefile.in
+--- dash.upstream/src/Makefile.in
++++ dash/src/Makefile.in
+@@ -669,12 +669,14 @@
+ 		-rm -f ./$(DEPDIR)/alias.Po
+ 	-rm -f ./$(DEPDIR)/arith_yacc.Po
+ 	-rm -f ./$(DEPDIR)/arith_yylex.Po
++	-rm -f ./$(DEPDIR)/builtins.Po
+ 	-rm -f ./$(DEPDIR)/cd.Po
+ 	-rm -f ./$(DEPDIR)/error.Po
+ 	-rm -f ./$(DEPDIR)/eval.Po
+ 	-rm -f ./$(DEPDIR)/exec.Po
+ 	-rm -f ./$(DEPDIR)/expand.Po
+ 	-rm -f ./$(DEPDIR)/histedit.Po
++	-rm -f ./$(DEPDIR)/init.Po
+ 	-rm -f ./$(DEPDIR)/input.Po
+ 	-rm -f ./$(DEPDIR)/jobs.Po
+ 	-rm -f ./$(DEPDIR)/mail.Po
+@@ -682,11 +684,14 @@
+ 	-rm -f ./$(DEPDIR)/memalloc.Po
+ 	-rm -f ./$(DEPDIR)/miscbltin.Po
+ 	-rm -f ./$(DEPDIR)/mystring.Po
++	-rm -f ./$(DEPDIR)/nodes.Po
+ 	-rm -f ./$(DEPDIR)/options.Po
+ 	-rm -f ./$(DEPDIR)/output.Po
+ 	-rm -f ./$(DEPDIR)/parser.Po
+ 	-rm -f ./$(DEPDIR)/redir.Po
+ 	-rm -f ./$(DEPDIR)/show.Po
++	-rm -f ./$(DEPDIR)/signames.Po
++	-rm -f ./$(DEPDIR)/syntax.Po
+ 	-rm -f ./$(DEPDIR)/system.Po
+ 	-rm -f ./$(DEPDIR)/trap.Po
+ 	-rm -f ./$(DEPDIR)/var.Po
 diff -Paur --no-dereference -- dash.upstream/src/miscbltin.c dash/src/miscbltin.c
 --- dash.upstream/src/miscbltin.c
 +++ dash/src/miscbltin.c
@@ -193,7 +193,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  #include <stdlib.h>
  
  #include "shell.h"
-@@ -1128,10 +1125,12 @@
+@@ -1137,10 +1134,12 @@
  				if (len) {
  					char *str;
  
@@ -207,7 +207,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  				}
  			}
  		}
-@@ -1363,7 +1362,7 @@
+@@ -1373,7 +1372,7 @@
  	str = NULL;
  	savelen = out - (char *)stackblock();
  	if (savelen > 0) {
@@ -216,7 +216,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  		memcpy(str, stackblock(), savelen);
  	}
          if (oldstyle) {
-@@ -1449,6 +1448,7 @@
+@@ -1463,6 +1462,7 @@
  	if (str) {
  		memcpy(out, str, savelen);
  		STADJUST(savelen, out);
