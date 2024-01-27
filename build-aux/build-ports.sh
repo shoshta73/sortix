@@ -101,7 +101,7 @@ if [ "$OPERATION" = build ]; then
      DEPENDENCIES="$(PACKAGES="$PACKAGES" \
                      "$(dirname -- "$0")"/list-packages.sh \
                      --dependencies $PACKAGE)"
-     echo "$PACKAGE: $(echo "$DEPENDENCIES" | tr '\n' ' ' | sed -E 's/ +$/\n/')"
+     echo "$PACKAGE: $(echo "$DEPENDENCIES" | tr '\n' ' ')"
      echo "	@echo $PACKAGE"
    done;
    printf ".PHONY:"
