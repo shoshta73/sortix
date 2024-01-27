@@ -1,40 +1,9 @@
-diff -Paur --no-dereference -- m4.upstream/build-aux/config.sub m4/build-aux/config.sub
---- m4.upstream/build-aux/config.sub
-+++ m4/build-aux/config.sub
-@@ -1305,7 +1305,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -Paur --no-dereference -- m4.upstream/lib/fcntl.c m4/lib/fcntl.c
---- m4.upstream/lib/fcntl.c
-+++ m4/lib/fcntl.c
-@@ -178,7 +178,7 @@
-         result = dupfd (fd, target, 0);
-         break;
-       }
--#elif FCNTL_DUPFD_BUGGY || REPLACE_FCHDIR
-+#elif (FCNTL_DUPFD_BUGGY || REPLACE_FCHDIR) && !defined(__sortix__)
-     case F_DUPFD:
-       {
-         int target = va_arg (arg, int);
 diff -Paur --no-dereference -- m4.upstream/lib/freadahead.c m4/lib/freadahead.c
 --- m4.upstream/lib/freadahead.c
 +++ m4/lib/freadahead.c
-@@ -1,5 +1,5 @@
- /* Retrieve information about a FILE stream.
--   Copyright (C) 2007-2011 Free Software Foundation, Inc.
-+   Copyright (C) 2007-2012 Free Software Foundation, Inc.
- 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-@@ -22,6 +22,10 @@
- #include <stdlib.h>
- #include "stdio-impl.h"
+@@ -30,6 +30,10 @@
+ /* This file is not used on systems that have the __freadahead function,
+    namely musl libc.  */
  
 +#if defined(__sortix__)
 +#include <FILE.h>
@@ -43,25 +12,10 @@ diff -Paur --no-dereference -- m4.upstream/lib/freadahead.c m4/lib/freadahead.c
  size_t
  freadahead (FILE *fp)
  {
-@@ -48,6 +52,10 @@
-   /* equivalent to
-      (fp->_ungetc_count == 0 ? fp->_rcount : fp->_ungetc_count - fp->_rcount) */
-   return (fp->_rcount > 0 ? fp->_rcount : fp->_ungetc_count - fp->_rcount);
-+#elif defined __minix               /* Minix */
-+  if ((fp_->_flags & _IOWRITING) != 0)
-+    return 0;
-+  return fp_->_count;
- #elif defined _IOERR                /* AIX, HP-UX, IRIX, OSF/1, Solaris, OpenServer, mingw, NonStop Kernel */
-   if ((fp_->_flag & _IOWRT) != 0)
+@@ -94,6 +98,10 @@
+   if (fp->state == 4 /* WR */ || fp->rp >= fp->wp)
      return 0;
-@@ -76,6 +84,14 @@
-   return (fp->__pushed_back
-           ? fp->__get_limit - fp->__pushback_bufp + 1
-           : fp->__get_limit - fp->__bufp);
-+#elif defined EPLAN9                /* Plan9 */
-+  if (fp->state == 4 /* WR */ || fp->rp >= fp->wp)
-+    return 0;
-+  return fp->wp - fp->rp;
+   return fp->wp - fp->rp;
 +#elif defined __sortix__
 +  if ( !(fp->flags & _FILE_LAST_READ) )
 +    return 0;
@@ -69,122 +23,6 @@ diff -Paur --no-dereference -- m4.upstream/lib/freadahead.c m4/lib/freadahead.c
  #elif defined SLOW_BUT_NO_HACKS     /* users can define this */
    abort ();
    return 0;
-diff -Paur --no-dereference -- m4.upstream/lib/fseeko.c m4/lib/fseeko.c
---- m4.upstream/lib/fseeko.c
-+++ m4/lib/fseeko.c
-@@ -1,5 +1,5 @@
- /* An fseeko() function that, together with fflush(), is POSIX compliant.
--   Copyright (C) 2007-2011 Free Software Foundation, Inc.
-+   Copyright (C) 2007-2012 Free Software Foundation, Inc.
- 
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-@@ -12,8 +12,7 @@
-    GNU General Public License for more details.
- 
-    You should have received a copy of the GNU General Public License along
--   with this program; if not, write to the Free Software Foundation,
--   Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
-+   with this program; if not, see <http://www.gnu.org/licenses/>.  */
- 
- #include <config.h>
- 
-@@ -32,6 +31,14 @@
- # undef fseek
- # define fseeko fseek
- #endif
-+#if _GL_WINDOWS_64_BIT_OFF_T
-+# undef fseeko
-+# if HAVE__FSEEKI64 /* msvc, mingw64 */
-+#  define fseeko _fseeki64
-+# else /* mingw */
-+#  define fseeko fseeko64
-+# endif
-+#endif
- {
- #if LSEEK_PIPE_BROKEN
-   /* mingw gives bogus answers rather than failure on non-seekable files.  */
-@@ -69,6 +76,9 @@
-       && fp->_rcount == 0
-       && fp->_wcount == 0
-       && fp->_ungetc_count == 0)
-+#elif defined __minix               /* Minix */
-+  if (fp_->_ptr == fp_->_buf
-+      && (fp_->_ptr == NULL || fp_->_count == 0))
- #elif defined _IOERR                /* AIX, HP-UX, IRIX, OSF/1, Solaris, OpenServer, mingw, NonStop Kernel */
-   if (fp_->_ptr == fp_->_base
-       && (fp_->_ptr == NULL || fp_->_cnt == 0))
-@@ -86,18 +96,19 @@
-       && fp->__get_limit == fp->__bufp
-       && fp->__put_limit == fp->__bufp
-       && !fp->__pushed_back)
-+#elif defined EPLAN9                /* Plan9 */
-+  if (fp->rp == fp->buf
-+      && fp->wp == fp->buf)
-+#elif defined __sortix__
-+  if (0) /* wtf is this shit - sortix handles fseeko just fine. */
- #else
-   #error "Please port gnulib fseeko.c to your platform! Look at the code in fpurge.c, then report this to bug-gnulib."
- #endif
-     {
--      /* We get here when an fflush() call immediately preceded this one.  We
--         know there are no buffers.
--         POSIX requires us to modify the file descriptor's position.
--         But we cannot position beyond end of file here.  */
--      off_t pos =
--        lseek (fileno (fp),
--               whence == SEEK_END && offset > 0 ? 0 : offset,
--               whence);
-+      /* We get here when an fflush() call immediately preceded this one (or
-+         if ftell() has created buffers but no I/O has occurred on a
-+         newly-opened stream).  We know there are no buffers.  */
-+      off_t pos = lseek (fileno (fp), offset, whence);
-       if (pos == -1)
-         {
- #if defined __sferror || defined __DragonFly__ /* FreeBSD, NetBSD, OpenBSD, DragonFly, MacOS X, Cygwin */
-@@ -108,6 +119,7 @@
- 
- #if defined _IO_ftrylockfile || __GNU_LIBRARY__ == 1 /* GNU libc, BeOS, Haiku, Linux libc5 */
-       fp->_flags &= ~_IO_EOF_SEEN;
-+      fp->_offset = pos;
- #elif defined __sferror || defined __DragonFly__ /* FreeBSD, NetBSD, OpenBSD, DragonFly, MacOS X, Cygwin */
- # if defined __CYGWIN__
-       /* fp_->_offset is typed as an integer.  */
-@@ -137,10 +149,7 @@
-       fp->__offset = pos;
-       fp->__eof = 0;
- #endif
--      /* If we were not requested to position beyond end of file, we're
--         done.  */
--      if (!(whence == SEEK_END && offset > 0))
--        return 0;
-+      return 0;
-     }
-   return fseeko (fp, offset, whence);
- }
-diff -Paur --no-dereference -- m4.upstream/lib/sigaction.c m4/lib/sigaction.c
---- m4.upstream/lib/sigaction.c
-+++ m4/lib/sigaction.c
-@@ -19,6 +19,7 @@
- 
- /* Specification.  */
- #include <signal.h>
-+#define NSIG SIG_MAX_NUM
- 
- #include <errno.h>
- #include <stdint.h>
-@@ -51,9 +52,11 @@
-    with this module should stick with only sigaction().  */
- 
- /* Check some of our assumptions.  */
-+#if !defined(__sortix__)
- #if defined SIGCHLD || defined HAVE_SIGALTSTACK || defined HAVE_SIGINTERRUPT
- # error "Revisit the assumptions made in the sigaction module"
- #endif
-+#endif
- 
- /* Out-of-range substitutes make a good fallback for uncatchable
-    signals.  */
 diff -Paur --no-dereference -- m4.upstream/lib/spawn_faction_addclose.c m4/lib/spawn_faction_addclose.c
 --- m4.upstream/lib/spawn_faction_addclose.c
 +++ m4/lib/spawn_faction_addclose.c
@@ -216,8 +54,8 @@ diff -Paur --no-dereference -- m4.upstream/lib/spawn_faction_adddup2.c m4/lib/sp
 diff -Paur --no-dereference -- m4.upstream/lib/spawn_faction_addopen.c m4/lib/spawn_faction_addopen.c
 --- m4.upstream/lib/spawn_faction_addopen.c
 +++ m4/lib/spawn_faction_addopen.c
-@@ -22,7 +22,9 @@
- #include <errno.h>
+@@ -24,7 +24,9 @@
+ #include <string.h>
  #include <unistd.h>
  
 -#if !_LIBC
@@ -230,7 +68,7 @@ diff -Paur --no-dereference -- m4.upstream/lib/spawn_faction_addopen.c m4/lib/sp
 diff -Paur --no-dereference -- m4.upstream/lib/spawni.c m4/lib/spawni.c
 --- m4.upstream/lib/spawni.c
 +++ m4/lib/spawni.c
-@@ -223,16 +223,20 @@
+@@ -808,16 +808,20 @@
      }
  #endif
  
@@ -251,20 +89,3 @@ diff -Paur --no-dereference -- m4.upstream/lib/spawni.c m4/lib/spawni.c
  
    /* Execute the file actions.  */
    if (file_actions != NULL)
-diff -Paur --no-dereference -- m4.upstream/lib/stdio.in.h m4/lib/stdio.in.h
---- m4.upstream/lib/stdio.in.h
-+++ m4/lib/stdio.in.h
-@@ -158,11 +158,13 @@
-                  "use gnulib module fflush for portable POSIX compliance");
- #endif
- 
-+#if !defined(__sortix__)
- /* It is very rare that the developer ever has full control of stdin,
-    so any use of gets warrants an unconditional warning.  Assume it is
-    always declared, since it is required by C89.  */
- #undef gets
- _GL_WARN_ON_USE (gets, "gets is a security hole - use fgets instead");
-+#endif
- 
- #if @GNULIB_FOPEN@
- # if @REPLACE_FOPEN@

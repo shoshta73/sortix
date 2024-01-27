@@ -1,11 +1,12 @@
 NAME=m4
 BUILD_LIBRARIES='libiconv? libintl?'
-VERSION=1.4.16
+VERSION=1.4.19
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=d5b5d51cf8f5b18f3bac39bc2f6b1e61f34d400136ae1a87d075e26a38028d5d
+SHA256SUM=63aede5c6d33b6d9b13511cd0be2cac046f2e70fd0a07aa9573a04a82783af96
 UPSTREAM_SITE=https://ftp.gnu.org/gnu/m4
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
-CONFIGURE_VARS='gt_cv_locale_fr=false gt_cv_locale_ja=false gt_cv_locale_fr_utf8=false gt_cv_locale_ja_utf8=false gt_cv_locale_tr_utf8=false gt_cv_locale_zh_CN=false'
+LICENSE=GPL-3.0-or-later
+MAKE_VARS=V=1
