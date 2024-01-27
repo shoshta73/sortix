@@ -1,40 +1,28 @@
-diff -Paur --no-dereference -- make.upstream/config/config.sub make/config/config.sub
---- make.upstream/config/config.sub
-+++ make/config/config.sub
-@@ -1356,7 +1356,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* | -plan9* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -Paur --no-dereference -- make.upstream/dir.c make/dir.c
---- make.upstream/dir.c
-+++ make/dir.c
-@@ -19,6 +19,8 @@
- #include "filedef.h"
+diff -Paur --no-dereference -- make.upstream/src/dir.c make/src/dir.c
+--- make.upstream/src/dir.c
++++ make/src/dir.c
+@@ -20,6 +20,8 @@
  #include "dep.h"
+ #include "debug.h"
  
 +#include <stddef.h>
 +
  #ifdef  HAVE_DIRENT_H
  # include <dirent.h>
  # define NAMLEN(dirent) strlen((dirent)->d_name)
-@@ -1142,7 +1144,7 @@
+@@ -1253,7 +1255,7 @@
            /* The glob interface wants a 'struct dirent', so mock one up.  */
            struct dirent *d;
-           unsigned int len = df->length + 1;
--          unsigned int sz = sizeof (*d) - sizeof (d->d_name) + len;
-+          unsigned int sz = offsetof(struct dirent, d_name) + len;
+           size_t len = df->length + 1;
+-          size_t sz = sizeof (*d) - sizeof (d->d_name) + len;
++          size_t sz = offsetof(struct dirent, d_name) + len;
            if (sz > bufsz)
              {
                bufsz *= 2;
-diff -Paur --no-dereference -- make.upstream/function.c make/function.c
---- make.upstream/function.c
-+++ make/function.c
-@@ -2095,27 +2095,23 @@
+diff -Paur --no-dereference -- make.upstream/src/function.c make/src/function.c
+--- make.upstream/src/function.c
++++ make/src/function.c
+@@ -2279,36 +2279,23 @@
            char *rp;
            struct stat st;
            PATH_VAR (in);
@@ -45,6 +33,15 @@ diff -Paur --no-dereference -- make.upstream/function.c make/function.c
  
 -#ifdef HAVE_REALPATH
 -          ENULLLOOP (rp, realpath (in, out));
+-# if defined _AIX
+-          /* AIX realpath() doesn't remove trailing slashes correctly.  */
+-          if (rp)
+-            {
+-              char *ep = rp + strlen (rp) - 1;
+-              while (ep > rp && ep[0] == '/')
+-                *(ep--) = '\0';
+-            }
+-# endif
 -#else
 -          rp = abspath (in, out);
 -#endif
@@ -66,40 +63,25 @@ diff -Paur --no-dereference -- make.upstream/function.c make/function.c
              }
          }
      }
-diff -Paur --no-dereference -- make.upstream/getloadavg.c make/getloadavg.c
---- make.upstream/getloadavg.c
-+++ make/getloadavg.c
-@@ -78,9 +78,11 @@
- /* Both the Emacs and non-Emacs sections want this.  Some
-    configuration files' definitions for the LOAD_AVE_CVT macro (like
-    sparc.h's) use macros like FSCALE, defined here.  */
-+#ifdef HAVE_SYS_PARAM_H
- #if defined (unix) || defined (__unix)
- # include <sys/param.h>
+diff -Paur --no-dereference -- make.upstream/src/job.c make/src/job.c
+--- make.upstream/src/job.c
++++ make/src/job.c
+@@ -74,6 +74,11 @@
+ # define VMS_POSIX_EXIT_MASK (C_FACILITY_NO | 0xA000)
  #endif
-+#endif
- 
- 
- /* Exclude all the code except the test program at the end
-diff -Paur --no-dereference -- make.upstream/job.c make/job.c
---- make.upstream/job.c
-+++ make/job.c
-@@ -67,6 +67,11 @@
- char default_shell[] = "";
- int batch_mode_shell = 0;
  
 +#elif defined (__sortix__)
 +
-+char default_shell[] = "sh";
++char const *default_shell = "sh";
 +int batch_mode_shell = 0;
 +
  #else
  
- char default_shell[] = "/bin/sh";
-diff -Paur --no-dereference -- make.upstream/main.c make/main.c
---- make.upstream/main.c
-+++ make/main.c
-@@ -2393,9 +2393,9 @@
+ const char *default_shell = "/bin/sh";
+diff -Paur --no-dereference -- make.upstream/src/main.c make/src/main.c
+--- make.upstream/src/main.c
++++ make/src/main.c
+@@ -2768,9 +2768,9 @@
            if (restarts)
              {
                char *b = alloca (40);
@@ -111,10 +93,10 @@ diff -Paur --no-dereference -- make.upstream/main.c make/main.c
              }
  
            fflush (stdout);
-diff -Paur --no-dereference -- make.upstream/misc.c make/misc.c
---- make.upstream/misc.c
-+++ make/misc.c
-@@ -710,6 +710,9 @@
+diff -Paur --no-dereference -- make.upstream/src/misc.c make/src/misc.c
+--- make.upstream/src/misc.c
++++ make/src/misc.c
+@@ -877,6 +877,9 @@
  unsigned int
  get_path_max (void)
  {
@@ -124,46 +106,46 @@ diff -Paur --no-dereference -- make.upstream/misc.c make/misc.c
    static unsigned int value;
  
    if (value == 0)
-@@ -722,5 +725,6 @@
+@@ -889,6 +892,7 @@
      }
  
    return value;
 +#endif
  }
  #endif
-diff -Paur --no-dereference -- make.upstream/output.c make/output.c
---- make.upstream/output.c
-+++ make/output.c
-@@ -278,6 +278,10 @@
- static void *
- acquire_semaphore (void)
- {
-+#if defined(__sortix__)
-+  static int foo;
-+  return &foo;
-+#else
-   static struct flock fl;
  
-   fl.l_type = F_WRLCK;
-@@ -288,16 +292,21 @@
-     return &fl;
-   perror ("fcntl()");
-   return NULL;
+diff -Paur --no-dereference -- make.upstream/src/posixos.c make/src/posixos.c
+--- make.upstream/src/posixos.c
++++ make/src/posixos.c
+@@ -722,6 +722,7 @@
+ {
+   if (osync_enabled())
+     {
++#ifdef F_SETLKW
+       struct flock fl;
+ 
+       fl.l_type = F_WRLCK;
+@@ -734,6 +735,7 @@
+           perror ("fcntl()");
+           return 0;
+         }
 +#endif
+     }
+ 
+   return 1;
+@@ -744,6 +746,7 @@
+ {
+   if (osync_enabled())
+     {
++#ifdef F_SETLKW
+       struct flock fl;
+ 
+       fl.l_type = F_UNLCK;
+@@ -753,6 +756,7 @@
+       /* We don't want to keep waiting on EINTR.  */
+       if (fcntl (osync_handle, F_SETLKW, &fl) == -1)
+         perror ("fcntl()");
++#endif
+     }
  }
  
- /* Release the lock for writing output.  */
- static void
- release_semaphore (void *sem)
- {
-+#if defined(__sortix__)
-+  (void) sem;
-+#else
-   struct flock *flp = (struct flock *)sem;
-   flp->l_type = F_UNLCK;
-   if (fcntl (sync_handle, F_SETLKW, flp) == -1)
-     perror ("fcntl()");
-+#endif
- }
- 
- /* Returns a file descriptor to a temporary file.  The file is automatically
