@@ -1,12 +1,13 @@
 NAME=wget
 BUILD_LIBRARIES='libz libiconv? libintl? libssl libpsl? libmetalink? libuuid? libpcre? libidn?'
-VERSION=1.18
+VERSION=1.21.4
 DISTNAME=$NAME-$VERSION
-COMPRESSION=tar.xz
+COMPRESSION=tar.gz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=b5b55b75726c04c06fe253daec9329a6f1a3c0c1878e3ea76ebfebc139ea9cc1
+SHA256SUM=81542f5cefb8faacc39bbbc6c82ded80e3e4a88505ae72ea51df27525bcde04c
 UPSTREAM_SITE=https://ftp.gnu.org/gnu/wget
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--with-ssl=openssl'
 MAKE_VARS='V=1'
