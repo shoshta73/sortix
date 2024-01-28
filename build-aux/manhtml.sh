@@ -359,7 +359,7 @@ for section in $SECTIONS; do
 done
 
 (find . -name '*.html' | while read FILE; do
-   grep -Eoh 'href=\"../man[[:digit:]]/[^/]+\.html\"' "$FILE" || true
+   grep -Eoh 'href="../man[[:digit:]]/[^/]+\.html"' "$FILE" || true
  done) | sort -u | grep -Eo 'man[[:digit:]]/[^/]+\.html' | sed 's/\.html$//' |
 while read manpage; do
   if ! [ -e "$manpage" ]; then
