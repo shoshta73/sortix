@@ -10,17 +10,6 @@ diff -Paur --no-dereference -- xorriso.upstream/config.sub xorriso/config.sub
  	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
  	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
  	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -Paur --no-dereference -- xorriso.upstream/configure xorriso/configure
---- xorriso.upstream/configure
-+++ xorriso/configure
-@@ -6166,7 +6166,6 @@
- #include <limits.h>
- #include <iconv.h>
- #include <locale.h>
--#include <langinfo.h>
- #include <unistd.h>
- int
- main ()
 diff -Paur --no-dereference -- xorriso.upstream/libburn/async.c xorriso/libburn/async.c
 --- xorriso.upstream/libburn/async.c
 +++ xorriso/libburn/async.c
@@ -32,311 +21,32 @@ diff -Paur --no-dereference -- xorriso.upstream/libburn/async.c xorriso/libburn/
  #include <pthread.h>
  #include <sys/types.h>
  #include <unistd.h>
-@@ -718,9 +719,11 @@
- 	pthread_sigmask(SIG_SETMASK, &sigset, &oldset);
- #endif /* Libburn_protect_fifo_threaD */
+diff -Paur --no-dereference -- xorriso.upstream/libisofs/rockridge.h xorriso/libisofs/rockridge.h
+--- xorriso.upstream/libisofs/rockridge.h
++++ xorriso/libisofs/rockridge.h
+@@ -39,6 +39,9 @@
+ #ifndef LIBISO_ROCKRIDGE_H
+ #define LIBISO_ROCKRIDGE_H
  
-+#if !defined(__sortix__)
- 	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &old);
- 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, &old);
- 		/* Note: Only burn_fifo_abort() shall cancel the fifo thread */
-+#endif
++/* PATCH: Get ssize_t. */
++#include <sys/types.h>
++
+ #include "ecma119.h"
  
- 	burn_fifo_source_shoveller(w->u.fifo.source, w->u.fifo.flag);
- 	remove_worker(pthread_self());
-@@ -775,7 +778,11 @@
  
- 	pt= *((pthread_t *) fs->thread_handle);
- 	remove_worker(pt);
-+#if !defined(__sortix__)
- 	ret = pthread_cancel(pt);
-+#else
-+	ret = (errno = ENOSYS, -1);
-+#endif
- 	return (ret == 0);
- }
- 
-diff -Paur --no-dereference -- xorriso.upstream/libburn/libdax_msgs.c xorriso/libburn/libdax_msgs.c
---- xorriso.upstream/libburn/libdax_msgs.c
-+++ xorriso/libburn/libdax_msgs.c
-@@ -34,14 +34,13 @@
-  int ret;
-  struct libdax_msgs_item *o;
-  struct timeval tv;
-- struct timezone tz;
- 
-  (*item)= o= 
-         (struct libdax_msgs_item *) calloc(1, sizeof(struct libdax_msgs_item));
-  if(o==NULL)
-    return(-1);
-  o->timestamp= 0.0;
-- ret= gettimeofday(&tv,&tz);
-+ ret= gettimeofday(&tv,NULL);
-  if(ret==0)
-    o->timestamp= tv.tv_sec+0.000001*tv.tv_usec;
-  o->process_id= getpid();
-diff -Paur --no-dereference -- xorriso.upstream/libburn/mmc.c xorriso/libburn/mmc.c
---- xorriso.upstream/libburn/mmc.c
-+++ xorriso/libburn/mmc.c
-@@ -739,7 +739,6 @@
- {
- 	int usec= 0, need, reported_3s = 0, first_wait = 1;
- 	struct timeval t0,tnow;
--	struct timezone dummy_tz;
- 	double max_fac, min_fac, waiting;
- 
- /* Enable to get reported waiting activities and total time.
-@@ -776,7 +775,7 @@
- 	/* There is need to inquire the buffer fill */
- 	d->pessimistic_writes++;
- 	min_fac = ((double) d->wfb_min_percent) / 100.0;
--	gettimeofday(&t0, &dummy_tz);
-+	gettimeofday(&t0, NULL);
- #ifdef Libburn_mmc_wfb_debuG
- 	sleeplist[0]= 0;
- 	sprintf(sleeplist,"(%d%s %d)",
-@@ -797,7 +796,7 @@
- 			(d->pbf_altered ? "? -" : " -"),
- 			(int) ((1.0 - min_fac) * d->progress.buffer_capacity));
- #endif
--		gettimeofday(&tnow,&dummy_tz);
-+		gettimeofday(&tnow,NULL);
- 		waiting = (tnow.tv_sec - t0.tv_sec) +
- 			  ((double) (tnow.tv_usec - t0.tv_usec)) / 1.0e6;
- 		if (d->pessimistic_buffer_free - buf->bytes >=
-diff -Paur --no-dereference -- xorriso.upstream/libburn/write.c xorriso/libburn/write.c
---- xorriso.upstream/libburn/write.c
-+++ xorriso/libburn/write.c
-@@ -2744,16 +2744,15 @@
- 			 int amount, int flag)
- {
- 	struct timeval tnow;
--	struct timezone dummy_tz;
- 	double to_wait;
- 
- 	if (flag & 1) {
--		gettimeofday(prev_time, &dummy_tz);
-+		gettimeofday(prev_time, NULL);
- 		return 1;
- 	}
- 	if(d->nominal_write_speed <= 0)
- 		return 2;
--	gettimeofday(&tnow, &dummy_tz);
-+	gettimeofday(&tnow, NULL);
- 	to_wait = ( ((double) amount) / (double) d->nominal_write_speed ) - 
- 		(double) ( tnow.tv_sec - prev_time->tv_sec ) -
- 		(double) ( tnow.tv_usec - prev_time->tv_usec ) / 1.0e6
-@@ -2761,7 +2760,7 @@
- 	if (to_wait >= 0.0001) {
- 		usleep((int) (to_wait * 1000000.0));
- 	}
--	gettimeofday(prev_time, &dummy_tz);
-+	gettimeofday(prev_time, NULL);
- 	return 1;
- }
- 
-diff -Paur --no-dereference -- xorriso.upstream/libisofs/ecma119.c xorriso/libisofs/ecma119.c
---- xorriso.upstream/libisofs/ecma119.c
-+++ xorriso/libisofs/ecma119.c
-@@ -39,7 +39,6 @@
- #include <time.h>
- #include <string.h>
- #include <locale.h>
--#include <langinfo.h>
- #include <stdio.h>
- 
- #ifdef Xorriso_standalonE
-diff -Paur --no-dereference -- xorriso.upstream/libisofs/fs_image.c xorriso/libisofs/fs_image.c
---- xorriso.upstream/libisofs/fs_image.c
-+++ xorriso/libisofs/fs_image.c
-@@ -31,7 +31,6 @@
- #include <stdlib.h>
- #include <string.h>
- #include <locale.h>
--#include <langinfo.h>
- #include <limits.h>
- #include <stdio.h>
- 
-diff -Paur --no-dereference -- xorriso.upstream/libisofs/libiso_msgs.c xorriso/libisofs/libiso_msgs.c
---- xorriso.upstream/libisofs/libiso_msgs.c
-+++ xorriso/libisofs/libiso_msgs.c
-@@ -30,19 +30,22 @@
- static int libiso_msgs_item_new(struct libiso_msgs_item **item,
-                          struct libiso_msgs_item *link, int flag)
- {
-+#if 0
-  int ret;
-+#endif
-  struct libiso_msgs_item *o;
-  struct timeval tv;
-- struct timezone tz;
- 
-  (*item)= o= 
-            (struct libiso_msgs_item *) malloc(sizeof(struct libiso_msgs_item));
-  if(o==NULL)
-    return(-1);
-  o->timestamp= 0.0;
-- ret= gettimeofday(&tv,&tz);
-+#if 0
-+ ret= gettimeofday(&tv,NULL);
-  if(ret==0)
-    o->timestamp= tv.tv_sec+0.000001*tv.tv_usec;
-+#endif
-  o->process_id= getpid();
-  o->origin= -1;
-  o->severity= LIBISO_MSGS_SEV_ALL;
-diff -Paur --no-dereference -- xorriso.upstream/libisofs/make_isohybrid_mbr.c xorriso/libisofs/make_isohybrid_mbr.c
---- xorriso.upstream/libisofs/make_isohybrid_mbr.c
-+++ xorriso/libisofs/make_isohybrid_mbr.c
-@@ -146,7 +146,6 @@
- 
-     /* For generating a weak random number */
-     struct timeval tv;
--    struct timezone tz;
- 
-     if (bin_lba < 0 || bin_lba >= (1 << 29))
-         return (0); /* 1 TB limit of signed 32 bit addressing of 512 byte blocks */
-@@ -201,7 +200,7 @@
-      from. An environment variable ?
-      125: Whatever, i use some 32-bit random value with no crypto strength.
-      */
--    gettimeofday(&tv, &tz);
-+    gettimeofday(&tv, NULL);
-     id = 0xffffffff & (tv.tv_sec ^ (tv.tv_usec * 2000));
- 
-     /*
-@@ -572,7 +571,6 @@
-     int gpt_count = 0, gpt_idx[128], apm_count = 0, gpt_cursor;
-     /* For generating a weak random number */
-     struct timeval tv;
--    struct timezone tz;
- 
-     hd_img_blocks = ((off_t) *img_blocks) * (off_t) 4;
- 
-@@ -608,7 +606,7 @@
-        (here some 32-bit random value with no crypto strength)
-     */
-     if (flag & 1) {
--        gettimeofday(&tv, &tz);
-+        gettimeofday(&tv, NULL);
-         id = 0xffffffff & (tv.tv_sec ^ (tv.tv_usec * 2000));
-         lsb_to_buf(&wpt, id, 32, 0);
-     } else {
-diff -Paur --no-dereference -- xorriso.upstream/libisofs/system_area.c xorriso/libisofs/system_area.c
---- xorriso.upstream/libisofs/system_area.c
-+++ xorriso/libisofs/system_area.c
-@@ -2061,7 +2061,6 @@
-     static uint8_t uuid_urandom[16];
-     uint32_t rnd, salt;
-     struct timeval tv;
--    struct timezone tz;
-     pid_t pid;
-     static int counter = 0, use_urandom = 0;
-     int i, ret, fd;
-@@ -2111,7 +2110,7 @@
-        per day.
-     */
-     memcpy(u, uuid_template, 16);
--    gettimeofday(&tv, &tz);
-+    gettimeofday(&tv, NULL);
-     for (i = 0; i < 4; i++)
-         u[i] = (salt >> (8 * i)) & 0xff;
-     for (i = 0; i < 2; i++)
-diff -Paur --no-dereference -- xorriso.upstream/libisofs/util.c xorriso/libisofs/util.c
---- xorriso.upstream/libisofs/util.c
-+++ xorriso/libisofs/util.c
-@@ -28,7 +28,6 @@
- #include <limits.h>
- #include <iconv.h>
- #include <locale.h>
--#include <langinfo.h>
- 
- #include <unistd.h>
- 
-@@ -186,7 +185,11 @@
- {
-    if(libisofs_local_charset[0])
-      return libisofs_local_charset;
-+#if defined(__sortix__)
-+   return "UTF-8";
-+#else
-    return nl_langinfo(CODESET);
-+#endif
- }
- 
- int strconv(const char *str, const char *icharset, const char *ocharset,
-@@ -1574,7 +1577,7 @@
- #else
-     if (tm.tm_isdst < 0)
-         tm.tm_isdst = 0;
--    tzoffset = ( - timezone / 60 / 15 ) + 4 * tm.tm_isdst;
-+    tzoffset = ( - 0 / 60 / 15 ) + 4 * tm.tm_isdst;
- #endif
- 
-     if (tzoffset > 52 || tzoffset < -48 || always_gmt) {
-@@ -1620,7 +1623,7 @@
- #else
-     if (tm.tm_isdst < 0)
-         tm.tm_isdst = 0;
--    tzoffset = ( - timezone / 60 / 15 ) + 4 * tm.tm_isdst;
-+    tzoffset = ( - 0 / 60 / 15 ) + 4 * tm.tm_isdst;
- #endif
- 
-     if (tzoffset > 52 || tzoffset < -48 || always_gmt) {
 diff -Paur --no-dereference -- xorriso.upstream/libjte/checksum.c xorriso/libjte/checksum.c
 --- xorriso.upstream/libjte/checksum.c
 +++ xorriso/libjte/checksum.c
-@@ -327,7 +327,9 @@
+@@ -328,7 +328,9 @@
          if (a->thread)
          {
              void *ret;
-+#if !defined(__sortix__)
++#if !defined(__sortix__) || defined(__SORTIX_HAS_PTHREAD_CANCEL__)
              pthread_cancel(a->thread);
 +#endif
              pthread_join(a->thread, &ret);
              a->thread = 0;
          }
-diff -Paur --no-dereference -- xorriso.upstream/xorriso/iso_manip.c xorriso/xorriso/iso_manip.c
---- xorriso.upstream/xorriso/iso_manip.c
-+++ xorriso/xorriso/iso_manip.c
-@@ -23,6 +23,12 @@
- #include <time.h>
- #include <errno.h>
- 
-+#ifndef S_ISGID
-+#define S_ISGID 02000
-+#endif
-+#ifndef S_ISUID
-+#define S_ISUID 04000
-+#endif
- 
- #include "xorriso.h"
- #include "xorriso_private.h"
-diff -Paur --no-dereference -- xorriso.upstream/xorriso/lib_mgt.c xorriso/xorriso/lib_mgt.c
---- xorriso.upstream/xorriso/lib_mgt.c
-+++ xorriso/xorriso/lib_mgt.c
-@@ -35,7 +35,9 @@
- 
- /* for -charset */
- #include <iconv.h>
-+#if !defined(__sortix__)
- #include <langinfo.h>
-+#endif
- 
- #ifdef Xorriso_standalonE
- 
-@@ -471,7 +473,11 @@
-  char *nl_charset;
-  iconv_t iconv_ret= (iconv_t) -1;
- 
-+#if defined(__sortix__)
-+ nl_charset= "UTF-8";
-+#else
-  nl_charset= nl_langinfo(CODESET);
-+#endif
-  if(name == NULL)
-    name= nl_charset;
- 
 diff -Paur --no-dereference -- xorriso.upstream/xorriso/misc_funct.c xorriso/xorriso/misc_funct.c
 --- xorriso.upstream/xorriso/misc_funct.c
 +++ xorriso/xorriso/misc_funct.c
@@ -348,50 +58,10 @@ diff -Paur --no-dereference -- xorriso.upstream/xorriso/misc_funct.c xorriso/xor
  
  
  #include "sfile.h"
-@@ -644,7 +645,7 @@
- #else
-      if(result_tm.tm_isdst < 0)
-        result_tm.tm_isdst = 0;
--     seconds-= timezone - result_tm.tm_isdst * 3600;
-+     seconds-= 0 - result_tm.tm_isdst * 3600;
- #endif
- 
-    }
-diff -Paur --no-dereference -- xorriso.upstream/xorriso/opts_a_c.c xorriso/xorriso/opts_a_c.c
---- xorriso.upstream/xorriso/opts_a_c.c
-+++ xorriso/xorriso/opts_a_c.c
-@@ -26,7 +26,6 @@
- 
- /* for -charset */
- #include <iconv.h>
--#include <langinfo.h>
- #include <locale.h>
- 
- 
 diff -Paur --no-dereference -- xorriso.upstream/xorriso/parse_exec.c xorriso/xorriso/parse_exec.c
 --- xorriso.upstream/xorriso/parse_exec.c
 +++ xorriso/xorriso/parse_exec.c
-@@ -2045,9 +2045,8 @@
-  char **argv= NULL;
-  double tdiff;
-  struct timeval tv;
-- struct timezone tz;
- 
-- gettimeofday(&tv,&tz);
-+ gettimeofday(&tv,NULL);
-  Xorriso_reset_counters(xorriso,0);
-  xorriso->idle_time= 0.0;
-  tdiff= tv.tv_sec+(1.e-6*(double) tv.tv_usec);
-@@ -2064,7 +2063,7 @@
-  ret= Xorriso_interpreter(xorriso, argc, argv, &idx, flag&0xffff);
-  if(ret<0)
-    goto ex;
-- gettimeofday(&tv,&tz);
-+ gettimeofday(&tv,NULL);
-  tdiff= tv.tv_sec+(1.e-6*(double) tv.tv_usec)-tdiff-xorriso->idle_time;
-  if(tdiff<0.001)
-    tdiff= 0.001;
-@@ -2814,7 +2813,7 @@
+@@ -2988,7 +2988,7 @@
  
   Xorriso_alloc_meM(prog, char, 5 * SfileadrL);
  
@@ -403,11 +73,11 @@ diff -Paur --no-dereference -- xorriso.upstream/xorriso/parse_exec.c xorriso/xor
 diff -Paur --no-dereference -- xorriso.upstream/xorriso/read_run.c xorriso/xorriso/read_run.c
 --- xorriso.upstream/xorriso/read_run.c
 +++ xorriso/xorriso/read_run.c
-@@ -721,7 +721,11 @@
+@@ -1139,7 +1139,11 @@
       Xorriso_msgs_submit(xorriso, 0, xorriso->info_text, errno, "FAILURE", 0);
       ret= 0; goto ex;
     }
-+#if defined(__sortix__)
++#if defined(__sortix__) && !defined(__SORTIX_HAS_MKNOD__)
 +   ret= (errno = ENOSYS, -1);
 +#else
     ret= mknod(disk_path, mode, dev);
@@ -415,11 +85,11 @@ diff -Paur --no-dereference -- xorriso.upstream/xorriso/read_run.c xorriso/xorri
     l_errno= errno;
  
   } else if(LIBISO_ISBLK(node)) {
-@@ -734,13 +738,21 @@
+@@ -1152,13 +1156,21 @@
       goto ex;
     if(dev == (dev_t) 1)
       goto probably_damaged;
-+#if defined(__sortix__)
++#if defined(__sortix__) && !defined(__SORTIX_HAS_MKNOD__)
 +   ret= (errno = ENOSYS, -1);
 +#else
     ret= mknod(disk_path, mode, dev);
@@ -429,7 +99,7 @@ diff -Paur --no-dereference -- xorriso.upstream/xorriso/read_run.c xorriso/xorri
   } else if(LIBISO_ISFIFO(node)) {
     what= "named pipe";
     mode= S_IFIFO | 0777;
-+#if defined(__sortix__)
++#if defined(__sortix__) && !defined(__SORTIX_HAS_MKNOD__)
 +   ret= (errno = ENOSYS, -1);
 +#else
     ret= mknod(disk_path, mode, dev);
@@ -437,96 +107,14 @@ diff -Paur --no-dereference -- xorriso.upstream/xorriso/read_run.c xorriso/xorri
     l_errno= errno;
  
   } else if(LIBISO_ISSOCK(node)) {
-diff -Paur --no-dereference -- xorriso.upstream/xorriso/sfile.c xorriso/xorriso/sfile.c
---- xorriso.upstream/xorriso/sfile.c
-+++ xorriso/xorriso/sfile.c
-@@ -206,11 +206,16 @@
- 
- int Sfile_being_group_member(struct stat *stbuf, int flag)
- {
-+#if !defined(__sortix__)
-  int i, suppl_groups;
-  gid_t *suppl_glist;
-+#endif
- 
-  if (getegid()==stbuf->st_gid)
-    return(1);
-+#if defined(__sortix__)
-+ return(0);
-+#else
-  suppl_groups= getgroups(0, NULL);
-  suppl_glist= (gid_t *) malloc((suppl_groups + 1) * sizeof(gid_t));
-  if (suppl_glist==NULL)
-@@ -224,6 +229,7 @@
-  }
-  free((char *) suppl_glist);
-  return(0);
-+#endif
- }
- 
- 
-@@ -879,8 +885,8 @@
- double Sfile_microtime(int flag)
- {
-  struct timeval tv;
-- struct timezone tz;
-- gettimeofday(&tv,&tz);
-+ /*struct timezone tz;*/
-+ gettimeofday(&tv,NULL);
-  return((double) (tv.tv_sec+1.0e-6*tv.tv_usec));
- }
- 
 diff -Paur --no-dereference -- xorriso.upstream/xorriso/text_io.c xorriso/xorriso/text_io.c
 --- xorriso.upstream/xorriso/text_io.c
 +++ xorriso/xorriso/text_io.c
-@@ -29,7 +29,9 @@
- 
- /* for -charset */
- #include <iconv.h>
-+#if !defined(__sortix__)
- #include <langinfo.h>
-+#endif
- #include <locale.h>
- 
- 
-@@ -327,10 +329,9 @@
- #endif /* Xorriso_with_line_editoR */
-  double tdiff;
-  struct timeval tv;
-- struct timezone tz;
-  struct Xorriso_lsT *next_lst;
- 
-- gettimeofday(&tv,&tz);
-+ gettimeofday(&tv,NULL);
-  tdiff= tv.tv_sec+(1.e-6*(double) tv.tv_usec);
- 
-  fflush(stdout);
-@@ -475,7 +476,7 @@
- ex:;
-  if(cpt!=NULL)
-    free(cpt);
-- gettimeofday(&tv,&tz);
-+ gettimeofday(&tv,NULL);
-  xorriso->idle_time+= tv.tv_sec+(1.e-6*(double) tv.tv_usec)-tdiff;
-  return(ret);
- }
-@@ -3484,7 +3485,11 @@
-    Xorriso_status_result(xorriso,filter,fp,flag&2);
- 
-  Xorriso_get_local_charset(xorriso, &local_charset, 0);
-+#if defined(__sortix__)
-+ nl_charset= "UTF-8";
-+#else
-  nl_charset= nl_langinfo(CODESET);
-+#endif
-  is_default= (strcmp(local_charset, nl_charset) == 0);
-  sprintf(line, "-local_charset %s\n", Text_shellsafe(local_charset, sfe, 0));
-  if(!(is_default && no_defaults))
-@@ -4126,8 +4131,12 @@
+@@ -4397,8 +4397,12 @@
         adrpt= reply_pipe_adr;
       ret= stat(adrpt, &stbuf);
       if(ret == -1) {
-+#if defined(__sortix__)
++#if defined(__sortix__) && !defined(__SORTIX_HAS_MKNOD__)
 +       ret= (errno = ENOSYS, -1);
 +#else
         ret= mknod(adrpt, S_IFIFO | S_IRWXU | S_IRWXG | S_IRWXO | S_IRWXO,
