@@ -175,7 +175,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
  CC=${CC:-cc}
  CPP=
  NGX_OBJS=objs
-@@ -188,6 +194,8 @@
+@@ -194,6 +200,8 @@
  
          --prefix=)                       NGX_PREFIX="!"             ;;
          --prefix=*)                      NGX_PREFIX="$value"        ;;
@@ -184,7 +184,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
          --sbin-path=*)                   NGX_SBIN_PATH="$value"     ;;
          --modules-path=*)                NGX_MODULES_PATH="$value"  ;;
          --conf-path=*)                   NGX_CONF_PATH="$value"     ;;
-@@ -199,9 +207,13 @@
+@@ -205,9 +213,13 @@
  
          --crossbuild=*)                  NGX_PLATFORM="$value"      ;;
  
@@ -199,7 +199,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
          --with-select_module)            EVENT_SELECT=YES           ;;
          --without-select_module)         EVENT_SELECT=NONE          ;;
          --with-poll_module)              EVENT_POLL=YES             ;;
-@@ -596,6 +608,12 @@
+@@ -608,6 +620,12 @@
      exit 1
  fi
  
@@ -212,7 +212,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
  
  if [ ".$NGX_PLATFORM" = ".win32" ]; then
      NGX_WINE=$WINE
-@@ -606,6 +624,8 @@
+@@ -618,6 +636,8 @@
  NGX_MODULES_PATH=${NGX_MODULES_PATH:-modules}
  NGX_CONF_PATH=${NGX_CONF_PATH:-conf/nginx.conf}
  NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
@@ -266,7 +266,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/types/sizeof nginx/auto/types
 diff -Paur --no-dereference -- nginx.upstream/auto/unix nginx/auto/unix
 --- nginx.upstream/auto/unix
 +++ nginx/auto/unix
-@@ -803,15 +803,15 @@
+@@ -851,15 +851,15 @@
  . auto/feature
  
  
@@ -418,7 +418,7 @@ diff -Paur --no-dereference -- nginx.upstream/configure nginx/configure
  
      echo " + $NGX_SYSTEM $NGX_RELEASE $NGX_MACHINE"
  
-@@ -83,6 +90,7 @@
+@@ -84,6 +91,7 @@
  
  have=NGX_SBIN_PATH value="\"$NGX_SBIN_PATH\"" . auto/define
  have=NGX_CONF_PATH value="\"$NGX_CONF_PATH\"" . auto/define
@@ -520,7 +520,7 @@ diff -Paur --no-dereference -- nginx.upstream/sites-available/default nginx/site
 diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/nginx.c
 --- nginx.upstream/src/core/nginx.c
 +++ nginx/src/core/nginx.c
-@@ -359,7 +359,7 @@
+@@ -360,7 +360,7 @@
  
  #endif
  
@@ -529,7 +529,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/ng
          return 1;
      }
  
-@@ -939,6 +939,7 @@
+@@ -991,6 +991,7 @@
  {
      u_char  *p;
      size_t   len;
@@ -537,7 +537,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/ng
  
      if (ngx_prefix) {
          len = ngx_strlen(ngx_prefix);
-@@ -999,14 +1000,18 @@
+@@ -1051,14 +1052,18 @@
          cycle->conf_file.data = ngx_conf_file;
  
      } else {
@@ -558,7 +558,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/ng
           p > cycle->conf_file.data;
           p--)
      {
-@@ -1088,7 +1093,7 @@
+@@ -1140,7 +1145,7 @@
  {
      ngx_core_conf_t  *ccf = conf;
  
@@ -690,7 +690,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/ngx_cycle.h nginx/src/cor
 diff -Paur --no-dereference -- nginx.upstream/src/event/ngx_event.c nginx/src/event/ngx_event.c
 --- nginx.upstream/src/event/ngx_event.c
 +++ nginx/src/event/ngx_event.c
-@@ -681,7 +681,8 @@
+@@ -699,7 +699,8 @@
  
      if (ngx_timer_resolution && !(ngx_event_flags & NGX_USE_TIMER_EVENT)) {
          struct sigaction  sa;
@@ -700,7 +700,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/event/ngx_event.c nginx/src/ev
  
          ngx_memzero(&sa, sizeof(struct sigaction));
          sa.sa_handler = ngx_timer_signal_handler;
-@@ -693,15 +694,16 @@
+@@ -711,15 +712,16 @@
              return NGX_ERROR;
          }
  
@@ -723,7 +723,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/event/ngx_event.c nginx/src/ev
      }
  
      if (ngx_event_flags & NGX_USE_FD_EVENT) {
-@@ -713,6 +715,11 @@
+@@ -731,6 +733,11 @@
              return NGX_ERROR;
          }
  
