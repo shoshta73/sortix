@@ -1,7 +1,19 @@
+diff -Paur --no-dereference -- vim.upstream/src/Makefile vim/src/Makefile
+--- vim.upstream/src/Makefile
++++ vim/src/Makefile
+@@ -2342,6 +2342,8 @@
+ # install targets
+ 
+ install: $(GUI_INSTALL)
++	ln -s ../../etc/vimrc $(DEST_VIM)/vimrc
++	ln -s ../../etc/gvimrc $(DEST_VIM)/gvimrc
+ 
+ install_normal: installvim installtools $(INSTALL_LANGS) install-icons
+ 
 diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/configure
 --- vim.upstream/src/auto/configure
 +++ vim/src/auto/configure
-@@ -10140,7 +10140,9 @@
+@@ -10739,7 +10739,9 @@
  
      if test "$cross_compiling" = yes; then :
  
@@ -12,7 +24,7 @@ diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/conf
  
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -11362,7 +11364,7 @@
+@@ -11961,7 +11963,7 @@
  
      if test "x$olibs" != "x$LIBS"; then
                          if test "$cross_compiling" = yes; then :
@@ -21,18 +33,7 @@ diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/conf
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
-@@ -11405,6 +11407,10 @@
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
- 
-+#ifdef HAVE_TERMCAP_H
-+# include <termcap.h>
-+#endif
-+
- int
- main ()
- {
-@@ -11433,7 +11439,8 @@
+@@ -12033,7 +12035,8 @@
  
      if test "$cross_compiling" = yes; then :
  
@@ -42,26 +43,17 @@ diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/conf
  
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -11486,7 +11493,8 @@
+@@ -12085,7 +12088,8 @@
  
-       if test "$cross_compiling" = yes; then :
+     if test "$cross_compiling" = yes; then :
  
--	as_fn_error $? "failed to compile test program." "$LINENO" 5
-+	#as_fn_error $? "failed to compile test program." "$LINENO" 5
-+	vim_cv_tgent=zero
+-      as_fn_error $? "failed to compile test program." "$LINENO" 5
++      #as_fn_error $? "failed to compile test program." "$LINENO" 5
++      vim_cv_tgetent=zero
  
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -11715,6 +11723,8 @@
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
- 
-+#include <stdlib.h>
-+
- int
- main ()
- {
-@@ -11957,7 +11967,8 @@
+@@ -12453,7 +12457,8 @@
  
      if test "$cross_compiling" = yes; then :
  
@@ -71,17 +63,17 @@ diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/conf
  
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -12324,7 +12335,8 @@
+@@ -13115,7 +13120,8 @@
  
      if test "$cross_compiling" = yes; then :
  
 -      as_fn_error $? "cross-compiling: please set 'vim_cv_stat_ignores_slash'" "$LINENO" 5
 +      #as_fn_error $? "cross-compiling: please set 'vim_cv_stat_ignores_slash'" "$LINENO" 5
-+      vim_cv_stat_ignores_slash=no
++      vim_cv_getcwd_broken=no
  
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -13325,8 +13337,8 @@
+@@ -14270,8 +14276,8 @@
  { $as_echo "$as_me:${as_lineno-$LINENO}: checking uint32_t is 32 bits" >&5
  $as_echo_n "checking uint32_t is 32 bits... " >&6; }
  if test "$cross_compiling" = yes; then :
@@ -92,15 +84,7 @@ diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/conf
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
-@@ -13337,6 +13349,7 @@
- #ifdef HAVE_INTTYPES_H
- # include <inttypes.h>
- #endif
-+#include <stdlib.h>
- main() {
-   uint32_t nr1 = (uint32_t)-1;
-   uint32_t nr2 = (uint32_t)0xffffffffUL;
-@@ -13386,7 +13399,8 @@
+@@ -14331,7 +14337,8 @@
  
      if test "$cross_compiling" = yes; then :
  
@@ -110,66 +94,42 @@ diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/conf
  
  else
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-diff -Paur --no-dereference -- vim.upstream/src/Makefile vim/src/Makefile
---- vim.upstream/src/Makefile
-+++ vim/src/Makefile
-@@ -2202,6 +2202,8 @@
- # install targets
+@@ -14801,6 +14808,10 @@
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
  
- install: $(GUI_INSTALL)
-+	ln -s ../../etc/vimrc $(DEST_VIM)/vimrc
-+	ln -s ../../etc/gvimrc $(DEST_VIM)/gvimrc
++#ifdef HAVE_TERMCAP_H
++# include <termcap.h>
++#endif
++
+ int
+ main ()
+ {
+@@ -14923,6 +14934,8 @@
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
  
- install_normal: installvim installtools $(INSTALL_LANGS) install-icons
- 
++#include <stdlib.h>
++
+ int
+ main ()
+ {
 diff -Paur --no-dereference -- vim.upstream/src/memfile.c vim/src/memfile.c
 --- vim.upstream/src/memfile.c
 +++ vim/src/memfile.c
-@@ -613,7 +613,7 @@
- 	    /* OpenNT is strictly POSIX (Benzinger) */
- 	    /* Tandem/Himalaya NSK-OSS doesn't have sync() */
- 	    /* No sync() on Stratus VOS */
+@@ -593,7 +593,7 @@
+ 	    // OpenNT is strictly POSIX (Benzinger)
+ 	    // Tandem/Himalaya NSK-OSS doesn't have sync()
+ 	    // No sync() on Stratus VOS
 -# if defined(__OPENNT) || defined(__TANDEM) || defined(__VOS__)
-+# if defined(__OPENNT) || defined(__TANDEM) || defined(__VOS__) || defined(__sortix__)
++# if defined(__OPENNT) || defined(__TANDEM) || defined(__VOS__) || (defined(__sortix__) && !defined(__SORTIX_HAS_SYNC__))
  	    fflush(NULL);
  # else
  	    sync();
-diff -Paur --no-dereference -- vim.upstream/src/regexp.c vim/src/regexp.c
---- vim.upstream/src/regexp.c
-+++ vim/src/regexp.c
-@@ -189,6 +189,7 @@
- #define KWORD		25	/*	Match keyword char */
- #define SKWORD		26	/*	Match word char but no digit */
- #define FNAME		27	/*	Match file name char */
-+#undef SFNAME /* <sortix/fork.h> namespace issue */
- #define SFNAME		28	/*	Match file name char but no digit */
- #define PRINT		29	/*	Match printable char */
- #define SPRINT		30	/*	Match printable char but no digit */
 diff -Paur --no-dereference -- vim.upstream/src/sha256.c vim/src/sha256.c
 --- vim.upstream/src/sha256.c
 +++ vim/src/sha256.c
-@@ -380,20 +380,6 @@
-     return failures > 0 ? FAIL : OK;
- }
- 
--    static unsigned int
--get_some_time(void)
--{
--# ifdef HAVE_GETTIMEOFDAY
--    struct timeval tv;
--
--    /* Using usec makes it less predictable. */
--    gettimeofday(&tv, NULL);
--    return (unsigned int)(tv.tv_sec + tv.tv_usec);
--# else
--    return (unsigned int)time(NULL);
--# endif
--}
--
- /*
-  * Fill "header[header_len]" with random_data.
-  * Also "salt[salt_len]" when "salt" is not NULL.
-@@ -410,10 +396,7 @@
+@@ -406,10 +406,7 @@
      char_u	     sha256sum[32];
      context_sha256_T ctx;
  
