@@ -66,6 +66,7 @@ int getifaddrs(struct ifaddrs** ifas_ptr)
 			freeifaddrs(ifas);
 			return -1;
 		}
+		struct if_status status;
 		struct if_config cfg;
 		if ( ioctl(fd, NIOC_GETCONFIG, &cfg) < 0 )
 		{
@@ -89,7 +90,7 @@ int getifaddrs(struct ifaddrs** ifas_ptr)
 			ifas = &ifa->pub;
 			strlcpy(ifa->name, netif->if_name, sizeof(ifa->name));
 			ifa->pub.ifa_name = ifa->name;
-			ifa->pub.ifa_flags = 0;
+			ifa->pub.ifa_flags = status.flags & IF_STATUS_FLAGS_UP ? IFF_UP : 0;
 			ifa->addr.in.sin_family = AF_INET;
 			memcpy(&ifa->addr.in.sin_addr, &cfg.inet.address,
 			       sizeof(struct in_addr));

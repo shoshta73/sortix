@@ -24,6 +24,8 @@
 
 #include <sys/__/types.h>
 
+#define IFF_UP (1 << 0)
+
 #ifndef __socklen_t_defined
 #define __socklen_t_defined
 typedef __socklen_t socklen_t;
