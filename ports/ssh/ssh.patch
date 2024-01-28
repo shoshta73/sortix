@@ -1,336 +1,3 @@
-diff -Paur --no-dereference -- ssh.upstream/auth.c ssh/auth.c
---- ssh.upstream/auth.c
-+++ ssh/auth.c
-@@ -99,7 +99,9 @@
- int
- allowed_user(struct ssh *ssh, struct passwd * pw)
- {
-+#if !defined(__sortix__)
- 	struct stat st;
-+#endif
- 	const char *hostname = NULL, *ipaddr = NULL;
- 	u_int i;
- 	int r;
-@@ -120,6 +122,8 @@
- 	 */
- 	if (options.chroot_directory == NULL ||
- 	    strcasecmp(options.chroot_directory, "none") == 0) {
-+/* PATCH: Sortix searches PATH for the shell which is not implemented here. */
-+#if !defined(__sortix__)
- 		char *shell = xstrdup((pw->pw_shell[0] == '\0') ?
- 		    _PATH_BSHELL : pw->pw_shell); /* empty = /bin/sh */
- 
-@@ -137,6 +141,7 @@
- 			return 0;
- 		}
- 		free(shell);
-+#endif
- 	}
- 
- 	if (options.num_deny_users > 0 || options.num_allow_users > 0 ||
-diff -Paur --no-dereference -- ssh.upstream/auth-passwd.c ssh/auth-passwd.c
---- ssh.upstream/auth-passwd.c
-+++ ssh/auth-passwd.c
-@@ -44,6 +44,7 @@
- #include <stdio.h>
- #include <string.h>
- #include <stdarg.h>
-+#include <unistd.h>
- 
- #include "packet.h"
- #include "sshbuf.h"
-@@ -187,6 +188,21 @@
- 		return (auth_close(as));
- 	}
- }
-+#elif defined(__sortix__)
-+/* PATCH: Sortix authentication support. */
-+int
-+sys_auth_passwd(struct ssh *ssh, const char *password)
-+{
-+	Authctxt *authctxt = ssh->authctxt;
-+	struct passwd *pw = authctxt->pw;
-+
-+	/* Just use the supplied fake password if authctxt is invalid */
-+	/* TODO: Use the default number of rounds according to login.conf once
-+	         this is implemented. */
-+	char *pw_password = authctxt->valid ? pw->pw_passwd : NULL;
-+
-+	return crypt_checkpass(password, pw_password) == 0;
-+}
- #elif !defined(CUSTOM_SYS_AUTH_PASSWD)
- int
- sys_auth_passwd(struct ssh *ssh, const char *password)
-diff -Paur --no-dereference -- ssh.upstream/channels.c ssh/channels.c
---- ssh.upstream/channels.c
-+++ ssh/channels.c
-@@ -1390,7 +1390,6 @@
- channel_decode_socks4(Channel *c, struct sshbuf *input, struct sshbuf *output)
- {
- 	const u_char *p;
--	char *host;
- 	u_int len, have, i, found, need;
- 	char username[256];
- 	struct {
-@@ -1454,7 +1453,9 @@
- 	free(c->path);
- 	c->path = NULL;
- 	if (need == 1) {			/* SOCKS4: one string */
--		host = inet_ntoa(s4_req.dest_addr);
-+		/* PATCH: Prefer the better designed inet_ntop over inet_ntoa. */
-+		char host[INET_ADDRSTRLEN + 1];
-+		inet_ntop(AF_INET, &s4_req.dest_addr, host, sizeof(host));
- 		c->path = xstrdup(host);
- 	} else {				/* SOCKS4A: two strings */
- 		have = sshbuf_len(input);
-@@ -2458,8 +2459,8 @@
- 		return;
- 	}
- 	if ((euid != 0) && (getuid() != euid)) {
--		error("multiplex uid mismatch: peer euid %u != uid %u",
--		    (u_int)euid, (u_int)getuid());
-+		error("multiplex uid mismatch: peer euid %ju != uid %ju",
-+		    (uintmax_t)euid, (uintmax_t)getuid());
- 		close(newsock);
- 		return;
- 	}
-diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
---- ssh.upstream/configure
-+++ ssh/configure
-@@ -8688,6 +8688,7 @@
- # the --with-solaris-privs option and --with-sandbox=solaris).
- SOLARIS_PRIVS="no"
- 
-+default_user_path="/usr/bin:/bin:/usr/sbin:/sbin"
- # Check for some target-specific stuff
- case "$host" in
- *-*-aix*)
-@@ -8701,6 +8702,9 @@
- 	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
- 
-+/* PATCH: Fix implicit declaration of exit(3). */
-+#include <stdlib.h>
-+
- #define testmacro foo
- #define testmacro bar
- int
-@@ -10399,6 +10403,10 @@
- printf "%s\n" "#define BROKEN_SETVBUF 1" >>confdefs.h
- 
- 	;;
-+*-*-sortix*)
-+	default_user_path="/bin:/sbin"
-+	MANTYPE=doc
-+	;;
- esac
- 
- { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking compiler and flags for sanity" >&5
-@@ -19135,7 +19143,12 @@
- 	long long num = 0x7fffffffffffffffll;
- #endif
- 	strcpy(expected_out, "9223372036854775807");
--	snprintf(buf, mazsize, "%lld", num);
-+/* PATCH: Fix format type issue. */
-+#if (SIZEOF_LONG_INT == 8)
-+	snprintf(buf, mazsize, "%ld", num);
-+#else
-+ 	snprintf(buf, mazsize, "%lld", num);
-+#endif
- 	if(strcmp(buf, expected_out) != 0)
- 		exit(1);
- 	exit(0);
-@@ -22069,7 +22082,8 @@
- 	elif ${NROFF} -man ${srcdir}/ssh.1 >/dev/null 2>&1; then
- 		MANTYPE=man
- 	else
--		MANTYPE=cat
-+		# PATCH: Sortix uses mandoc (mdocml) even when cross-compiling.
-+		MANTYPE=doc
- 	fi
- fi
- 
-@@ -22258,7 +22272,7 @@
- 		fi
- 		if test "$cross_compiling" = yes
- then :
--   user_path="/usr/bin:/bin:/usr/sbin:/sbin"
-+   user_path="$default_user_path"
- 
- else $as_nop
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -22274,7 +22288,7 @@
- # ifdef _PATH_USERPATH	/* Irix */
- #  define _PATH_STDPATH _PATH_USERPATH
- # else
--#  define _PATH_STDPATH "/usr/bin:/bin:/usr/sbin:/sbin"
-+#  define _PATH_STDPATH "$default_user_path"
- # endif
- #endif
- #include <sys/types.h>
-@@ -22306,7 +22320,7 @@
- then :
-    user_path=`cat conftest.stdpath`
- else $as_nop
--   user_path="/usr/bin:/bin:/usr/sbin:/sbin"
-+   user_path="$default_user_path"
- fi
- rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-   conftest.$ac_objext conftest.beam conftest.$ac_ext
-diff -Paur --no-dereference -- ssh.upstream/defines.h ssh/defines.h
---- ssh.upstream/defines.h
-+++ ssh/defines.h
-@@ -56,7 +56,9 @@
-  * Definitions for IP type of service (ip_tos)
-  */
- #include <netinet/in_systm.h>
-+#if __has_include(<netinet/ip.h>)
- #include <netinet/ip.h>
-+#endif
- #ifndef IPTOS_LOWDELAY
- # define IPTOS_LOWDELAY          0x10
- # define IPTOS_THROUGHPUT        0x08
-@@ -121,10 +123,14 @@
- # ifdef PATH_MAX
- #  define MAXPATHLEN PATH_MAX
- # else /* PATH_MAX */
--#  define MAXPATHLEN 64
-+#  define MAXPATHLEN 4096
- # endif /* PATH_MAX */
- #endif /* MAXPATHLEN */
- 
-+#ifndef PATH_MAX
-+# define PATH_MAX 4096
-+#endif
-+
- #ifndef HOST_NAME_MAX
- # include "netdb.h" /* for MAXHOSTNAMELEN */
- # if defined(_POSIX_HOST_NAME_MAX)
-@@ -216,7 +222,9 @@
- /* (or die trying) */
- 
- #ifndef HAVE_U_INT
-+typedef unsigned short u_short;
- typedef unsigned int u_int;
-+typedef unsigned long u_long;
- #endif
- 
- #ifndef HAVE_INTXX_T
-diff -Paur --no-dereference -- ssh.upstream/dh.c ssh/dh.c
---- ssh.upstream/dh.c
-+++ ssh/dh.c
-@@ -54,7 +54,10 @@
- 
- static const char * get_moduli_filename(void)
- {
--	return moduli_filename ? moduli_filename : _PATH_DH_MODULI;
-+	/* PATCH: Use /etc/default for the default configuration. */
-+	return moduli_filename ? moduli_filename :
-+	       !access(_PATH_DH_MODULI, F_OK) ? _PATH_DH_MODULI :
-+	       _PATH_DH_MODULI_DEFAULT;
- }
- 
- static int
-diff -Paur --no-dereference -- ssh.upstream/includes.h ssh/includes.h
---- ssh.upstream/includes.h
-+++ ssh/includes.h
-@@ -109,7 +109,9 @@
- #endif
- 
- #include <netinet/in.h>
-+#if __has_include(<netinet/in_systm.h>)
- #include <netinet/in_systm.h> /* For typedefs */
-+#endif
- #ifdef HAVE_RPC_TYPES_H
- # include <rpc/types.h> /* For INADDR_LOOPBACK */
- #endif
-@@ -152,6 +154,9 @@
- #endif
- 
- #include <errno.h>
-+#ifndef EPFNOSUPPORT
-+#define EPFNOSUPPORT EAFNOSUPPORT
-+#endif
- 
- /*
-  * On HP-UX 11.11, shadow.h and prot.h provide conflicting declarations
-diff -Paur --no-dereference -- ssh.upstream/init/sshd ssh/init/sshd
---- ssh.upstream/init/sshd
-+++ ssh/init/sshd
-@@ -0,0 +1,3 @@
-+require network
-+require sshd-keygen
-+exec /sbin/sshd -De
-diff -Paur --no-dereference -- ssh.upstream/init/sshd-keygen ssh/init/sshd-keygen
---- ssh.upstream/init/sshd-keygen
-+++ ssh/init/sshd-keygen
-@@ -0,0 +1 @@
-+exec ssh-keygen -A
-diff -Paur --no-dereference -- ssh.upstream/kex.h ssh/kex.h
---- ssh.upstream/kex.h
-+++ ssh/kex.h
-@@ -85,6 +85,9 @@
- 	PROPOSAL_MAX
- };
- 
-+#ifdef MODE_MAX
-+#undef MODE_MAX /* PATCH: Collides with Sortix constant. */
-+#endif
- enum kex_modes {
- 	MODE_IN,
- 	MODE_OUT,
-diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
---- ssh.upstream/loginrec.c
-+++ ssh/loginrec.c
-@@ -147,6 +147,7 @@
- 
- #include "includes.h"
- 
-+#include <sys/time.h>
- #include <sys/types.h>
- #include <sys/stat.h>
- #include <sys/socket.h>
-@@ -187,6 +188,20 @@
- # include <util.h>
- #endif
- 
-+#if defined(__sortix__) && !__has_include(<utmpx.h>)
-+struct utmpx
-+{
-+	short ut_type;
-+	pid_t ut_pid;
-+	char ut_line[32];
-+	char ut_id[4];
-+	char ut_user[32];
-+	struct timeval ut_tv;
-+};
-+#define USER_PROCESS    7
-+#define DEAD_PROCESS    8
-+#endif
-+
- /**
-  ** prototypes for helper functions in this file
-  **/
-@@ -439,6 +454,10 @@
- int
- login_write(struct logininfo *li)
- {
-+/* TODO: Sortix doesn't have anything like utmp yet. */
-+#if defined(__sortix__) && !__has_include(<utmpx.h>)
-+	return 0;
-+#endif
- #ifndef HAVE_CYGWIN
- 	if (geteuid() != 0) {
- 		logit("Attempt to write login records by non-root user (aborting)");
-@@ -1033,7 +1052,7 @@
- 		return (0);
- 	}
- # else
--	if (!utmpx_write_direct(li, &ut)) {
-+	if (!utmpx_write_direct(li, &utx)) {
- 		logit("%s: utmp_write_direct() failed", __func__);
- 		return (0);
- 	}
 diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
 --- ssh.upstream/Makefile.in
 +++ ssh/Makefile.in
@@ -581,10 +248,343 @@ diff -Paur --no-dereference -- ssh.upstream/Makefile.in ssh/Makefile.in
  	    regress/unittests/test_helper/libtest_helper.a \
  	    -lssh -lopenbsd-compat -lssh -lopenbsd-compat $(TESTLIBS)
  
+diff -Paur --no-dereference -- ssh.upstream/auth-passwd.c ssh/auth-passwd.c
+--- ssh.upstream/auth-passwd.c
++++ ssh/auth-passwd.c
+@@ -44,6 +44,7 @@
+ #include <stdio.h>
+ #include <string.h>
+ #include <stdarg.h>
++#include <unistd.h>
+ 
+ #include "packet.h"
+ #include "sshbuf.h"
+@@ -187,6 +188,21 @@
+ 		return (auth_close(as));
+ 	}
+ }
++#elif defined(__sortix__)
++/* PATCH: Sortix authentication support. */
++int
++sys_auth_passwd(struct ssh *ssh, const char *password)
++{
++	Authctxt *authctxt = ssh->authctxt;
++	struct passwd *pw = authctxt->pw;
++
++	/* Just use the supplied fake password if authctxt is invalid */
++	/* TODO: Use the default number of rounds according to login.conf once
++	         this is implemented. */
++	char *pw_password = authctxt->valid ? pw->pw_passwd : NULL;
++
++	return crypt_checkpass(password, pw_password) == 0;
++}
+ #elif !defined(CUSTOM_SYS_AUTH_PASSWD)
+ int
+ sys_auth_passwd(struct ssh *ssh, const char *password)
+diff -Paur --no-dereference -- ssh.upstream/auth.c ssh/auth.c
+--- ssh.upstream/auth.c
++++ ssh/auth.c
+@@ -99,7 +99,9 @@
+ int
+ allowed_user(struct ssh *ssh, struct passwd * pw)
+ {
++#if !defined(__sortix__)
+ 	struct stat st;
++#endif
+ 	const char *hostname = NULL, *ipaddr = NULL;
+ 	u_int i;
+ 	int r;
+@@ -120,6 +122,8 @@
+ 	 */
+ 	if (options.chroot_directory == NULL ||
+ 	    strcasecmp(options.chroot_directory, "none") == 0) {
++/* PATCH: Sortix searches PATH for the shell which is not implemented here. */
++#if !defined(__sortix__)
+ 		char *shell = xstrdup((pw->pw_shell[0] == '\0') ?
+ 		    _PATH_BSHELL : pw->pw_shell); /* empty = /bin/sh */
+ 
+@@ -137,6 +141,7 @@
+ 			return 0;
+ 		}
+ 		free(shell);
++#endif
+ 	}
+ 
+ 	if (options.num_deny_users > 0 || options.num_allow_users > 0 ||
+diff -Paur --no-dereference -- ssh.upstream/channels.c ssh/channels.c
+--- ssh.upstream/channels.c
++++ ssh/channels.c
+@@ -1407,7 +1407,6 @@
+ channel_decode_socks4(Channel *c, struct sshbuf *input, struct sshbuf *output)
+ {
+ 	const u_char *p;
+-	char *host;
+ 	u_int len, have, i, found, need;
+ 	char username[256];
+ 	struct {
+@@ -1471,7 +1470,9 @@
+ 	free(c->path);
+ 	c->path = NULL;
+ 	if (need == 1) {			/* SOCKS4: one string */
+-		host = inet_ntoa(s4_req.dest_addr);
++		/* PATCH: Prefer the better designed inet_ntop over inet_ntoa. */
++		char host[INET_ADDRSTRLEN + 1];
++		inet_ntop(AF_INET, &s4_req.dest_addr, host, sizeof(host));
+ 		c->path = xstrdup(host);
+ 	} else {				/* SOCKS4A: two strings */
+ 		have = sshbuf_len(input);
+@@ -2476,8 +2477,8 @@
+ 		return;
+ 	}
+ 	if ((euid != 0) && (getuid() != euid)) {
+-		error("multiplex uid mismatch: peer euid %u != uid %u",
+-		    (u_int)euid, (u_int)getuid());
++		error("multiplex uid mismatch: peer euid %ju != uid %ju",
++		    (uintmax_t)euid, (uintmax_t)getuid());
+ 		close(newsock);
+ 		return;
+ 	}
+diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
+--- ssh.upstream/configure
++++ ssh/configure
+@@ -10983,6 +10983,7 @@
+ # the --with-solaris-privs option and --with-sandbox=solaris).
+ SOLARIS_PRIVS="no"
+ 
++default_user_path="/usr/bin:/bin:/usr/sbin:/sbin"
+ # Check for some target-specific stuff
+ case "$host" in
+ *-*-aix*)
+@@ -10996,6 +10997,9 @@
+ 	cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
++/* PATCH: Fix implicit declaration of exit(3). */
++#include <stdlib.h>
++
+ #define testmacro foo
+ #define testmacro bar
+ int
+@@ -12773,6 +12777,10 @@
+ printf "%s\n" "#define BROKEN_SETVBUF 1" >>confdefs.h
+ 
+ 	;;
++*-*-sortix*)
++	default_user_path="/bin:/sbin"
++	MANTYPE=doc
++	;;
+ esac
+ 
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking compiler and flags for sanity" >&5
+@@ -21559,7 +21567,12 @@
+ 	long long num = 0x7fffffffffffffffll;
+ #endif
+ 	strcpy(expected_out, "9223372036854775807");
+-	snprintf(buf, mazsize, "%lld", num);
++/* PATCH: Fix format type issue. */
++#if (SIZEOF_LONG_INT == 8)
++	snprintf(buf, mazsize, "%ld", num);
++#else
++ 	snprintf(buf, mazsize, "%lld", num);
++#endif
+ 	if(strcmp(buf, expected_out) != 0)
+ 		exit(1);
+ 	exit(0);
+@@ -24493,7 +24506,8 @@
+ 	elif ${NROFF} -man ${srcdir}/ssh.1 >/dev/null 2>&1; then
+ 		MANTYPE=man
+ 	else
+-		MANTYPE=cat
++		# PATCH: Sortix uses mandoc (mdocml) even when cross-compiling.
++		MANTYPE=doc
+ 	fi
+ fi
+ 
+@@ -24682,7 +24696,7 @@
+ 		fi
+ 		if test "$cross_compiling" = yes
+ then :
+-   user_path="/usr/bin:/bin:/usr/sbin:/sbin"
++   user_path="$default_user_path"
+ 
+ else $as_nop
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -24698,7 +24712,7 @@
+ # ifdef _PATH_USERPATH	/* Irix */
+ #  define _PATH_STDPATH _PATH_USERPATH
+ # else
+-#  define _PATH_STDPATH "/usr/bin:/bin:/usr/sbin:/sbin"
++#  define _PATH_STDPATH "$default_user_path"
+ # endif
+ #endif
+ #include <sys/types.h>
+@@ -24730,7 +24744,7 @@
+ then :
+    user_path=`cat conftest.stdpath`
+ else $as_nop
+-   user_path="/usr/bin:/bin:/usr/sbin:/sbin"
++   user_path="$default_user_path"
+ fi
+ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+   conftest.$ac_objext conftest.beam conftest.$ac_ext
+diff -Paur --no-dereference -- ssh.upstream/defines.h ssh/defines.h
+--- ssh.upstream/defines.h
++++ ssh/defines.h
+@@ -56,7 +56,9 @@
+  * Definitions for IP type of service (ip_tos)
+  */
+ #include <netinet/in_systm.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ #ifndef IPTOS_LOWDELAY
+ # define IPTOS_LOWDELAY          0x10
+ # define IPTOS_THROUGHPUT        0x08
+@@ -121,10 +123,14 @@
+ # ifdef PATH_MAX
+ #  define MAXPATHLEN PATH_MAX
+ # else /* PATH_MAX */
+-#  define MAXPATHLEN 64
++#  define MAXPATHLEN 4096
+ # endif /* PATH_MAX */
+ #endif /* MAXPATHLEN */
+ 
++#ifndef PATH_MAX
++# define PATH_MAX 4096
++#endif
++
+ #ifndef HOST_NAME_MAX
+ # include "netdb.h" /* for MAXHOSTNAMELEN */
+ # if defined(_POSIX_HOST_NAME_MAX)
+@@ -216,7 +222,9 @@
+ /* (or die trying) */
+ 
+ #ifndef HAVE_U_INT
++typedef unsigned short u_short;
+ typedef unsigned int u_int;
++typedef unsigned long u_long;
+ #endif
+ 
+ #ifndef HAVE_INTXX_T
+diff -Paur --no-dereference -- ssh.upstream/dh.c ssh/dh.c
+--- ssh.upstream/dh.c
++++ ssh/dh.c
+@@ -54,7 +54,10 @@
+ 
+ static const char * get_moduli_filename(void)
+ {
+-	return moduli_filename ? moduli_filename : _PATH_DH_MODULI;
++	/* PATCH: Use /etc/default for the default configuration. */
++	return moduli_filename ? moduli_filename :
++	       !access(_PATH_DH_MODULI, F_OK) ? _PATH_DH_MODULI :
++	       _PATH_DH_MODULI_DEFAULT;
+ }
+ 
+ static int
+diff -Paur --no-dereference -- ssh.upstream/includes.h ssh/includes.h
+--- ssh.upstream/includes.h
++++ ssh/includes.h
+@@ -109,7 +109,9 @@
+ #endif
+ 
+ #include <netinet/in.h>
++#if __has_include(<netinet/in_systm.h>)
+ #include <netinet/in_systm.h> /* For typedefs */
++#endif
+ #ifdef HAVE_RPC_TYPES_H
+ # include <rpc/types.h> /* For INADDR_LOOPBACK */
+ #endif
+@@ -152,6 +154,9 @@
+ #endif
+ 
+ #include <errno.h>
++#ifndef EPFNOSUPPORT
++#define EPFNOSUPPORT EAFNOSUPPORT
++#endif
+ 
+ /*
+  * On HP-UX 11.11, shadow.h and prot.h provide conflicting declarations
+diff -Paur --no-dereference -- ssh.upstream/init/sshd ssh/init/sshd
+--- ssh.upstream/init/sshd
++++ ssh/init/sshd
+@@ -0,0 +1,3 @@
++require network
++require sshd-keygen
++exec /sbin/sshd -De
+diff -Paur --no-dereference -- ssh.upstream/init/sshd-keygen ssh/init/sshd-keygen
+--- ssh.upstream/init/sshd-keygen
++++ ssh/init/sshd-keygen
+@@ -0,0 +1 @@
++exec ssh-keygen -A
+diff -Paur --no-dereference -- ssh.upstream/kex.h ssh/kex.h
+--- ssh.upstream/kex.h
++++ ssh/kex.h
+@@ -85,6 +85,9 @@
+ 	PROPOSAL_MAX
+ };
+ 
++#ifdef MODE_MAX
++#undef MODE_MAX /* PATCH: Collides with Sortix constant. */
++#endif
+ enum kex_modes {
+ 	MODE_IN,
+ 	MODE_OUT,
+diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
+--- ssh.upstream/loginrec.c
++++ ssh/loginrec.c
+@@ -147,6 +147,7 @@
+ 
+ #include "includes.h"
+ 
++#include <sys/time.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ #include <sys/socket.h>
+@@ -187,6 +188,20 @@
+ # include <util.h>
+ #endif
+ 
++#if defined(__sortix__) && !__has_include(<utmpx.h>)
++struct utmpx
++{
++	short ut_type;
++	pid_t ut_pid;
++	char ut_line[32];
++	char ut_id[4];
++	char ut_user[32];
++	struct timeval ut_tv;
++};
++#define USER_PROCESS    7
++#define DEAD_PROCESS    8
++#endif
++
+ /**
+  ** prototypes for helper functions in this file
+  **/
+@@ -439,6 +454,10 @@
+ int
+ login_write(struct logininfo *li)
+ {
++/* TODO: Sortix doesn't have anything like utmp yet. */
++#if defined(__sortix__) && !__has_include(<utmpx.h>)
++	return 0;
++#endif
+ #ifndef HAVE_CYGWIN
+ 	if (geteuid() != 0) {
+ 		logit("Attempt to write login records by non-root user (aborting)");
+@@ -1033,7 +1052,7 @@
+ 		return (0);
+ 	}
+ # else
+-	if (!utmpx_write_direct(li, &ut)) {
++	if (!utmpx_write_direct(li, &utx)) {
+ 		logit("%s: utmp_write_direct() failed", __func__);
+ 		return (0);
+ 	}
 diff -Paur --no-dereference -- ssh.upstream/misc.c ssh/misc.c
 --- ssh.upstream/misc.c
 +++ ssh/misc.c
-@@ -70,6 +70,33 @@
+@@ -77,6 +77,33 @@
  #include "ssherr.h"
  #include "platform.h"
  
@@ -618,7 +618,7 @@ diff -Paur --no-dereference -- ssh.upstream/misc.c ssh/misc.c
  /* remove newline at end of string */
  char *
  chop(char *s)
-@@ -2742,17 +2769,17 @@
+@@ -2810,17 +2837,17 @@
  
  		if (geteuid() == 0 &&
  		    initgroups(pw->pw_name, pw->pw_gid) == -1) {
@@ -669,7 +669,7 @@ diff -Paur --no-dereference -- ssh.upstream/monitor_fdpass.c ssh/monitor_fdpass.
 diff -Paur --no-dereference -- ssh.upstream/mux.c ssh/mux.c
 --- ssh.upstream/mux.c
 +++ ssh/mux.c
-@@ -495,7 +495,7 @@
+@@ -497,7 +497,7 @@
  	/* prepare reply */
  	if ((r = sshbuf_put_u32(reply, MUX_S_ALIVE)) != 0 ||
  	    (r = sshbuf_put_u32(reply, rid)) != 0 ||
@@ -718,18 +718,20 @@ diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/bsd-misc.h ssh/openbs
  #endif /* !HAVE_SETSID */
  
  #ifndef HAVE_SETENV
-@@ -190,7 +190,10 @@
+@@ -190,8 +190,11 @@
  struct tm *localtime_r(const time_t *, struct tm *);
  #endif
  
 -#ifndef HAVE_REALPATH
+-#define realpath(x, y)	(sftp_realpath((x), (y)))
 +/* TODO: Quick hack to avoid rewriting all the realpath invocations */
 +#if !defined(HAVE_REALPATH) || defined(__sortix__)
 +#include <stdlib.h>
-+char* sftp_realpath(const char *path, char *resolved);
- #define realpath(x, y)	(sftp_realpath((x), (y)))
++char* sftp_do_realpath(const char *path, char *resolved);
++#define realpath(x, y)	(sftp_do_realpath((x), (y)))
  #endif
  
+ #endif /* _BSD_MISC_H */
 diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/bsd-pselect.c ssh/openbsd-compat/bsd-pselect.c
 --- ssh.upstream/openbsd-compat/bsd-pselect.c
 +++ ssh/openbsd-compat/bsd-pselect.c
@@ -922,7 +924,7 @@ diff -Paur --no-dereference -- ssh.upstream/pathnames.h ssh/pathnames.h
 diff -Paur --no-dereference -- ssh.upstream/progressmeter.c ssh/progressmeter.c
 --- ssh.upstream/progressmeter.c
 +++ ssh/progressmeter.c
-@@ -80,7 +80,8 @@
+@@ -79,7 +79,8 @@
  static int
  can_output(void)
  {
@@ -935,7 +937,7 @@ diff -Paur --no-dereference -- ssh.upstream/progressmeter.c ssh/progressmeter.c
 diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
 --- ssh.upstream/readconf.c
 +++ ssh/readconf.c
-@@ -509,6 +509,10 @@
+@@ -517,6 +517,10 @@
  int
  default_ssh_port(void)
  {
@@ -946,7 +948,7 @@ diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
  	static int port;
  	struct servent *sp;
  
-@@ -517,6 +521,7 @@
+@@ -525,6 +529,7 @@
  		port = sp ? ntohs(sp->s_port) : SSH_DEFAULT_PORT;
  	}
  	return port;
@@ -983,7 +985,7 @@ diff -Paur --no-dereference -- ssh.upstream/scp.c ssh/scp.c
  
  	if (!isatty(STDOUT_FILENO))
  		showprogress = 0;
-@@ -1009,7 +1009,7 @@
+@@ -1014,7 +1014,7 @@
  
  static struct sftp_conn *
  do_sftp_connect(char *host, char *user, int port, char *sftp_direct,
@@ -995,7 +997,7 @@ diff -Paur --no-dereference -- ssh.upstream/scp.c ssh/scp.c
 diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
 --- ssh.upstream/servconf.c
 +++ ssh/servconf.c
-@@ -308,7 +308,10 @@
+@@ -307,7 +307,10 @@
  	if (options->pid_file == NULL)
  		options->pid_file = xstrdup(_PATH_SSH_DAEMON_PID_FILE);
  	if (options->moduli_file == NULL)
@@ -1007,7 +1009,7 @@ diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
  	if (options->login_grace_time == -1)
  		options->login_grace_time = 120;
  	if (options->permit_root_login == PERMIT_NOT_SET)
-@@ -453,7 +456,12 @@
+@@ -452,7 +455,12 @@
  
  	/* Turn privilege separation and sandboxing on by default */
  	if (use_privsep == -1)
@@ -1082,7 +1084,7 @@ diff -Paur --no-dereference -- ssh.upstream/session.c ssh/session.c
 diff -Paur --no-dereference -- ssh.upstream/sftp-common.c ssh/sftp-common.c
 --- ssh.upstream/sftp-common.c
 +++ ssh/sftp-common.c
-@@ -217,18 +217,18 @@
+@@ -219,18 +219,18 @@
  {
  	int ulen, glen, sz = 0;
  	struct tm *ltime = localtime(&st->st_mtime);
@@ -1104,9 +1106,55 @@ diff -Paur --no-dereference -- ssh.upstream/sftp-common.c ssh/sftp-common.c
  			group = gbuf;
  		}
  		strlcpy(lc, "?", sizeof(lc));
+diff -Paur --no-dereference -- ssh.upstream/sftp-realpath.c ssh/sftp-realpath.c
+--- ssh.upstream/sftp-realpath.c
++++ ssh/sftp-realpath.c
+@@ -45,7 +45,7 @@
+ 
+ /* XXX rewrite sftp-server to use POSIX realpath and remove this hack */
+ 
+-char *sftp_realpath(const char *path, char *resolved);
++char *sftp_do_realpath(const char *path, char *resolved);
+ 
+ /*
+  * char *realpath(const char *path, char resolved[PATH_MAX]);
+@@ -54,8 +54,9 @@
+  * components.  Returns (resolved) on success, or (NULL) on failure,
+  * in which case the path which caused trouble is left in (resolved).
+  */
++/* PATCH: Rename because there's a conflicting unrelated sftp_realpath. Ugh. */
+ char *
+-sftp_realpath(const char *path, char *resolved)
++sftp_do_realpath(const char *path, char *resolved)
+ {
+ 	struct stat sb;
+ 	char *p, *q, *s;
+diff -Paur --no-dereference -- ssh.upstream/sftp-server-main.c ssh/sftp-server-main.c
+--- ssh.upstream/sftp-server-main.c
++++ ssh/sftp-server-main.c
+@@ -43,8 +43,8 @@
+ 	sanitise_stdfd();
+ 
+ 	if ((user_pw = getpwuid(getuid())) == NULL) {
+-		fprintf(stderr, "No user found for uid %lu\n",
+-		    (u_long)getuid());
++		fprintf(stderr, "No user found for uid %ju\n",
++		    (uintmax_t)getuid());
+ 		return 1;
+ 	}
+ 
 diff -Paur --no-dereference -- ssh.upstream/sftp-server.c ssh/sftp-server.c
 --- ssh.upstream/sftp-server.c
 +++ ssh/sftp-server.c
+@@ -57,7 +57,7 @@
+ #include "sftp.h"
+ #include "sftp-common.h"
+ 
+-char *sftp_realpath(const char *, char *); /* sftp-realpath.c */
++char *sftp_do_realpath(const char *, char *); /* sftp-realpath.c */
+ 
+ /* Maximum data read that we are willing to accept */
+ #define SFTP_MAX_READ_LENGTH (SFTP_MAX_MSG_LENGTH - 1024)
 @@ -1020,8 +1020,8 @@
  			status = errno_to_portable(errno);
  	}
@@ -1129,6 +1177,15 @@ diff -Paur --no-dereference -- ssh.upstream/sftp-server.c ssh/sftp-server.c
  #ifdef HAVE_FCHOWN
  			r = fchown(fd, a.uid, a.gid);
  #else
+@@ -1253,7 +1253,7 @@
+ 	}
+ 	debug3("request %u: realpath", id);
+ 	verbose("realpath \"%s\"", path);
+-	if (sftp_realpath(path, resolvedname) == NULL) {
++	if (sftp_do_realpath(path, resolvedname) == NULL) {
+ 		send_status(id, errno_to_portable(errno));
+ 	} else {
+ 		Stat s;
 @@ -1501,8 +1501,8 @@
  			status = errno_to_portable(errno);
  	}
@@ -1140,24 +1197,19 @@ diff -Paur --no-dereference -- ssh.upstream/sftp-server.c ssh/sftp-server.c
  		r = fchownat(AT_FDCWD, name, a.uid, a.gid,
  		    AT_SYMLINK_NOFOLLOW);
  		if (r == -1)
-diff -Paur --no-dereference -- ssh.upstream/sftp-server-main.c ssh/sftp-server-main.c
---- ssh.upstream/sftp-server-main.c
-+++ ssh/sftp-server-main.c
-@@ -43,8 +43,8 @@
- 	sanitise_stdfd();
- 
- 	if ((user_pw = getpwuid(getuid())) == NULL) {
--		fprintf(stderr, "No user found for uid %lu\n",
--		    (u_long)getuid());
-+		fprintf(stderr, "No user found for uid %ju\n",
-+		    (uintmax_t)getuid());
- 		return 1;
+@@ -1595,7 +1595,7 @@
+ 		path = npath;
  	}
- 
+ 	verbose("expand \"%s\"", path);
+-	if (sftp_realpath(path, resolvedname) == NULL) {
++	if (sftp_do_realpath(path, resolvedname) == NULL) {
+ 		send_status(id, errno_to_portable(errno));
+ 		goto out;
+ 	}
 diff -Paur --no-dereference -- ssh.upstream/ssh-add.c ssh/ssh-add.c
 --- ssh.upstream/ssh-add.c
 +++ ssh/ssh-add.c
-@@ -982,8 +982,8 @@
+@@ -1018,8 +1018,8 @@
  		int count = 0;
  
  		if ((pw = getpwuid(getuid())) == NULL) {
@@ -1171,7 +1223,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-add.c ssh/ssh-add.c
 diff -Paur --no-dereference -- ssh.upstream/ssh-agent.c ssh/ssh-agent.c
 --- ssh.upstream/ssh-agent.c
 +++ ssh/ssh-agent.c
-@@ -1748,8 +1748,8 @@
+@@ -1944,8 +1944,8 @@
  		return -1;
  	}
  	if ((euid != 0) && (getuid() != euid)) {
@@ -1182,10 +1234,175 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-agent.c ssh/ssh-agent.c
  		close(fd);
  		return -1;
  	}
+diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.1 ssh/ssh-keygen.1
+--- ssh.upstream/ssh-keygen.1
++++ ssh/ssh-keygen.1
+@@ -214,7 +214,7 @@
+ .Pa ~/.ssh/id_rsa .
+ Additionally, the system administrator may use this to generate host keys,
+ as seen in
+-.Pa /etc/rc .
++.Xr init 8 .
+ .Pp
+ Normally this program generates the key and asks for a file in which
+ to store the private key.
+@@ -280,7 +280,7 @@
+ has also been specified, its argument is used as a prefix to the
+ default path for the resulting host key files.
+ This is used by
+-.Pa /etc/rc
++.Xr init 8
+ to generate new host keys.
+ .It Fl a Ar rounds
+ When saving a private key, this option specifies the number of KDF
+diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
+--- ssh.upstream/ssh-keygen.c
++++ ssh/ssh-keygen.c
+@@ -827,7 +827,7 @@
+ 	}
+ 	sshkey_free(prv);
+ 	free(comment);
+-	exit(0);
++	return;
+ }
+ 
+ static void
+@@ -985,7 +985,7 @@
+ 			free(line);
+ 			fclose(f);
+ 			fingerprint_private(path);
+-			exit(0);
++			return;
+ 		}
+ 
+ 		/*
+@@ -1034,7 +1034,7 @@
+ 
+ 	if (invalid)
+ 		fatal("%s is not a public key file.", path);
+-	exit(0);
++	return;
+ }
+ 
+ static void
+@@ -1074,14 +1074,32 @@
+ 
+ 		/* Check whether private key exists and is not zero-length */
+ 		if (stat(prv_file, &st) == 0) {
+-			if (st.st_size != 0)
++			/* PATCH: ssh-keygen -Al lists the generated host keys. */
++			if (st.st_size != 0) {
++				if (print_fingerprint || print_bubblebabble) {
++					char saved[sizeof(identity_file)];
++					memcpy(saved, identity_file, sizeof(identity_file));
++					if (strlcpy(identity_file, key_types[i].path,
++						sizeof(identity_file)) >= sizeof(identity_file))
++						fatal("Identity filename too long");
++					if (strlcat(identity_file, ".pub",
++						sizeof(identity_file)) >= sizeof(identity_file))
++						fatal("Identity filename too long");
++					have_identity = 1;
++					do_fingerprint(pw);
++					memcpy(identity_file, saved, sizeof(identity_file));
++				}
+ 				goto next;
++			}
+ 		} else if (errno != ENOENT) {
+ 			error("Could not stat %s: %s", key_types[i].path,
+ 			    strerror(errno));
+ 			goto failnext;
+ 		}
+ 
++		if (print_fingerprint || print_bubblebabble)
++				goto next;
++
+ 		/*
+ 		 * Private key doesn't exist or is invalid; proceed with
+ 		 * key generation.
+@@ -3365,7 +3383,7 @@
+ 	/* we need this for the home * directory.  */
+ 	pw = getpwuid(getuid());
+ 	if (!pw)
+-		fatal("No user exists for uid %lu", (u_long)getuid());
++		fatal("No user exists for uid %ju", (uintmax_t)getuid());
+ 	pw = pwcopy(pw);
+ 	if (gethostname(hostname, sizeof(hostname)) == -1)
+ 		fatal("gethostname: %s", strerror(errno));
+@@ -3721,8 +3739,10 @@
+ 		}
+ 		return do_download_sk(sk_provider, sk_device);
+ 	}
+-	if (print_fingerprint || print_bubblebabble)
++	if ((print_fingerprint || print_bubblebabble) && !gen_all_hostkeys) {
+ 		do_fingerprint(pw);
++		return (0);
++	}
+ 	if (change_passphrase)
+ 		do_change_passphrase(pw);
+ 	if (change_comment)
+diff -Paur --no-dereference -- ssh.upstream/ssh-keyscan.c ssh/ssh-keyscan.c
+--- ssh.upstream/ssh-keyscan.c
++++ ssh/ssh-keyscan.c
+@@ -36,6 +36,11 @@
+ #include <string.h>
+ #include <unistd.h>
+ 
++#if defined(__sortix__) && !defined(timercmp)
++#define timercmp(s,t,op) ((s)->tv_sec == (t)->tv_sec ? \
++	(s)->tv_usec op (t)->tv_usec : (s)->tv_sec op (t)->tv_sec)
++#endif
++
+ #include "xmalloc.h"
+ #include "ssh.h"
+ #include "sshbuf.h"
+@@ -56,6 +61,14 @@
+ #include "dns.h"
+ #include "addr.h"
+ 
++#if defined(__sortix__) && !defined(timerclear)
++static inline void timerclear(struct timeval *tvp)
++{
++	tvp->tv_sec = 0;
++	tvp->tv_usec = 0;
++}
++#endif
++
+ /* Flag indicating whether IPv4 or IPv6.  This can be set on the command line.
+    Default value is AF_UNSPEC means both IPv4 and IPv6. */
+ int IPv4or6 = AF_UNSPEC;
+diff -Paur --no-dereference -- ssh.upstream/ssh-keysign.c ssh/ssh-keysign.c
+--- ssh.upstream/ssh-keysign.c
++++ ssh/ssh-keysign.c
+@@ -184,6 +184,7 @@
+ 	u_char *signature, *data, rver;
+ 	char *host, *fp, *pkalg;
+ 	size_t slen, dlen;
++	const char* host_config_file = _PATH_HOST_CONFIG_FILE;
+ 
+ 	if (pledge("stdio rpath getpw dns id", NULL) != 0)
+ 		fatal("%s: pledge: %s", __progname, strerror(errno));
+@@ -217,12 +218,15 @@
+ 
+ 	/* verify that ssh-keysign is enabled by the admin */
+ 	initialize_options(&options);
+-	(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw, "", "",
++	/* PATCH: Use /etc/default for the default configuration. */
++	if (access(host_config_file, F_OK) < 0)
++		host_config_file = _PATH_HOST_CONFIG_DEFAULT;
++	(void)read_config_file(host_config_file, pw, "", "",
+ 	    &options, 0, NULL);
+ 	(void)fill_default_options(&options);
+ 	if (options.enable_ssh_keysign != 1)
+ 		fatal("ssh-keysign not enabled in %s",
+-		    _PATH_HOST_CONFIG_FILE);
++		    host_config_file);
+ 
+ 	if (pledge("stdio dns", NULL) != 0)
+ 		fatal("%s: pledge: %s", __progname, strerror(errno));
 diff -Paur --no-dereference -- ssh.upstream/ssh.c ssh/ssh.c
 --- ssh.upstream/ssh.c
 +++ ssh/ssh.c
-@@ -561,6 +561,7 @@
+@@ -563,6 +563,7 @@
  {
  	char buf[PATH_MAX];
  	int r;
@@ -1193,7 +1410,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh.c ssh/ssh.c
  
  	if (config != NULL) {
  		if (strcasecmp(config, "none") != 0 &&
-@@ -577,8 +578,11 @@
+@@ -579,8 +580,11 @@
  			    &options, SSHCONF_CHECKPERM | SSHCONF_USERCONF |
  			    (final_pass ? SSHCONF_FINAL : 0), want_final_pass);
  
@@ -1206,7 +1423,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh.c ssh/ssh.c
  		    host, host_name, &options,
  		    final_pass ? SSHCONF_FINAL : 0, want_final_pass);
  	}
-@@ -671,7 +675,7 @@
+@@ -709,7 +713,7 @@
  	/* Get user data. */
  	pw = getpwuid(getuid());
  	if (!pw) {
@@ -1237,17 +1454,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
  		perror(argv[0]);
  		exit(1);
  	}
-@@ -305,7 +306,9 @@
- 	for (allow_local = 0; allow_local < 2; allow_local++) {
- 		for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
- 			if (ifa->ifa_addr == NULL || ifa->ifa_name == NULL ||
-+#ifdef IFF_UP
- 			    (ifa->ifa_flags & IFF_UP) == 0 ||
-+#endif
- 			    ifa->ifa_addr->sa_family != af ||
- 			    strcmp(ifa->ifa_name, options.bind_interface) != 0)
- 				continue;
-@@ -1670,7 +1673,7 @@
+@@ -1678,7 +1679,7 @@
  	if (pid == 0) {
  		ssh_signal(SIGPIPE, SIG_DFL);
  		debug3("Executing %s -c \"%s\"", shell, args);
@@ -1410,7 +1617,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  		/* Accept a connection and return in a forked child */
  		server_accept_loop(&sock_in, &sock_out,
  		    &newsock, config_s);
-@@ -2447,10 +2496,10 @@
+@@ -2449,10 +2498,10 @@
  		do_cleanup(the_active_state, the_authctxt);
  		if (use_privsep && privsep_is_preauth &&
  		    pmonitor != NULL && pmonitor->m_pid > 1) {
@@ -1449,171 +1656,6 @@ diff -Paur --no-dereference -- ssh.upstream/sshd_config ssh/sshd_config
  #PermitEmptyPasswords no
  
  # Change to no to disable s/key passwords
-diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.1 ssh/ssh-keygen.1
---- ssh.upstream/ssh-keygen.1
-+++ ssh/ssh-keygen.1
-@@ -214,7 +214,7 @@
- .Pa ~/.ssh/id_rsa .
- Additionally, the system administrator may use this to generate host keys,
- as seen in
--.Pa /etc/rc .
-+.Xr init 8 .
- .Pp
- Normally this program generates the key and asks for a file in which
- to store the private key.
-@@ -280,7 +280,7 @@
- has also been specified, its argument is used as a prefix to the
- default path for the resulting host key files.
- This is used by
--.Pa /etc/rc
-+.Xr init 8
- to generate new host keys.
- .It Fl a Ar rounds
- When saving a private key, this option specifies the number of KDF
-diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
---- ssh.upstream/ssh-keygen.c
-+++ ssh/ssh-keygen.c
-@@ -831,7 +831,7 @@
- 	}
- 	sshkey_free(prv);
- 	free(comment);
--	exit(0);
-+	return;
- }
- 
- static void
-@@ -989,7 +989,7 @@
- 			free(line);
- 			fclose(f);
- 			fingerprint_private(path);
--			exit(0);
-+			return;
- 		}
- 
- 		/*
-@@ -1037,7 +1037,7 @@
- 
- 	if (invalid)
- 		fatal("%s is not a public key file.", path);
--	exit(0);
-+	return;
- }
- 
- static void
-@@ -1077,14 +1077,32 @@
- 
- 		/* Check whether private key exists and is not zero-length */
- 		if (stat(prv_file, &st) == 0) {
--			if (st.st_size != 0)
-+			/* PATCH: ssh-keygen -Al lists the generated host keys. */
-+			if (st.st_size != 0) {
-+				if (print_fingerprint || print_bubblebabble) {
-+					char saved[sizeof(identity_file)];
-+					memcpy(saved, identity_file, sizeof(identity_file));
-+					if (strlcpy(identity_file, key_types[i].path,
-+						sizeof(identity_file)) >= sizeof(identity_file))
-+						fatal("Identity filename too long");
-+					if (strlcat(identity_file, ".pub",
-+						sizeof(identity_file)) >= sizeof(identity_file))
-+						fatal("Identity filename too long");
-+					have_identity = 1;
-+					do_fingerprint(pw);
-+					memcpy(identity_file, saved, sizeof(identity_file));
-+				}
- 				goto next;
-+			}
- 		} else if (errno != ENOENT) {
- 			error("Could not stat %s: %s", key_types[i].path,
- 			    strerror(errno));
- 			goto failnext;
- 		}
- 
-+		if (print_fingerprint || print_bubblebabble)
-+				goto next;
-+
- 		/*
- 		 * Private key doesn't exist or is invalid; proceed with
- 		 * key generation.
-@@ -3363,7 +3381,7 @@
- 	/* we need this for the home * directory.  */
- 	pw = getpwuid(getuid());
- 	if (!pw)
--		fatal("No user exists for uid %lu", (u_long)getuid());
-+		fatal("No user exists for uid %ju", (uintmax_t)getuid());
- 	pw = pwcopy(pw);
- 	if (gethostname(hostname, sizeof(hostname)) == -1)
- 		fatal("gethostname: %s", strerror(errno));
-@@ -3719,8 +3737,10 @@
- 		}
- 		return do_download_sk(sk_provider, sk_device);
- 	}
--	if (print_fingerprint || print_bubblebabble)
-+	if ((print_fingerprint || print_bubblebabble) && !gen_all_hostkeys) {
- 		do_fingerprint(pw);
-+		return (0);
-+	}
- 	if (change_passphrase)
- 		do_change_passphrase(pw);
- 	if (change_comment)
-diff -Paur --no-dereference -- ssh.upstream/ssh-keyscan.c ssh/ssh-keyscan.c
---- ssh.upstream/ssh-keyscan.c
-+++ ssh/ssh-keyscan.c
-@@ -35,6 +35,11 @@
- #include <string.h>
- #include <unistd.h>
- 
-+#if defined(__sortix__) && !defined(timercmp)
-+#define timercmp(s,t,op) ((s)->tv_sec == (t)->tv_sec ? \
-+	(s)->tv_usec op (t)->tv_usec : (s)->tv_sec op (t)->tv_sec)
-+#endif
-+
- #include "xmalloc.h"
- #include "ssh.h"
- #include "sshbuf.h"
-@@ -55,6 +60,14 @@
- #include "dns.h"
- #include "addr.h"
- 
-+#if defined(__sortix__) && !defined(timerclear)
-+static inline void timerclear(struct timeval *tvp)
-+{
-+	tvp->tv_sec = 0;
-+	tvp->tv_usec = 0;
-+}
-+#endif
-+
- /* Flag indicating whether IPv4 or IPv6.  This can be set on the command line.
-    Default value is AF_UNSPEC means both IPv4 and IPv6. */
- int IPv4or6 = AF_UNSPEC;
-diff -Paur --no-dereference -- ssh.upstream/ssh-keysign.c ssh/ssh-keysign.c
---- ssh.upstream/ssh-keysign.c
-+++ ssh/ssh-keysign.c
-@@ -184,6 +184,7 @@
- 	u_char *signature, *data, rver;
- 	char *host, *fp, *pkalg;
- 	size_t slen, dlen;
-+	const char* host_config_file = _PATH_HOST_CONFIG_FILE;
- 
- 	if (pledge("stdio rpath getpw dns id", NULL) != 0)
- 		fatal("%s: pledge: %s", __progname, strerror(errno));
-@@ -217,12 +218,15 @@
- 
- 	/* verify that ssh-keysign is enabled by the admin */
- 	initialize_options(&options);
--	(void)read_config_file(_PATH_HOST_CONFIG_FILE, pw, "", "",
-+	/* PATCH: Use /etc/default for the default configuration. */
-+	if (access(host_config_file, F_OK) < 0)
-+		host_config_file = _PATH_HOST_CONFIG_DEFAULT;
-+	(void)read_config_file(host_config_file, pw, "", "",
- 	    &options, 0, NULL);
- 	(void)fill_default_options(&options);
- 	if (options.enable_ssh_keysign != 1)
- 		fatal("ssh-keysign not enabled in %s",
--		    _PATH_HOST_CONFIG_FILE);
-+		    host_config_file);
- 
- 	if (pledge("stdio dns", NULL) != 0)
- 		fatal("%s: pledge: %s", __progname, strerror(errno));
 diff -Paur --no-dereference -- ssh.upstream/sshpty.c ssh/sshpty.c
 --- ssh.upstream/sshpty.c
 +++ ssh/sshpty.c
