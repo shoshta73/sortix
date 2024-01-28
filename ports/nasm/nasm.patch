@@ -1,31 +1,45 @@
-diff -Paur --no-dereference -- nasm.upstream/Makefile.in nasm/Makefile.in
---- nasm.upstream/Makefile.in
-+++ nasm/Makefile.in
-@@ -201,12 +201,12 @@
- manpages: nasm.1 ndisasm.1
+diff -Paur --no-dereference -- nasm.upstream/doc/Makefile nasm/doc/Makefile
+--- nasm.upstream/doc/Makefile
++++ nasm/doc/Makefile
+@@ -7,8 +7,8 @@
+ top_srcdir	= ..
+ srcdir		= .
  
- install: nasm$(X) ndisasm$(X)
--	$(MKDIR) -p $(INSTALLROOT)$(bindir)
--	$(INSTALL_PROGRAM) nasm$(X) $(INSTALLROOT)$(bindir)/nasm$(X)
--	$(INSTALL_PROGRAM) ndisasm$(X) $(INSTALLROOT)$(bindir)/ndisasm$(X)
--	$(MKDIR) -p $(INSTALLROOT)$(mandir)/man1
--	$(INSTALL_DATA) $(srcdir)/nasm.1 $(INSTALLROOT)$(mandir)/man1/nasm.1
--	$(INSTALL_DATA) $(srcdir)/ndisasm.1 $(INSTALLROOT)$(mandir)/man1/ndisasm.1
-+	$(MKDIR) -p $(DESTDIR)$(bindir)
-+	$(INSTALL_PROGRAM) nasm$(X) $(DESTDIR)$(bindir)/nasm$(X)
-+	$(INSTALL_PROGRAM) ndisasm$(X) $(DESTDIR)$(bindir)/ndisasm$(X)
-+	$(MKDIR) -p $(DESTDIR)$(mandir)/man1
-+	$(INSTALL_DATA) $(srcdir)/nasm.1 $(DESTDIR)$(mandir)/man1/nasm.1
-+	$(INSTALL_DATA) $(srcdir)/ndisasm.1 $(DESTDIR)$(mandir)/man1/ndisasm.1
+-prefix		= /usr/local
+-exec_prefix	= ${prefix}
++prefix		= 
++exec_prefix	= 
+ bindir		= ${exec_prefix}/bin
+ mandir		= ${datarootdir}/man
+ docdir		= ${datarootdir}/doc/${PACKAGE}
+@@ -16,7 +16,7 @@
+ infodir		= ${datarootdir}/info
+ datarootdir	= ${prefix}/share
  
- clean:
- 	$(RM) -f *.$(O) *.s *.i
-@@ -218,7 +218,7 @@
+-INSTALL		= /bin/install -c
++INSTALL		= /usr/bin/install -c
+ INSTALL_PROGRAM	= ${INSTALL}
+ INSTALL_DATA	= ${INSTALL} -m 644
  
- distclean: clean
- 	$(RM) -f config.h config.log config.status
--	$(RM) -f Makefile *~ *.bak *.lst *.bin
-+	$(RM) -f Makefile doc/Makefile *~ *.bak *.lst *.bin
- 	$(RM) -f output/*~ output/*.bak
- 	$(RM) -f test/*.lst test/*.bin test/*.$(O) test/*.bin
- 	$(RM) -rf autom4te*.cache
+@@ -24,7 +24,7 @@
+ 
+ PDFOPT		= 
+ 
+-MKDIR_P		= /bin/mkdir -p
++MKDIR_P		= /usr/bin/mkdir -p
+ RM_F		= rm -f
+ RM_RF		= rm -rf
+ CP_F		= cp -f
+diff -Paur --no-dereference -- nasm.upstream/include/compiler.h nasm/include/compiler.h
+--- nasm.upstream/include/compiler.h
++++ nasm/include/compiler.h
+@@ -412,4 +412,9 @@
+ # define default case BOGUS_CASE: default
+ #endif
+ 
++/* PATCH: Sortix doesn't have FILENAME_MAX at this time. */
++#if !defined(FILENAME_MAX) && defined(__sortix__)
++#define FILENAME_MAX 256
++#endif
++
+ #endif	/* NASM_COMPILER_H */
