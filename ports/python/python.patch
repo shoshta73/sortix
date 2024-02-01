@@ -1,43 +1,36 @@
 diff -Paur --no-dereference -- python.upstream/Include/py_curses.h python/Include/py_curses.h
 --- python.upstream/Include/py_curses.h
 +++ python/Include/py_curses.h
-@@ -48,22 +48,29 @@
- #include <ncurses.h>
- #else
- #include <curses.h>
-+#endif
-+/* PATCH: Some declarations are in term.h/termcap.h in Sortix's libcurses. */
- #ifdef HAVE_TERM_H
- /* for tigetstr, which is not declared in SysV curses */
- #include <term.h>
-+#if __has_include(<termcap.h>)
-+#include <termcap.h>
- #endif
+@@ -37,6 +37,12 @@
  #endif
  
  #ifdef HAVE_NCURSES_H
- /* configure was checking <curses.h>, but we will
-    use <ncurses.h>, which has all these features. */
--#ifndef WINDOW_HAS_FLAGS
--#define WINDOW_HAS_FLAGS 1
--#endif
-+/* PATCH: Sortix's libcurses doesn't have a public _ISPAD. */
-+/* PATCH: The above statement doesn't appear to be true anymore, the
-+          bootstrap python build is failing because ncurses doesn't
-+          seem to expose the typedef anymore. */
++/* PATCH: Sortix's libcurses doesn't have a public _ISPAD */
 +#ifdef _ISPAD
- #ifndef MVWDELCH_IS_EXPRESSION
- #define MVWDELCH_IS_EXPRESSION 1
- #endif
- #endif
++#ifndef WINDOW_HAS_FLAGS
++#define WINDOW_HAS_FLAGS 1
 +#endif
++#endif
+ /* configure was checking <curses.h>, but we will
+    use <ncurses.h>, which has some or all these features. */
+ #if !defined(WINDOW_HAS_FLAGS) && !(NCURSES_OPAQUE+0)
+diff -Paur --no-dereference -- python.upstream/Include/pyport.h python/Include/pyport.h
+--- python.upstream/Include/pyport.h
++++ python/Include/pyport.h
+@@ -3,6 +3,9 @@
  
- #ifdef __cplusplus
- extern "C" {
+ #include "pyconfig.h" /* include for defines */
+ 
++/* PATCH: Get SSIZE_MAX on Sortix whose limits.h is broken. */
++#include <sys/types.h>
++
+ #include <inttypes.h>
+ 
+ #include <limits.h>
 diff -Paur --no-dereference -- python.upstream/Lib/ctypes/__init__.py python/Lib/ctypes/__init__.py
 --- python.upstream/Lib/ctypes/__init__.py
 +++ python/Lib/ctypes/__init__.py
-@@ -429,7 +429,15 @@
+@@ -469,7 +469,15 @@
  elif _sys.platform == "cygwin":
      pythonapi = PyDLL("libpython%d.%d.dll" % _sys.version_info[:2])
  else:
@@ -57,15 +50,7 @@ diff -Paur --no-dereference -- python.upstream/Lib/ctypes/__init__.py python/Lib
 diff -Paur --no-dereference -- python.upstream/Makefile.pre.in python/Makefile.pre.in
 --- python.upstream/Makefile.pre.in
 +++ python/Makefile.pre.in
-@@ -604,6 +604,7 @@
- 	    *\ -s*|s*) quiet="-q";; \
- 	    *) quiet="";; \
- 	esac; \
-+	test $(MACHDEP) = sortix || \
- 	$(RUNSHARED) CC='$(CC)' LDSHARED='$(BLDSHARED)' OPT='$(OPT)' \
- 		_TCLTK_INCLUDES='$(TCLTK_INCLUDES)' _TCLTK_LIBS='$(TCLTK_LIBS)' \
- 		$(PYTHON_FOR_BUILD) $(srcdir)/setup.py $$quiet build
-@@ -1145,20 +1146,25 @@
+@@ -2033,24 +2033,29 @@
  	else true; \
  	fi
  	(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(VERSION)$(EXE) python3$(EXE))
@@ -79,11 +64,15 @@ diff -Paur --no-dereference -- python.upstream/Makefile.pre.in python/Makefile.p
 -		(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(LDVERSION)-config python$(VERSION)-config); \
  		rm -f $(DESTDIR)$(LIBPC)/python-$(LDVERSION).pc; \
  		(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION).pc python-$(LDVERSION).pc); \
+ 		rm -f $(DESTDIR)$(LIBPC)/python-$(LDVERSION)-embed.pc; \
+ 		(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION)-embed.pc python-$(LDVERSION)-embed.pc); \
  	fi
 -	-rm -f $(DESTDIR)$(BINDIR)/python3-config
 -	(cd $(DESTDIR)$(BINDIR); $(LN) -s python$(VERSION)-config python3-config)
  	-rm -f $(DESTDIR)$(LIBPC)/python3.pc
  	(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION).pc python3.pc)
+ 	-rm -f $(DESTDIR)$(LIBPC)/python3-embed.pc
+ 	(cd $(DESTDIR)$(LIBPC); $(LN) -s python-$(VERSION)-embed.pc python3-embed.pc)
  	-rm -f $(DESTDIR)$(BINDIR)/idle3
  	(cd $(DESTDIR)$(BINDIR); $(LN) -s idle$(VERSION) idle3)
 +	-rm -f $(DESTDIR)$(BINDIR)/idle
@@ -94,249 +83,54 @@ diff -Paur --no-dereference -- python.upstream/Makefile.pre.in python/Makefile.p
 +	(cd $(DESTDIR)$(BINDIR); $(LN) -s pydoc$(VERSION) pydoc)
  	-rm -f $(DESTDIR)$(BINDIR)/2to3
  	(cd $(DESTDIR)$(BINDIR); $(LN) -s 2to3-$(VERSION) 2to3)
- 	-rm -f $(DESTDIR)$(BINDIR)/pyvenv
-@@ -1411,7 +1417,6 @@
+ 	if test "x$(LIPO_32BIT_FLAGS)" != "x" ; then \
+@@ -2467,7 +2472,6 @@
  	$(INSTALL_SCRIPT) $(srcdir)/Modules/makesetup $(DESTDIR)$(LIBPL)/makesetup
  	$(INSTALL_SCRIPT) $(srcdir)/install-sh $(DESTDIR)$(LIBPL)/install-sh
  	$(INSTALL_SCRIPT) python-config.py $(DESTDIR)$(LIBPL)/python-config.py
 -	$(INSTALL_SCRIPT) python-config $(DESTDIR)$(BINDIR)/python$(LDVERSION)-config
- 	@if [ -s Modules/python.exp -a \
- 		"`echo $(MACHDEP) | sed 's/^\(...\).*/\1/'`" = "aix" ]; then \
- 		echo; echo "Installing support files for building shared extension modules on AIX:"; \
-@@ -1637,6 +1642,8 @@
+ 	$(INSTALL_SCRIPT) $(SCRIPT_2TO3) $(DESTDIR)$(BINDIR)/2to3-$(VERSION)
+ 	$(INSTALL_SCRIPT) $(SCRIPT_IDLE) $(DESTDIR)$(BINDIR)/idle$(VERSION)
+ 	$(INSTALL_SCRIPT) $(SCRIPT_PYDOC) $(DESTDIR)$(BINDIR)/pydoc$(VERSION)
+@@ -2728,6 +2732,8 @@
  				     -o -name '*.orig' -o -name '*.rej' \
  				     -o -name '*.bak' ')' \
  				     -exec rm -f {} ';'
 +	-rm -rf $(srcdir)/Lib/plat-sortix
 +	-rm -f Misc/python-config.sh
  
- # Check for smelly exported symbols (not starting with Py/_Py)
- smelly: all
-diff -Paur --no-dereference -- python.upstream/Modules/Setup.dist python/Modules/Setup.dist
---- python.upstream/Modules/Setup.dist
-+++ python/Modules/Setup.dist
-@@ -97,6 +97,8 @@
- COREPYTHONPATH=$(DESTPATH)$(SITEPATH)$(TESTPATH)$(MACHDEPPATH)$(EXTRAMACHDEPPATH)
- PYTHONPATH=$(COREPYTHONPATH)
+ # Check that all symbols exported by libpython start with "Py" or "_Py"
+ .PHONY: smelly
+diff -Paur --no-dereference -- python.upstream/Modules/Setup.stdlib.in python/Modules/Setup.stdlib.in
+--- python.upstream/Modules/Setup.stdlib.in
++++ python/Modules/Setup.stdlib.in
+@@ -171,13 +171,14 @@
+ @MODULE__TESTCAPI_TRUE@_testcapi _testcapimodule.c _testcapi/vectorcall.c _testcapi/vectorcall_limited.c _testcapi/heaptype.c _testcapi/abstract.c _testcapi/bytearray.c _testcapi/bytes.c _testcapi/unicode.c _testcapi/dict.c _testcapi/set.c _testcapi/list.c _testcapi/tuple.c _testcapi/getargs.c _testcapi/pytime.c _testcapi/datetime.c _testcapi/docstring.c _testcapi/mem.c _testcapi/watchers.c _testcapi/long.c _testcapi/float.c _testcapi/complex.c _testcapi/numbers.c _testcapi/structmember.c _testcapi/exceptions.c _testcapi/code.c _testcapi/buffer.c _testcapi/pyos.c _testcapi/run.c _testcapi/file.c _testcapi/codec.c _testcapi/immortal.c _testcapi/heaptype_relative.c _testcapi/gc.c _testcapi/sys.c
+ @MODULE__TESTCLINIC_TRUE@_testclinic _testclinic.c
  
-+# PATCH: Build all the modules into the python binary rather than shared libs.
-+
++# PATCH: Sortix doesn't have shared libraries yet and we don't need these.
+ # Some testing modules MUST be built as shared libraries.
+ *shared*
+-@MODULE__TESTIMPORTMULTIPLE_TRUE@_testimportmultiple _testimportmultiple.c
+-@MODULE__TESTMULTIPHASE_TRUE@_testmultiphase _testmultiphase.c
+-@MODULE__TESTMULTIPHASE_TRUE@_testsinglephase _testsinglephase.c
+-@MODULE__CTYPES_TEST_TRUE@_ctypes_test _ctypes/_ctypes_test.c
++#@MODULE__TESTIMPORTMULTIPLE_TRUE@_testimportmultiple _testimportmultiple.c
++#@MODULE__TESTMULTIPHASE_TRUE@_testmultiphase _testmultiphase.c
++#@MODULE__TESTMULTIPHASE_TRUE@_testsinglephase _testsinglephase.c
++#@MODULE__CTYPES_TEST_TRUE@_ctypes_test _ctypes/_ctypes_test.c
  
- # The modules listed here can't be built as shared libraries for
- # various reasons; therefore they are listed here instead of in the
-@@ -164,45 +166,44 @@
- # it, depending on your system -- see the GNU readline instructions.
- # It's okay for this to be a shared library, too.
- 
--#readline readline.c -lreadline -ltermcap
-+readline readline.c -lreadline -ltermcap
- 
- 
- # Modules that should always be present (non UNIX dependent):
- 
--#array arraymodule.c	# array objects
--#cmath cmathmodule.c _math.c # -lm # complex math library functions
--#math mathmodule.c _math.c # -lm # math library functions, e.g. sin()
--#_struct _struct.c	# binary structure packing/unpacking
--#_weakref _weakref.c	# basic weak reference support
-+array arraymodule.c	# array objects
-+cmath cmathmodule.c	# -lm # complex math library functions
-+math mathmodule.c _math.c # -lm # math library functions, e.g. sin()
-+_struct _struct.c	# binary structure packing/unpacking
- #_testcapi _testcapimodule.c    # Python C API test module
--#_random _randommodule.c	# Random number generator
--#_elementtree -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI _elementtree.c	# elementtree accelerator
--#_pickle _pickle.c	# pickle accelerator
--#_datetime _datetimemodule.c	# datetime accelerator
--#_bisect _bisectmodule.c	# Bisection algorithms
--#_heapq _heapqmodule.c	# Heap queue algorithm
--#_asyncio _asynciomodule.c  # Fast asyncio Future
-+_random _randommodule.c	# Random number generator
-+_elementtree -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI _elementtree.c	# elementtree accelerator
-+_pickle _pickle.c	# pickle accelerator
-+_datetime _datetimemodule.c	# datetime accelerator
-+_bisect _bisectmodule.c	# Bisection algorithms
-+_heapq _heapqmodule.c	# Heap queue algorithm
-+_asyncio _asynciomodule.c  # Fast asyncio Future
- 
--#unicodedata unicodedata.c    # static Unicode character database
-+unicodedata unicodedata.c    # static Unicode character database
- 
- 
- # Modules with some UNIX dependencies -- on by default:
- # (If you have a really backward UNIX, select and socket may not be
- # supported...)
- 
--#fcntl fcntlmodule.c	# fcntl(2) and ioctl(2)
-+fcntl fcntlmodule.c	# fcntl(2) and ioctl(2)
- #spwd spwdmodule.c		# spwd(3)
--#grp grpmodule.c		# grp(3)
--#select selectmodule.c	# select(2); not on ancient System V
-+grp grpmodule.c		# grp(3)
-+select selectmodule.c	# select(2); not on ancient System V
- 
- # Memory-mapped files (also works on Win32).
--#mmap mmapmodule.c
-+mmap mmapmodule.c
- 
- # CSV file helper
--#_csv _csv.c
-+_csv _csv.c
- 
- # Socket module helper for socket(2)
--#_socket socketmodule.c
-+_socket socketmodule.c
- 
- # Socket module helper for SSL support; you must comment out the other
- # socket line above, and possibly edit the SSL variable:
-@@ -210,6 +211,7 @@
- #_ssl _ssl.c \
- #	-DUSE_SSL -I$(SSL)/include -I$(SSL)/include/openssl \
- #	-L$(SSL)/lib -lssl -lcrypto
-+_ssl _ssl.c -DUSE_SSL -lssl -lcrypto
- 
- # The crypt module is now disabled by default because it breaks builds
- # on many systems (where -lcrypt is needed), e.g. Linux (I believe).
-@@ -223,10 +225,10 @@
- # are not supported by all UNIX systems:
- 
- #nis nismodule.c -lnsl	# Sun yellow pages -- not everywhere
--#termios termios.c	# Steen Lumholt's termios module
--#resource resource.c	# Jeremy Hylton's rlimit interface
-+termios termios.c	# Steen Lumholt's termios module
-+resource resource.c	# Jeremy Hylton's rlimit interface
- 
--#_posixsubprocess _posixsubprocess.c  # POSIX subprocess module helper
-+_posixsubprocess _posixsubprocess.c  # POSIX subprocess module helper
- 
- # Multimedia modules -- off by default.
- # These don't work for 64-bit platforms!!!
-@@ -242,17 +244,18 @@
- # The _md5 module implements the RSA Data Security, Inc. MD5
- # Message-Digest Algorithm, described in RFC 1321.
- 
--#_md5 md5module.c
-+_md5 md5module.c
- 
- 
- # The _sha module implements the SHA checksum algorithms.
- # (NIST's Secure Hash Algorithms.)
--#_sha1 sha1module.c
--#_sha256 sha256module.c
--#_sha512 sha512module.c
-+_sha1 sha1module.c
-+_sha256 sha256module.c
-+_sha512 sha512module.c
-+_sha3 _sha3/sha3module.c
- 
- # _blake module
--#_blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
-+_blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
- 
- # The _tkinter module.
- #
-@@ -298,7 +301,7 @@
- #	-lX11
- 
- # Lance Ellinghaus's syslog module
--#syslog syslogmodule.c		# syslog daemon interface
-+syslog syslogmodule.c		# syslog daemon interface
- 
- 
- # Curses support, requiring the System V version of curses, often
-@@ -307,9 +310,9 @@
- #
- # First, look at Setup.config; configure may have set this for you.
- 
--#_curses _cursesmodule.c -lcurses -ltermcap
-+_curses _cursesmodule.c -lcurses -ltermcap
- # Wrapper for the panel library that's part of ncurses and SYSV curses.
--#_curses_panel _curses_panel.c -lpanel -lncurses
-+_curses_panel _curses_panel.c -lpanel -lncurses
- 
- 
- # Modules that provide persistent dictionary-like semantics.  You will
-@@ -336,10 +339,10 @@
- 
- 
- # Helper module for various ascii-encoders
--#binascii binascii.c
-+binascii binascii.c
- 
- # Fred Drake's interface to the Python parser
--#parser parsermodule.c
-+parser parsermodule.c
- 
- 
- # Lee Busby's SIGFPE modules.
-@@ -357,12 +360,12 @@
- #fpectl fpectlmodule.c ...
- 
- # Test module for fpectl.  No extra libraries needed.
--#fpetest fpetestmodule.c
-+fpetest fpetestmodule.c
- 
- # Andrew Kuchling's zlib module.
- # This require zlib 1.1.3 (or later).
- # See http://www.gzip.org/zlib/
--#zlib zlibmodule.c -I$(prefix)/include -L$(exec_prefix)/lib -lz
-+zlib zlibmodule.c -lz
- 
- # Interface to the Expat XML parser
- #
-@@ -375,22 +378,29 @@
- #
- # More information on Expat can be found at www.libexpat.org.
- #
--#pyexpat expat/xmlparse.c expat/xmlrole.c expat/xmltok.c pyexpat.c -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
-+pyexpat expat/xmlparse.c expat/xmlrole.c expat/xmltok.c pyexpat.c -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
- 
- # Hye-Shik Chang's CJKCodecs
- 
- # multibytecodec is required for all the other CJK codec modules
--#_multibytecodec cjkcodecs/multibytecodec.c
-+_multibytecodec cjkcodecs/multibytecodec.c
- 
--#_codecs_cn cjkcodecs/_codecs_cn.c
--#_codecs_hk cjkcodecs/_codecs_hk.c
--#_codecs_iso2022 cjkcodecs/_codecs_iso2022.c
--#_codecs_jp cjkcodecs/_codecs_jp.c
--#_codecs_kr cjkcodecs/_codecs_kr.c
--#_codecs_tw cjkcodecs/_codecs_tw.c
-+_codecs_cn cjkcodecs/_codecs_cn.c
-+_codecs_hk cjkcodecs/_codecs_hk.c
-+_codecs_iso2022 cjkcodecs/_codecs_iso2022.c
-+_codecs_jp cjkcodecs/_codecs_jp.c
-+_codecs_kr cjkcodecs/_codecs_kr.c
-+_codecs_tw cjkcodecs/_codecs_tw.c
- 
- # Example -- included for reference only:
- # xx xxmodule.c
- 
- # Another example -- the 'xxsubtype' module shows C-level subtyping in action
- xxsubtype xxsubtype.c
-+
-+# PATCH: The rest of the modules that weren't mentioned in this file.
-+_bz2 _bz2module.c -lbz2
-+_ctypes _ctypes/callbacks.c _ctypes/callproc.c _ctypes/cfield.c _ctypes/_ctypes.c _ctypes/_ctypes_test.c _ctypes/malloc_closure.c _ctypes/stgdict.c -lffi
-+_lsprof _lsprof.c rotatingtree.c
-+_lzma _lzmamodule.c -llzma
-+_opcode _opcode.c
+ # Limited API template modules; must be built as shared modules.
+-@MODULE_XXLIMITED_TRUE@xxlimited xxlimited.c
+-@MODULE_XXLIMITED_35_TRUE@xxlimited_35 xxlimited_35.c
++#@MODULE_XXLIMITED_TRUE@xxlimited xxlimited.c
++#@MODULE_XXLIMITED_35_TRUE@xxlimited_35 xxlimited_35.c
 diff -Paur --no-dereference -- python.upstream/Modules/_cursesmodule.c python/Modules/_cursesmodule.c
 --- python.upstream/Modules/_cursesmodule.c
 +++ python/Modules/_cursesmodule.c
-@@ -116,7 +116,7 @@
-     #defines many common symbols (such as "lines") which breaks the
-     curses module in other ways.  So the code will just specify
-     explicit prototypes here. */
--extern int setupterm(char *,int,int *);
-+/* PATCH: We use term.h now so let that header declare setupterm. */
- #ifdef __sgi
- #include <term.h>
- #endif
-@@ -142,6 +142,14 @@
- 
- #include "clinic/_cursesmodule.c.h"
+@@ -167,6 +167,14 @@
+ [clinic start generated code]*/
+ /*[clinic end generated code: output=da39a3ee5e6b4b0d input=43265c372c2887d6]*/
  
 +/* PATCH: Avoid conflict with <term.h> as described above now that we use it. */
 +#ifdef lines
@@ -349,275 +143,63 @@ diff -Paur --no-dereference -- python.upstream/Modules/_cursesmodule.c python/Mo
  /* Definition of exception curses.error */
  
  static PyObject *PyCursesError;
-@@ -475,7 +483,10 @@
- Window_NoArgNoReturnVoidFunction(wclear)
- 
- Window_OneArgNoReturnVoidFunction(idcok, int, "i;True(1) or False(0)")
-+/* PATCH: Sortix's libcurses doesn't have these declarations. */
-+#ifndef __sortix__
- Window_OneArgNoReturnVoidFunction(immedok, int, "i;True(1) or False(0)")
-+#endif
- Window_OneArgNoReturnVoidFunction(wtimeout, int, "i;delay")
- 
- Window_NoArg2TupleReturnFunction(getyx, int, "ii")
-@@ -499,7 +510,9 @@
- Window_OneArgNoReturnFunction(notimeout, int, "i;True(1) or False(0)")
- Window_OneArgNoReturnFunction(scrollok, int, "i;True(1) or False(0)")
- Window_OneArgNoReturnFunction(winsdelln, int, "i;nlines")
-+#ifndef __sortix__
- Window_OneArgNoReturnFunction(syncok, int, "i;True(1) or False(0)")
-+#endif
- 
- Window_TwoArgNoReturnFunction(mvwin, int, "ii;y,x")
- Window_TwoArgNoReturnFunction(mvderwin, int, "ii;y,x")
-@@ -2024,7 +2037,9 @@
-     {"hline",           (PyCFunction)PyCursesWindow_Hline, METH_VARARGS},
-     {"idcok",           (PyCFunction)PyCursesWindow_idcok, METH_VARARGS},
-     {"idlok",           (PyCFunction)PyCursesWindow_idlok, METH_VARARGS},
-+#ifndef __sortix__
-     {"immedok",         (PyCFunction)PyCursesWindow_immedok, METH_VARARGS},
-+#endif
-     {"inch",            (PyCFunction)PyCursesWindow_InCh, METH_VARARGS},
-     {"insch",           (PyCFunction)PyCursesWindow_InsCh, METH_VARARGS},
-     {"insdelln",        (PyCFunction)PyCursesWindow_winsdelln, METH_VARARGS},
-@@ -2060,7 +2075,9 @@
-     {"subpad",          (PyCFunction)PyCursesWindow_SubWin, METH_VARARGS},
-     {"subwin",          (PyCFunction)PyCursesWindow_SubWin, METH_VARARGS},
-     {"syncdown",        (PyCFunction)PyCursesWindow_wsyncdown, METH_NOARGS},
-+#ifndef __sortix__
-     {"syncok",          (PyCFunction)PyCursesWindow_syncok, METH_VARARGS},
-+#endif
-     {"syncup",          (PyCFunction)PyCursesWindow_wsyncup, METH_NOARGS},
-     {"timeout",         (PyCFunction)PyCursesWindow_wtimeout, METH_VARARGS},
-     {"touchline",       (PyCFunction)PyCursesWindow_TouchLine, METH_VARARGS},
-@@ -2152,6 +2169,7 @@
- NoArgNoReturnVoidFunction(flushinp)
- NoArgNoReturnVoidFunction(noqiflush)
+@@ -2154,6 +2162,7 @@
+ This information can be later retrieved using the getwin() function.
+ [clinic start generated code]*/
  
 +#ifndef __sortix__
  static PyObject *
- PyCurses_filter(PyObject *self)
- {
-@@ -2161,6 +2179,7 @@
-     Py_INCREF(Py_None);
-     return Py_None;
+ _curses_window_putwin(PyCursesWindowObject *self, PyObject *file)
+ /*[clinic end generated code: output=3a25e2a5e7a040ac input=0608648e09c8ea0a]*/
+@@ -2188,6 +2197,7 @@
+     fclose(fp);
+     return res;
  }
 +#endif
  
- static PyObject *
- PyCurses_Color_Content(PyObject *self, PyObject *args)
-@@ -2232,6 +2251,7 @@
-     return PyBytes_FromStringAndSize(&ch, 1);
- }
- 
+ /*[clinic input]
+ _curses.window.redrawln
+@@ -2534,7 +2544,9 @@
+     _CURSES_WINDOW_NOUTREFRESH_METHODDEF
+     _CURSES_WINDOW_OVERLAY_METHODDEF
+     _CURSES_WINDOW_OVERWRITE_METHODDEF
 +#ifndef __sortix__
- static PyObject *
- PyCurses_getsyx(PyObject *self)
- {
-@@ -2244,6 +2264,7 @@
- 
-     return Py_BuildValue("(ii)", y, x);
- }
+     _CURSES_WINDOW_PUTWIN_METHODDEF
 +#endif
- 
- #ifdef NCURSES_MOUSE_VERSION
- static PyObject *
-@@ -2355,6 +2376,7 @@
- }
- 
- #ifndef STRICT_SYSV_CURSES
-+#ifndef __sortix__
- /* No has_key! */
- static PyObject * PyCurses_has_key(PyObject *self, PyObject *args)
- {
-@@ -2371,6 +2393,7 @@
-     Py_INCREF(Py_True);
-     return Py_True;
- }
-+#endif
- #endif /* STRICT_SYSV_CURSES */
- 
- static PyObject *
-@@ -2938,6 +2961,7 @@
- }
- #endif /* HAVE_CURSES_RESIZE_TERM */
- 
-+#ifndef __sortix__
- static PyObject *
- PyCurses_setsyx(PyObject *self, PyObject *args)
- {
-@@ -2957,6 +2981,7 @@
-     Py_INCREF(Py_None);
-     return Py_None;
- }
-+#endif
- 
- static PyObject *
- PyCurses_Start_Color(PyObject *self)
-@@ -3055,6 +3080,7 @@
-     return PyBytes_FromString(result);
- }
- 
-+#ifndef __sortix__
- static PyObject *
- PyCurses_TypeAhead(PyObject *self, PyObject *args)
- {
-@@ -3066,6 +3092,7 @@
- 
-     return PyCursesCheckERR(typeahead( fd ), "typeahead");
- }
-+#endif
- 
- static PyObject *
- PyCurses_UnCtrl(PyObject *self, PyObject *args)
-@@ -3165,6 +3192,7 @@
- }
- #endif
- 
-+#ifndef __sortix__
- static PyObject *
- PyCurses_Use_Env(PyObject *self, PyObject *args)
- {
-@@ -3183,6 +3211,7 @@
-     Py_INCREF(Py_None);
-     return Py_None;
- }
-+#endif
- 
- #ifndef STRICT_SYSV_CURSES
- static PyObject *
-@@ -3221,21 +3250,27 @@
-     {"echo",                (PyCFunction)PyCurses_echo, METH_VARARGS},
-     {"endwin",              (PyCFunction)PyCurses_endwin, METH_NOARGS},
-     {"erasechar",           (PyCFunction)PyCurses_EraseChar, METH_NOARGS},
-+#ifndef __sortix__
-     {"filter",              (PyCFunction)PyCurses_filter, METH_NOARGS},
-+#endif
-     {"flash",               (PyCFunction)PyCurses_flash, METH_NOARGS},
-     {"flushinp",            (PyCFunction)PyCurses_flushinp, METH_NOARGS},
- #ifdef NCURSES_MOUSE_VERSION
-     {"getmouse",            (PyCFunction)PyCurses_GetMouse, METH_NOARGS},
-     {"ungetmouse",          (PyCFunction)PyCurses_UngetMouse, METH_VARARGS},
- #endif
-+#ifndef __sortix__
-     {"getsyx",              (PyCFunction)PyCurses_getsyx, METH_NOARGS},
-+#endif
-     {"getwin",              (PyCFunction)PyCurses_GetWin, METH_O},
-     {"has_colors",          (PyCFunction)PyCurses_has_colors, METH_NOARGS},
-     {"has_ic",              (PyCFunction)PyCurses_has_ic, METH_NOARGS},
-     {"has_il",              (PyCFunction)PyCurses_has_il, METH_NOARGS},
-+#ifndef __sortix__
- #ifndef STRICT_SYSV_CURSES
-     {"has_key",             (PyCFunction)PyCurses_has_key, METH_VARARGS},
- #endif
-+#endif
-     {"halfdelay",           (PyCFunction)PyCurses_HalfDelay, METH_VARARGS},
-     {"init_color",          (PyCFunction)PyCurses_Init_Color, METH_VARARGS},
-     {"init_pair",           (PyCFunction)PyCurses_Init_Pair, METH_VARARGS},
-@@ -3279,7 +3314,9 @@
-     {"resize_term",         (PyCFunction)PyCurses_Resize_Term, METH_VARARGS},
- #endif
-     {"savetty",             (PyCFunction)PyCurses_savetty, METH_NOARGS},
-+#ifndef __sortix__
-     {"setsyx",              (PyCFunction)PyCurses_setsyx, METH_VARARGS},
-+#endif
-     {"setupterm",           (PyCFunction)PyCurses_setupterm,
-      METH_VARARGS|METH_KEYWORDS},
-     {"start_color",         (PyCFunction)PyCurses_Start_Color, METH_NOARGS},
-@@ -3289,7 +3326,9 @@
-     {"tigetnum",            (PyCFunction)PyCurses_tigetnum, METH_VARARGS},
-     {"tigetstr",            (PyCFunction)PyCurses_tigetstr, METH_VARARGS},
-     {"tparm",               (PyCFunction)PyCurses_tparm, METH_VARARGS},
-+#ifndef __sortix__
-     {"typeahead",           (PyCFunction)PyCurses_TypeAhead, METH_VARARGS},
-+#endif
-     {"unctrl",              (PyCFunction)PyCurses_UnCtrl, METH_VARARGS},
-     {"ungetch",             (PyCFunction)PyCurses_UngetCh, METH_VARARGS},
- #if defined(HAVE_CURSES_RESIZETERM) || defined(HAVE_CURSES_RESIZE_TERM)
-@@ -3298,7 +3337,9 @@
- #ifdef HAVE_NCURSESW
-     {"unget_wch",           (PyCFunction)PyCurses_Unget_Wch, METH_VARARGS},
- #endif
-+#ifndef __sortix__
-     {"use_env",             (PyCFunction)PyCurses_Use_Env, METH_VARARGS},
-+#endif
- #ifndef STRICT_SYSV_CURSES
-     {"use_default_colors",  (PyCFunction)PyCurses_Use_Default_Colors, METH_NOARGS},
- #endif
+     _CURSES_WINDOW_REDRAWLN_METHODDEF
+     {"redrawwin",       (PyCFunction)PyCursesWindow_redrawwin, METH_NOARGS},
+     _CURSES_WINDOW_REFRESH_METHODDEF
 diff -Paur --no-dereference -- python.upstream/Modules/_ssl.c python/Modules/_ssl.c
 --- python.upstream/Modules/_ssl.c
 +++ python/Modules/_ssl.c
-@@ -101,6 +101,9 @@
- 
- #if (OPENSSL_VERSION_NUMBER >= 0x10100000L) && !defined(LIBRESSL_VERSION_NUMBER)
- #  define OPENSSL_VERSION_1_1 1
-+/* PATCH: The libressl shipped with Sortix is new enough.*/
-+#elif !defined(OPENSSL_VERSION_1_1) && defined(LIBRESSL_VERSION_NUMBER) && 0x3000200fL <= LIBRESSL_VERSION_NUMBER
-+#  define OPENSSL_VERSION_1_1 1
- #endif
- 
- /* Openssl comes with TLSv1.1 and TLSv1.2 between 1.0.0h and 1.0.1
-@@ -616,7 +619,7 @@
-     Py_INCREF(sslctx);
- 
-     /* Make sure the SSL error state is initialized */
--    (void) ERR_get_state();
-+    /* PATCH: ERR_get_state is now private, ERR_clear_error calls it anyway. */
-     ERR_clear_error();
- 
-     PySSL_BEGIN_ALLOW_THREADS
-diff -Paur --no-dereference -- python.upstream/Modules/expat/xmlparse.c python/Modules/expat/xmlparse.c
---- python.upstream/Modules/expat/xmlparse.c
-+++ python/Modules/expat/xmlparse.c
-@@ -693,9 +693,15 @@
- static unsigned long
- generate_hash_secret_salt(void)
- {
-+#if defined(__sortix__)
-+  unsigned long result;
-+  arc4random_buf(&result, sizeof(result));
-+  return result;
-+#else
-   unsigned int seed = time(NULL) % UINT_MAX;
-   srand(seed);
-   return rand();
-+#endif
+@@ -4519,7 +4519,7 @@
+     return 0;
  }
  
- static XML_Bool  /* only valid for root parser */
-diff -Paur --no-dereference -- python.upstream/Modules/faulthandler.c python/Modules/faulthandler.c
---- python.upstream/Modules/faulthandler.c
-+++ python/Modules/faulthandler.c
-@@ -14,6 +14,10 @@
- #  include <sys/resource.h>
- #endif
- 
-+#if defined(__sortix__) && !defined(SIGSTKSZ)
-+#define SIGSTKSZ (64 * 1024) /* just some value */
-+#endif
-+
- /* Allocate at maximum 100 MB of the stack to raise the stack overflow */
- #define STACK_OVERFLOW_MAX_SIZE (100*1024*1024)
- 
+-#if OPENSSL_VERSION_NUMBER < 0x30300000L
++#if OPENSSL_VERSION_NUMBER < 0x30300000L && !defined(LIBRESSL_VERSION_NUMBER)
+ static X509_OBJECT *x509_object_dup(const X509_OBJECT *obj)
+ {
+     int ok;
 diff -Paur --no-dereference -- python.upstream/Modules/fcntlmodule.c python/Modules/fcntlmodule.c
 --- python.upstream/Modules/fcntlmodule.c
 +++ python/Modules/fcntlmodule.c
-@@ -288,6 +288,10 @@
-     Py_BEGIN_ALLOW_THREADS
-     ret = flock(fd, code);
-     Py_END_ALLOW_THREADS
-+#elif defined(__sortix__)
+@@ -299,6 +299,10 @@
+         ret = flock(fd, code);
+         Py_END_ALLOW_THREADS
+     } while (ret == -1 && errno == EINTR && !(async_err = PyErr_CheckSignals()));
++#elif !defined(F_SETLK)
 +    errno = ENOSYS;
 +    PyErr_SetFromErrno(PyExc_IOError);
 +    return NULL;
  #else
  
  #ifndef LOCK_SH
-@@ -371,6 +375,11 @@
+@@ -389,6 +393,11 @@
  #define LOCK_UN         8       /* unlock */
  #endif  /* LOCK_SH */
      {
-+#if defined(__sortix__)
++#ifndef F_SETLK
 +        errno = ENOSYS;
 +        PyErr_SetFromErrno(PyExc_IOError);
 +        return NULL;
@@ -625,102 +207,88 @@ diff -Paur --no-dereference -- python.upstream/Modules/fcntlmodule.c python/Modu
          struct flock l;
          if (code == LOCK_UN)
              l.l_type = F_UNLCK;
-@@ -410,6 +419,7 @@
-         Py_BEGIN_ALLOW_THREADS
-         ret = fcntl(fd, (code & LOCK_NB) ? F_SETLK : F_SETLKW, &l);
-         Py_END_ALLOW_THREADS
+@@ -430,6 +439,7 @@
+             ret = fcntl(fd, (code & LOCK_NB) ? F_SETLK : F_SETLKW, &l);
+             Py_END_ALLOW_THREADS
+         } while (ret == -1 && errno == EINTR && !(async_err = PyErr_CheckSignals()));
 +#endif
      }
      if (ret < 0) {
-         PyErr_SetFromErrno(PyExc_IOError);
+         return !async_err ? PyErr_SetFromErrno(PyExc_OSError) : NULL;
 diff -Paur --no-dereference -- python.upstream/Modules/getpath.c python/Modules/getpath.c
 --- python.upstream/Modules/getpath.c
 +++ python/Modules/getpath.c
-@@ -131,6 +131,11 @@
-     return err;
+@@ -799,6 +799,12 @@
  }
+ 
  
 +static const char* fix_empty_prefix(const char* path)
 +{
 +    return path[0] ? path : "/";
 +}
 +
- static void
- reduce(wchar_t *dir)
++
+ /* Perform the actual path calculation.
+ 
+    When compute_path_config is 0, this only reads any initialised path
+@@ -886,8 +892,8 @@
+ #else
+         !int_to_dict(dict, "WITH_NEXT_FRAMEWORK", 0) ||
+ #endif
+-        !decode_to_dict(dict, "PREFIX", PREFIX) ||
+-        !decode_to_dict(dict, "EXEC_PREFIX", EXEC_PREFIX) ||
++        !decode_to_dict(dict, "PREFIX", fix_empty_prefix(PREFIX)) ||
++        !decode_to_dict(dict, "EXEC_PREFIX", fix_empty_prefix(EXEC_PREFIX)) ||
+         !decode_to_dict(dict, "PYTHONPATH", PYTHONPATH) ||
+         !decode_to_dict(dict, "VPATH", VPATH) ||
+         !decode_to_dict(dict, "PLATLIBDIR", PLATLIBDIR) ||
+diff -Paur --no-dereference -- python.upstream/Modules/getpath_noop.c python/Modules/getpath_noop.c
+--- python.upstream/Modules/getpath_noop.c
++++ python/Modules/getpath_noop.c
+@@ -8,3 +8,10 @@
  {
-@@ -492,8 +497,8 @@
-     wchar_t *lib_python;
+     return PyStatus_Error("path configuration is unsupported");
+ }
++
++/* PATCH: _testinternalcapi.c pulls this in during Programs/_freeze_module */
++PyObject *
++_Py_Get_Getpath_CodeObject(void)
++{
++    return NULL;
++}
+diff -Paur --no-dereference -- python.upstream/Modules/mathmodule.c python/Modules/mathmodule.c
+--- python.upstream/Modules/mathmodule.c
++++ python/Modules/mathmodule.c
+@@ -123,6 +123,11 @@
+     return (DoubleLength) {x, y};
+ }
  
-     _pythonpath = Py_DecodeLocale(PYTHONPATH, NULL);
--    _prefix = Py_DecodeLocale(PREFIX, NULL);
--    _exec_prefix = Py_DecodeLocale(EXEC_PREFIX, NULL);
-+    _prefix = Py_DecodeLocale(fix_empty_prefix(PREFIX), NULL);
-+    _exec_prefix = Py_DecodeLocale(fix_empty_prefix(EXEC_PREFIX), NULL);
-     lib_python = Py_DecodeLocale("lib/python" VERSION, NULL);
++/* PATCH: Oops Sortix somehow doesn't have fma(3) in libm. */
++#if defined(__sortix__) && !defined(__SORTIX_HAS_FMA__)
++#define UNRELIABLE_FMA
++#endif
++
+ #ifndef UNRELIABLE_FMA
  
-     if (!_pythonpath || !_prefix || !_exec_prefix || !lib_python) {
+ static DoubleLength
 diff -Paur --no-dereference -- python.upstream/Modules/mmapmodule.c python/Modules/mmapmodule.c
 --- python.upstream/Modules/mmapmodule.c
 +++ python/Modules/mmapmodule.c
-@@ -599,7 +599,7 @@
- 
- #ifdef MS_WINDOWS
-     return PyLong_FromLong((long) FlushViewOfFile(self->data+offset, size));
+@@ -678,7 +678,7 @@
+         return NULL;
+     }
+     Py_RETURN_NONE;
 -#elif defined(UNIX)
-+#elif defined(UNIX) && !defined(__sortix__)
-     /* XXX semantics of return value? */
++#elif defined(UNIX) && !(defined(__sortix__) && !defined(__SORTIX_HAS_MSYNC__))
      /* XXX flags for msync? */
      if (-1 == msync(self->data + offset, size, MS_SYNC)) {
-diff -Paur --no-dereference -- python.upstream/Modules/posixmodule.c python/Modules/posixmodule.c
---- python.upstream/Modules/posixmodule.c
-+++ python/Modules/posixmodule.c
-@@ -5734,15 +5734,6 @@
- #endif /* HAVE_SCHED_H */
- 
- 
--/* AIX uses /dev/ptc but is otherwise the same as /dev/ptmx */
--/* IRIX has both /dev/ptc and /dev/ptmx, use ptmx */
--#if defined(HAVE_DEV_PTC) && !defined(HAVE_DEV_PTMX)
--#define DEV_PTY_FILE "/dev/ptc"
--#define HAVE_DEV_PTMX
--#else
--#define DEV_PTY_FILE "/dev/ptmx"
--#endif
--
- #if defined(HAVE_OPENPTY) || defined(HAVE_FORKPTY) || defined(HAVE_DEV_PTMX)
- #ifdef HAVE_PTY_H
- #include <pty.h>
-@@ -5807,7 +5798,7 @@
-         goto error;
- 
- #else
--    master_fd = open(DEV_PTY_FILE, O_RDWR | O_NOCTTY); /* open master */
-+    master_fd = posix_openpt(O_RDWR | O_NOCTTY); /* open master */
-     if (master_fd < 0)
-         goto posix_error;
- 
-@@ -8925,6 +8916,7 @@
-         return posix_error();
- #endif
- 
-+#ifdef HAVE_PUTENV
-     /* Remove the key from posix_putenv_garbage;
-      * this will cause it to be collected.  This has to
-      * happen after the real unsetenv() call because the
-@@ -8934,6 +8926,7 @@
-         /* really not much we can do; just leak */
-         PyErr_Clear();
-     }
-+#endif
-     Py_RETURN_NONE;
- }
- #endif /* HAVE_UNSETENV */
+         PyErr_SetFromErrno(PyExc_OSError);
 diff -Paur --no-dereference -- python.upstream/Modules/resource.c python/Modules/resource.c
 --- python.upstream/Modules/resource.c
 +++ python/Modules/resource.c
 @@ -9,6 +9,10 @@
+ #include <errno.h>
  #include <unistd.h>
- #endif
  
 +#if defined(__sortix__) && !defined(RLIM_NLIMITS)
 +#define RLIM_NLIMITS __RLIMIT_NUM_DECLARED
@@ -729,7 +297,7 @@ diff -Paur --no-dereference -- python.upstream/Modules/resource.c python/Modules
  /* On some systems, these aren't in any header file.
     On others they are, with inconsistent prototypes.
     We declare the (default) return type, to shut up gcc -Wall;
-@@ -83,6 +87,7 @@
+@@ -124,6 +128,7 @@
                      PyFloat_FromDouble(doubletime(ru.ru_utime)));
      PyStructSequence_SET_ITEM(result, 1,
                      PyFloat_FromDouble(doubletime(ru.ru_stime)));
@@ -737,7 +305,7 @@ diff -Paur --no-dereference -- python.upstream/Modules/resource.c python/Modules
      PyStructSequence_SET_ITEM(result, 2, PyLong_FromLong(ru.ru_maxrss));
      PyStructSequence_SET_ITEM(result, 3, PyLong_FromLong(ru.ru_ixrss));
      PyStructSequence_SET_ITEM(result, 4, PyLong_FromLong(ru.ru_idrss));
-@@ -97,6 +102,7 @@
+@@ -138,6 +143,7 @@
      PyStructSequence_SET_ITEM(result, 13, PyLong_FromLong(ru.ru_nsignals));
      PyStructSequence_SET_ITEM(result, 14, PyLong_FromLong(ru.ru_nvcsw));
      PyStructSequence_SET_ITEM(result, 15, PyLong_FromLong(ru.ru_nivcsw));
@@ -748,9 +316,9 @@ diff -Paur --no-dereference -- python.upstream/Modules/resource.c python/Modules
 diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Modules/socketmodule.c
 --- python.upstream/Modules/socketmodule.c
 +++ python/Modules/socketmodule.c
-@@ -83,6 +83,17 @@
- 
- */
+@@ -89,6 +89,17 @@
+ #  define Py_BUILD_CORE_MODULE 1
+ #endif
  
 +#if defined(__sortix__)
 +struct hostent
@@ -764,11 +332,11 @@ diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Mod
 +#endif
 +
  #ifdef __APPLE__
- #include <AvailabilityMacros.h>
- /* for getaddrinfo thread safety test on old versions of OS X */
-@@ -479,6 +490,12 @@
- #define INADDR_NONE (-1)
- #endif
+ // Issue #35569: Expose RFC 3542 socket options.
+ #define __APPLE_USE_RFC_3542 1
+@@ -592,6 +603,12 @@
+ #include "clinic/socketmodule.c.h"
+ #undef clinic_state
  
 +#if defined(__sortix__)
 +#define h_errno 0
@@ -779,24 +347,32 @@ diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Mod
  /* XXX There's a problem here: *static* functions are not supposed to have
     a Py prefix (or use CapitalizedWords).  Later... */
  
-@@ -5628,6 +5645,10 @@
+@@ -5721,7 +5738,6 @@
+ #endif
+ 
+ 
+-#if defined(HAVE_GETHOSTBYNAME_R) || defined (HAVE_GETHOSTBYNAME) || defined (HAVE_GETHOSTBYADDR)
+ static PyObject*
+ sock_decode_hostname(const char *name)
+ {
+@@ -5735,6 +5751,7 @@
+ #endif
+ }
+ 
++#if defined(HAVE_GETHOSTBYNAME_R) || defined (HAVE_GETHOSTBYNAME) || defined (HAVE_GETHOSTBYADDR)
+ /* Convenience function common to gethostbyname_ex and gethostbyaddr */
+ 
+ static PyObject *
+@@ -6472,7 +6489,7 @@
  static PyObject*
  socket_inet_aton(PyObject *self, PyObject *args)
  {
-+/* PATCH: Sortix only has the modern inet_pton. */
-+#if defined(HAVE_INET_PTON) && !defined(HAVE_INET_ATON) && !defined(HAVE_INET_ADDR)
-+    struct in_addr buf;
-+#else
- #ifdef HAVE_INET_ATON
+-#ifdef HAVE_INET_ATON
++#if defined(HAVE_INET_ATON) || defined(HAVE_INET_PTON)
      struct in_addr buf;
  #endif
-@@ -5639,11 +5660,21 @@
-     /* Have to use inet_addr() instead */
-     unsigned int packed_addr;
- #endif
-+#endif
-     char *ip_addr;
  
+@@ -6488,6 +6505,15 @@
      if (!PyArg_ParseTuple(args, "s:inet_aton", &ip_addr))
          return NULL;
  
@@ -812,7 +388,7 @@ diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Mod
  
  #ifdef HAVE_INET_ATON
  
-@@ -5688,6 +5719,8 @@
+@@ -6533,6 +6559,8 @@
  #endif
  
  #endif
@@ -820,233 +396,131 @@ diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Mod
 +#endif
  }
  
- PyDoc_STRVAR(inet_ntoa_doc,
-@@ -5700,6 +5733,7 @@
- {
-     Py_buffer packed_ip;
-     struct in_addr packed_addr;
-+    char addr[INET_ADDRSTRLEN];
- 
-     if (!PyArg_ParseTuple(args, "y*:inet_ntoa", &packed_ip)) {
-         return NULL;
-@@ -5715,7 +5749,9 @@
-     memcpy(&packed_addr, packed_ip.buf, packed_ip.len);
-     PyBuffer_Release(&packed_ip);
- 
--    return PyUnicode_FromString(inet_ntoa(packed_addr));
-+    /* PATCH: Sortix only has the modern inet_ntop. */
-+    inet_ntop(AF_INET, &packed_addr, addr, sizeof(addr));
-+    return PyUnicode_FromString(addr);
- }
- 
- #if defined(HAVE_INET_PTON) || defined(MS_WINDOWS)
+ #ifdef HAVE_INET_NTOA
 diff -Paur --no-dereference -- python.upstream/Modules/timemodule.c python/Modules/timemodule.c
 --- python.upstream/Modules/timemodule.c
 +++ python/Modules/timemodule.c
-@@ -1198,13 +1198,25 @@
- #if defined(HAVE_TZNAME) && !defined(__GLIBC__) && !defined(__CYGWIN__)
-     PyObject *otz0, *otz1;
+@@ -1773,13 +1773,25 @@
+ #if !defined(MS_WINDOWS) || defined(MS_WINDOWS_DESKTOP) || defined(MS_WINDOWS_SYSTEM)
      tzset();
+ #endif
 +#if defined(__sortix__) && !defined(__SORTIX_HAS_TIMEZONE__)
-+    PyModule_AddIntConstant(m, "timezone", 0);
++    ADD_INT("timezone", 0);
 +#else
-     PyModule_AddIntConstant(m, "timezone", timezone);
+     ADD_INT("timezone", _Py_timezone);
 +#endif
  #ifdef HAVE_ALTZONE
-     PyModule_AddIntConstant(m, "altzone", altzone);
+     ADD_INT("altzone", altzone);
  #else
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_ALTZONE__)
-+    PyModule_AddIntConstant(m, "altzone", 0);
++#if defined(__sortix__) && !defined(__SORTIX_HAS_TIMEZONE__)
++    ADD_INT("altzone", -3600);
 +#else
-     PyModule_AddIntConstant(m, "altzone", timezone-3600);
+     ADD_INT("altzone", _Py_timezone-3600);
  #endif
 +#endif
 +#if defined(__sortix__) && !defined(__SORTIX_HAS_DAYLIGHT__)
-+    PyModule_AddIntConstant(m, "daylight", 0);
++    ADD_INT("daylight", 0);
 +#else
-     PyModule_AddIntConstant(m, "daylight", daylight);
+     ADD_INT("daylight", _Py_daylight);
 +#endif
-     otz0 = PyUnicode_DecodeLocale(tzname[0], "surrogateescape");
-     otz1 = PyUnicode_DecodeLocale(tzname[1], "surrogateescape");
-     PyModule_AddObject(m, "tzname", Py_BuildValue("(NN)", otz0, otz1));
+ #ifdef MS_WINDOWS
+     TIME_ZONE_INFORMATION tzinfo = {0};
+     GetTimeZoneInformation(&tzinfo);
+diff -Paur --no-dereference -- python.upstream/Programs/_testembed.c python/Programs/_testembed.c
+--- python.upstream/Programs/_testembed.c
++++ python/Programs/_testembed.c
+@@ -14,6 +14,9 @@
+ #include <stdlib.h>               // putenv()
+ #include <wchar.h>
+ 
++/* PATCH: Ignore silly tests using putenv instead of setenv. */
++#define putenv(x)
++
+ int main_argc;
+ char **main_argv;
+ 
+@@ -1851,6 +1854,10 @@
+ 
+ static int check_use_frozen_modules(const char *rawval)
+ {
++#if defined(__sortix__) && !defined(__SORTIX_HAS_SWPRINTF__)
++    error("no swprintf");
++    return -1;
++#else
+     wchar_t optval[100];
+     if (rawval == NULL) {
+         wcscpy(optval, L"frozen_modules");
+@@ -1884,6 +1891,7 @@
+     dump_config();
+     Py_Finalize();
+     return 0;
++#endif
+ }
+ 
+ static int test_init_use_frozen_modules(void)
 diff -Paur --no-dereference -- python.upstream/Python/fileutils.c python/Python/fileutils.c
 --- python.upstream/Python/fileutils.c
 +++ python/Python/fileutils.c
-@@ -1387,7 +1387,9 @@
-               wchar_t *resolved_path, size_t resolved_path_size)
+@@ -2107,7 +2107,6 @@
+               wchar_t *resolved_path, size_t resolved_path_len)
  {
      char *cpath;
-+#if !defined(__sortix__)
-     char cresolved_path[MAXPATHLEN];
-+#endif
+-    char cresolved_path[MAXPATHLEN];
      wchar_t *wresolved_path;
      char *res;
      size_t r;
-@@ -1396,12 +1398,21 @@
+@@ -2116,12 +2115,13 @@
          errno = EINVAL;
          return NULL;
      }
-+#if defined(__sortix__)
+-    res = realpath(cpath, cresolved_path);
 +    res = realpath(cpath, NULL);
-+#else
-     res = realpath(cpath, cresolved_path);
-+#endif
-     PyMem_Free(cpath);
+     PyMem_RawFree(cpath);
      if (res == NULL)
          return NULL;
  
-+#if defined(__sortix__)
+-    wresolved_path = Py_DecodeLocale(cresolved_path, &r);
 +    wresolved_path = Py_DecodeLocale(res, &r);
 +    free(res);
-+#else
-     wresolved_path = Py_DecodeLocale(cresolved_path, &r);
-+#endif
      if (wresolved_path == NULL) {
          errno = EINVAL;
          return NULL;
-@@ -1411,7 +1422,11 @@
-         errno = EINVAL;
-         return NULL;
-     }
-+#if defined(__sortix__)
-+    wcslcpy(resolved_path, wresolved_path, resolved_path_size);
-+#else
-     wcsncpy(resolved_path, wresolved_path, resolved_path_size);
-+#endif
-     PyMem_RawFree(wresolved_path);
-     return resolved_path;
- }
-diff -Paur --no-dereference -- python.upstream/Python/random.c python/Python/random.c
---- python.upstream/Python/random.c
-+++ python/Python/random.c
-@@ -1,9 +1,15 @@
-+#if defined(__sortix__)
-+#define HAVE_ARC4RANDOM
-+#endif
-+
- #include "Python.h"
- #ifdef MS_WINDOWS
- #  include <windows.h>
- /* All sample MSDN wincrypt programs include the header below. It is at least
-  * required with Min GW. */
- #  include <wincrypt.h>
-+#elif defined(HAVE_ARC4RANDOM)
-+#  include <stdlib.h>
- #else
- #  include <fcntl.h>
- #  ifdef HAVE_SYS_STAT_H
-@@ -26,6 +32,7 @@
- static int _Py_HashSecret_Initialized = 0;
- #endif
- 
-+#ifndef HAVE_ARC4RANDOM
- #ifdef MS_WINDOWS
- static HCRYPTPROV hCryptProv = 0;
- 
-@@ -351,6 +358,7 @@
- }
- 
- #endif
-+#endif /* !defined(HAVE_ARC4RANDOM) */
- 
- /* Fill buffer with pseudo-random bytes generated by a linear congruent
-    generator (LCG):
-@@ -373,6 +381,7 @@
-     }
- }
- 
-+#if !defined(HAVE_ARC4RANDOM)
- /* If raise is zero:
-    - Don't raise exceptions on error
-    - Don't call PyErr_CheckSignals() on EINTR (retry directly the interrupted
-@@ -401,6 +410,7 @@
-     return dev_urandom(buffer, size, blocking, raise);
- #endif
- }
-+#endif /* !defined(HAVE_ARC4RANDOM) */
- 
- /* Fill buffer with size pseudo-random bytes from the operating system random
-    number generator (RNG). It is suitable for most cryptographic purposes
-@@ -414,7 +424,12 @@
- int
- _PyOS_URandom(void *buffer, Py_ssize_t size)
- {
-+#ifdef HAVE_ARC4RANDOM
-+    arc4random_buf(buffer, size);
-+    return 0;
-+#else
-     return pyurandom(buffer, size, 1, 1);
-+#endif
- }
- 
- /* Fill buffer with size pseudo-random bytes from the operating system random
-@@ -428,7 +443,12 @@
- int
- _PyOS_URandomNonblock(void *buffer, Py_ssize_t size)
- {
-+#ifdef HAVE_ARC4RANDOM
-+    arc4random_buf(buffer, size);
-+    return 0;
-+#else
-     return pyurandom(buffer, size, 0, 1);
-+#endif
- }
- 
- void
-@@ -469,6 +489,7 @@
-         }
-     }
-     else {
-+#ifndef HAVE_ARC4RANDOM
-         int res;
- 
-         /* _PyRandom_Init() is called very early in the Python initialization
-@@ -480,6 +501,9 @@
-         if (res < 0) {
-             Py_FatalError("failed to get random numbers to initialize Python");
-         }
-+#else
-+        arc4random_buf(secret, secret_size);
-+#endif
-     }
- }
- 
-@@ -491,7 +515,7 @@
-         CryptReleaseContext(hCryptProv, 0);
-         hCryptProv = 0;
-     }
--#elif defined(PY_GETENTROPY)
-+#elif defined(HAVE_ARC4RANDOM) || defined(PY_GETENTROPY)
-     /* nothing to clean */
- #else
-     dev_urandom_close();
-diff -Paur --no-dereference -- python.upstream/config.sub python/config.sub
---- python.upstream/config.sub
-+++ python/config.sub
-@@ -1360,7 +1360,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* | -plan9* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -Paur --no-dereference -- python.upstream/configure python/configure
 --- python.upstream/configure
 +++ python/configure
-@@ -3253,6 +3253,9 @@
- 	*-*-cygwin*)
- 		ac_sys_system=Cygwin
+@@ -3663,6 +3663,10 @@
+ # pybuilddir.txt will be created by --generate-posix-vars in the Makefile
+ rm -f pybuilddir.txt
+ 
++# PATCH: Simplify the port(5) by assuming --with-build-python on cross builds.
++if test "x$cross_compiling" = xyes; then
++  with_build_python=yes
++fi
+ 
+ # Check whether --with-build-python was given.
+ if test ${with_build_python+y}
+@@ -4037,6 +4041,9 @@
+ 		UNIVERSALSDK=
+ 		enable_universalsdk=
  		;;
 +	*-*-sortix*)
 +		ac_sys_system=Sortix
 +		;;
  	*)
+ 		UNIVERSALSDK=$enableval
+ 		if test ! -d "${UNIVERSALSDK}"
+@@ -4279,6 +4286,9 @@
+ 	*-*-wasi)
+ 	    ac_sys_system=WASI
+ 	    ;;
++	*-*-sortix)
++	    ac_sys_system=Sortix
++	    ;;
+ 	*)
  		# for now, limit cross builds to known configurations
  		MACHDEP="unknown"
-@@ -3299,9 +3302,8 @@
- 		_host_cpu=
+@@ -4342,9 +4352,8 @@
+ 		_host_cpu=$host_cpu
  		;;
  	*)
 -		# for now, limit cross builds to known configurations
@@ -1057,7 +531,7 @@ diff -Paur --no-dereference -- python.upstream/configure python/configure
  	esac
  	_PYTHON_HOST_PLATFORM="$MACHDEP${_host_cpu:+-$_host_cpu}"
  fi
-@@ -9279,7 +9281,9 @@
+@@ -12842,7 +12851,9 @@
  	CYGWIN*)
  		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
  		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
@@ -1067,10 +541,10 @@ diff -Paur --no-dereference -- python.upstream/configure python/configure
 +		LDCXXSHARED='$(CXX) -shared';;
  	esac
  fi
- { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LDSHARED" >&5
-@@ -9619,6 +9623,50 @@
- 						# pthread (first!) on Linux
+ 
+@@ -13638,6 +13649,50 @@
  fi
+ 
  
 +# check if we need libiconv for iconv functions
 +{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libiconv in -liconv" >&5
@@ -1117,63 +591,65 @@ diff -Paur --no-dereference -- python.upstream/configure python/configure
 +fi
 +
  # check if we need libintl for locale functions
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking for textdomain in -lintl" >&5
- $as_echo_n "checking for textdomain in -lintl... " >&6; }
-@@ -12709,7 +12757,7 @@
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for textdomain in -lintl" >&5
+ printf %s "checking for textdomain in -lintl... " >&6; }
+@@ -22478,7 +22533,7 @@
  if test "${enable_ipv6+set}" = set; then
    ac_cv_buggy_getaddrinfo="no -- configured with --(en|dis)able-ipv6"
  else
 -  ac_cv_buggy_getaddrinfo=yes
 +  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
  fi
- else
+ else $as_nop
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -12808,7 +12856,7 @@
- if ac_fn_c_try_run "$LINENO"; then :
-   ac_cv_buggy_getaddrinfo=no
- else
--  ac_cv_buggy_getaddrinfo=yes
-+  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
- fi
- rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-   conftest.$ac_objext conftest.beam conftest.$ac_ext
-@@ -15712,7 +15760,7 @@
- 
- # first curses header check
- ac_save_cppflags="$CPPFLAGS"
--CPPFLAGS="$CPPFLAGS -I/usr/include/ncursesw"
-+# PATCH: Removed cross-compilation unsafe include path addition.
- 
- for ac_header in curses.h ncurses.h
- do :
-@@ -15908,6 +15956,12 @@
+@@ -27138,18 +27193,10 @@
  
  if test "x$cross_compiling" = xyes; then
    if test "${ac_cv_file__dev_ptmx+set}" != set; then
+-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for /dev/ptmx" >&5
+-printf %s "checking for /dev/ptmx... " >&6; }
+-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: not set" >&5
+-printf "%s\n" "not set" >&6; }
+-    as_fn_error $? "set ac_cv_file__dev_ptmx to yes/no in your CONFIG_SITE file when cross compiling" "$LINENO" 5
 +    ac_cv_file__dev_ptmx=yes
-+  fi
-+  if test "${ac_cv_file__dev_ptc+set}" != set; then
+   fi
+   if test "${ac_cv_file__dev_ptc+set}" != set; then
+-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for /dev/ptc" >&5
+-printf %s "checking for /dev/ptc... " >&6; }
+-    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: not set" >&5
+-printf "%s\n" "not set" >&6; }
+-    as_fn_error $? "set ac_cv_file__dev_ptc to yes/no in your CONFIG_SITE file when cross compiling" "$LINENO" 5
 +    ac_cv_file__dev_ptc=no
-+  fi
-+  if test "${ac_cv_file__dev_ptmx+set}" != set; then
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for /dev/ptmx" >&5
- $as_echo_n "checking for /dev/ptmx... " >&6; }
-     { $as_echo "$as_me:${as_lineno-$LINENO}: result: not set" >&5
+   fi
+ fi
+ 
+@@ -28680,6 +28727,11 @@
+  ;;
+ esac
+ 
++# PATCH: Sortix doesn't have dynamic linking yet.
++if test "$host_os" = sortix; then
++  MODULE_BUILDTYPE=static
++fi
++
+ 
+ 
+ MODULE_BLOCK=
 diff -Paur --no-dereference -- python.upstream/configure.ac python/configure.ac
 --- python.upstream/configure.ac
 +++ python/configure.ac
-@@ -385,6 +385,9 @@
- 	*-*-cygwin*)
- 		ac_sys_system=Cygwin
+@@ -436,6 +436,9 @@
+ 		fi
+ 		enable_framework=
  		;;
 +	*-*-sortix*)
 +		ac_sys_system=Sortix
 +		;;
  	*)
- 		# for now, limit cross builds to known configurations
- 		MACHDEP="unknown"
-@@ -431,9 +434,8 @@
- 		_host_cpu=
+ 		PYTHONFRAMEWORKPREFIX="${enableval}"
+ 		PYTHONFRAMEWORKINSTALLDIR=$PYTHONFRAMEWORKPREFIX/$PYTHONFRAMEWORKDIR
+@@ -620,9 +623,8 @@
+ 		_host_cpu=$host_cpu
  		;;
  	*)
 -		# for now, limit cross builds to known configurations
@@ -1184,7 +660,7 @@ diff -Paur --no-dereference -- python.upstream/configure.ac python/configure.ac
  	esac
  	_PYTHON_HOST_PLATFORM="$MACHDEP${_host_cpu:+-$_host_cpu}"
  fi
-@@ -2535,7 +2537,9 @@
+@@ -3407,7 +3409,9 @@
  	CYGWIN*)
  		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
  		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
@@ -1194,10 +670,10 @@ diff -Paur --no-dereference -- python.upstream/configure.ac python/configure.ac
 +		LDCXXSHARED='$(CXX) -shared';;
  	esac
  fi
- AC_MSG_RESULT($LDSHARED)
-@@ -2679,6 +2683,12 @@
- 						# pthread (first!) on Linux
- fi
+ 
+@@ -3660,6 +3664,12 @@
+ # pthread (first!) on Linux
+ AC_SEARCH_LIBS([sem_init], [pthread rt posix4])
  
 +# check if we need libiconv for iconv functions
 +AC_CHECK_LIB(iconv, libiconv,
@@ -1206,18 +682,18 @@ diff -Paur --no-dereference -- python.upstream/configure.ac python/configure.ac
 +        LIBS="-liconv $LIBS"])
 +
  # check if we need libintl for locale functions
- AC_CHECK_LIB(intl, textdomain,
- 	[AC_DEFINE(WITH_LIBINTL, 1,
-@@ -3871,7 +3881,7 @@
+ AC_CHECK_LIB([intl], [textdomain],
+ 	[AC_DEFINE([WITH_LIBINTL], [1],
+@@ -5416,7 +5426,7 @@
  if test "${enable_ipv6+set}" = set; then
    ac_cv_buggy_getaddrinfo="no -- configured with --(en|dis)able-ipv6"
  else
 -  ac_cv_buggy_getaddrinfo=yes
 +  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
  fi]))
- fi
  
-@@ -4980,6 +4990,12 @@
+ dnl if ac_cv_func_getaddrinfo
+@@ -6626,6 +6636,12 @@
  dnl NOTE: Inform user how to proceed with files when cross compiling.
  if test "x$cross_compiling" = xyes; then
    if test "${ac_cv_file__dev_ptmx+set}" != set; then

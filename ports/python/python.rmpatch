@@ -1,3 +1,0 @@
-rm -rf -- 'Python/graminit.c'
-rm -rf -- 'Python/importlib.h'
-rm -rf -- 'Python/importlib_external.h'

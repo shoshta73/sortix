@@ -1,10 +1,10 @@
 NAME=python
 BUILD_LIBRARIES='libbz2 libcurses libexpat libffi libreadline libssl libz liblzma libiconv? libintl? llibmpdec?'
-VERSION=3.6.0
+VERSION=3.12.6
 DISTNAME=Python-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=b0c5f904f685e32d9232f7bdcbece9819a892929063b6e385414ad2dd6a23622
+SHA256SUM=1999658298cf2fb837dffed8ff3c033ef0c98ef20cf73c5d5f66bed5ab89697c
 UPSTREAM_SITE=https://www.python.org/ftp/python/$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
