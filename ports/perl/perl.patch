@@ -1,579 +1,56 @@
-diff -Paur --no-dereference -- perl.upstream/cnf/configure perl/cnf/configure
---- perl.upstream/cnf/configure
-+++ perl/cnf/configure
-@@ -48,7 +48,9 @@
- # past this point $build/$buildarch are non-empty unless we're in target mode
- 
- if [ -z "$mode" ]; then
--	if [ -z "$target" -o "$target" = "$build" ]; then
-+	cc_sysroot=`${CC-cc} --print-sysroot || true`
-+	if [ -z "$target" -o "$target" = "$build" ] &&
-+	   [ "$cc_sysroot" = "" -o "$cc_sysroot" = / ]; then
- 		mode='native'
- 	else
- 		mode='cross'
-diff -Paur --no-dereference -- perl.upstream/cnf/configure_args.sh perl/cnf/configure_args.sh
---- perl.upstream/cnf/configure_args.sh
-+++ perl/cnf/configure_args.sh
-@@ -91,18 +91,23 @@
- 	esac
- 	# split --set-foo and similar constructs into --set foo
- 	# and things like --prefix=/foo into --prefix and /foo
-+	# PATCH: Fix --foo= bar being parsed as --foo bar.
-+	split=
- 	case "$a" in
- 		set-*|use-*|include-*)
- 			k=`echo "$a" | sed -e 's/^[^-]*-//'`
- 			a=`echo "$a" | sed -e 's/-.*//'`
-+			split=1
- 			;;
- 		dont-use-*|dont-include-*)	
- 			k=`echo "$a" | sed -e 's/^dont-[^-]*-//'`
- 			a=`echo "$a" | sed -e 's/^\(dont-[^-]*\)-.*/\1/'`
-+			split=1
- 			;;
- 		*=*)
- 			k=`echo "$a" | sed -e 's/^[^=]*=//'`
- 			a=`echo "$a" | sed -e 's/=.*//'`
-+			split=1
- 			;;
- 	esac
- 	# check whether kv is required
-@@ -114,7 +119,7 @@
- 	esac
- 	# fetch argument if necessary (--set foo=bar)
- 	# note that non-empty n means there must be no argument
--	if [ -n "$x" -a -z "$k" -a -z "$n" ]; then
-+	if [ -z "$split" -a -n "$x" -a -z "$k" -a -z "$n" ]; then
- 		eval k="\${$i}"; i=$((i+1))
- 	fi
- 	# split kv pair into k and v (k=foo v=bar)
-@@ -155,7 +160,8 @@
- 		help) mode="help" ;;
- 		regen|regenerate) mode="regen" ;;
- 		keeplog) defuser "$a" 1 ;;
--		prefix|html[13]dir|libsdir)	defuser $a "$v" ;;
-+		# PATCH: At least recognize --exec-prefix even though it's ignored.        
-+		prefix|exec-prefix|html[13]dir|libsdir)	defuser $a "$v" ;;
- 		man[13]dir|otherlibsdir)	defuser $a "$v" ;;
- 		siteprefix|sitehtml[13]dir)	defuser $a "$v" ;;
- 		siteman[13]dir|vendorman[13]dir)defuser $a "$v" ;;
-diff -Paur --no-dereference -- perl.upstream/cnf/configure_func_ext.sh perl/cnf/configure_func_ext.sh
---- perl.upstream/cnf/configure_func_ext.sh
-+++ perl/cnf/configure_func_ext.sh
-@@ -68,7 +68,8 @@
- mstart "Checking FD_SET macros"
- if not hinted d_fd_macros 'found' 'missing'; then
- 	try_start
--	try_includes sys/time.h sys/types.h unistd.h
-+	# PATCH: FD_SET is defined in <sys/select.h>.
-+	try_includes sys/select.h sys/time.h sys/types.h unistd.h
- 	try_cat <<END
- #if defined(FD_SET) && defined(FD_CLR) && defined(FD_ISSET) && defined(FD_ZERO)
- #else
-diff -Paur --no-dereference -- perl.upstream/cnf/configure_func.sh perl/cnf/configure_func.sh
---- perl.upstream/cnf/configure_func.sh
-+++ perl/cnf/configure_func.sh
-@@ -7,7 +7,8 @@
- 		try_start
- 		funcincludes "$3" "$4" "$includes"
- 		try_add "int main(void) { $2($3); return 0; }"
--		try_link -O0 -fno-builtin
-+		# PATCH: Work around tests for functions without prototypes.
-+		try_link -O0 -fno-builtin -Wno-error=implicit-function-declaration
- 		resdef $1 'found' 'missing'
- 	fi
- }
-@@ -184,7 +185,8 @@
- checkfunc d_pathconf 'pathconf'
- checkfunc d_pause 'pause'
- checkfunc d_pipe 'pipe' 'NULL' 'fcntl.h unistd.h'
--checkfunc d_pipe2 'pipe' 'NULL,0' 'fcntl.h unistd.h'
-+# PATCH: pipe2 accidentally checked for pipe.
-+checkfunc d_pipe2 'pipe2' 'NULL,0' 'fcntl.h unistd.h'
- checkfunc d_poll 'poll'
- checkfunc d_prctl 'prctl'
- checkfunc d_pthread_atfork 'pthread_atfork'
-@@ -306,4 +308,6 @@
- checkfunc d_wcsxfrm 'wcsxfrm'
- checkfunc d_wctomb 'wctomb'
- checkfunc d_writev 'writev'
-+# PATCH: Add missing check for whether nanosleep exists.
-+checkfunc d_nanosleep 'nanosleep'
- unset includes
-diff -Paur --no-dereference -- perl.upstream/cnf/configure_tool.sh perl/cnf/configure_tool.sh
---- perl.upstream/cnf/configure_tool.sh
-+++ perl/cnf/configure_tool.sh
-@@ -270,6 +270,10 @@
- 			define osname "gnu"
- 			result "GNU"
- 			;;
-+		*-sortix*)
-+			define osname "sortix"
-+			result "Sortix"
-+			;;
- 		*)
- 			result "no"
- 			;;
-diff -Paur --no-dereference -- perl.upstream/cnf/configure_type.sh perl/cnf/configure_type.sh
---- perl.upstream/cnf/configure_type.sh
-+++ perl/cnf/configure_type.sh
-@@ -102,7 +102,8 @@
- test "$d_longdbl" = 'define'  && checksize longdblsize 'long double'
- test "$d_longlong" = 'define' && checksize longlongsize 'long long'
- 
--checktype d_fd_set 'fd_set' 'sys/types.h'
-+# PATCH: FD_SET is defined in <sys/select.h>.
-+checktype d_fd_set 'fd_set' 'sys/select.h'
- checktype d_fpos64_t 'fpos64_t' 'stdio.h'
- checktype d_off64_t 'off64_t' 'sys/types.h'
- checktype d_ptrdiff_t 'ptrdiff_t' 'stddef.h'
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/constant.applied perl/cnf/diffs/perl5-5.32.0/constant.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/constant.applied
-+++ perl/cnf/diffs/perl5-5.32.0/constant.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/dynaloader.applied perl/cnf/diffs/perl5-5.32.0/dynaloader.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/dynaloader.applied
-+++ perl/cnf/diffs/perl5-5.32.0/dynaloader.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/findext.applied perl/cnf/diffs/perl5-5.32.0/findext.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/findext.applied
-+++ perl/cnf/diffs/perl5-5.32.0/findext.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/installscripts.applied perl/cnf/diffs/perl5-5.32.0/installscripts.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/installscripts.applied
-+++ perl/cnf/diffs/perl5-5.32.0/installscripts.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/liblist.applied perl/cnf/diffs/perl5-5.32.0/liblist.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/liblist.applied
-+++ perl/cnf/diffs/perl5-5.32.0/liblist.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/makemaker.applied perl/cnf/diffs/perl5-5.32.0/makemaker.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/makemaker.applied
-+++ perl/cnf/diffs/perl5-5.32.0/makemaker.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/posix-makefile.applied perl/cnf/diffs/perl5-5.32.0/posix-makefile.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/posix-makefile.applied
-+++ perl/cnf/diffs/perl5-5.32.0/posix-makefile.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/test-checkcase.applied perl/cnf/diffs/perl5-5.32.0/test-checkcase.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/test-checkcase.applied
-+++ perl/cnf/diffs/perl5-5.32.0/test-checkcase.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/test-commonsense.applied perl/cnf/diffs/perl5-5.32.0/test-commonsense.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/test-commonsense.applied
-+++ perl/cnf/diffs/perl5-5.32.0/test-commonsense.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.32.0/xconfig.applied perl/cnf/diffs/perl5-5.32.0/xconfig.applied
---- perl.upstream/cnf/diffs/perl5-5.32.0/xconfig.applied
-+++ perl/cnf/diffs/perl5-5.32.0/xconfig.applied
-@@ -0,0 +1 @@
-+
-diff -Paur --no-dereference -- perl.upstream/config_h.SH perl/config_h.SH
---- perl.upstream/config_h.SH
-+++ perl/config_h.SH
-@@ -1230,6 +1230,9 @@
-  *	function used to generate normalized random numbers.
-  *	Values include 15, 16, 31, and 48.
-  */
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_DRAND48__)
-+double drand48(void);
-+#endif
- #define Drand01()		$drand01		/**/
- #define Rand_seed_t		$randseedtype		/**/
- #define seedDrand01(x)	$seedfunc((Rand_seed_t)x)	/**/
-diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-Constant/t/Constant.t perl/cpan/ExtUtils-Constant/t/Constant.t
---- perl.upstream/cpan/ExtUtils-Constant/t/Constant.t
-+++ perl/cpan/ExtUtils-Constant/t/Constant.t
-@@ -1,8 +1,18 @@
- #!/usr/bin/perl -w
- 
- use Config;
-+use IPC::Cmd qw(can_run);
-+
- unless ($Config{usedl}) {
--    print "1..0 # no usedl, skipping\n";
-+    print "1..0 # SKIP no usedl\n";
-+    exit 0;
-+}
-+
-+my $make = $Config{make};
-+$make = $ENV{MAKE} if exists $ENV{MAKE};
-+
-+unless ( can_run($make) ) {
-+    print "1..0 # SKIP make not available\n";
-     exit 0;
- }
- 
-@@ -34,8 +44,6 @@
- # module from blib
- @INC = map {File::Spec->rel2abs($_)} @INC if $] < 5.007 && $] >= 5.006;
- 
--my $make = $Config{make};
--$make = $ENV{MAKE} if exists $ENV{MAKE};
- if ($^O eq 'MSWin32' && $make eq 'nmake') { $make .= " -nologo"; }
- 
- # VMS may be using something other than MMS/MMK
-diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm
---- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm
-+++ perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm
-@@ -20,9 +20,10 @@
- use File::Spec;
- 
- sub ext {
--    if    ( $^O eq 'VMS' )     { return &_vms_ext; }
--    elsif ( $^O eq 'MSWin32' ) { return &_win32_ext; }
--    else                       { return &_unix_os2_ext; }
-+  if   ($Config{usemmldlt}){ return &_ld_ext;       }
-+  elsif($^O eq 'VMS')      { return &_vms_ext;      }
-+  elsif($^O eq 'MSWin32')  { return &_win32_ext;    }
-+  else                     { return &_unix_os2_ext; }
- }
- 
- sub _unix_os2_ext {
-@@ -652,4 +653,51 @@
-     wantarray ? ( $lib, '', $ldlib, '', ( $give_libs ? \@flibs : () ) ) : $lib;
- }
- 
-+# A direct test for -l validity.
-+# Because guessing real file names for -llib options when dealing
-+# with a cross compiler is generally a BAD IDEA^tm.
-+sub _ld_ext {
-+    my($self,$potential_libs, $verbose, $give_libs) = @_;
-+    $verbose ||= 0;
-+
-+    if ($^O =~ 'os2' and $Config{perllibs}) { 
-+	# Dynamic libraries are not transitive, so we may need including
-+	# the libraries linked against perl.dll again.
-+
-+	$potential_libs .= " " if $potential_libs;
-+	$potential_libs .= $Config{perllibs};
-+    }
-+    return ("", "", "", "", ($give_libs ? [] : ())) unless $potential_libs;
-+    warn "Potential libraries are '$potential_libs':\n" if $verbose;
-+
-+    my($ld)   = $Config{ld};
-+    my($lddlflags)   = $Config{lddlflags};
-+    my($libs) = defined $Config{perllibs} ? $Config{perllibs} : $Config{libs};
-+
-+    my $try = 'try_mm.c';
-+    my $tryx = 'try_mm.x';
-+    open(TRY, '>', $try) || die "Can't create MakeMaker test file $try: $!\n";
-+    print TRY "int main(void) { return 0; }\n";
-+    close(TRY);
-+
-+    my $testlibs = '';
-+    my @testlibs = ();
-+    foreach my $thislib (split ' ', $potential_libs) {
-+        $testlibs = join(' ', @testlibs);
-+	if($thislib =~ /^-L/) {
-+		push(@testlibs, $thislib);
-+		next
-+	};
-+	my $cmd = "$ld $lddlflags -o $tryx $try $testlibs $thislib >/dev/null 2>&1";
-+	my $ret = system($cmd);
-+	warn "Warning (mostly harmless): " . "No library found for $thislib\n" if $ret;
-+	next if $ret;
-+	push @testlibs, $thislib;
-+    }
-+    unlink($try);
-+    unlink($tryx);
-+
-+    return (join(' ', @testlibs), '', join(' ', @testlibs), '');
-+}
-+
- 1;
-diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm
---- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm
-+++ perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm
-@@ -36,7 +36,7 @@
-     $Is{BSD}     = ($^O =~ /^(?:free|net|open)bsd$/ or
-                    grep( $^O eq $_, qw(bsdos interix dragonfly) )
-                   );
--    $Is{Android} = $^O =~ /android/;
-+    $Is{Android} = $^O =~ /android/ || $Config{osname} eq 'android';
-     if ( $^O eq 'darwin' && $^X eq '/usr/bin/perl' ) {
-       my @osvers = split /\./, $Config{osvers};
-       $Is{ApplCor} = ( $osvers[0] >= 18 );
-diff -Paur --no-dereference -- perl.upstream/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm perl/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
---- perl.upstream/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
-+++ perl/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
-@@ -1676,7 +1676,7 @@
-         if ($self->is_os2) {
-           unshift @pagers, 'less', 'cmd /c more <';
-         }
--        push @pagers, qw( more less pg view cat );
-+        push @pagers, qw( less pager more pg view cat );
-         unshift @pagers, "$ENV{PAGER} <"  if $ENV{PAGER};
-     }
- 
-diff -Paur --no-dereference -- perl.upstream/dist/Safe/Safe.pm perl/dist/Safe/Safe.pm
---- perl.upstream/dist/Safe/Safe.pm
-+++ perl/dist/Safe/Safe.pm
-@@ -43,7 +43,10 @@
-     }
- }
- 
--use Opcode 1.01, qw(
-+# PATCH: 'use Safe;' fails with '"%.*g" is not exported by the Opcode module'
-+#        on Sortix without floating point support when a floating point version
-+#        number is used here.
-+use Opcode 1, qw(
-     opset opset_to_ops opmask_add
-     empty_opset full_opset invert_opset verify_opset
-     opdesc opcodes opmask define_optag opset_to_hex
-diff -Paur --no-dereference -- perl.upstream/ext/DynaLoader/hints/linux.pl perl/ext/DynaLoader/hints/linux.pl
---- perl.upstream/ext/DynaLoader/hints/linux.pl
-+++ perl/ext/DynaLoader/hints/linux.pl
-@@ -1,5 +1 @@
--# XXX Configure test needed.
--# Some Linux releases like to hide their <nlist.h>
--$self->{CCFLAGS} = $Config{ccflags} . ' -I/usr/include/libelf'
--	if -f "/usr/include/libelf/nlist.h";
- 1;
-diff -Paur --no-dereference -- perl.upstream/ext/Errno/Errno_pm.PL perl/ext/Errno/Errno_pm.PL
---- perl.upstream/ext/Errno/Errno_pm.PL
-+++ perl/ext/Errno/Errno_pm.PL
-@@ -2,6 +2,9 @@
- use Config;
- use strict;
- 
-+# PATCH: Recognize the right operating system when cross-compiling.
-+$^O = $Config{osname};
-+
- our $VERSION = "1.30";
- 
- my %err = ();
-@@ -167,6 +170,11 @@
- 
- 	close(CPPI);
- 
-+	# PATCH: Simply process errno.c rather then the special logic below to
-+	# locate the system headers.
-+	$file{"errno.c"} = 1;
-+	return keys %file;
-+
- 	# invoke CPP and read the output
- 	if ($IsMSWin32 || $^O eq 'NetWare') {
- 	    open(CPPO,"$Config{cpprun} $Config{cppflags} errno.c |") or
-diff -Paur --no-dereference -- perl.upstream/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm perl/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
---- perl.upstream/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
-+++ perl/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
-@@ -2,7 +2,8 @@
- package ExtUtils::Miniperl;
- use strict;
- require Exporter;
--use ExtUtils::Embed 1.31, qw(xsi_header xsi_protos xsi_body);
-+# PATCH: "%.*g" is not exported by the ExtUtils::Embed module
-+use ExtUtils::Embed 1, qw(xsi_header xsi_protos xsi_body);
- 
- our @ISA = qw(Exporter);
- our @EXPORT = qw(writemain);
-diff -Paur --no-dereference -- perl.upstream/ext/POSIX/Makefile.PL perl/ext/POSIX/Makefile.PL
---- perl.upstream/ext/POSIX/Makefile.PL
-+++ perl/ext/POSIX/Makefile.PL
-@@ -1,4 +1,9 @@
- # Expect this line to be read by t/posix.t, don't change it
-+
-+# Explicitly avoid including '.' in @INC; autoloader gets confused since it
-+# can find POSIX.pm, but can't find autosplit.ix.
-+BEGIN { pop @INC;}
-+#
- use ExtUtils::MakeMaker;
- use ExtUtils::Constant 0.23 'WriteConstants';
- use Config;
-diff -Paur --no-dereference -- perl.upstream/ext/POSIX/POSIX.xs perl/ext/POSIX/POSIX.xs
---- perl.upstream/ext/POSIX/POSIX.xs
-+++ perl/ext/POSIX/POSIX.xs
-@@ -1,3 +1,12 @@
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_PAUSE__)
-+#include <stddef.h>
-+#include <signal.h>
-+int pause(void)
-+{
-+	return sigsuspend(NULL);
-+}
-+#endif
-+
- #define PERL_EXT_POSIX
- #define PERL_EXT
- 
-@@ -1418,7 +1427,11 @@
- #      define mkfifo(a,b) not_here("mkfifo")
- #    else	/* !( defined OS2 ) */
- #      ifndef mkfifo
-+#if defined(__sortix__)
-+#        define mkfifo(path, mode) not_here("mkfifo")
-+#else
- #        define mkfifo(path, mode) (mknod((path), (mode) | S_IFIFO, 0))
-+#endif
- #      endif
- #    endif
- #  endif /* !HAS_MKFIFO */
-@@ -3820,12 +3833,19 @@
- ctermid(s = 0)
- 	char *          s = 0;
-     CODE:
-+/* PATCH: Sortix doesn't have ctermid at this time. */
-+#ifdef L_ctermid
- #ifdef I_TERMIOS
-         /* On some systems L_ctermid is a #define; but not all; this code works
-          * for all cases (so far...) */
- 	s = (char *) safemalloc((size_t) L_ctermid);
- #endif
- 	RETVAL = ctermid(s);
-+#else
-+	s = (char *) safemalloc(strlen("/dev/tty"));
-+	strcpy(s, "/dev/tty");
-+	RETVAL = s;
-+#endif
-     OUTPUT:
- 	RETVAL
-     CLEANUP:
-diff -Paur --no-dereference -- perl.upstream/installman perl/installman
---- perl.upstream/installman
-+++ perl/installman
-@@ -1,8 +1,6 @@
- #!./perl -w
- 
- BEGIN {
--    @INC = qw(lib);
--
-     # This needs to be at BEGIN time, before any use of Config
-     # install_lib itself loads and imports Config into main::
-     require './install_lib.pl';
-diff -Paur --no-dereference -- perl.upstream/installperl perl/installperl
---- perl.upstream/installperl
-+++ perl/installperl
-@@ -2,8 +2,6 @@
- 
- BEGIN {
-     chdir '..' if !-d 'lib' and -d '../lib';
--    @INC = 'lib';
--    $ENV{PERL5LIB} = 'lib';
- 
-     # This needs to be at BEGIN time, before any use of Config
-     # install_lib itself loads and imports Config into main::
-@@ -194,6 +192,7 @@
- 
- # Fetch some frequently-used items from %Config
- my $installbin = "$opts{destdir}$Config{installbin}";
-+my $installlib = "$opts{destdir}$Config{installlib}";
- my $installscript = "$opts{destdir}$Config{installscript}";
- my $installprivlib = "$opts{destdir}$Config{installprivlib}";
- my $installarchlib = "$opts{destdir}$Config{installarchlib}";
-@@ -378,7 +377,8 @@
-     @corefiles = <*.h>;
- } else {
-     # [als] hard-coded 'libperl' name... not good!
--    @corefiles = <*.h libperl*.* perl*$Config{lib_ext}>;
-+    @corefiles = <*.h perl*$Config{lib_ext}>;
-+    push(@corefiles, $Config{libperl}) if $Config{useshrplib} && !$Config{soname};
- 
-     # AIX needs perl.exp installed as well.
-     push(@corefiles,'perl.exp') if $^O eq 'aix';
-@@ -404,6 +404,29 @@
- 	chmod($NON_SO_MODE, $dest) foreach @corefiles;
- }
- 
-+if($Config{useshrplib} && $Config{soname}) {
-+    my $libperl = $Config{libperl};
-+    my $soname = $Config{soname};
-+    mkpath($installlib);
-+    if (copy_if_diff($libperl, "$installlib/$libperl")) {
-+        strip("-S", "$installlib/$libperl");
-+        chmod(0555, "$installlib/$libperl");
-+
-+        # Normally this should be done by ldconfig.
-+        safe_unlink("$installlib/$soname") unless $soname eq $libperl;
-+        safe_unlink("$installlib/libperl.so") unless $soname eq 'libperl.so';
-+        symlink($libperl, "$installlib/$soname") unless $soname eq $libperl;
-+        symlink($libperl, "$installlib/libperl.so") unless $soname eq 'libperl.so';
-+        # using $so here instead of .so hardly makes any sense,
-+        # all systems supporting SONAME have $so=.so
-+
-+        # Backward compatibility: provide a symlink where people expect it
-+        safe_unlink("$installarchlib/CORE/libperl.so");
-+        symlink("$Config{installlib}/$libperl", "$installarchlib/CORE/libperl.so");
-+        #        ^ without destdir here!
-+    }
-+}
-+
- # Install main perl executables
- # Make links to ordinary names if installbin directory isn't current directory.
- 
-diff -Paur --no-dereference -- perl.upstream/lib/unicore/mktables perl/lib/unicore/mktables
---- perl.upstream/lib/unicore/mktables
-+++ perl/lib/unicore/mktables
-@@ -12629,10 +12629,12 @@
-         if (   defined $nv_floating_to_rational{$float}
-             && $nv_floating_to_rational{$float} ne $rational)
-         {
--            die Carp::my_carp_bug("Both '$rational' and"
--                            . " '$nv_floating_to_rational{$float}' evaluate to"
--                            . " the same floating point number."
--                            . "  \$E_FLOAT_PRECISION must be increased");
-+            # PATCH: This test fails on native Sortix due to lack of floating
-+            #        point formatting support, but nothing is wrong.
-+            #die Carp::my_carp_bug("Both '$rational' and"
-+            #                . " '$nv_floating_to_rational{$float}' evaluate to"
-+            #                . " the same floating point number."
-+            #                . "  \$E_FLOAT_PRECISION must be increased");
-         }
-         $nv_floating_to_rational{$float} = $rational;
-     }
 diff -Paur --no-dereference -- perl.upstream/Makefile perl/Makefile
 --- perl.upstream/Makefile
 +++ perl/Makefile
-@@ -61,7 +61,8 @@
+@@ -67,7 +67,8 @@
  # Original versions are not saved anymore; patch generally takes care of this,
  # and if that fails, reaching for the source tarball is the safest option.
  $(CROSSPATCHED): %.applied: %.patch
--	patch -p1 -i $< && touch $@
+-	$(cpatch) -p1 -i $< && touch $@
 +	# PATCH: The .applied files needs to be non-empty to be in the diff.
-+	patch -p1 -i $< && echo > $@
++	$(cpatch) -p1 -i $< && echo > $@
  
  # ---[ common ]-----------------------------------------------------------------
  
-@@ -243,14 +244,19 @@
+@@ -240,8 +241,13 @@
  
- preplibrary: $(CONFIGPM) | miniperl$X lib/re.pm lib/lib.pm
+ ext/DynaLoader/Makefile: config.h | dist/lib/pm_to_blib
  
 +# PATCH: Set LINKTYPE to static or otherwise the all target depends on linkext
 +#        that depends on dynamic, and thus both static and dynamic libraries
 +#        gets built.
++# PATCH: pm_to_blib is required to do the copy process for non-C modules.
+ $(static_modules): %/pm_to_blib: | %/Makefile $(nonxs_tgt)
+ 	$(MAKE) -C $(dir $@) PERL_CORE=1 LIBPERL=$(LIBPERL) LINKTYPE=static static
++	$(MAKE) -C $(dir $@) PERL_CORE=1 LIBPERL=$(LIBPERL) LINKTYPE=static pm_to_blib
+ 	@touch $@
+ 
+ $(dynamic_modules) $(disabled_dynamic): %/pm_to_blib: | %/Makefile
+@@ -257,6 +263,7 @@
  dist/lib/Makefile: dist/lib/Makefile.PL cflags config.h $(CONFIGPM) | miniperl$X
  	$(eval top=$(shell echo $(dir $@) | sed -re 's![^/]+!..!g'))
  	cd $(dir $@) && $(top)miniperl_top -I$(top)lib Makefile.PL \
 +	 LINKTYPE=static \
  	 PERL_CORE=1 LIBPERL_A=$(LIBPERL) PERL="$(top)miniperl_top"
  
- %/Makefile: %/Makefile.PL preplibrary cflags config.h | $(XSUBPP) miniperl$X
+ preplibrary = miniperl$X lib/re.pm lib/lib.pm
+@@ -265,6 +272,7 @@
  	$(eval top=$(shell echo $(dir $@) | sed -re 's![^/]+!..!g'))
  	cd $(dir $@) && $(top)miniperl_top -I$(top)lib Makefile.PL \
-+	 LINKTYPE=static \
  	 INSTALLDIRS=perl INSTALLMAN1DIR=none INSTALLMAN3DIR=none \
++	 LINKTYPE=static \
  	 PERL_CORE=1 LIBPERL_A=$(LIBPERL) PERL="$(top)miniperl_top"
  
-@@ -319,7 +325,7 @@
+ # Allow building modules by typing "make cpan/Module-Name"
+@@ -325,7 +333,7 @@
  cpan/ExtUtils-ParseXS/Makefile cpan/ExtUtils-Constant/Makefile: \
- 		%/Makefile: %/Makefile.PL preplibrary cflags | miniperl$X miniperl_top
+ 		%/Makefile: %/Makefile.PL cflags $(CONFIGPM) | $(preplibrary)
  	$(eval top=$(shell echo $(dir $@) | sed -re 's![^/]+!..!g'))
 -	cd $(dir $@) && $(top)miniperl_top Makefile.PL PERL_CORE=1 PERL=$(top)miniperl_top
 +	cd $(dir $@) && $(top)miniperl_top Makefile.PL LINKTYPE=static PERL_CORE=1 PERL=$(top)miniperl_top
  
- cpan/List-Util/pm_to_blib: | dynaloader
+ cpan/List-Util/pm_to_blib: | ext/DynaLoader/pm_to_blib
  
-@@ -432,7 +438,10 @@
+@@ -440,7 +448,10 @@
  
  install.sym: # deprecated
  
@@ -585,7 +62,7 @@ diff -Paur --no-dereference -- perl.upstream/Makefile perl/Makefile
  	./miniperl_top installman --destdir=$(DESTDIR) $(INSTALLFLAGS)
  
  # ---[ testpack ]---------------------------------------------------------------
-@@ -445,9 +454,10 @@
+@@ -453,9 +464,10 @@
  	tar -zcvf $@ -T $<
  
  # ---[ clean ]------------------------------------------------------------------
@@ -597,16 +74,7 @@ diff -Paur --no-dereference -- perl.upstream/Makefile perl/Makefile
  
  clean-obj:
  	-test -n "$o" && rm -f *$o
-@@ -458,7 +468,7 @@
- 
- # assuming modules w/o Makefiles were never built and need no cleaning
- clean-modules: config.h
--	@for i in $(modules disabled); do \
-+	@for i in $(modules) $(disabled) ext/DynaLoader; do \
- 		test -f $$i/Makefile && \
- 		touch $$i/Makefile && \
- 		$(MAKE) -C $$i clean \
-@@ -478,3 +488,307 @@
+@@ -486,3 +498,313 @@
  clean-testpack:
  	-rm -fr TESTPACK
  	-rm -f TESTPACK.list
@@ -899,6 +367,12 @@ diff -Paur --no-dereference -- perl.upstream/Makefile perl/Makefile
 +	rm -rf lib/version
 +	rm -f lib/version.pm
 +	rm -f lib/version.pod
++	rm -f lib/ExtUtils/MM_OS390.pm
++	rm -f lib/ExtUtils/PL2Bat.pm
++	rm -f lib/Getopt/Long/Parser.pm
++	rm -f lib/Pod/Html/Util.pm
++	rm -f lib/bigfloat.pm
++	rm -f lib/stable.pm
 +	rm -f libperl.a
 +	rm -f mg_data.h
 +	rm -f miniperl
@@ -914,21 +388,596 @@ diff -Paur --no-dereference -- perl.upstream/Makefile perl/Makefile
 +	rm -f try.out
 +	rm -f xconfig.sh
 +	rm -f Makefile.config config.sh
+diff -Paur --no-dereference -- perl.upstream/cnf/configure perl/cnf/configure
+--- perl.upstream/cnf/configure
++++ perl/cnf/configure
+@@ -48,7 +48,10 @@
+ # past this point $build/$buildarch are non-empty unless we're in target mode
+ 
+ if [ -z "$mode" ]; then
+-	if [ -z "$target" -o "$target" = "$build" ]; then
++	# PATCH: Cross-compile when a sysroot is used even if a native build.
++	cc_sysroot=`${CC-cc} --print-sysroot || true`
++	if [ -z "$target" -o "$target" = "$build" ] &&
++	   [ "$cc_sysroot" = "" -o "$cc_sysroot" = / ]; then
+ 		mode='native'
+ 	else
+ 		mode='cross'
+diff -Paur --no-dereference -- perl.upstream/cnf/configure_args.sh perl/cnf/configure_args.sh
+--- perl.upstream/cnf/configure_args.sh
++++ perl/cnf/configure_args.sh
+@@ -91,18 +91,23 @@
+ 	esac
+ 	# split --set-foo and similar constructs into --set foo
+ 	# and things like --prefix=/foo into --prefix and /foo
++	# PATCH: Fix --foo= bar being parsed as --foo bar.
++	split=
+ 	case "$a" in
+ 		set-*|use-*|include-*)
+ 			k=`echo "$a" | sed -e 's/^[^-]*-//'`
+ 			a=`echo "$a" | sed -e 's/-.*//'`
++			split=1
+ 			;;
+ 		dont-use-*|dont-include-*)	
+ 			k=`echo "$a" | sed -e 's/^dont-[^-]*-//'`
+ 			a=`echo "$a" | sed -e 's/^\(dont-[^-]*\)-.*/\1/'`
++			split=1
+ 			;;
+ 		*=*)
+ 			k=`echo "$a" | sed -e 's/^[^=]*=//'`
+ 			a=`echo "$a" | sed -e 's/=.*//'`
++			split=1
+ 			;;
+ 	esac
+ 	# check whether kv is required
+@@ -114,7 +119,7 @@
+ 	esac
+ 	# fetch argument if necessary (--set foo=bar)
+ 	# note that non-empty n means there must be no argument
+-	if [ -n "$x" -a -z "$k" -a -z "$n" ]; then
++	if [ -z "$split" -a -n "$x" -a -z "$k" -a -z "$n" ]; then
+ 		eval k="\${$i}"; i=$((i+1))
+ 	fi
+ 	# split kv pair into k and v (k=foo v=bar)
+@@ -155,7 +160,8 @@
+ 		help) mode="help" ;;
+ 		regen|regenerate) mode="regen" ;;
+ 		keeplog) defuser "$a" 1 ;;
+-		prefix|html[13]dir|libsdir)	defuser $a "$v" ;;
++		# PATCH: At least recognize --exec-prefix even though it's ignored.        
++		prefix|exec-prefix|html[13]dir|libsdir)	defuser $a "$v" ;;
+ 		man[13]dir|otherlibsdir)	defuser $a "$v" ;;
+ 		siteprefix|sitehtml[13]dir)	defuser $a "$v" ;;
+ 		siteman[13]dir|vendorman[13]dir)defuser $a "$v" ;;
+diff -Paur --no-dereference -- perl.upstream/cnf/configure_func.sh perl/cnf/configure_func.sh
+--- perl.upstream/cnf/configure_func.sh
++++ perl/cnf/configure_func.sh
+@@ -8,7 +8,8 @@
+     try_add '#define _GNU_SOURCE'
+ 		funcincludes "$3" "$4" "$includes"
+ 		try_add "int main(void) { $2($3); return 0; }"
+-		try_link -O0 -fno-builtin
++		# PATCH: Work around tests for functions without prototypes.
++		try_link -O0 -fno-builtin -Wno-error=implicit-function-declaration
+ 		resdef $1 'found' 'missing'
+ 	fi
+ }
+@@ -187,7 +188,8 @@
+ checkfunc d_pathconf 'pathconf' 'NULL,0' 'unistd.h'
+ checkfunc d_pause 'pause' '' 'unistd.h'
+ checkfunc d_pipe 'pipe' 'NULL' 'fcntl.h unistd.h'
+-checkfunc d_pipe2 'pipe' 'NULL,0' 'fcntl.h unistd.h'
++# PATCH: pipe2 accidentally checked for pipe.
++checkfunc d_pipe2 'pipe2' 'NULL,0' 'fcntl.h unistd.h'
+ checkfunc d_poll 'poll' 'NULL,0,0' 'poll.h'
+ checkfunc d_prctl 'prctl' '0,0,0,0,0' 'sys/prctl.h'
+ checkfunc d_pthread_atfork 'pthread_atfork' 'NULL,NULL,NULL' 'pthread.h'
+@@ -310,4 +312,6 @@
+ checkfunc d_wcsxfrm 'wcsxfrm' 'NULL,NULL,0' 'wchar.h'
+ checkfunc d_wctomb 'wctomb' 'NULL,NULL' 'wchar.h'
+ checkfunc d_writev 'writev' '0,NULL,0' 'sys/uio.h'
++# PATCH: Add missing check for whether nanosleep exists.
++checkfunc d_nanosleep 'nanosleep' 'NULL,NULL' 'time.h'
+ unset includes
+diff -Paur --no-dereference -- perl.upstream/cnf/configure_func_ext.sh perl/cnf/configure_func_ext.sh
+--- perl.upstream/cnf/configure_func_ext.sh
++++ perl/cnf/configure_func_ext.sh
+@@ -68,7 +68,8 @@
+ mstart "Checking FD_SET macros"
+ if not hinted d_fd_macros 'found' 'missing'; then
+ 	try_start
+-	try_includes sys/time.h sys/types.h unistd.h
++	# PATCH: FD_SET is defined in <sys/select.h>.
++	try_includes sys/select.h sys/time.h sys/types.h unistd.h
+ 	try_cat <<END
+ #if defined(FD_SET) && defined(FD_CLR) && defined(FD_ISSET) && defined(FD_ZERO)
+ #else
+diff -Paur --no-dereference -- perl.upstream/cnf/configure_tool.sh perl/cnf/configure_tool.sh
+--- perl.upstream/cnf/configure_tool.sh
++++ perl/cnf/configure_tool.sh
+@@ -270,6 +270,10 @@
+ 			define osname "midipix"
+ 			result "Midipix"
+ 			;;
++		*-sortix*)
++			define osname "sortix"
++			result "Sortix"
++			;;
+ 		*)
+ 			result "no"
+ 			;;
+diff -Paur --no-dereference -- perl.upstream/cnf/configure_type.sh perl/cnf/configure_type.sh
+--- perl.upstream/cnf/configure_type.sh
++++ perl/cnf/configure_type.sh
+@@ -102,7 +102,8 @@
+ test "$d_longdbl" = 'define'  && checksize longdblsize 'long double'
+ test "$d_longlong" = 'define' && checksize longlongsize 'long long'
+ 
+-checktype d_fd_set 'fd_set' 'sys/types.h'
++# PATCH: FD_SET is defined in <sys/select.h>.
++checktype d_fd_set 'fd_set' 'sys/select.h'
+ checktype d_fpos64_t 'fpos64_t' 'stdio.h'
+ checktype d_off64_t 'off64_t' 'sys/types.h'
+ checktype d_ptrdiff_t 'ptrdiff_t' 'stddef.h'
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/constant.applied perl/cnf/diffs/perl5-5.39.5/constant.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/constant.applied
++++ perl/cnf/diffs/perl5-5.39.5/constant.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/dynaloader.applied perl/cnf/diffs/perl5-5.39.5/dynaloader.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/dynaloader.applied
++++ perl/cnf/diffs/perl5-5.39.5/dynaloader.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/findext.applied perl/cnf/diffs/perl5-5.39.5/findext.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/findext.applied
++++ perl/cnf/diffs/perl5-5.39.5/findext.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/installscripts.applied perl/cnf/diffs/perl5-5.39.5/installscripts.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/installscripts.applied
++++ perl/cnf/diffs/perl5-5.39.5/installscripts.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/liblist.applied perl/cnf/diffs/perl5-5.39.5/liblist.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/liblist.applied
++++ perl/cnf/diffs/perl5-5.39.5/liblist.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/makemaker.applied perl/cnf/diffs/perl5-5.39.5/makemaker.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/makemaker.applied
++++ perl/cnf/diffs/perl5-5.39.5/makemaker.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/posix-makefile.applied perl/cnf/diffs/perl5-5.39.5/posix-makefile.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/posix-makefile.applied
++++ perl/cnf/diffs/perl5-5.39.5/posix-makefile.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/test-checkcase.applied perl/cnf/diffs/perl5-5.39.5/test-checkcase.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/test-checkcase.applied
++++ perl/cnf/diffs/perl5-5.39.5/test-checkcase.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/test-makemaker.applied perl/cnf/diffs/perl5-5.39.5/test-makemaker.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/test-makemaker.applied
++++ perl/cnf/diffs/perl5-5.39.5/test-makemaker.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/cnf/diffs/perl5-5.39.5/xconfig.applied perl/cnf/diffs/perl5-5.39.5/xconfig.applied
+--- perl.upstream/cnf/diffs/perl5-5.39.5/xconfig.applied
++++ perl/cnf/diffs/perl5-5.39.5/xconfig.applied
+@@ -0,0 +1 @@
++
+diff -Paur --no-dereference -- perl.upstream/config_h.SH perl/config_h.SH
+--- perl.upstream/config_h.SH
++++ perl/config_h.SH
+@@ -1230,6 +1230,9 @@
+  *	function used to generate normalized random numbers.
+  *	Values include 15, 16, 31, and 48.
+  */
++#if defined(__sortix__) && !defined(__SORTIX_HAS_DRAND48__)
++double drand48(void);
++#endif
+ #define Drand01()		$drand01		/**/
+ #define Rand_seed_t		$randseedtype		/**/
+ #define seedDrand01(x)	$seedfunc((Rand_seed_t)x)	/**/
+diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-Constant/t/Constant.t perl/cpan/ExtUtils-Constant/t/Constant.t
+--- perl.upstream/cpan/ExtUtils-Constant/t/Constant.t
++++ perl/cpan/ExtUtils-Constant/t/Constant.t
+@@ -1,8 +1,18 @@
+ #!/usr/bin/perl -w
+ 
+ use Config;
++use IPC::Cmd qw(can_run);
++
+ unless ($Config{usedl}) {
+-    print "1..0 # no usedl, skipping\n";
++    print "1..0 # SKIP no usedl\n";
++    exit 0;
++}
++
++my $make = $Config{make};
++$make = $ENV{MAKE} if exists $ENV{MAKE};
++
++unless ( can_run($make) ) {
++    print "1..0 # SKIP make not available\n";
+     exit 0;
+ }
+ 
+@@ -34,8 +44,6 @@
+ # module from blib
+ @INC = map {File::Spec->rel2abs($_)} @INC if $] < 5.007 && $] >= 5.006;
+ 
+-my $make = $Config{make};
+-$make = $ENV{MAKE} if exists $ENV{MAKE};
+ if ($^O eq 'MSWin32' && $make eq 'nmake') { $make .= " -nologo"; }
+ 
+ # VMS may be using something other than MMS/MMK
+diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm
+--- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm
++++ perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/Liblist/Kid.pm
+@@ -20,9 +20,10 @@
+ use File::Spec;
+ 
+ sub ext {
+-    if    ( $^O eq 'VMS' )     { return &_vms_ext; }
+-    elsif ( $^O eq 'MSWin32' ) { return &_win32_ext; }
+-    else                       { return &_unix_os2_ext; }
++  if   ($Config{usemmldlt}){ return &_ld_ext;       }
++  elsif($^O eq 'VMS')      { return &_vms_ext;      }
++  elsif($^O eq 'MSWin32')  { return &_win32_ext;    }
++  else                     { return &_unix_os2_ext; }
+ }
+ 
+ sub _unix_os2_ext {
+@@ -661,4 +662,51 @@
+     wantarray ? ( $lib, '', $ldlib, '', ( $give_libs ? \@flibs : () ) ) : $lib;
+ }
+ 
++# A direct test for -l validity.
++# Because guessing real file names for -llib options when dealing
++# with a cross compiler is generally a BAD IDEA^tm.
++sub _ld_ext {
++    my($self,$potential_libs, $verbose, $give_libs) = @_;
++    $verbose ||= 0;
++
++    if ($^O =~ 'os2' and $Config{perllibs}) { 
++	# Dynamic libraries are not transitive, so we may need including
++	# the libraries linked against perl.dll again.
++
++	$potential_libs .= " " if $potential_libs;
++	$potential_libs .= $Config{perllibs};
++    }
++    return ("", "", "", "", ($give_libs ? [] : ())) unless $potential_libs;
++    warn "Potential libraries are '$potential_libs':\n" if $verbose;
++
++    my($ld)   = $Config{ld};
++    my($lddlflags)   = $Config{lddlflags};
++    my($libs) = defined $Config{perllibs} ? $Config{perllibs} : $Config{libs};
++
++    my $try = 'try_mm.c';
++    my $tryx = 'try_mm.x';
++    open(TRY, '>', $try) || die "Can't create MakeMaker test file $try: $!\n";
++    print TRY "int main(void) { return 0; }\n";
++    close(TRY);
++
++    my $testlibs = '';
++    my @testlibs = ();
++    foreach my $thislib (split ' ', $potential_libs) {
++        $testlibs = join(' ', @testlibs);
++	if($thislib =~ /^-L/) {
++		push(@testlibs, $thislib);
++		next
++	};
++	my $cmd = "$ld $lddlflags -o $tryx $try $testlibs $thislib >/dev/null 2>&1";
++	my $ret = system($cmd);
++	warn "Warning (mostly harmless): " . "No library found for $thislib\n" if $ret;
++	next if $ret;
++	push @testlibs, $thislib;
++    }
++    unlink($try);
++    unlink($tryx);
++
++    return (join(' ', @testlibs), '', join(' ', @testlibs), '');
++}
++
+ 1;
+diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm
+--- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm
++++ perl/cpan/ExtUtils-MakeMaker/lib/ExtUtils/MM_Unix.pm
+@@ -38,7 +38,7 @@
+     $Is{BSD}     = ($^O =~ /^(?:free|midnight|net|open)bsd$/ or
+                    grep( $^O eq $_, qw(bsdos interix dragonfly) )
+                   );
+-    $Is{Android} = $^O =~ /android/;
++    $Is{Android} = $^O =~ /android/ || $Config{osname} eq 'android';
+     if ( $^O eq 'darwin' ) {
+       my @osvers = split /\./, $Config{osvers};
+       if ( $^X eq '/usr/bin/perl' ) {
+diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-MakeMaker/t/lib/MakeMaker/Test/Utils.pm perl/cpan/ExtUtils-MakeMaker/t/lib/MakeMaker/Test/Utils.pm
+--- perl.upstream/cpan/ExtUtils-MakeMaker/t/lib/MakeMaker/Test/Utils.pm
++++ perl/cpan/ExtUtils-MakeMaker/t/lib/MakeMaker/Test/Utils.pm
+@@ -359,8 +359,6 @@
+ =cut
+ 
+ sub have_compiler {
+-    return 1 if $ENV{PERL_CORE};
+-
+     my $have_compiler = 0;
+ 
+     in_dir(sub {
+diff -Paur --no-dereference -- perl.upstream/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm perl/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
+--- perl.upstream/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
++++ perl/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
+@@ -1676,7 +1676,7 @@
+         if ($self->is_os2) {
+           unshift @pagers, 'less', 'cmd /c more <';
+         }
+-        push @pagers, qw( more less pg view cat );
++        push @pagers, qw( less pager more pg view cat );
+         unshift @pagers, "$ENV{PAGER} <"  if $ENV{PAGER};
+     }
+ 
+diff -Paur --no-dereference -- perl.upstream/dist/Safe/Safe.pm perl/dist/Safe/Safe.pm
+--- perl.upstream/dist/Safe/Safe.pm
++++ perl/dist/Safe/Safe.pm
+@@ -43,7 +43,10 @@
+     }
+ }
+ 
+-use Opcode 1.01, qw(
++# PATCH: 'use Safe;' fails with '"%.*g" is not exported by the Opcode module'
++#        on Sortix without floating point support when a floating point version
++#        number is used here.
++use Opcode 1, qw(
+     opset opset_to_ops opmask_add
+     empty_opset full_opset invert_opset verify_opset
+     opdesc opcodes opmask define_optag opset_to_hex
+diff -Paur --no-dereference -- perl.upstream/dist/Time-HiRes/Makefile.PL perl/dist/Time-HiRes/Makefile.PL
+--- perl.upstream/dist/Time-HiRes/Makefile.PL
++++ perl/dist/Time-HiRes/Makefile.PL
+@@ -112,7 +112,11 @@
+             my $res = system($cccmd);
+             $ok = defined($res) && $res == 0 && -s $tmp_exe && -x _;
+ 
+-            if ( $ok && exists $args{run} && $args{run} && !$ENV{TIME_HIRES_DONT_RUN_PROBES} ) {
++            # PATCH: Do not do this when cross-compiling. I don't know how to
++            #        detect cross-compilation in this script, so just avoid
++            #        execution entirely, and instead  justassume the interfaces
++            #        work if they can be linked with.
++            if ( 0 ) {
+                 my $tmp_exe =
+                     File::Spec->catfile(File::Spec->curdir, $tmp_exe);
+                 my @run = $tmp_exe;
+diff -Paur --no-dereference -- perl.upstream/ext/DynaLoader/hints/linux.pl perl/ext/DynaLoader/hints/linux.pl
+--- perl.upstream/ext/DynaLoader/hints/linux.pl
++++ perl/ext/DynaLoader/hints/linux.pl
+@@ -1,5 +1 @@
+-# XXX Configure test needed.
+-# Some Linux releases like to hide their <nlist.h>
+-$self->{CCFLAGS} = $Config{ccflags} . ' -I/usr/include/libelf'
+-	if -f "/usr/include/libelf/nlist.h";
+ 1;
+diff -Paur --no-dereference -- perl.upstream/ext/Errno/Errno_pm.PL perl/ext/Errno/Errno_pm.PL
+--- perl.upstream/ext/Errno/Errno_pm.PL
++++ perl/ext/Errno/Errno_pm.PL
+@@ -1,6 +1,9 @@
+ use ExtUtils::MakeMaker;
+ use Config;
+ use strict;
++ 
++# PATCH: Recognize the right operating system when cross-compiling.
++$^O = $Config{osname};
+ 
+ our $VERSION = "1.38";
+ 
+@@ -160,6 +163,11 @@
+ 
+ 	close(CPPI);
+ 
++	# PATCH: Simply process errno.c rather then the special logic below to
++	# locate the system headers.
++	push(@file, "errno.c");
++	return uniq(@file);
++
+ 	# invoke CPP and read the output
+ 	if ($IsMSWin32) {
+ 	    open(CPPO,"$Config{cpprun} $Config{cppflags} errno.c |") or
+diff -Paur --no-dereference -- perl.upstream/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm perl/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
+--- perl.upstream/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
++++ perl/ext/ExtUtils-Miniperl/lib/ExtUtils/Miniperl.pm
+@@ -2,7 +2,9 @@
+ package ExtUtils::Miniperl;
+ use strict;
+ use Exporter 'import';
+-use ExtUtils::Embed 1.31, qw(xsi_header xsi_protos xsi_body);
++# PATCH: Work around missing Sortix printf floating point support causing:
++#        "%.*g" is not exported by the ExtUtils::Embed module
++use ExtUtils::Embed 1, qw(xsi_header xsi_protos xsi_body);
+ 
+ our @EXPORT = qw(writemain);
+ our $VERSION = '1.14';
+diff -Paur --no-dereference -- perl.upstream/ext/POSIX/Makefile.PL perl/ext/POSIX/Makefile.PL
+--- perl.upstream/ext/POSIX/Makefile.PL
++++ perl/ext/POSIX/Makefile.PL
+@@ -1,4 +1,9 @@
+ # Expect this line to be read by t/posix.t, don't change it
++
++# Explicitly avoid including '.' in @INC; autoloader gets confused since it
++# can find POSIX.pm, but can't find autosplit.ix.
++BEGIN { pop @INC;}
++#
+ use ExtUtils::MakeMaker;
+ use ExtUtils::Constant 0.23 'WriteConstants';
+ use Config;
+diff -Paur --no-dereference -- perl.upstream/ext/POSIX/POSIX.xs perl/ext/POSIX/POSIX.xs
+--- perl.upstream/ext/POSIX/POSIX.xs
++++ perl/ext/POSIX/POSIX.xs
+@@ -1418,7 +1418,11 @@
+ #      define mkfifo(a,b) not_here("mkfifo")
+ #    else	/* !( defined OS2 ) */
+ #      ifndef mkfifo
++#if defined(__sortix__) && !defined(__SORTIX_HAS_MKFIFO__)
++#        define mkfifo(path, mode) not_here("mkfifo")
++#else
+ #        define mkfifo(path, mode) (mknod((path), (mode) | S_IFIFO, 0))
++#endif
+ #      endif
+ #    endif
+ #  endif /* !HAS_MKFIFO */
+diff -Paur --no-dereference -- perl.upstream/installman perl/installman
+--- perl.upstream/installman
++++ perl/installman
+@@ -1,8 +1,6 @@
+ #!./perl -w
+ 
+ BEGIN {
+-    @INC = qw(lib);
+-
+     # This needs to be at BEGIN time, before any use of Config
+     # install_lib itself loads and imports Config into main::
+     require './install_lib.pl';
+diff -Paur --no-dereference -- perl.upstream/installperl perl/installperl
+--- perl.upstream/installperl
++++ perl/installperl
+@@ -2,8 +2,6 @@
+ 
+ BEGIN {
+     chdir '..' if !-d 'lib' and -d '../lib';
+-    @INC = 'lib';
+-    $ENV{PERL5LIB} = 'lib';
+ 
+     # This needs to be at BEGIN time, before any use of Config
+     # install_lib itself loads and imports Config into main::
+@@ -183,6 +181,7 @@
+ 
+ # Fetch some frequently-used items from %Config
+ my $installbin = "$opts{destdir}$Config{installbin}";
++my $installlib = "$opts{destdir}$Config{installlib}";
+ my $installscript = "$opts{destdir}$Config{installscript}";
+ my $installprivlib = "$opts{destdir}$Config{installprivlib}";
+ my $installarchlib = "$opts{destdir}$Config{installarchlib}";
+@@ -339,7 +338,8 @@
+     @corefiles = <*.h>;
+ } else {
+     # [als] hard-coded 'libperl' name... not good!
+-    @corefiles = <*.h libperl*.* perl*$Config{lib_ext}>;
++    @corefiles = <*.h perl*$Config{lib_ext}>;
++    push(@corefiles, $Config{libperl}) if $Config{useshrplib} && !$Config{soname};
+ 
+     # AIX needs perl.exp installed as well.
+     push(@corefiles,'perl.exp') if $^O eq 'aix';
+@@ -366,6 +366,29 @@
+ 	chmod($NON_SO_MODE, $dest) foreach @corefiles;
+ }
+ 
++if($Config{useshrplib} && $Config{soname}) {
++    my $libperl = $Config{libperl};
++    my $soname = $Config{soname};
++    mkpath($installlib);
++    if (copy_if_diff($libperl, "$installlib/$libperl")) {
++        strip("-S", "$installlib/$libperl");
++        chmod(0555, "$installlib/$libperl");
++
++        # Normally this should be done by ldconfig.
++        safe_unlink("$installlib/$soname") unless $soname eq $libperl;
++        safe_unlink("$installlib/libperl.so") unless $soname eq 'libperl.so';
++        symlink($libperl, "$installlib/$soname") unless $soname eq $libperl;
++        symlink($libperl, "$installlib/libperl.so") unless $soname eq 'libperl.so';
++        # using $so here instead of .so hardly makes any sense,
++        # all systems supporting SONAME have $so=.so
++
++        # Backward compatibility: provide a symlink where people expect it
++        safe_unlink("$installarchlib/CORE/libperl.so");
++        symlink("$Config{installlib}/$libperl", "$installarchlib/CORE/libperl.so");
++        #        ^ without destdir here!
++    }
++}
++
+ # Install main perl executables
+ # Make links to ordinary names if installbin directory isn't current directory.
+ 
+diff -Paur --no-dereference -- perl.upstream/lib/unicore/mktables perl/lib/unicore/mktables
+--- perl.upstream/lib/unicore/mktables
++++ perl/lib/unicore/mktables
+@@ -12646,10 +12646,12 @@
+         if (   defined $nv_floating_to_rational{$float}
+             && $nv_floating_to_rational{$float} ne $rational)
+         {
+-            die Carp::my_carp_bug("Both '$rational' and"
+-                            . " '$nv_floating_to_rational{$float}' evaluate to"
+-                            . " the same floating point number."
+-                            . "  \$E_FLOAT_PRECISION must be increased");
++            # PATCH: This test fails on native Sortix due to lack of floating
++            #        point formatting support, but nothing is wrong.
++            #die Carp::my_carp_bug("Both '$rational' and"
++            #                . " '$nv_floating_to_rational{$float}' evaluate to"
++            #                . " the same floating point number."
++            #                . "  \$E_FLOAT_PRECISION must be increased");
+         }
+         $nv_floating_to_rational{$float} = $rational;
+     }
+diff -Paur --no-dereference -- perl.upstream/locale.c perl/locale.c
+--- perl.upstream/locale.c
++++ perl/locale.c
+@@ -302,7 +302,12 @@
+  * initialization.  This is done before option parsing, and before any thread
+  * creation, so can be a file-level static.  (Must come before #including
+  * perl.h) */
+-#include "config.h"
++/* PATCH: Dammit this file special cases it instead of using perl.h. */
++#ifndef USE_CROSS_COMPILE
++#  include "config.h"
++#else
++#  include "xconfig.h"
++#endif
+ 
+ /* Returns the Unix errno portion; ignoring any others.  This is a macro here
+  * instead of putting it into perl.h, because unclear to khw what should be
+@@ -4524,6 +4529,17 @@
+ STATIC bool
+ S_is_locale_utf8(pTHX_ const char * locale)
+ {
++    /* PATCH: For some reason, the locale is "" here if no locale envvars are
++              set, even though libc should be returning "C" in that case. This
++              code is a confusing labyrinth, and I can't figure out where the
++              setlocale and nl_langinfo call actually happens and with what
++              parameters, so just unconditionally return true. Without this
++              change, perl will complain a lot about the locale being
++              unsupported. */
++#ifdef __sortix__
++    return TRUE;
++#endif
++
+     /* Returns TRUE if the locale 'locale' is UTF-8; FALSE otherwise.  It uses
+      * my_langinfo(), which employs various methods to get this information
+      * if nl_langinfo() isn't available, using heuristics as a last resort, in
 diff -Paur --no-dereference -- perl.upstream/perl.h perl/perl.h
 --- perl.upstream/perl.h
 +++ perl/perl.h
-@@ -25,7 +25,11 @@
- #ifdef PERL_MICRO
- #   include "uconfig.h"
- #else
-+#   ifndef USE_CROSS_COMPILE
- #   include "config.h"
-+#   else
-+#       include "xconfig.h"
-+#   endif
- #endif
+@@ -43,7 +43,11 @@
+  */
+ /* #define PERL_RC_STACK */
  
- /* this is used for functions which take a depth trailing
+-#include "config.h"
++#ifndef USE_CROSS_COMPILE
++#  include "config.h"
++#else
++#  include "xconfig.h"
++#endif
+ 
+ /* This fakes up using Mingw for locale handling.  In order to not define WIN32
+  * in this file (and hence throughout the code that isn't expecting it), this
+@@ -449,6 +453,8 @@
+ #ifdef HASATTRIBUTE_WARN_UNUSED_RESULT
+ #  define __attribute__warn_unused_result__ __attribute__((warn_unused_result))
+ #endif
++/* PATCH: Silence annoying always_inline -Wattribute warnings. */
++#undef HASATTRIBUTE_ALWAYS_INLINE
+ #ifdef HASATTRIBUTE_ALWAYS_INLINE
+ /* always_inline is buggy in gcc <= 4.6 and causes compilation errors */
+ #  if !defined(PERL_IS_GCC) || PERL_GCC_VERSION_GE(4,7,0)
 diff -Paur --no-dereference -- perl.upstream/perl_langinfo.h perl/perl_langinfo.h
 --- perl.upstream/perl_langinfo.h
 +++ perl/perl_langinfo.h
@@ -942,14 +991,14 @@ diff -Paur --no-dereference -- perl.upstream/perl_langinfo.h perl/perl_langinfo.
  #include "config.h"
 +#endif
  
- #if defined(HAS_NL_LANGINFO) && defined(I_LANGINFO)
+ #if defined(I_LANGINFO)
  #   include <langinfo.h>
 diff -Paur --no-dereference -- perl.upstream/pp.c perl/pp.c
 --- perl.upstream/pp.c
 +++ perl/pp.c
-@@ -2866,6 +2866,13 @@
-    --Jarkko Hietaniemi	27 September 1998
-  */
+@@ -3196,6 +3196,13 @@
+     }
+ }
  
 +#if defined(__sortix__) && !defined(__SORTIX_HAS_DRAND48__)
 +double drand48(void)
@@ -958,18 +1007,33 @@ diff -Paur --no-dereference -- perl.upstream/pp.c perl/pp.c
 +}
 +#endif
 +
- PP(pp_rand)
- {
-     if (!PL_srand_called) {
+ /* Support Configure command-line overrides for rand() functions.
+    After 5.005, perhaps we should replace this by Configure support
+    for drand48(), random(), or rand().  For 5.005, though, maintain
+diff -Paur --no-dereference -- perl.upstream/regcomp.c perl/regcomp.c
+--- perl.upstream/regcomp.c
++++ perl/regcomp.c
+@@ -145,6 +145,11 @@
+ #include "unicode_constants.h"
+ #include "regcomp_internal.h"
+ 
++/* PATCH: Avoid multiple definitions. */
++#ifdef PERL_EXT_RE_BUILD
++#undef PERL_RE_BUILD_AUX
++#endif
++
+ /* =========================================================
+  * BEGIN edit_distance stuff.
+  *
 diff -Paur --no-dereference -- perl.upstream/t/lib/commonsense.t perl/t/lib/commonsense.t
 --- perl.upstream/t/lib/commonsense.t
 +++ perl/t/lib/commonsense.t
-@@ -18,7 +18,7 @@
+@@ -17,7 +17,7 @@
+ if (($Config{'extensions'} !~ /\bIO\s/) ){
    BAIL_OUT("Perl configured without IO module");
  }
- # hey, DOS users do not need this kind of common sense ;-)
--if ($^O ne 'dos' && ($Config{'extensions'} !~ /\bFile\/Glob\b/) ){
-+if ($^O ne 'dos' && ($Config{'extensions'} !~ /\bFile.Glob\b/) ){
+-if (($Config{'extensions'} !~ /\bFile\/Glob\b/) ){
++if (($Config{'extensions'} !~ /\bFile.Glob\b/) ){
    BAIL_OUT("Perl configured without File::Glob module");
  }
  
@@ -988,61 +1052,53 @@ diff -Paur --no-dereference -- perl.upstream/t/porting/checkcase.t perl/t/portin
 diff -Paur --no-dereference -- perl.upstream/util.c perl/util.c
 --- perl.upstream/util.c
 +++ perl/util.c
-@@ -2094,7 +2094,7 @@
-  * For Solaris, setenv() and unsetenv() were introduced in Solaris 9, so
-  * testing for HAS UNSETENV is sufficient.
-  */
--#  if defined(__CYGWIN__)|| defined(__SYMBIAN32__) || defined(__riscos__) || (defined(__sun) && defined(HAS_UNSETENV)) || defined(PERL_DARWIN)
-+#  if defined(__CYGWIN__)|| defined(__SYMBIAN32__) || defined(__riscos__) || (defined(__sun) && defined(HAS_UNSETENV)) || defined(PERL_DARWIN) || defined(__sortix__)
- #    define MY_HAS_SETENV
- #  endif
- 
-@@ -2102,7 +2102,7 @@
+@@ -2300,7 +2300,7 @@
   * 'current' is non-null, with up to three sizes that are added together.
   * It handles integer overflow.
   */
--#  ifndef MY_HAS_SETENV
+-#  ifndef HAS_SETENV
 +/* PATCH: Support having only setenv/unsetenv and no putenv. */
  static char *
  S_env_alloc(void *current, Size_t l1, Size_t l2, Size_t l3, Size_t size)
  {
-@@ -2127,7 +2127,6 @@
+@@ -2325,7 +2325,6 @@
    panic:
      croak_memory_wrap();
  }
 -#  endif
  
- 
- #  if !defined(WIN32) && !defined(NETWARE)
+ /*
+ =for apidoc_section $utility
 diff -Paur --no-dereference -- perl.upstream/vutil.c perl/vutil.c
 --- perl.upstream/vutil.c
 +++ perl/vutil.c
-@@ -702,12 +702,25 @@
- #endif
+@@ -588,6 +588,7 @@
  
- 	if (sv) {
-+/* PATCH: Sortix doesn't have floating point printing yet. */
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_FORMAT_FLOAT__)
-+		double d = SvNVX(ver);
-+                Perl_sv_catpvf(aTHX_ sv, "%d.%09d", (int) d,
-+                               (int) ((long long)(d * 1000000000) % 1000000000));
-+#else
-                 Perl_sv_catpvf(aTHX_ sv, "%.9" NVff, SvNVX(ver));
-+#endif
- 	    len = SvCUR(sv);
- 	    buf = SvPVX(sv);
- 	}
- 	else {
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_FORMAT_FLOAT__)
-+		double d = SvNVX(ver);
-+                len = my_snprintf(tbuf, sizeof(tbuf), "%d.%09d", (int) d,
-+                                  (int) ((long long)(d * 1000000000) % 1000000000));
-+#else
-                 len = my_snprintf(tbuf, sizeof(tbuf), "%.9" NVff, SvNVX(ver));
-+#endif
- 	    buf = tbuf;
- 	}
- 
+ /* Macro to do the meat of getting the PV of an NV version number.  This is
+  * macroized because can be called from several places */
++/* PATCH: Work around lack of Sortix printf floating point support. */
+ #define GET_NUMERIC_VERSION(ver, sv, tbuf, buf, len)                        \
+     STMT_START {                                                            \
+                                                                             \
+@@ -597,13 +598,16 @@
+         /* We earlier created 'sv' for very large version numbers, to rely  \
+          * on the specialized algorithms SV code has built-in for such      \
+          * values */                                                        \
++        double d = SvNVX(ver); \
+         if (sv) {                                                           \
+-            Perl_sv_setpvf(aTHX_ sv, "%.9" NVff, SvNVX(ver));               \
++            Perl_sv_setpvf(aTHX_ sv, "%d.%09d", (int) d,                    \
++                (int) ((long long)(d * 1000000000) % 1000000000));          \
+             len = SvCUR(sv);                                                \
+             buf = SvPVX(sv);                                                \
+         }                                                                   \
+         else {                                                              \
+-            len = my_snprintf(tbuf, sizeof(tbuf), "%.9" NVff, SvNVX(ver));  \
++            len = my_snprintf(tbuf, sizeof(tbuf), "%d.%09d", (int) d,       \
++                (int) ((long long)(d * 1000000000) % 1000000000));          \
+             buf = tbuf;                                                     \
+         }                                                                   \
+                                                                             \
 diff -Paur --no-dereference -- perl.upstream/win32/FindExt.pm perl/win32/FindExt.pm
 --- perl.upstream/win32/FindExt.pm
 +++ perl/win32/FindExt.pm
