@@ -1,7 +1,76 @@
+diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
+--- git.upstream/Makefile
++++ git/Makefile
+@@ -646,7 +646,9 @@
+ MSGCAT = msgcat
+ MSGFMT = msgfmt
+ MSGMERGE = msgmerge
+-CURL_CONFIG = curl-config
++# PATCH: Always use pkg-config instead of the cross unsafe curl-config.
++PKG_CONFIG ?= pkg-config
++CURL_CONFIG = $(PKG_CONFIG) libcurl
+ GCOV = gcov
+ STRIP = strip
+ SPATCH = spatch
+@@ -2843,8 +2845,9 @@
+ doc: man-perl
+ 	$(MAKE) -C Documentation all
+ 
+-man: man-perl
+-	$(MAKE) -C Documentation man
++# PATCH: Build manual pages if asciidoc and xmlto are installed.
++man: man
++	if which asciidoc 1>/dev/null 2>/dev/null && which xmlto 1>/dev/null 2>/dev/null; then $(MAKE) -C Documentation man; fi
+ 
+ man-perl: perl/build/man/man3/Git.3pm
+ 
+@@ -3444,7 +3447,7 @@
+ 
+ INSTALL_STRIP =
+ 
+-install: all
++install: all install-man
+ 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(bindir_SQ)'
+ 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
+ 	$(INSTALL) $(INSTALL_STRIP) $(PROGRAMS) '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
+@@ -3540,8 +3543,9 @@
+ install-doc: install-man-perl
+ 	$(MAKE) -C Documentation install
+ 
+-install-man: install-man-perl
+-	$(MAKE) -C Documentation install-man
++# PATCH: Build manual pages if asciidoc and xmlto are installed.
++install-man:
++	if which asciidoc 1>/dev/null 2>/dev/null && which xmlto 1>/dev/null 2>/dev/null; then $(MAKE) -C Documentation install-man; fi
+ 
+ install-man-perl: man-perl
+ 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(mandir_SQ)/man3'
+@@ -3648,8 +3652,8 @@
+ 
+ ### Cleaning rules
+ 
++# PATCH: Don't delete configure when making distclean because it is in the dist.
+ distclean: clean
+-	$(RM) configure
+ 	$(RM) config.log config.status config.cache
+ 	$(RM) config.mak.autogen config.mak.append
+ 	$(RM) -r autom4te.cache
+diff -Paur --no-dereference -- git.upstream/builtin/gc.c git/builtin/gc.c
+--- git.upstream/builtin/gc.c
++++ git/builtin/gc.c
+@@ -1771,7 +1771,7 @@
+ 
+ static char *launchctl_get_uid(void)
+ {
+-	return xstrfmt("gui/%d", getuid());
++	return xstrfmt("gui/%jd", (intmax_t)getuid());
+ }
+ 
+ static int launchctl_boot_plist(int enable, const char *filename)
 diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
 --- git.upstream/builtin/log.c
 +++ git/builtin/log.c
-@@ -249,7 +249,12 @@
+@@ -395,7 +395,12 @@
  	fprintf(rev->diffopt.file, _("Final output: %d %s\n"), nr, stage);
  }
  
@@ -14,7 +83,7 @@ diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
  
  static void log_show_early(struct rev_info *revs, struct commit_list *list)
  {
-@@ -297,9 +302,18 @@
+@@ -444,9 +449,18 @@
  	 * trigger every second even if we're blocked on a
  	 * reader!
  	 */
@@ -32,10 +101,10 @@ diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
 +#endif
  }
  
- static void early_output(int signal)
-@@ -309,6 +323,13 @@
+ static void early_output(int signal UNUSED)
+@@ -456,6 +470,13 @@
  
- static void setup_early_output(struct rev_info *rev)
+ static void setup_early_output(void)
  {
 +#if defined(__sortix__) && !defined(__SORTIX_HAS_RESTARTABLE_SYSCALLS__)
 +	/* TODO: Sortix doesn't have restartable system calls at the moment and this
@@ -47,7 +116,7 @@ diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
  	struct sigaction sa;
  
  	/*
-@@ -331,13 +352,37 @@
+@@ -478,13 +499,37 @@
  	 *
  	 * This is a one-time-only trigger.
  	 */
@@ -82,7 +151,7 @@ diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
 +#if defined(__sortix__)
 +	timer_delete(early_output_timer);
 +#endif
- 	int n = estimate_commit_count(rev, rev->commits);
+ 	int n = estimate_commit_count(rev->commits);
  	signal(SIGALRM, SIG_IGN);
  	show_early_header(rev, "done", n);
 diff -Paur --no-dereference -- git.upstream/compat/hstrerror.c git/compat/hstrerror.c
@@ -107,7 +176,7 @@ diff -Paur --no-dereference -- git.upstream/compat/hstrerror.c git/compat/hstrer
 diff -Paur --no-dereference -- git.upstream/config.mak.uname git/config.mak.uname
 --- git.upstream/config.mak.uname
 +++ git/config.mak.uname
-@@ -17,6 +17,8 @@
+@@ -40,6 +40,8 @@
  # because maintaining the nesting to match is a pain.  If
  # we had "elif" things would have been much nicer...
  
@@ -116,29 +185,47 @@ diff -Paur --no-dereference -- git.upstream/config.mak.uname git/config.mak.unam
  ifeq ($(uname_S),OSF1)
  	# Need this for u_short definitions et al
  	BASIC_CFLAGS += -D_OSF_SOURCE
+@@ -60,10 +62,12 @@
+ 	HAVE_SYNC_FILE_RANGE = YesPlease
+ 	HAVE_GETDELIM = YesPlease
+ 	FREAD_READS_DIRECTORIES = UnfortunatelyYes
+-	BASIC_CFLAGS += -DHAVE_SYSINFO
+-	PROCFS_EXECUTABLE_PATH = /proc/self/exe
+-	HAVE_PLATFORM_PROCINFO = YesPlease
+-	COMPAT_OBJS += compat/linux/procinfo.o
++	# PATCH: Unfortunately this whole system isn't cross safe and isn't fully
++	#        overriden by config.mak.autogen.
++	#BASIC_CFLAGS += -DHAVE_SYSINFO
++	#PROCFS_EXECUTABLE_PATH = /proc/self/exe
++	#HAVE_PLATFORM_PROCINFO = YesPlease
++	#COMPAT_OBJS += compat/linux/procinfo.o
+ 	# centos7/rhel7 provides gcc 4.8.5 and zlib 1.2.7.
+ 	ifneq ($(findstring .el7.,$(uname_R)),)
+ 		BASIC_CFLAGS += -std=c99
 diff -Paur --no-dereference -- git.upstream/configure git/configure
 --- git.upstream/configure
 +++ git/configure
-@@ -5315,7 +5315,7 @@
-   $as_echo_n "(cached) " >&6
- else
+@@ -5466,7 +5466,7 @@
+   printf %s "(cached) " >&6
+ else $as_nop
    ac_check_lib_save_LIBS=$LIBS
 -LIBS="-lcurl  $LIBS"
 +LIBS="-lcurl -lssl -lcrypto -lz $LIBS"
  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
  
-@@ -5364,52 +5364,13 @@
+@@ -5516,49 +5516,7 @@
  
  if test -z "$NO_CURL"; then
  
 -# Extract the first word of "curl-config", so it can be a program name with args.
 -set dummy curl-config; ac_word=$2
--{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
--$as_echo_n "checking for $ac_word... " >&6; }
--if ${ac_cv_prog_CURL_CONFIG+:} false; then :
--  $as_echo_n "(cached) " >&6
--else
+-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+-printf %s "checking for $ac_word... " >&6; }
+-if test ${ac_cv_prog_CURL_CONFIG+y}
+-then :
+-  printf %s "(cached) " >&6
+-else $as_nop
 -  if test -n "$CURL_CONFIG"; then
 -  ac_cv_prog_CURL_CONFIG="$CURL_CONFIG" # Let the user override the test.
 -else
@@ -146,11 +233,15 @@ diff -Paur --no-dereference -- git.upstream/configure git/configure
 -for as_dir in $PATH
 -do
 -  IFS=$as_save_IFS
--  test -z "$as_dir" && as_dir=.
+-  case $as_dir in #(((
+-    '') as_dir=./ ;;
+-    */) ;;
+-    *) as_dir=$as_dir/ ;;
+-  esac
 -    for ac_exec_ext in '' $ac_executable_extensions; do
--  if as_fn_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+-  if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
 -    ac_cv_prog_CURL_CONFIG="curl-config"
--    $as_echo "$as_me:${as_lineno-$LINENO}: found $as_dir/$ac_word$ac_exec_ext" >&5
+-    printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
 -    break 2
 -  fi
 -done
@@ -162,61 +253,60 @@ diff -Paur --no-dereference -- git.upstream/configure git/configure
 -fi
 -CURL_CONFIG=$ac_cv_prog_CURL_CONFIG
 -if test -n "$CURL_CONFIG"; then
--  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $CURL_CONFIG" >&5
--$as_echo "$CURL_CONFIG" >&6; }
+-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $CURL_CONFIG" >&5
+-printf "%s\n" "$CURL_CONFIG" >&6; }
 -else
--  { $as_echo "$as_me:${as_lineno-$LINENO}: result: no" >&5
--$as_echo "no" >&6; }
+-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: no" >&5
+-printf "%s\n" "no" >&6; }
 -fi
 -
 -
--
--if test $CURL_CONFIG != no; then
-+# PATCH: pkg-config must be used instead of the bad curl-config.
++# PATCH: Do not use the cross unsafe curl-config.
  
- config_appended_defs="$config_appended_defs${newline}CURL_CONFIG=${CURL_CONFIG}"
-     if test -z "${NO_OPENSSL}"; then
-       { $as_echo "$as_me:${as_lineno-$LINENO}: checking if Curl supports SSL" >&5
- $as_echo_n "checking if Curl supports SSL... " >&6; }
--      if test $(curl-config --features|grep SSL) = SSL; then
-+      if test -n "$(${PKG_CONFIG:-pkg-config} libcurl --variable=supported_features|grep SSL)"; then
-          NEEDS_SSL_WITH_CURL=YesPlease
-          { $as_echo "$as_me:${as_lineno-$LINENO}: result: yes" >&5
- $as_echo "yes" >&6; }
-@@ -5423,8 +5384,6 @@
-     fi
- fi
+ if test $CURL_CONFIG != no; then
  
--fi
--
+@@ -6240,10 +6198,8 @@
  
- #
- # Define NO_EXPAT if you do not have expat installed.  git-http-push is
+ if test "$cross_compiling" = yes
+ then :
+-  { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: error: in \`$ac_pwd':" >&5
+-printf "%s\n" "$as_me: error: in \`$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See \`config.log' for more details" "$LINENO" 5; }
++# PATCH: Guess iconv does not omit the BOM.
++ac_cv_iconv_omits_bom=no
+ else $as_nop
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
 diff -Paur --no-dereference -- git.upstream/git-compat-util.h git/git-compat-util.h
 --- git.upstream/git-compat-util.h
 +++ git/git-compat-util.h
-@@ -325,6 +325,10 @@
+@@ -429,7 +429,14 @@
  typedef uintmax_t timestamp_t;
  #define PRItime PRIuMAX
  #define parse_timestamp strtoumax
-+/* PATCH: Avoid conflicting Sortix macro. */
++/* PATCH: Avoid conflicting Sortix macros. */
 +#ifdef TIME_MAX
 +#undef TIME_MAX
 +#endif
  #define TIME_MAX UINTMAX_MAX
++#ifdef TIME_MIN
++#undef TIME_MIN
++#endif
+ #define TIME_MIN 0
  
  #ifndef PATH_SEP
 diff -Paur --no-dereference -- git.upstream/lockfile.c git/lockfile.c
 --- git.upstream/lockfile.c
 +++ git/lockfile.c
-@@ -105,16 +105,10 @@
+@@ -107,16 +107,10 @@
  	int n = 1;
  	int multiplier = 1;
  	long remaining_ms = 0;
 -	static int random_initialized = 0;
  
  	if (timeout_ms == 0)
- 		return lock_file(lk, path, flags);
+ 		return lock_file(lk, path, flags, mode);
  
 -	if (!random_initialized) {
 -		srand((unsigned int)getpid());
@@ -226,7 +316,7 @@ diff -Paur --no-dereference -- git.upstream/lockfile.c git/lockfile.c
  	if (timeout_ms > 0)
  		remaining_ms = timeout_ms;
  
-@@ -133,7 +127,8 @@
+@@ -135,7 +129,8 @@
  
  		backoff_ms = multiplier * INITIAL_BACKOFF_MS;
  		/* back off for between 0.75*backoff_ms and 1.25*backoff_ms */
@@ -236,100 +326,11 @@ diff -Paur --no-dereference -- git.upstream/lockfile.c git/lockfile.c
  		sleep_millisec(wait_ms);
  		remaining_ms -= wait_ms;
  
-diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
---- git.upstream/Makefile
-+++ git/Makefile
-@@ -1176,9 +1176,7 @@
- 	endif
- 	ifdef NEEDS_SSL_WITH_CURL
- 		CURL_LIBCURL += -lssl
--		ifdef NEEDS_CRYPTO_WITH_SSL
--			CURL_LIBCURL += -lcrypto
--		endif
-+		CURL_LIBCURL += -lcrypto
- 	endif
- 	ifdef NEEDS_IDN_WITH_CURL
- 		CURL_LIBCURL += -lidn
-@@ -1252,6 +1250,12 @@
- 	LIB_4_CRYPTO += -framework Security -framework CoreFoundation
- endif
- endif
-+# PATCH: Link with libintl first so it can statically link with libiconv.
-+ifndef NO_GETTEXT
-+ifndef LIBC_CONTAINS_LIBINTL
-+	EXTLIBS += -lintl
-+endif
-+endif
- ifdef NEEDS_LIBICONV
- 	ifdef ICONVDIR
- 		BASIC_CFLAGS += -I$(ICONVDIR)/include
-@@ -1259,19 +1263,11 @@
- 	else
- 		ICONV_LINK =
- 	endif
--	ifdef NEEDS_LIBINTL_BEFORE_LIBICONV
--		ICONV_LINK += -lintl
--	endif
- 	EXTLIBS += $(ICONV_LINK) -liconv
- endif
- ifdef NEEDS_LIBGEN
- 	EXTLIBS += -lgen
- endif
--ifndef NO_GETTEXT
--ifndef LIBC_CONTAINS_LIBINTL
--	EXTLIBS += -lintl
--endif
--endif
- ifdef NEEDS_SOCKET
- 	EXTLIBS += -lsocket
- endif
-@@ -2184,8 +2180,10 @@
- doc:
- 	$(MAKE) -C Documentation all
- 
-+# PATCH: Build manual pages if asciidoc and xmlto are installed.
-+all:: man
- man:
--	$(MAKE) -C Documentation man
-+	if which asciidoc 1>/dev/null 2>/dev/null && which xmlto 1>/dev/null 2>/dev/null; then $(MAKE) -C Documentation man; fi
- 
- html:
- 	$(MAKE) -C Documentation html
-@@ -2502,7 +2500,7 @@
- profile-fast-install: profile-fast
- 	$(MAKE) install
- 
--install: all
-+install: all install-man
- 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(bindir_SQ)'
- 	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
- 	$(INSTALL) $(ALL_PROGRAMS) '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
-@@ -2570,8 +2568,9 @@
- install-doc:
- 	$(MAKE) -C Documentation install
- 
-+# PATCH: Install manual pages if asciidoc and xmlto are installed.
- install-man:
--	$(MAKE) -C Documentation install-man
-+	if which asciidoc 1>/dev/null 2>/dev/null && which xmlto 1>/dev/null 2>/dev/null; then $(MAKE) -C Documentation install-man; fi
- 
- install-html:
- 	$(MAKE) -C Documentation install-html
-@@ -2638,8 +2637,8 @@
- 
- ### Cleaning rules
- 
-+# PATCH: Don't delete configure when making distclean because it is in the dist.
- distclean: clean
--	$(RM) configure
- 	$(RM) config.log config.status config.cache
- 	$(RM) config.mak.autogen config.mak.append
- 	$(RM) -r autom4te.cache
 diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
 --- git.upstream/progress.c
 +++ git/progress.c
-@@ -39,6 +39,10 @@
- 	uint64_t start_ns;
+@@ -47,6 +47,10 @@
+ 	int split;
  };
  
 +/* PATCH: Sortix does not have obsolescent XSI itimers. */
@@ -338,8 +339,8 @@ diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
 +#endif
  static volatile sig_atomic_t progress_update;
  
- static void progress_interval(int signum)
-@@ -48,8 +52,19 @@
+ /*
+@@ -68,8 +72,19 @@
  
  static void set_progress_signal(void)
  {
@@ -357,9 +358,9 @@ diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
  	struct itimerval v;
 +#endif
  
- 	progress_update = 0;
- 
-@@ -59,16 +74,39 @@
+ 	if (progress_testing)
+ 		return;
+@@ -82,20 +97,43 @@
  	sa.sa_flags = SA_RESTART;
  	sigaction(SIGALRM, &sa, NULL);
  
@@ -390,10 +391,14 @@ diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
 +	return;
 +#endif
 +
+ 	struct itimerval v = {{0,},};
+ 
+ 	if (progress_testing)
+ 		return;
+ 
 +#if defined(__sortix__)
 +	timer_delete(progress_timer);
 +#else
- 	struct itimerval v = {{0,},};
  	setitimer(ITIMER_REAL, &v, NULL);
 +#endif
  	signal(SIGALRM, SIG_IGN);
@@ -402,28 +407,28 @@ diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
 diff -Paur --no-dereference -- git.upstream/run-command.c git/run-command.c
 --- git.upstream/run-command.c
 +++ git/run-command.c
-@@ -491,9 +491,12 @@
+@@ -515,9 +515,12 @@
  #else
- 	bug_die(pthread_sigmask(SIG_SETMASK, &all, &as->old),
+ 	CHECK_BUG(pthread_sigmask(SIG_SETMASK, &all, &as->old),
  		"blocking all signals");
 +/* PATCH: Sortix doesn't have pthread cancelation. */
 +#ifdef PTHREAD_CANCEL_DISABLE
- 	bug_die(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &as->cs),
+ 	CHECK_BUG(pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &as->cs),
  		"disabling cancellation");
  #endif
 +#endif
  }
  
  static void atfork_parent(struct atfork_state *as)
-@@ -502,8 +505,11 @@
+@@ -526,8 +529,11 @@
  	if (sigprocmask(SIG_SETMASK, &as->old, NULL))
  		die_errno("sigprocmask");
  #else
 +/* PATCH: Sortix doesn't have pthread cancelation. */
 +#ifdef PTHREAD_CANCEL_DISABLE
- 	bug_die(pthread_setcancelstate(as->cs, NULL),
+ 	CHECK_BUG(pthread_setcancelstate(as->cs, NULL),
  		"re-enabling cancellation");
 +#endif
- 	bug_die(pthread_sigmask(SIG_SETMASK, &as->old, NULL),
+ 	CHECK_BUG(pthread_sigmask(SIG_SETMASK, &as->old, NULL),
  		"restoring signal mask");
  #endif
