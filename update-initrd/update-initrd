@@ -94,5 +94,6 @@ EOF
 fi
 mkdir -p "$output/boot"
 LC_AL=C ls -A "$tmp" |
-tar -C "$tmp" -cf "$output/boot/sortix.initrd" \
+tar -C "$tmp" -cf "$output/boot/sortix.initrd.new" \
     --numeric-owner --owner=0 --group=0 -T -
+mv "$output/boot/sortix.initrd.new" "$output/boot/sortix.initrd"
