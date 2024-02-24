@@ -468,15 +468,18 @@ $(LIVE_INITRD): sysroot
 
 .PHONY: $(OVERLAY_INITRD)
 $(OVERLAY_INITRD): sysroot
+	mkdir -p `dirname $(OVERLAY_INITRD)`
 	test ! -d "$(SYSROOT_OVERLAY)" || \
 	LC_ALL=C ls -A "$(SYSROOT_OVERLAY)" | \
 	tar -cf $(OVERLAY_INITRD) -C "$(SYSROOT_OVERLAY)" --numeric-owner --owner=0 --group=0 -T -
 
 $(SRC_INITRD): sysroot
+	mkdir -p `dirname $(SRC_INITRD)`
 	sed -E 's,^/,,' "$(SYSROOT)/tix/manifest/src" | \
 	tar -cf $(SRC_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/src
 
 $(SYSTEM_INITRD): sysroot
+	mkdir -p `dirname $(SYSTEM_INITRD)`
 	sed -E 's,^/,,' "$(SYSROOT)/tix/manifest/system" | \
 	tar -cf $(SYSTEM_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/system tix/tixinfo/system
 
