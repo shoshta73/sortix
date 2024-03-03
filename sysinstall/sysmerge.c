@@ -225,7 +225,7 @@ int main(int argc, char* argv[])
 	if ( !conf_path )
 		err(2, "malloc");
 	if ( !conf_load(&conf, conf_path) && errno != ENOENT )
-		err(2, conf_path);
+		err(2, "%s", conf_path);
 
 	bool did_cancel = false;
 	if ( !no_cancel && has_pending_upgrade(target) )
