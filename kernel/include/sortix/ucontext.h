@@ -72,7 +72,7 @@ enum
 #define REG_CR2 REG_CR2
 	REG_FSBASE,
 #define REG_FSBASE REG_FSBASE
-	REG_GSBASE,
+	REG_GSBASE
 #define REG_GSBASE REG_GSBASE
 };
 #endif
@@ -126,7 +126,7 @@ enum
 #define REG_CR2 REG_CR2
 	REG_FSBASE,
 #define REG_FSBASE REG_FSBASE
-	REG_GSBASE,
+	REG_GSBASE
 #define REG_GSBASE REG_GSBASE
 };
 #endif
