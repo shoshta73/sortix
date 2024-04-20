@@ -1,0 +1,133 @@
+diff -Paur --no-dereference -- libsqlite3.upstream/shell.c libsqlite3/shell.c
+--- libsqlite3.upstream/shell.c
++++ libsqlite3/shell.c
+@@ -150,6 +150,10 @@
+ #include <sys/types.h>
+ #include <sys/stat.h>
+ 
++#if !defined(FILENAME_MAX) && defined(__sortix__)
++#define FILENAME_MAX 256
++#endif
++
+ #if HAVE_READLINE
+ # include <readline/readline.h>
+ # include <readline/history.h>
+@@ -4915,7 +4919,6 @@
+ */
+ 
+ #include <stdio.h>
+-#include <memory.h>
+ #include <string.h>
+ #include <assert.h>
+ #ifndef OMIT_BASE85_CHECKER
+@@ -7540,7 +7543,7 @@
+       return 1;
+     }
+ #endif
+-#elif defined(AT_FDCWD) && 0 /* utimensat() is not universally available */
++#elif defined(AT_FDCWD)
+     /* Recent unix */
+     struct timespec times[2];
+     times[0].tv_nsec = times[1].tv_nsec = 0;
+@@ -28955,8 +28958,8 @@
+ #if !defined(_WIN32_WCE)
+   if( getenv("SQLITE_DEBUG_BREAK") ){
+     if( isatty(0) && isatty(2) ){
+-      eputf("attach debugger to process %d and press any key to continue.\n",
+-            GETPID());
++      eputf("attach debugger to process %jd and press any key to continue.\n",
++            (intmax_t)GETPID());
+       fgetc(stdin);
+     }else{
+ #if defined(_WIN32) || defined(WIN32)
+diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.c
+--- libsqlite3.upstream/sqlite3.c
++++ libsqlite3/sqlite3.c
+@@ -15518,6 +15518,9 @@
+ 
+ /* Maximum pathname length.  Note: FILENAME_MAX defined by stdio.h
+ */
++#if !defined(FILENAME_MAX) && defined(__sortix__)
++#define FILENAME_MAX 256
++#endif
+ #ifndef SQLITE_MAX_PATHLEN
+ # define SQLITE_MAX_PATHLEN FILENAME_MAX
+ #endif
+@@ -38135,6 +38138,45 @@
+ # include <sys/param.h>
+ #endif /* SQLITE_ENABLE_LOCKING_STYLE */
+ 
++#ifndef F_SETLK
++#define F_SETLK (-1)
++#define F_SETLKW (-2)
++#define F_GETLK (-3)
++#define F_UNLCK 0
++#define F_RDLCK 1
++#define F_WRLCK 2
++struct flock
++{
++	short l_type;
++	short l_whence;
++	off_t l_start;
++	off_t l_len;
++	pid_t l_pid;
++};
++int fcntl_no_lock(int fd, int cmd, ...)
++{
++	va_list ap;
++	va_start(ap, cmd);
++	int result;
++	if ( cmd == F_SETLK )
++		result = 0;
++	else if ( cmd == F_SETLKW )
++		result = 0;
++	else if ( cmd == F_GETLK )
++	{
++		struct flock* fl = va_arg(ap, struct flock*);
++		fl->l_type = F_UNLCK;
++	}
++	else if ( cmd == F_SETFD )
++		result = fcntl(fd, cmd, va_arg(ap, int));
++	else
++		result = errno = ENOSYS, -1;
++	va_end(ap);
++	return result;
++}
++#define fcntl fcntl_no_lock
++#endif
++
+ /*
+ ** Try to determine if gethostuuid() is available based on standard
+ ** macros.  This might sometimes compute the wrong value for some
+@@ -39598,6 +39640,7 @@
+ 
+   /* Otherwise see if some other process holds it.
+   */
++#ifdef F_WRLCK
+ #ifndef __DJGPP__
+   if( !reserved && !pFile->pInode->bProcessLock ){
+     struct flock lock;
+@@ -39613,6 +39656,7 @@
+     }
+   }
+ #endif
++#endif
+ 
+   sqlite3_mutex_leave(pFile->pInode->pLockMutex);
+   OSTRACE(("TEST WR-LOCK %d %d %d (unix)\n", pFile->h, rc, reserved));
+@@ -40365,11 +40409,15 @@
+   if( pFile->eFileLock > NO_LOCK ){
+     pFile->eFileLock = eFileLock;
+     /* Always update the timestamp on the old file */
++#if defined(__sortix__)
++    utimens(zLockFile, NULL);
++#else
+ #ifdef HAVE_UTIME
+     utime(zLockFile, NULL);
+ #else
+     utimes(zLockFile, NULL);
+ #endif
++#endif
+     return SQLITE_OK;
+   }
+ 
