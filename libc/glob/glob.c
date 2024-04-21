@@ -302,8 +302,8 @@ int glob(const char* restrict pattern,
 				const char* path = segment->prefix ? segment->prefix : ".";
 				if ( errno == ENOMEM )
 					result = GLOB_NOSPACE;
-				else if ( (errfunc && errfunc(path, errno)) ||
-				          (flags & GLOB_ERR) )
+				else if ( errno && ((errfunc && errfunc(path, errno)) ||
+				                    (flags & GLOB_ERR)) )
 					result = GLOB_ABORTED;
 				segment->done = true;
 				continue;
@@ -414,7 +414,7 @@ int glob(const char* restrict pattern,
 				free(path);
 				continue;
 			}
-			if ( want_slash && path[size - 3] != '/' )
+			if ( want_slash && is_dir && path[size - 3] != '/' )
 				path[size - 2] = '/', path[size - 1] = '\0';
 			if ( !exists )
 			{
