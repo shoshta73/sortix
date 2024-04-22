@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2016, 2017, 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2014, 2016-2017, 2021-2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -390,6 +390,7 @@ int StreamSocket::getsockopt(ioctx_t* ctx, int level, int option_name,
 	{
 	case SO_RCVBUF: result = incoming.Size(); break;
 	case SO_SNDBUF: result = outgoing.Size(); break;
+	case SO_ERROR: result = 0; break;
 	default: return errno = ENOPROTOOPT, -1; break;
 	}
 
