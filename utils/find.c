@@ -406,6 +406,13 @@ static int evaluate(const struct expr* expr,
 		}
 		else if ( expr->kind == EXPR_EXEC )
 		{
+			// Flush all buffered output before the -ok prompt, and
+			// before fork() to avoid duplicate output
+			if ( fflush(NULL) != 0 )
+			{
+				warn("fflush");
+				result &= ~SUCCESS;
+			}
 			bool is_ok = true;
 			if ( expr->expr_exec.ok )
 			{
