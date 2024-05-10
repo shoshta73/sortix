@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -257,8 +258,8 @@ void editor_input_begin(struct editor_input* editor_input)
 	}
 }
 
-void editor_input_process(struct editor_input* editor_input,
-                          struct editor* editor)
+void editor_input_process_byte(struct editor_input* editor_input,
+                               struct editor* editor)
 {
 	unsigned char uc;
 	ssize_t amount_read = read(0, &uc, sizeof(uc));
@@ -350,6 +351,14 @@ void editor_input_process(struct editor_input* editor_input,
 		editor_input->termseq_used--;
 		editor_input->termseq_seen = 0;
 	}
+}
+
+void editor_input_process(struct editor_input* editor_input,
+                          struct editor* editor)
+{
+	struct pollfd pfd = { .fd = 0, .events = POLLIN };
+	do editor_input_process_byte(editor_input, editor);
+	while ( poll(&pfd, 1, 0) == 1 );
 }
 
 void editor_input_end(struct editor_input* editor_input)
