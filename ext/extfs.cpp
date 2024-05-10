@@ -270,16 +270,16 @@ int main(int argc, char* argv[])
 
 	if ( write && sb.s_feature_ro_compat & ~EXT2_FEATURE_RO_COMPAT_SUPPORTED )
 	{
-		warn("warning: %s: Uses unsupported and incompatible features, "
-		     "falling back to read-only access\n", device_path);
+		warnx("warning: %s: Uses unsupported and incompatible features, "
+		      "falling back to read-only access", device_path);
 		// TODO: Modify the file descriptor such that writing fails!
 		write = false;
 	}
 
 	// Check whether any features are in use that we can safely disregard.
 	if ( sb.s_feature_compat & ~EXT2_FEATURE_COMPAT_SUPPORTED )
-		warn("%s: Filesystem uses unsupported but compatible features\n",
-		     device_path);
+		warnx("%s: Filesystem uses unsupported but compatible features",
+		      device_path);
 
 	// Check the block size is sane. 64 KiB may have issues, 32 KiB then.
 	if ( sb.s_log_block_size > (15-10) /* 32 KiB blocks */ )
@@ -287,7 +287,7 @@ int main(int argc, char* argv[])
 
 	// Check whether the filesystem was unmounted cleanly.
 	if ( sb.s_state != EXT2_VALID_FS )
-		warn("warning: %s: Filesystem wasn't unmounted cleanly\n", device_path);
+		warnx("warning: %s: Filesystem wasn't unmounted cleanly", device_path);
 
 	uint32_t block_size = 1024U << sb.s_log_block_size;
 
