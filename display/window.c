@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2017, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014-2017, 2022-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,8 @@
  * window.c
  * Window abstraction.
  */
+
+#include <sys/keycodes.h>
 
 #include <assert.h>
 #include <stdbool.h>
@@ -572,4 +574,62 @@ void window_notify_client_resize(struct window* window)
 
 	connection_schedule_transmit(window->connection, &header, sizeof(header));
 	connection_schedule_transmit(window->connection, &event, sizeof(event));
+}
+
+void window_send_key(struct window* window, uint32_t codepoint)
+{
+	int kbkey = KBKEY_DECODE(codepoint);
+	unsigned int abskbkey = kbkey < 0 ? -kbkey : kbkey;
+	if ( 0 < abskbkey && abskbkey < 512 )
+	{
+		size_t index = abskbkey / (8 * sizeof(size_t));
+		size_t bit = abskbkey % (8 * sizeof(size_t));
+		size_t mask = 1ULL << bit;
+		if ( kbkey < 0 )
+			window->key_bitmap[index] &= ~mask;
+		else
+			window->key_bitmap[index] |= mask;
+	}
+
+	struct event_keyboard event;
+	event.window_id = window->window_id;
+	event.codepoint = codepoint;
+
+	struct display_packet_header header;
+	header.id = EVENT_KEYBOARD;
+	header.size = sizeof(event);
+
+	assert(window->connection);
+
+	connection_schedule_transmit(window->connection, &header, sizeof(header));
+	connection_schedule_transmit(window->connection, &event, sizeof(event));
+}
+
+void window_unsend_keys(struct window* window)
+{
+	struct event_keyboard event;
+	event.window_id = window->window_id;
+	event.codepoint = 0;
+
+	struct display_packet_header header;
+	header.id = EVENT_KEYBOARD;
+	header.size = sizeof(event);
+
+	assert(window->connection);
+
+	for ( int kbkey = 1; kbkey < 512; kbkey++ )
+	{
+		size_t index = kbkey / (8 * sizeof(size_t));
+		size_t bit = kbkey % (8 * sizeof(size_t));
+		size_t mask = 1ULL << bit;
+		if ( window->key_bitmap[index] & mask )
+		{
+			event.codepoint = KBKEY_ENCODE(-kbkey);
+			connection_schedule_transmit(window->connection, &header,
+			                             sizeof(header));
+			connection_schedule_transmit(window->connection, &event,
+			                             sizeof(event));
+		}
+	}
+	memset(window->key_bitmap, 0, sizeof(window->key_bitmap));
 }

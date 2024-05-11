@@ -66,6 +66,7 @@ struct display
 	bool key_lalt;
 	bool key_lsuper;
 	bool key_rsuper;
+	bool codepoint_discard;
 	bool redraw;
 	int pointer_x;
 	int pointer_y;

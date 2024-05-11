@@ -160,6 +160,7 @@ void display_unmark_active_window(struct display* display,
 	window->focus = false;
 	display->active_window = NULL;
 	window_render_frame(window);
+	window_unsend_keys(window);
 }
 
 void display_mark_active_window(struct display* display, struct window* window)
@@ -466,6 +467,11 @@ void display_keyboard_event(struct display* display, uint32_t codepoint)
 	int kbkey = KBKEY_DECODE(codepoint);
 	int abskbkey = kbkey < 0 ? -kbkey : kbkey;
 
+	if ( !kbkey && display->codepoint_discard )
+		return;
+	else if ( kbkey < 0 )
+		display->codepoint_discard = false;
+
 	if ( kbkey && (!window || !window->grab_input) )
 	{
 		switch ( abskbkey )
@@ -484,6 +490,7 @@ void display_keyboard_event(struct display* display, uint32_t codepoint)
 				execlp("terminal", "terminal", (char*) NULL);
 				_exit(127);
 			}
+			display->codepoint_discard = true;
 			return;
 		}
 		else if ( display->key_lctrl && display->key_lalt && kbkey == -KBKEY_T )
@@ -496,18 +503,21 @@ void display_keyboard_event(struct display* display, uint32_t codepoint)
 		if ( (display->key_lalt && kbkey == KBKEY_F4) /* ||
 		     (display->key_lctrl && kbkey == KBKEY_Q)*/  )
 		{
+			display->codepoint_discard = true;
 			window_quit(window);
 			return;
 		}
 
 		if ( display->key_lalt && kbkey == KBKEY_F10 )
 		{
+			display->codepoint_discard = true;
 			window_toggle_maximized(display->active_window);
 			return;
 		}
 
 		if ( display->key_lalt && kbkey == KBKEY_TAB )
 		{
+			display->codepoint_discard = true;
 			if ( !display->tab_candidate )
 				display->tab_candidate = display->active_window;
 			struct window* old_candidate = display->tab_candidate;
@@ -531,21 +541,25 @@ void display_keyboard_event(struct display* display, uint32_t codepoint)
 			struct window* window = display->active_window;
 			if ( kbkey == KBKEY_LEFT )
 			{
+				display->codepoint_discard = true;
 				window_tile_leftward(window);
 				return;
 			}
 			if ( kbkey == KBKEY_RIGHT )
 			{
+				display->codepoint_discard = true;
 				window_tile_rightward(window);
 				return;
 			}
 			if ( kbkey == KBKEY_UP )
 			{
+				display->codepoint_discard = true;
 				window_tile_up(window);
 				return;
 			}
 			if ( kbkey == KBKEY_DOWN )
 			{
+				display->codepoint_discard = true;
 				window_tile_down(window);
 				return;
 			}
@@ -580,18 +594,7 @@ void display_keyboard_event(struct display* display, uint32_t codepoint)
 	if ( !window )
 		return;
 
-	struct event_keyboard event;
-	event.window_id = display->active_window->window_id;
-	event.codepoint = codepoint;
-
-	struct display_packet_header header;
-	header.id = EVENT_KEYBOARD;
-	header.size = sizeof(event);
-
-	assert(window->connection);
-
-	connection_schedule_transmit(window->connection, &header, sizeof(header));
-	connection_schedule_transmit(window->connection, &event, sizeof(event));
+	window_send_key(display->active_window, codepoint);
 }
 
 void display_mouse_event(struct display* display, uint8_t byte)

@@ -81,6 +81,7 @@ struct window
 	bool show;
 	bool focus;
 	bool grab_input;
+	size_t key_bitmap[512 / (8 * sizeof(size_t))];
 };
 
 struct framebuffer window_client_buffer(struct window* window);
@@ -115,5 +116,7 @@ void window_tile_bottom(struct window* window);
 void window_tile_bottom_left(struct window* window);
 void window_tile_bottom_right(struct window* window);
 void window_notify_client_resize(struct window* window);
+void window_send_key(struct window* window, uint32_t codepoint);
+void window_unsend_keys(struct window* window);
 
 #endif
