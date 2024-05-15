@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2017, 2020, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,8 @@
  * checksum.c
  * Compute and check cryptographic hashes.
  */
+
+#include <sys/stat.h>
 
 #include <err.h>
 #include <errno.h>
@@ -97,8 +99,21 @@ static struct hash* hashes[] =
 	NULL,
 };
 
+struct checklist
+{
+	const char* file;
+	uint8_t checksum[DIGEST_MAX_LENGTH];
+	bool initialized;
+	bool invalidated;
+};
+
+static struct checklist** cache = NULL;
+static size_t cache_used = 0;
+static size_t cache_length = 0;
+static struct timespec cache_time;
 static struct hash* hash = NULL;
 static const char* algorithm = NULL;
+static const char* cache_path = NULL;
 static const char* checklist = NULL;
 static bool check = false;
 static bool ignore_missing = false;
@@ -116,19 +131,183 @@ int debase(char c)
 	return -1;
 }
 
-static void printhex(const uint8_t* buffer, size_t size)
+static void fprinthex(FILE* fp, const uint8_t* buffer, size_t size)
 {
 	for ( size_t i = 0; i < size; i++ )
 	{
-		putchar(hexchars[buffer[i] >> 4]);
-		putchar(hexchars[buffer[i] & 0xF]);
+		fputc(hexchars[buffer[i] >> 4], fp);
+		fputc(hexchars[buffer[i] & 0xF], fp);
 	}
+}
+
+static int compare_checklist_file(const void* a_ptr, const void* b_ptr)
+{
+	struct checklist* a = *(struct checklist**) a_ptr;
+	struct checklist* b = *(struct checklist**) b_ptr;
+	return strcmp(a->file, b->file);
+}
+
+static int search_checklist_file(const void* file_ptr, const void* elem_ptr)
+{
+	const char* file = (const char*) file_ptr;
+	struct checklist* elem = *(struct checklist**) elem_ptr;
+	return strcmp(file, elem->file);
+}
+
+static struct checklist* checklist_lookup(struct checklist** sorted,
+                                          size_t used,
+                                          const char* file)
+{
+	struct checklist** entry_ptr =
+		bsearch(file, sorted, used,
+                sizeof(struct checksum*), search_checklist_file);
+	return entry_ptr ? *entry_ptr : NULL;
+}
+
+static void checklist_add(struct checklist*** checklist_ptr,
+                          size_t* used_ptr,
+                          size_t* length_ptr,
+                          uint8_t digest[DIGEST_MAX_LENGTH],
+                          const char* file)
+{
+	struct checklist* entry = calloc(1, sizeof(struct checklist));
+	if ( !entry || !(entry->file = strdup(file)) )
+		err(1, "malloc");
+	memcpy(entry->checksum, digest, hash->digest_size);
+	if ( *used_ptr == *length_ptr )
+	{
+		struct checklist** new_checklist =
+			reallocarray(*checklist_ptr, *length_ptr,
+			             2 * sizeof(struct checklist*));
+		if ( !new_checklist )
+			err(1, "malloc");
+		*checklist_ptr = new_checklist;
+		*length_ptr *= 2;
+	}
+	(*checklist_ptr)[(*used_ptr)++] = entry;
+}
+
+static void checklist_parse(char* line,
+                            size_t line_length,
+                            struct checklist* entry,
+                            const char* path,
+                            off_t line_number)
+{
+	if ( line[line_length - 1] != '\n' )
+		errx(1, "%s:%ji: Line was not terminated with a newline",
+		     path, (intmax_t) line_number);
+	line[--line_length] = '\0';
+	if ( (size_t) line_length < 2 * hash->digest_size )
+		errx(1, "%s:%ji: Improperly formatted %s checksum line",
+		     path, (intmax_t) line_number, hash->name);
+	for ( size_t i = 0; i < hash->digest_size; i++ )
+	{
+		int higher = debase(line[i*2 + 0]);
+		int lower = debase(line[i*2 + 1]);
+		if ( higher == -1 || lower == -1 )
+			errx(1, "%s:%ji: Improperly formatted %s checksum line",
+			     path, (intmax_t) line_number, hash->name);
+		entry->checksum[i] = higher << 4 | lower;
+	}
+	if ( line[2 * hash->digest_size + 0] != ' ' ||
+	     line[2 * hash->digest_size + 1] != ' ' ||
+	     line[2 * hash->digest_size + 2] == '\0' )
+		errx(1, "%s:%ji: Improperly formatted %s checksum line",
+		     path, (intmax_t) line_number, hash->name);
+	entry->file = line + 2 * hash->digest_size + 2;
+	if ( !strcmp(path, "-") && !strcmp(entry->file, "-") )
+		errx(1, "%s:%ji: Improperly formatted %s checksum line",
+		     path, (intmax_t) line_number, hash->name);
+}
+
+static void checklist_read(struct checklist*** ptr,
+                           size_t* used_ptr,
+                           size_t* length_ptr,
+                           struct timespec* time_ptr,
+                           const char* path,
+                           bool allow_missing)
+{
+	if ( !(*ptr = malloc(sizeof(struct checklist*) * 4)) )
+		err(1, "malloc");
+	*used_ptr = 0;
+	*length_ptr = 4;
+	FILE* fp = fopen(path, "r");
+	if ( !fp )
+	{
+		if ( allow_missing )
+			return;
+		err(1, "malloc");
+	}
+	struct stat st;
+	fstat(fileno(fp), &st);
+	*time_ptr = st.st_mtim;
+	char* line = NULL;
+	size_t line_size = 0;
+	ssize_t line_length;
+	off_t line_number = 0;
+	struct checklist input;
+	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
+	{
+		line_number++;
+		checklist_parse(line, (size_t) line_length, &input, path, line_number);
+		checklist_add(ptr, used_ptr, length_ptr, input.checksum, input.file);
+	}
+	free(line);
+	if ( ferror(fp) )
+		err(1, "%s", path);
+	fclose(fp);
+	qsort(*ptr, *used_ptr, sizeof(struct checklist*), compare_checklist_file);
+}
+
+static void checklist_write(struct checklist** checklist,
+                            size_t used,
+                            const char* path)
+{
+	char* out_path;
+	if ( asprintf(&out_path, "%s.XXXXXX", path) < 0 )
+		err(1, "malloc");
+	int out_fd = mkstemp(out_path);
+	if ( out_fd < 0 )
+		err(1, "mkstemp: %s.XXXXXX", path);
+	FILE* out = fdopen(out_fd, "w");
+	if ( !out )
+	{
+		unlink(out_path);
+		err(1, "fdopen");
+	}
+	for ( size_t i = 0; i < used; i++ )
+	{
+		fprinthex(out, checklist[i]->checksum, hash->digest_size);
+		fprintf(out, "  %s\n", checklist[i]->file);
+	}
+	if ( ferror(out) || fclose(out) == EOF )
+	{
+		unlink(out_path);
+		err(1, "%s", out_path);
+	}
+	if ( rename(out_path, path) < 0 )
+		err(1, "rename: %s -> %s", out_path, path);
+	free(out_path);
 }
 
 static int digest_fd(uint8_t digest[DIGEST_MAX_LENGTH],
                      int fd,
                      const char* path)
 {
+	struct checklist* entry = NULL;
+	if ( cache && (entry = checklist_lookup(cache, cache_used, path)) &&
+	     !entry->invalidated )
+	{
+		struct stat st;
+		fstat(fd, &st);
+		if ( st.st_mtim.tv_sec < cache_time.tv_sec ||
+		     (st.st_mtim.tv_sec == cache_time.tv_sec &&
+		      st.st_mtim.tv_nsec <= cache_time.tv_nsec) )
+		{
+			memcpy(digest, entry->checksum, hash->digest_size);
+			return 0;
+		}
+	}
 	union ctx ctx;
 	hash->init(&ctx);
 	ssize_t amount;
@@ -140,6 +319,25 @@ static int digest_fd(uint8_t digest[DIGEST_MAX_LENGTH],
 		return 1;
 	}
 	hash->final(digest, &ctx);
+	if ( cache )
+	{
+		if ( entry )
+		{
+			memcpy(entry->checksum, digest, hash->digest_size);
+			entry->invalidated = false;
+		}
+		else
+		{
+			checklist_add(&cache, &cache_used, &cache_length, digest, path);
+			size_t i = cache_used - 1;
+			while ( i && 0 < strcmp(cache[i - 1]->file, cache[i]->file) )
+			{
+				struct checklist* t = cache[i - 1];
+				cache[i - 1] = cache[i];
+				cache[i--] = t;
+			}
+		}
+	}
 	return 0;
 }
 
@@ -162,6 +360,10 @@ static int digest_path(uint8_t digest[DIGEST_MAX_LENGTH], const char* path)
 
 static int verify_path(uint8_t checksum[], const char* path)
 {
+	struct checklist* entry = NULL;
+	if ( cache && (entry = checklist_lookup(cache, cache_used, path)) &&
+	     timingsafe_memcmp(checksum, entry->checksum, hash->digest_size) != 0 )
+		entry->invalidated = true;
 	uint8_t digest[DIGEST_MAX_LENGTH];
 	int status = digest_path(digest, path);
 	if ( status == -1 )
@@ -173,27 +375,6 @@ static int verify_path(uint8_t checksum[], const char* path)
 	if ( !silent && (!quiet || status != 0) )
 		printf("%s: %s\n", path, status == 0 ? "OK" : "FAILED");
 	return status;
-}
-
-struct checklist
-{
-	const char* file;
-	uint8_t checksum[DIGEST_MAX_LENGTH];
-	bool initialized;
-};
-
-static int compare_checklist_file(const void* a_ptr, const void* b_ptr)
-{
-	struct checklist* a = *(struct checklist**) a_ptr;
-	struct checklist* b = *(struct checklist**) b_ptr;
-	return strcmp(a->file, b->file);
-}
-
-static int search_checklist_file(const void* file_ptr, const void* elem_ptr)
-{
-	const char* file = (const char*) file_ptr;
-	struct checklist* elem = *(struct checklist**) elem_ptr;
-	return strcmp(file, elem->file);
 }
 
 static int checklist_fp(FILE* fp,
@@ -217,7 +398,6 @@ static int checklist_fp(FILE* fp,
 		qsort(checklist_sorted, files_count, sizeof(struct checklist*),
 		      compare_checklist_file);
 	}
-	uint8_t checksum[DIGEST_MAX_LENGTH];
 	bool any = false;
 	char* line = NULL;
 	size_t line_size = 0;
@@ -225,52 +405,29 @@ static int checklist_fp(FILE* fp,
 	off_t line_number = 0;
 	size_t read_failures = 0;
 	size_t check_failures = 0;
+	struct checklist input;
 	while ( 0 < (line_length = getline(&line, &line_size, fp)) )
 	{
 		line_number++;
-		if ( line[line_length - 1] != '\n' )
-			errx(1, "%s:%ji: Line was not terminated with a newline",
-			     path, (intmax_t) line_number);
-		line[--line_length] = '\0';
-		if ( (size_t) line_length < 2 * hash->digest_size )
-			errx(1, "%s:%ji: Improperly formatted %s checksum line",
-			     path, (intmax_t) line_number, hash->name);
-		for ( size_t i = 0; i < hash->digest_size; i++ )
-		{
-			int higher = debase(line[i*2 + 0]);
-			int lower = debase(line[i*2 + 1]);
-			if ( higher == -1 || lower == -1 )
-				errx(1, "%s:%ji: Improperly formatted %s checksum line",
-				     path, (intmax_t) line_number, hash->name);
-			checksum[i] = higher << 4 | lower;
-		}
-		if ( line[2 * hash->digest_size + 0] != ' ' ||
-		     line[2 * hash->digest_size + 1] != ' ' ||
-		     line[2 * hash->digest_size + 2] == '\0' )
-			errx(1, "%s:%ji: Improperly formatted %s checksum line",
-			     path, (intmax_t) line_number, hash->name);
-		const char* file = line + 2 * hash->digest_size + 2;
-		if ( !strcmp(path, "-") && !strcmp(file, "-") )
-			errx(1, "%s:%ji: Improperly formatted %s checksum line",
-			     path, (intmax_t) line_number, hash->name);
+		checklist_parse(line, (size_t) line_length, &input, path, line_number);
 		if ( files )
 		{
 			struct checklist** entry_ptr =
-				bsearch(file, checklist_sorted, files_count,
+				bsearch(input.file, checklist_sorted, files_count,
                         sizeof(struct checksum*), search_checklist_file);
 			if ( entry_ptr )
 			{
 				struct checklist* entry = *entry_ptr;
 				if ( entry->initialized )
 					errx(1, "%s:%ji: Duplicate hash found for: %s", path,
-					     (intmax_t) line_number, file);
-				memcpy(entry->checksum, checksum, DIGEST_MAX_LENGTH);
+					     (intmax_t) line_number, input.file);
+				memcpy(entry->checksum, input.checksum, DIGEST_MAX_LENGTH);
 				entry->initialized = true;
 			}
 		}
 		else
 		{
-			int status = verify_path(checksum, file);
+			int status = verify_path(input.checksum, input.file);
 			if ( status == 1 )
 				read_failures++;
 			else if ( status == 2 )
@@ -296,7 +453,7 @@ static int checklist_fp(FILE* fp,
 		else if ( status == 2 )
 			check_failures++;
 	}
-	explicit_bzero(checksum, sizeof(checksum));
+	explicit_bzero(input.checksum, sizeof(input.checksum));
 	free(checklist);
 	free(checklist_sorted);
 	if ( !silent && read_failures )
@@ -391,6 +548,15 @@ int main(int argc, char* argv[])
 		}
 		else if ( !strncmp(arg, "--algorithm=", strlen("--algorithm=")) )
 			algorithm = arg + strlen("--algorithm=");
+		else if ( !strcmp(arg, "--cache") )
+		{
+			if ( i + 1 == argc )
+				errx(1, "option '--cache' requires an argument");
+			cache_path = argv[i+1];
+			argv[++i] = NULL;
+		}
+		else if ( !strncmp(arg, "--cache=", strlen("--cache=")) )
+			cache_path = arg + strlen("--cache=");
 		else if ( !strcmp(arg, "--check") )
 			check = true;
 		else if ( !strcmp(arg, "--checklist") )
@@ -439,6 +605,14 @@ int main(int argc, char* argv[])
 	else
 		errx(1, "No hash algorithm was specified with -a");
 
+	if ( cache_path )
+	{
+		if ( !strcmp(cache_path, "-") )
+			errx(1, "cache cannot be the standard input");
+		checklist_read(&cache, &cache_used, &cache_length, &cache_time,
+		               cache_path, true);
+	}
+
 	bool read_failures = false;
 	bool check_failures = false;
 
@@ -464,10 +638,10 @@ int main(int argc, char* argv[])
 		else
 		{
 			uint8_t digest[DIGEST_MAX_LENGTH];
-			int result = digest_fd(digest, 0, "-");
+			int result = digest_path(digest, "-");
 			if ( result == 0 )
 			{
-				printhex(digest, hash->digest_size);
+				fprinthex(stdout, digest, hash->digest_size);
 				puts("  -");
 				explicit_bzero(digest, sizeof(digest));
 			}
@@ -491,7 +665,7 @@ int main(int argc, char* argv[])
 			int result = digest_path(digest, argv[i]);
 			if ( result == 0 )
 			{
-				printhex(digest, hash->digest_size);
+				fprinthex(stdout, digest, hash->digest_size);
 				printf("  %s\n", argv[i]);
 				explicit_bzero(digest, sizeof(digest));
 			}
@@ -502,5 +676,9 @@ int main(int argc, char* argv[])
 
 	if ( ferror(stdout) || fflush(stdout) == EOF )
 		return 1;
+
+	if ( cache_path )
+	     checklist_write(cache, cache_used, cache_path);
+
 	return read_failures ? 1 : check_failures ? 2 : 0;
 }

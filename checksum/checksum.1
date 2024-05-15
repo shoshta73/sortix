@@ -17,18 +17,23 @@
 .Nm sha224sum
 .Op Fl ciqs
 .Op Fl C Ar checklist
+.Op Fl \-cache Ar cache
+.Op Fl \-cache Ar cache
 .Op Ar
 .Nm sha256sum
 .Op Fl ciqs
 .Op Fl C Ar checklist
+.Op Fl \-cache Ar cache
 .Op Ar
 .Nm sha384sum
 .Op Fl ciqs
 .Op Fl C Ar checklist
+.Op Fl \-cache Ar cache
 .Op Ar
 .Nm sha512sum
 .Op Fl ciqs
 .Op Fl C Ar checklist
+.Op Fl \-cache Ar cache
 .Op Ar
 .Sh DESCRIPTION
 .Nm
@@ -103,6 +108,19 @@ is invoked by the
 or
 .Nm sha512sum
 names.
+.It Fl \-cache Ar cache
+Cache the checksums in the
+.Ar cache
+file for fast answers on subsequent invocations, unless the input file is newer
+than the
+.Ar cache
+file.
+If
+.Fl c
+or
+.Fl C ,
+only use the cached checksums if they are the desired answer, otherwise recheck
+the input file to be safe.
 .It Fl c , Fl \-check
 Each input is interpreted as a checklist of files to be checked.
 .It Fl C , Fl \-checklist Ns "=" Ns Ar checklist
