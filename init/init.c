@@ -949,8 +949,9 @@ static char** tokenize(size_t* out_tokens_used, const char* string)
 		bool singly = false;
 		bool doubly = false;
 		bool escaped = false;
-		for ( char c = *string++; c; c = *string++ )
+		while ( *string )
 		{
+			char c = *string++;
 			if ( !escaped && !singly && !doubly && isspace((unsigned char) c) )
 				break;
 			if ( !escaped && !doubly && c == '\'' )
