@@ -69,6 +69,21 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add init groups
+The
+.Xr setinit 2
+and
+.Xr getinit 2
+system calls have been added for nested init groups.
+The
+.Dv TIOCSCTTY
+.Xr ioctl 2
+for acquiring a controlling terminal has gained a force flag essential to
+transferring terminals into nested sessions, and the new
+.Dv TIOCUCTTY
+.Xr ioctl 2
+releases a controlling terminal.
+This is a minor compatible ABI change.
 .Ss Update to gcc-14.2.0 and binutils-2.43.1
 The toolchain has been updated to gcc 14.2.0 and binutils 2.43.1 and must be
 rebuilt before building the operating system per

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2016, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -852,11 +852,29 @@ int TTY::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 		return errno = EIO, -1;
 	if ( cmd == TIOCSCTTY )
 	{
-		ScopedLock family_lock(&process_family_lock);
-		if ( 0 <= sid )
+		// TODO: After releasing Sortix 1.1, restore the invalid arguments check
+		// that is temporarily omitted since some Sortix 1.1 commits invoke the
+		// ioctl without an argument which was accidentally undefined. For now
+		// the kernel should be able to largely run older userspaces without
+		// issue, however terminal(1) did this which was fairly essential.
+		//if ( ((int) arg) & ~3 )
+		//	return errno = EINVAL, -1;
+		bool force = arg & 1;
+		bool reset = arg & 2;
+		if ( !force && 0 <= sid )
 			return errno = EPERM, -1;
+		ScopedLock family_lock(&process_family_lock);
 		Process* process = CurrentProcess();
-		if ( !process->sessionfirst )
+		if ( !force && !process->sessionfirst )
+			return errno = EPERM, -1;
+		Process* session = process->session;
+		Process* group = process->group;
+		if ( session->pid == sid )
+		{
+			foreground_pgid = group->pid;
+			return 0;
+		}
+		if ( session->GetTTY() && !reset )
 			return errno = EPERM, -1;
 		if ( (ctx->dflags & (O_READ | O_WRITE)) != (O_READ | O_WRITE) )
 			return errno = EPERM, -1;
@@ -866,10 +884,36 @@ int TTY::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 		Ref<Descriptor> desc(new Descriptor(vnode, O_READ | O_WRITE));
 		if ( !desc )
 			return -1;
-		sid = process->pid;
-		foreground_pgid = process->pid;
-		process->SetTTY(desc);
+		if ( 0 <= sid )
+		{
+			Process* owner = process->GetPTable()->Get(sid);
+			if ( owner )
+				owner->SetTTY(Ref<Descriptor>());
+			// TODO: SIGHUP?
+		}
+		sid = session->pid;
+		foreground_pgid = group->pid;
+		session->SetTTY(desc);
 		return 0;
+	}
+	else if ( cmd == TIOCUCTTY )
+	{
+		if ( ((int) arg) & ~1 )
+			return errno = EINVAL, -1;
+		if ( 0 <= sid )
+		{
+			ScopedLock family_lock(&process_family_lock);
+			Process* process = CurrentProcess();
+			Process* owner = process->GetPTable()->Get(sid);
+			bool force = arg & 1;
+			if ( owner != process && !force )
+				return errno = EPERM, -1;
+			if ( owner )
+				owner->SetTTY(Ref<Descriptor>());
+			// TODO: SIGHUP?
+		}
+		sid = -1;
+		foreground_pgid = -1;
 	}
 	else if ( cmd == TIOCSPTLCK )
 	{

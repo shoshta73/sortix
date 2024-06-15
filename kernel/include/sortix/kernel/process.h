@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -124,12 +124,17 @@ public:
 	Process* sessionprev;
 	Process* sessionnext;
 	Process* sessionfirst;
+	Process* init;
+	Process* initprev;
+	Process* initnext;
+	Process* initfirst;
 	kthread_mutex_t childlock;
 	kthread_mutex_t parentlock;
 	kthread_cond_t zombiecond;
 	bool iszombie;
 	bool nozombify;
 	bool limbo;
+	bool is_init_exiting;
 	int exit_code;
 
 public:
@@ -178,6 +183,7 @@ public:
 	                int prot);
 	void GroupRemoveMember(Process* child);
 	void SessionRemoveMember(Process* child);
+	void InitRemoveMember(Process* child);
 
 public:
 	Process* Fork();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,6 +39,7 @@
 #define TIOCGNAME __IOCTL(6, __IOCTL_TYPE_PTR)
 #define TIOCGPTN __IOCTL(7, __IOCTL_TYPE_PTR)
 #define TIOCGDISPLAYS __IOCTL(8, __IOCTL_TYPE_PTR)
+#define TIOCUCTTY __IOCTL(9, __IOCTL_TYPE_INT)
 
 #define IOC_TYPE(x) ((x) >> 0 & 0xFF)
 #define IOC_TYPE_BLOCK_DEVICE 1

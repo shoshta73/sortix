@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -97,6 +97,7 @@ int sys_getentropy(void*, size_t);
 uid_t sys_geteuid(void);
 gid_t sys_getgid(void);
 int sys_gethostname(char*, size_t);
+pid_t sys_getinit(pid_t);
 size_t sys_getpagesize(void);
 int sys_getpeername(int, void*, size_t*);
 pid_t sys_getpgid(pid_t);
@@ -151,6 +152,7 @@ int sys_setegid(gid_t);
 int sys_seteuid(uid_t);
 int sys_setgid(gid_t);
 int sys_sethostname(const char*, size_t);
+int sys_setinit(void);
 int sys_setpgid(pid_t, pid_t);
 int sys_setpriority(int, id_t, int);
 pid_t sys_setsid(void);

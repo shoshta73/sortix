@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, 2021-2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -379,6 +379,10 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	system->sessionprev = NULL;
 	system->sessionnext = NULL;
 	system->sessionfirst = system;
+	system->init = NULL;
+	system->initprev = NULL;
+	system->initnext = NULL;
+	system->initfirst = NULL;
 
 	if ( !(system->program_image_path = String::Clone("<kernel process>")) )
 		Panic("Unable to clone string for system process name");
@@ -674,6 +678,10 @@ static void BootThread(void* /*user*/)
 	init->sessionprev = NULL;
 	init->sessionnext = NULL;
 	init->sessionfirst = init;
+	init->init = init;
+	init->initprev = NULL;
+	init->initnext = NULL;
+	init->initfirst = init;
 	kthread_mutex_unlock(&process_family_lock);
 
 	// TODO: Why don't we fork from pid=0 and this is done for us?
@@ -683,7 +691,6 @@ static void BootThread(void* /*user*/)
 	mtable.Reset();
 	init->BootstrapDirectories(droot);
 	init->addrspace = initaddrspace;
-	Scheduler::SetInitProcess(init);
 
 	Thread* initthread = RunKernelThread(init, InitThread, NULL, "main");
 	if ( !initthread )

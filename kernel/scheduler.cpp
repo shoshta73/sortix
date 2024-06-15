@@ -268,7 +268,6 @@ static void SwitchRegisters(struct interrupt_context* intctx,
 static Thread* idle_thread;
 static Thread* first_runnable_thread;
 static Thread* true_current_thread;
-static Process* init_process;
 
 static void SwitchThread(struct interrupt_context* intctx,
                          Thread* old_thread,
@@ -405,16 +404,6 @@ void SetIdleThread(Thread* thread)
 	SetThreadState(thread, ThreadState::NONE);
 	current_thread = thread;
 	true_current_thread = thread;
-}
-
-void SetInitProcess(Process* init)
-{
-	init_process = init;
-}
-
-Process* GetInitProcess()
-{
-	return init_process;
 }
 
 Process* GetKernelProcess()

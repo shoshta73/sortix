@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2022, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,35 +13,17 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * reboot.c
- * Reboots the computer.
+ * unistd/getinit.c
+ * Get the current init.
  */
 
-#include <sys/types.h>
+#include <sys/syscall.h>
 
-#include <err.h>
-#include <getopt.h>
-#include <signal.h>
-#include <stdlib.h>
 #include <unistd.h>
 
-int main(int argc, char* argv[])
+DEFN_SYSCALL1(pid_t, sys_getinit, SYSCALL_GETINIT, pid_t);
+
+pid_t getinit(pid_t pid)
 {
-	int opt;
-	while ( (opt = getopt(argc, argv, "")) != -1 )
-	{
-		switch ( opt )
-		{
-		default: return 1;
-		}
-	}
-
-	if ( optind < argc )
-		errx(1, "extra operand: %s", argv[optind]);
-
-	pid_t init_pid = getinit(0);
-	if ( kill(init_pid, SIGINT) < 0 )
-		err(1, "kill: %" PRIdPID, init_pid);
-
-	return 0;
+	return sys_getinit(pid);
 }

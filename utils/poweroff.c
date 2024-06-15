@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021, 2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,7 @@
 #include <getopt.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 int main(int argc, char* argv[])
 {
@@ -38,11 +39,7 @@ int main(int argc, char* argv[])
 	if ( optind < argc )
 		errx(1, "extra operand: %s", argv[optind]);
 
-	pid_t init_pid = 1;
-	// TODO: Use a more reliable getinit() approach that also works in sshd.
-	if ( getenv("INIT_PID") )
-		init_pid = atoll(getenv("INIT_PID"));
-
+	pid_t init_pid = getinit(0);
 	if ( kill(init_pid, SIGTERM) < 0 )
 		err(1, "kill: %" PRIdPID, init_pid);
 

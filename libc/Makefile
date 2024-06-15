@@ -726,6 +726,7 @@ unistd/getentropy.o \
 unistd/geteuid.o \
 unistd/getgid.o \
 unistd/gethostname.o \
+unistd/getinit.o \
 unistd/getlogin.o \
 unistd/getlogin_r.o \
 unistd/getpagesize.o \
@@ -754,6 +755,7 @@ unistd/setegid.o \
 unistd/seteuid.o \
 unistd/setgid.o \
 unistd/sethostname.o \
+unistd/setinit.o \
 unistd/setpgid.o \
 unistd/setsid.o \
 unistd/setuid.o \
@@ -792,6 +794,8 @@ MANPAGES2=\
 scram/scram.2 \
 sys/dnsconfig/getdnsconfig.2 \
 sys/dnsconfig/setdnsconfig.2 \
+unistd/setinit.2 \
+unistd/getinit.2 \
 
 MANPAGES3=\
 time/add_leap_seconds.3 \

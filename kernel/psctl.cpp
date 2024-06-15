@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -110,11 +110,21 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 			psst.sid_next = -1;
 		}
 		psst.sid_first = process->sessionfirst ? process->sessionfirst->pid : -1;
-		// TODO: Implement init groupings.
-		psst.init = 1;
-		psst.init_prev = ptable->Prev(pid);
-		psst.init_next = ptable->Next(pid);
-		psst.init_first = pid == 1 ? 1 : -1;
+
+		if ( process->init )
+		{
+			Process* init = process->init;
+			psst.init = init->pid;
+			psst.init_prev = process->initprev ? process->initprev->pid : -1;
+			psst.init_next = process->initnext ? process->initnext->pid : -1;
+		}
+		else
+		{
+			psst.init = -1;
+			psst.init_prev = -1;
+			psst.init_next = -1;
+		}
+		psst.init_first = process->initfirst ? process->initfirst->pid : -1;
 		kthread_mutex_lock(&process->idlock);
 		psst.uid = process->uid;
 		psst.euid = process->euid;

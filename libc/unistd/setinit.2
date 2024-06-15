@@ -1,0 +1,75 @@
+.Dd June 18, 2024
+.Dt SETINIT 2
+.Os
+.Sh NAME
+.Nm setinit
+.Nd become and locate init
+.Sh SYNOPSIS
+.In unistd.h
+.Ft int
+.Fn getinit "pid_t pid"
+.Ft int
+.Fn setinit void
+.Sh DESCRIPTION
+.Fn setinit
+sets the current process as the init process for itself and its subsequently
+created descendant processes.
+.Fn setinit
+runs
+.Xr setsid 2
+to create a new session (and process group) and can fail for the same reasons as
+.Xr setsid 2 .
+.Pp
+.Fn getinit
+returns the init process for the process specified in
+.Fa pid ,
+or the current process if
+.Fa pid
+is zero.
+.Pp
+Orphaned descendant processes are reparented to their init process.
+If an init process exits, all descendant processes atomically receive the
+.Dv SIGKILL
+signal and become unable to create new processes and threads.
+.Sh RETURN VALUES
+.Fn setinit
+returns the pid of the init process (the current process) on success, or -1 on
+error and
+.Va error
+is set appropriately.
+.Pp
+.Fn getinit
+returns the returns the pid of the init process, or -1 on
+error and
+.Va error
+is set appropriately.
+.Sh ERRORS
+.Fn setinit
+will fail if:
+.Bl -tag -width "12345678"
+.It Er EPERM
+The process is already a process group leader, a session leader, or an init
+process.
+.El
+.Pp
+.Fn getinit
+will fail if:
+.Bl -tag -width "12345678"
+.It Er ESRCH
+The process specified in
+.Fa pid
+does not exist.
+.El
+.Sh SEE ALSO
+.Xr getpgrp 2 ,
+.Xr getsid 2 ,
+.Xr psctl 2 ,
+.Xr setpgrp 2 ,
+.Xr setsid 2 ,
+.Xr init 8
+.Sh HISTORY
+The
+.Fn getinit
+and
+.Fn setinit
+system calls originally appeared in Sortix 1.1.

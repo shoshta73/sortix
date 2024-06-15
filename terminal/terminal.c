@@ -1210,7 +1210,7 @@ int main(int argc, char* argv[])
 			warn("setsid");
 			_exit(1);
 		}
-		if ( ioctl(slave_fd, TIOCSCTTY) < 0 )
+		if ( ioctl(slave_fd, TIOCSCTTY, 0) < 0 )
 		{
 			warn("ioctl: TIOCSCTTY");
 			_exit(1);

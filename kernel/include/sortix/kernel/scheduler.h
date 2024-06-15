@@ -41,8 +41,6 @@ void SetThreadState(Thread* thread, ThreadState state, bool wake_only = false);
 void SetSignalPending(Thread* thread, unsigned long is_pending);
 ThreadState GetThreadState(Thread* thread);
 void SetIdleThread(Thread* thread);
-void SetInitProcess(Process* init);
-Process* GetInitProcess();
 Process* GetKernelProcess();
 void InterruptYieldCPU(struct interrupt_context* intctx, void* user);
 void ThreadExitCPU(struct interrupt_context* intctx, void* user);

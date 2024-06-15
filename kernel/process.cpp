@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -73,8 +73,6 @@ kthread_mutex_t process_family_lock = KTHREAD_MUTEX_INITIALIZER;
 
 // The system is shutting down and creation of additional processes and threads
 // should be prevented. Protected by process_family_lock.
-static bool is_init_exiting = false;
-
 Process::Process()
 {
 	program_image_path = NULL;
@@ -130,10 +128,15 @@ Process::Process()
 	sessionprev = NULL;
 	sessionnext = NULL;
 	sessionfirst = NULL;
+	init = NULL;
+	initprev = NULL;
+	initnext = NULL;
+	initfirst = NULL;
 	zombiecond = KTHREAD_COND_INITIALIZER;
 	iszombie = false;
 	nozombify = false;
 	limbo = false;
+	is_init_exiting = false;
 	exit_code = -1;
 
 	firstthread = NULL;
@@ -168,9 +171,11 @@ Process::~Process() // process_family_lock taken
 		alarm_timer.Detach();
 	delete[] program_image_path;
 	assert(!zombiechild);
+	assert(!init);
 	assert(!session);
 	assert(!group);
 	assert(!parent);
+	assert(!initfirst);
 	assert(!sessionfirst);
 	assert(!groupfirst);
 	assert(!firstchild);
@@ -208,9 +213,6 @@ void Process::BootstrapDirectories(Ref<Descriptor> root)
 
 void Process::OnLastThreadExit()
 {
-	Process* init = Scheduler::GetInitProcess();
-	assert(init);
-
 	// Child processes can't be reparented away if we're init. The system is
 	// about to shut down, so broadcast SIGKILL every process and wait for every
 	// single process to exit. The operating system is finished when init has
@@ -221,14 +223,21 @@ void Process::OnLastThreadExit()
 		// Forbid any more processes and threads from being created, so this
 		// loop will always terminate.
 		is_init_exiting = true;
-		kthread_mutex_lock(&ptrlock);
-		for ( pid_t pid = ptable->Next(0); 0 < pid; pid = ptable->Next(pid) )
+		Process* process = firstchild;
+		while ( process )
 		{
-			Process* process = ptable->Get(pid);
-			if ( process->pid != 0 && process != init )
+			if ( process->pid != 0 )
 				process->DeliverSignal(SIGKILL);
+			if ( process->init == process )
+				process->is_init_exiting = true;
+			if ( process->firstchild )
+				process = process->firstchild;
+			while ( process && process != this && !process->nextsibling )
+				process = process->parent;
+			if ( process == this )
+				break;
+			process = process->nextsibling;
 		}
-		kthread_mutex_unlock(&ptrlock);
 		// NotifyChildExit always signals zombiecond for init when
 		// is_init_exiting is true.
 		while ( firstchild )
@@ -342,12 +351,10 @@ void Process::LastPrayer()
 	iszombie = true;
 
 	// Init is nice and will gladly raise our orphaned children and zombies.
-	Process* init = Scheduler::GetInitProcess();
-	assert(init);
-
 	// Child processes can't be reparented away if we're init. OnLastThreadExit
 	// must have already killed all the child processes and prevented more from
 	// being created.
+	assert(init);
 	if ( init == this )
 	{
 		assert(is_init_exiting);
@@ -386,6 +393,9 @@ void Process::LastPrayer()
 	// Remove ourself from our session.
 	if ( session )
 		session->SessionRemoveMember(this);
+	// Remove ourself from our init.
+	if ( init )
+		init->InitRemoveMember(this);
 
 	bool zombify = !nozombify;
 
@@ -403,7 +413,7 @@ void Process::WaitedFor() // process_family_lock taken
 {
 	parent = NULL;
 	limbo = false;
-	if ( groupfirst || sessionfirst )
+	if ( groupfirst || sessionfirst || initfirst )
 		limbo = true;
 	if ( !limbo )
 		delete this;
@@ -460,9 +470,23 @@ void Process::SessionRemoveMember(Process* child) // process_family_lock taken
 		delete this;
 }
 
+void Process::InitRemoveMember(Process* child) // process_family_lock taken
+{
+	assert(child->init == this);
+	if ( child->initprev )
+		child->initprev->initnext = child->initnext;
+	else
+		initfirst = child->initnext;
+	if ( child->initnext )
+		child->initnext->initprev = child->initprev;
+	child->init = NULL;
+	if ( IsLimboDone() )
+		delete this;
+}
+
 bool Process::IsLimboDone() // process_family_lock taken
 {
-	return limbo && !groupfirst && !sessionfirst;
+	return limbo && !groupfirst && !sessionfirst && !initfirst;
 }
 
 // process_family_lock taken
@@ -491,7 +515,7 @@ void Process::NotifyChildExit(Process* child, bool zombify)
 	// when init is exiting, because OnLastThreadExit needs to be able to catch
 	// every child exiting.
 	DeliverSignal(SIGCHLD);
-	if ( zombify || (is_init_exiting && Scheduler::GetInitProcess() == this) )
+	if ( zombify || is_init_exiting )
 		kthread_cond_broadcast(&zombiecond);
 }
 
@@ -704,7 +728,7 @@ Process* Process::Fork()
 	kthread_mutex_lock(&process_family_lock);
 
 	// Forbid the creation of new processes if init has exited.
-	if ( is_init_exiting )
+	if ( init->is_init_exiting )
 	{
 		kthread_mutex_unlock(&process_family_lock);
 		clone->AbortConstruction();
@@ -740,6 +764,13 @@ Process* Process::Fork()
 	if ( (clone->sessionnext = session->sessionfirst) )
 		session->sessionfirst->sessionprev = clone;
 	session->sessionfirst = clone;
+
+	// Add the new process to the current init.
+	clone->init = init;
+	clone->initprev = NULL;
+	if ( (clone->initnext = init->initfirst) )
+		init->initfirst->initprev = clone;
+	init->initfirst = clone;
 
 	kthread_mutex_unlock(&process_family_lock);
 
@@ -1485,14 +1516,12 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 		stack_aligned = (stack_aligned + 16) & ~(stack_alignment-1);
 	stack_aligned_size &= 0xFFFFFFF0;
 
+	Process* parent_process = CurrentProcess();
 	Process* child_process;
 	if ( making_thread )
-		child_process = CurrentProcess();
-	else if ( !(child_process = CurrentProcess()->Fork()) )
-	{
-		delete[] newkernelstack;
-		return -1;
-	}
+		child_process = parent_process;
+	else if ( !(child_process = parent_process->Fork()) )
+		return delete[] newkernelstack, -1;
 
 	struct thread_registers cpuregs;
 	memset(&cpuregs, 0, sizeof(cpuregs));
@@ -1548,7 +1577,7 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 
 	// Forbid the creation of new threads if init has exited.
 	ScopedLock process_family_lock_lock(&process_family_lock);
-	if ( is_init_exiting )
+	if ( child_process->init->is_init_exiting )
 		return errno = EPERM, -1;
 
 	// If the thread could not be created, make the process commit suicide
@@ -1602,12 +1631,23 @@ pid_t sys_getpgid(pid_t pid)
 pid_t sys_getsid(pid_t pid)
 {
 	ScopedLock lock(&process_family_lock);
-	Process* process = !pid ? CurrentProcess() : CurrentProcess()->GetPTable()->Get(pid);
+	Process* process =
+		!pid ? CurrentProcess() : CurrentProcess()->GetPTable()->Get(pid);
 	if ( !process )
 		return errno = ESRCH, -1;
 	if ( !process->session )
 		return errno = ESRCH, -1;
 	return process->session->pid;
+}
+
+pid_t sys_getinit(pid_t pid)
+{
+	ScopedLock lock(&process_family_lock);
+	Process* process =
+		!pid ? CurrentProcess() : CurrentProcess()->GetPTable()->Get(pid);
+	if ( !process->init )
+		return errno = ESRCH, -1;
+	return process->init->pid;
 }
 
 int sys_setpgid(pid_t pid, pid_t pgid)
@@ -1692,6 +1732,49 @@ pid_t sys_setsid(void)
 	// Remove the process from its current session.
 	if ( process->session )
 		process->session->SessionRemoveMember(process);
+
+	// Insert the process into its new session.
+	process->sessionprev = NULL;
+	process->sessionnext = NULL;
+	process->sessionfirst = process;
+	process->session = process;
+
+	// Insert the process into its new process group.
+	process->groupprev = NULL;
+	process->groupnext = NULL;
+	process->groupfirst = process;
+	process->group = process;
+
+	return process->pid;
+}
+
+int sys_setinit(void)
+{
+	Process* process = CurrentProcess();
+
+	ScopedLock lock(&process_family_lock);
+
+	// Test if already a process group leader.
+	if ( process->group == process )
+		return errno = EPERM, -1;
+
+	// Remove the process from its current process group.
+	if ( process->group )
+		process->group->GroupRemoveMember(process);
+
+	// Remove the process from its current session.
+	if ( process->session )
+		process->session->SessionRemoveMember(process);
+
+	// Remove the process from its current init.
+	if ( process->init )
+		process->init->InitRemoveMember(process);
+
+	// Insert the process into its new init.
+	process->initprev = NULL;
+	process->initnext = NULL;
+	process->initfirst = process;
+	process->init = process;
 
 	// Insert the process into its new session.
 	process->sessionprev = NULL;

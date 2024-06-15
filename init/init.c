@@ -2225,7 +2225,6 @@ static void daemon_start(struct daemon* daemon)
 	char ppid_str[sizeof(pid_t) * 3];
 	snprintf(ppid_str, sizeof(ppid_str), "%" PRIiPID, ppid);
 	if ( (!daemon->need_tty && setenv("READYFD", "3", 1) < 0) ||
-	     setenv("INIT_PID", ppid_str, 1) < 0 ||
 	     setenv("LOGNAME", pwd->pw_name, 1) < 0 ||
 	     setenv("USER", pwd->pw_name, 1) < 0 ||
 	     setenv("HOME", home, 1) < 0 ||
@@ -2321,7 +2320,6 @@ static void daemon_start(struct daemon* daemon)
 	// TODO: Also unset other things.
 	if ( !daemon->need_tty )
 		unsetenv("READYFD");
-	unsetenv("INIT_PID");
 	unsetenv("LOGNAME");
 	unsetenv("USER");
 	unsetenv("HOME");
@@ -3512,8 +3510,11 @@ int main(int argc, char* argv[])
 	}
 
 	// Prevent recursive init without care.
-	if ( getenv("INIT_PID") )
+	if ( getinit(0) != getpid() )
 		fatal("System is already managed by an init process");
+
+	if ( !isatty(0) || !isatty(1) || !isatty(2)  )
+		fatal("stdin, stdout, and stderr must be the terminal");
 
 	// Register handler that shuts down the system when init exits.
 	if ( atexit(niht) != 0 )
@@ -3694,6 +3695,9 @@ int main(int argc, char* argv[])
 		chain_dev_path_made = true;
 		close(new_dev_fd);
 		close(old_dev_fd);
+		int tty_fd = open("/dev/tty", O_RDWR | O_CLOEXEC);
+		if ( tty_fd < 0 )
+			fatal("/dev/tty: %m");
 		// TODO: Forward the early init log to the chain init.
 		// Run the chain booted operating system.
 		pid_t child_pid = fork();
@@ -3706,6 +3710,10 @@ int main(int argc, char* argv[])
 				fatal("chroot: %s: %m", chain_path);
 			if ( chdir("/") < 0 )
 				fatal("chdir: %s: %m", chain_path);
+			if ( setinit() < 0 )
+				fatal("setinit: %m");
+			if ( ioctl(tty_fd, TIOCSCTTY, 1) < 0 )
+				fatal("ioctl: TIOCSCTTY: %m");
 			char verbose_opt[] = {'-', "sqv"[verbosity], '\0'};
 			// TODO: Concat next_argv onto this argv_next, so the arguments
 			//       can be passed to the final init.
@@ -3750,6 +3758,9 @@ int main(int argc, char* argv[])
 		}
 		sigprocmask(SIG_BLOCK, &handled_signals, NULL);
 		forward_signal_pid = -1; // Racy with waitpid.
+		if ( ioctl(tty_fd, TIOCSCTTY, 1) < 0 )
+			fatal("ioctl: TIOCSCTTY: %m");
+		close(tty_fd);
 		if ( WIFEXITED(status) )
 			return WEXITSTATUS(status);
 		else if ( WIFSIGNALED(status) )
