@@ -52,13 +52,11 @@ namespace NetFS {
 class Manager;
 class StreamSocket;
 
-class Manager : public AbstractInode
+class Manager : public Refcountable
 {
 public:
-	Manager(uid_t owner, gid_t group, mode_t mode);
-	virtual ~Manager() { }
-	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
-	                        mode_t mode);
+	Manager();
+	virtual ~Manager();
 
 public:
 	bool Bind(StreamSocket* socket, struct sockaddr_un* addr, size_t addrsize);
@@ -114,6 +112,7 @@ public:
 public: /* For use by Manager. */
 	PollChannel accept_poll_channel;
 	Ref<Manager> manager;
+	Ref<Descriptor> root;
 	PipeEndpoint incoming;
 	PipeEndpoint outgoing;
 	StreamSocket* prev_socket;
@@ -189,6 +188,7 @@ StreamSocket::StreamSocket(uid_t owner, gid_t group, mode_t mode,
 	this->is_connected = false;
 	this->is_refused = false;
 	this->manager = manager;
+	this->root = CurrentProcess()->GetRoot();
 	this->socket_lock = KTHREAD_MUTEX_INITIALIZER;
 	this->pending_cond = KTHREAD_COND_INITIALIZER;
 	this->accepted_cond = KTHREAD_COND_INITIALIZER;
@@ -476,18 +476,17 @@ int StreamSocket::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 	return 0;
 }
 
-Manager::Manager(uid_t owner, gid_t group, mode_t mode)
+Manager::Manager()
 {
-	inode_type = INODE_TYPE_UNKNOWN;
-	dev = (dev_t) this;
-	ino = 0;
-	this->type = S_IFDIR;
-	this->stat_uid = owner;
-	this->stat_gid = group;
-	this->stat_mode = (mode & S_SETABLE) | this->type;
 	this->manager_lock = KTHREAD_MUTEX_INITIALIZER;
 	this->first_server = NULL;
 	this->last_server = NULL;
+}
+
+Manager::~Manager()
+{
+	assert(!first_server);
+	assert(!last_server);
 }
 
 static int CompareAddress(const struct sockaddr_un* a,
@@ -498,8 +497,10 @@ static int CompareAddress(const struct sockaddr_un* a,
 
 StreamSocket* Manager::LookupServer(struct sockaddr_un* address)
 {
+	Ref<Descriptor> root = CurrentProcess()->GetRoot();
 	for ( StreamSocket* iter = first_server; iter; iter = iter->next_socket )
-		if ( CompareAddress(iter->name, address) == 0 )
+		if ( CompareAddress(iter->name, address) == 0 &&
+		     iter->root->dev == root->dev && iter->root->ino == root->ino )
 			return iter;
 	return NULL;
 }
@@ -664,24 +665,11 @@ bool Manager::Connect(StreamSocket* socket,
 	return true;
 }
 
-// TODO: Support a poll method in Manager.
-
-Ref<Inode> Manager::open(ioctx_t* /*ctx*/, const char* filename,
-                             int /*flags*/, mode_t /*mode*/)
-{
-	if ( !strcmp(filename, "stream") )
-	{
-		StreamSocket* socket = new StreamSocket(0, 0, 0666, Ref<Manager>(this));
-		return Ref<StreamSocket>(socket);
-	}
-	return errno = ENOENT, Ref<Inode>(NULL);
-}
-
 static Ref<Manager> manager;
 
 void Init()
 {
-	manager = Ref<Manager>(new Manager(0, 0, 0600));
+	manager = Ref<Manager>(new Manager());
 }
 
 Ref<Inode> Socket(int type, int protocol)
