@@ -17,6 +17,7 @@
  * Runs a process with another root directory.
  */
 
+#include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -46,6 +47,7 @@ static void compact_arguments(int* argc, char*** argv)
 }
 
 static char* mount_point_dev;
+static int tty_fd = -1;
 
 static void unmount_handler(int signum)
 {
@@ -61,6 +63,7 @@ static void unmount_handler(int signum)
 int main(int argc, char* argv[])
 {
 	bool devices = false;
+	bool init = false;
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
@@ -75,12 +78,15 @@ int main(int argc, char* argv[])
 			while ( (c = *++arg) ) switch ( c )
 			{
 			case 'd': devices = true; break;
+			case 'I': init = true; break;
 			default:
 				errx(1, "unknown option -- '%c'", c);
 			}
 		}
 		else if ( !strcmp(arg, "--devices") )
 			devices = true;
+		else if ( !strcmp(arg, "--init") )
+			init = true;
 		else
 			errx(1, "unknown option: %s", arg);
 	}
@@ -90,7 +96,7 @@ int main(int argc, char* argv[])
 	if ( argc < 2 )
 		errx(1, "missing operand, expected new root directory");
 
-	bool need_cleanup = devices;
+	bool need_cleanup = devices || init;
 
 	// TODO: Why do we even have signal handling instead of just blocking the
 	// signals and waiting for the subprocess to react?
@@ -122,6 +128,9 @@ int main(int argc, char* argv[])
 		close(new_dev_fd);
 		close(old_dev_fd);
 	}
+
+	if ( init && (tty_fd = open("/dev/tty", O_RDWR | O_CLOEXEC)) < 0 )
+		err(1, "/dev/tty");
 
 	sigset_t oldset, sigs;
 	if ( need_cleanup )
@@ -156,6 +165,14 @@ int main(int argc, char* argv[])
 			sigprocmask(SIG_SETMASK, &oldset, NULL);
 		}
 
+		if ( init )
+		{
+			if ( setinit() < 0 )
+				err(1, "setinit");
+			if ( ioctl(tty_fd, TIOCSCTTY, 1) < 0 )
+				err(1, "TIOCSCTTY");
+		}
+
 		if ( chroot(argv[1]) != 0 )
 			err(1, "%s", argv[1]);
 
@@ -175,6 +192,11 @@ int main(int argc, char* argv[])
 	int code;
 	waitpid(child_pid, &code, 0);
 	sigprocmask(SIG_BLOCK, &sigs, &oldset);
+	if ( init )
+	{
+		if ( ioctl(tty_fd, TIOCSCTTY, 1) < 0 )
+			warn("TIOCSCTTY");
+	}
 	if ( devices )
 	{
 		if ( unmount(mount_point_dev, 0) < 0 )

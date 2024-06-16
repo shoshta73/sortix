@@ -1687,7 +1687,7 @@ int main(void)
 			unmount_all_but_root();
 			unsetenv("SYSINSTALL_TARGET");
 			unsetenv("SHLVL");
-			exit(execute((const char*[]) { "chroot", "-d", fs,
+			exit(execute((const char*[]) { "chroot", "-dI", fs,
 			                               "/sbin/init", NULL }, "f"));
 		}
 	}

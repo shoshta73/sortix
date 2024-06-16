@@ -6,7 +6,7 @@
 .Nd run command with changed root directory
 .Sh SYNOPSIS
 .Nm
-.Op Fl d
+.Op Fl dI
 .Ar newroot
 .Oo
 .Ar command
@@ -43,6 +43,12 @@ The mountpoint is removed when
 .Ar command
 completes.
 This option is useful for running installations.
+.It Fl I , Fl \-init
+Become an init process using
+.Xr setinit 2
+and transfer the controlling terminal temporarily to the new session using the
+.Sy TIOCSCTTY
+.Xr ioctl 2 .
 .El
 .Sh ENVIRONMENT
 The environment is preserved.
