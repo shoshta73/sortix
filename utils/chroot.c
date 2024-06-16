@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2023, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,7 +23,6 @@
 
 #include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <fsmarshall.h>
 #include <signal.h>
@@ -89,16 +88,15 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 2 )
-		error(1, 0, "missing operand, expected new root directory");
+		errx(1, "missing operand, expected new root directory");
 
-	if ( devices )
+	bool need_cleanup = devices;
+
+	// TODO: Why do we even have signal handling instead of just blocking the
+	// signals and waiting for the subprocess to react?
+
+	if ( need_cleanup )
 	{
-		if ( asprintf(&mount_point_dev, "%s/dev", argv[1]) < 0 )
-			error(1, errno, "asprintf: `%s/dev'", argv[1]);
-
-		// Create a device directory in the root filesystem.
-		mkdir(mount_point_dev, 0755);
-
 		struct sigaction sa;
 		memset(&sa, 0, sizeof(sa));
 		sa.sa_handler = unmount_handler;
@@ -107,6 +105,15 @@ int main(int argc, char* argv[])
 		sigaction(SIGINT, &sa, NULL);
 		sigaction(SIGQUIT, &sa, NULL);
 		sigaction(SIGTERM, &sa, NULL);
+	}
+
+	if ( devices )
+	{
+		if ( asprintf(&mount_point_dev, "%s/dev", argv[1]) < 0 )
+			err(1, "malloc");
+
+		// Create a device directory in the root filesystem.
+		mkdir(mount_point_dev, 0755);
 
 		// Mount the current device directory inside the new root filesystem.
 		int old_dev_fd = open("/dev", O_DIRECTORY | O_RDONLY);
@@ -114,55 +121,69 @@ int main(int argc, char* argv[])
 		fsm_fsbind(old_dev_fd, new_dev_fd, 0);
 		close(new_dev_fd);
 		close(old_dev_fd);
+	}
 
-		sigset_t oldset, sigs;
+	sigset_t oldset, sigs;
+	if ( need_cleanup )
+	{
 		sigemptyset(&sigs);
 		sigaddset(&sigs, SIGHUP);
 		sigaddset(&sigs, SIGINT);
 		sigaddset(&sigs, SIGQUIT);
 		sigaddset(&sigs, SIGTERM);
 		sigprocmask(SIG_BLOCK, &sigs, &oldset);
-		pid_t child_pid = fork();
-		if ( child_pid < 0 )
-		{
-			int errnum = errno;
-			unmount(mount_point_dev, 0);
-			mount_point_dev = NULL;
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			error(1, errnum, "fork");
-		}
-		if ( child_pid != 0 )
-		{
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			int code;
-			waitpid(child_pid, &code, 0);
-			sigprocmask(SIG_BLOCK, &sigs, &oldset);
-			unmount(mount_point_dev, 0);
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-			mount_point_dev = NULL;
-			if ( WIFEXITED(code) )
-				return WEXITSTATUS(code);
-			raise(WTERMSIG(code));
-			return 128 + WTERMSIG(code);
-		}
-		signal(SIGHUP, SIG_DFL);
-		signal(SIGINT, SIG_DFL);
-		signal(SIGQUIT, SIG_DFL);
-		signal(SIGTERM, SIG_DFL);
-		sigprocmask(SIG_SETMASK, &oldset, NULL);
 	}
 
-	if ( chroot(argv[1]) != 0 )
-		error(1, errno, "`%s'", argv[1]);
+	pid_t child_pid = need_cleanup ? fork() : 0;
+	if ( child_pid < 0 )
+	{
+		int errnum = errno;
+		unmount(mount_point_dev, 0);
+		mount_point_dev = NULL;
+		sigprocmask(SIG_SETMASK, &oldset, NULL);
+		errno = errnum;
+		err(1, "fork");
+	}
 
-	if ( chdir("/.") != 0 )
-		error(1, errno, "chdir: `%s/.'", argv[1]);
+	if ( !child_pid )
+	{
+		if ( need_cleanup )
+		{
+			signal(SIGHUP, SIG_DFL);
+			signal(SIGINT, SIG_DFL);
+			signal(SIGQUIT, SIG_DFL);
+			signal(SIGTERM, SIG_DFL);
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+		}
 
-	char* default_argv[] = { (char*) "sh", (char*) NULL };
+		if ( chroot(argv[1]) != 0 )
+			err(1, "%s", argv[1]);
 
-	char** exec_argv = 3 <= argc ? argv + 2 : default_argv;
-	execvp(exec_argv[0], exec_argv);
+		if ( chdir("/.") != 0 )
+			err(1, "chdir: %s/.", argv[1]);
 
-	error(0, errno, "`%s'", exec_argv[0]);
-	_exit(127);
+		char* default_argv[] = { (char*) "sh", (char*) NULL };
+
+		char** exec_argv = 3 <= argc ? argv + 2 : default_argv;
+		execvp(exec_argv[0], exec_argv);
+
+		warn("%s", exec_argv[0]);
+		_exit(127);
+	}
+
+	sigprocmask(SIG_SETMASK, &oldset, NULL);
+	int code;
+	waitpid(child_pid, &code, 0);
+	sigprocmask(SIG_BLOCK, &sigs, &oldset);
+	if ( devices )
+	{
+		if ( unmount(mount_point_dev, 0) < 0 )
+			warn("unmount: %s", mount_point_dev);
+	}
+	sigprocmask(SIG_SETMASK, &oldset, NULL);
+	mount_point_dev = NULL;
+	if ( WIFEXITED(code) )
+		return WEXITSTATUS(code);
+	raise(WTERMSIG(code));
+	return 128 + WTERMSIG(code);
 }
