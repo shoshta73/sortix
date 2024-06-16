@@ -235,7 +235,8 @@ The working directory to run the deamon inside.
 (Default is
 .Pa / )
 .It Sy echo Oo Sy false "|" true Oc
-Whether to echo the output of the daemon to the console.
+Whether to echo the output of the daemon to the console (only if the tty has not
+been gifted to a daemon).
 .Pp
 The default is
 .Sy false

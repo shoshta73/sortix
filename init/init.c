@@ -302,6 +302,8 @@ static bool chain_dev_path_made;
 
 static pid_t main_pid;
 static pid_t forward_signal_pid = -1;
+static int tty_fd;
+static bool tty_gifted;
 
 static volatile sig_atomic_t caught_exit_signal = -1;
 static sigset_t handled_signals;
@@ -849,6 +851,8 @@ static void log_status(const char* status, const char* format, ...)
 	      strcmp(status, "failed") != 0 &&
 	      strcmp(status, "timeout") != 0) )
 		return;
+	if ( tty_gifted )
+		return;
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	struct tm tm;
@@ -885,6 +889,11 @@ static void log_status(const char* status, const char* format, ...)
 __attribute__((format(printf, 1, 2)))
 noreturn static void fatal(const char* format, ...)
 {
+	if ( tty_gifted )
+	{
+		(void) ioctl(tty_fd, TIOCSCTTY, 1);
+		tty_gifted = false;
+	}
 	va_list ap;
 	va_start(ap, format);
 	fprintf(stderr, "%s: fatal: ", program_invocation_name);
@@ -908,12 +917,15 @@ __attribute__((format(printf, 1, 2)))
 static void warning(const char* format, ...)
 {
 	va_list ap;
-	va_start(ap, format);
-	fprintf(stderr, "%s: warning: ", program_invocation_name);
-	vfprintf(stderr, format, ap);
-	fprintf(stderr, "\n");
-	fflush(stderr);
-	va_end(ap);
+	if ( !tty_gifted )
+	{
+		va_start(ap, format);
+		fprintf(stderr, "%s: warning: ", program_invocation_name);
+		vfprintf(stderr, format, ap);
+		fprintf(stderr, "\n");
+		fflush(stderr);
+		va_end(ap);
+	}
 	if ( getpid() == main_pid )
 	{
 		va_start(ap, format);
@@ -927,12 +939,15 @@ __attribute__((format(printf, 1, 2)))
 static void note(const char* format, ...)
 {
 	va_list ap;
-	va_start(ap, format);
-	fprintf(stderr, "%s: ", program_invocation_name);
-	vfprintf(stderr, format, ap);
-	fprintf(stderr, "\n");
-	fflush(stderr);
-	va_end(ap);
+	if ( !tty_gifted )
+	{
+		va_start(ap, format);
+		fprintf(stderr, "%s: ", program_invocation_name);
+		vfprintf(stderr, format, ap);
+		fprintf(stderr, "\n");
+		fflush(stderr);
+		va_end(ap);
+	}
 	if ( getpid() == main_pid )
 	{
 		va_start(ap, format);
@@ -2233,36 +2248,31 @@ static void daemon_start(struct daemon* daemon)
 	int errfds[2];
 	if ( pipe2(errfds, O_CLOEXEC) < 0 )
 		fatal("pipe");
+	if ( daemon->need_tty )
+		tty_gifted = true;
 	daemon->pid = daemon->log.pid = fork();
 	if ( daemon->pid < 0 )
 		fatal("fork: %m");
 	if ( daemon->need_tty )
 	{
-		if ( tcgetattr(0, &daemon->oldtio) )
+		if ( tcgetattr(tty_fd, &daemon->oldtio) )
 			fatal("tcgetattr: %m");
 	}
 	if ( daemon->pid == 0 )
 	{
 		uninstall_signal_handler();
 		close(errfds[0]);
+		if ( setsid() < 0 )
+			exit_errfd(errfds[1], "setsid");
 		if ( chdir(cd) < 0 )
 			exit_errfd(errfds[1], "chdir");
 		if ( daemon->need_tty )
 		{
-			pid_t pid = getpid();
-			// TODO: Support for setsid(2).
-			if ( setpgid(0, 0) < 0 )
-				exit_errfd(errfds[1], "setpgid");
-			sigset_t oldset, sigttou;
-			sigemptyset(&sigttou);
-			sigaddset(&sigttou, SIGTTOU);
-			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-			if ( tcsetpgrp(0, pid) < 0 )
-				exit_errfd(errfds[1], "tcsetpgrp");
+			if ( ioctl(tty_fd, TIOCSCTTY, 1) < 0 )
+				exit_errfd(errfds[1], "TIOCSCTTY");
 			daemon->oldtio.c_cflag |= CREAD;
-			if ( tcsetattr(0, TCSANOW, &daemon->oldtio) < 0 )
+			if ( tcsetattr(tty_fd, TCSANOW, &daemon->oldtio) < 0 )
 				exit_errfd(errfds[1], "tcsetattr");
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
 			dup3(errfds[1], 3, O_CLOEXEC);
 			closefrom(4);
 		}
@@ -2371,7 +2381,7 @@ static bool daemon_process_output(struct daemon* daemon)
 	else if ( amount == 0 )
 		return false;
 	log_formatted(&daemon->log, data, amount);
-	if ( daemon->echo )
+	if ( daemon->echo && !tty_gifted )
 		writeall(1, data, amount);
 	return true;
 }
@@ -2417,10 +2427,12 @@ static void daemon_on_exit(struct daemon* daemon, int exit_code)
 		sigemptyset(&sigttou);
 		sigaddset(&sigttou, SIGTTOU);
 		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-		if ( tcsetattr(0, TCSAFLUSH, &daemon->oldtio) )
+		if ( tcsetattr(tty_fd, TCSAFLUSH, &daemon->oldtio) )
 			fatal("tcsetattr: %m");
-		if ( tcsetpgrp(0, getpgid(0)) < 0 )
-			fatal("tcsetpgrp: %m");
+		// TODO: Do this in niht too?
+		if ( ioctl(tty_fd, TIOCSCTTY, 1) < 0 )
+			fatal("TIOCSCTTY: %m");
+		tty_gifted = false;
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
 	}
 	daemon_on_finished(daemon);
@@ -2943,12 +2955,8 @@ static void set_hostname(void)
 
 static void set_kblayout(void)
 {
-	int tty_fd = open("/dev/tty", O_RDWR);
-	if ( !tty_fd )
-		return warning("unable to set keyboard layout: /dev/tty: %m");
 	bool unsupported = tcgetblob(tty_fd, "kblayout", NULL, 0) < 0 &&
 	                   (errno == ENOTTY || errno == ENOENT);
-	close(tty_fd);
 	if ( unsupported )
 		return;
 	char* action = "unable to set keyboard layout";
@@ -2976,9 +2984,6 @@ static void set_kblayout(void)
 
 static void set_videomode(void)
 {
-	int tty_fd = open("/dev/tty", O_RDWR);
-	if ( !tty_fd )
-		return warning("unable to set video mode: /dev/tty: %m");
 	struct tiocgdisplay display;
 	struct tiocgdisplays gdisplays;
 	memset(&gdisplays, 0, sizeof(gdisplays));
@@ -2986,7 +2991,6 @@ static void set_videomode(void)
 	gdisplays.displays = &display;
 	bool unsupported = ioctl(tty_fd, TIOCGDISPLAYS, &gdisplays) < 0 ||
 	                   gdisplays.count == 0;
-	close(tty_fd);
 	if ( unsupported )
 		return;
 	char* action = "unable to set video mode";
@@ -3437,6 +3441,12 @@ static void niht(void)
 	if ( getpid() != main_pid )
 		return;
 
+	if ( tty_gifted )
+	{
+		(void) ioctl(tty_fd, TIOCSCTTY, 1);
+		tty_gifted = false;
+	}
+
 	// TODO: Unify with new daemon system? At least it needs to recursively kill
 	//       all processes. Ideally fatal wouldn't be called for daemons.
 
@@ -3513,9 +3523,6 @@ int main(int argc, char* argv[])
 	if ( getinit(0) != getpid() )
 		fatal("System is already managed by an init process");
 
-	if ( !isatty(0) || !isatty(1) || !isatty(2)  )
-		fatal("stdin, stdout, and stderr must be the terminal");
-
 	// Register handler that shuts down the system when init exits.
 	if ( atexit(niht) != 0 )
 		fatal("atexit: %m");
@@ -3536,6 +3543,10 @@ int main(int argc, char* argv[])
 	     !(chain_path = join_paths(tmp_path, "fs.XXXXXX")) ||
 	     !(chain_dev_path = join_paths(chain_path, "dev")) )
 		fatal("malloc: %m");
+
+	// Remember the controlling terminal to give it away and reclaim it.
+	if ( (tty_fd = open("/dev/tty", O_RDWR | O_CLOEXEC)) < 0 )
+		fatal("/dev/tty: %m");
 
 	// Handle signals but block them until the safe points where we handle them.
 	// All child processes have to uninstall the signal handler and unblock the
@@ -3695,9 +3706,6 @@ int main(int argc, char* argv[])
 		chain_dev_path_made = true;
 		close(new_dev_fd);
 		close(old_dev_fd);
-		int tty_fd = open("/dev/tty", O_RDWR | O_CLOEXEC);
-		if ( tty_fd < 0 )
-			fatal("/dev/tty: %m");
 		// TODO: Forward the early init log to the chain init.
 		// Run the chain booted operating system.
 		pid_t child_pid = fork();
@@ -3760,7 +3768,6 @@ int main(int argc, char* argv[])
 		forward_signal_pid = -1; // Racy with waitpid.
 		if ( ioctl(tty_fd, TIOCSCTTY, 1) < 0 )
 			fatal("ioctl: TIOCSCTTY: %m");
-		close(tty_fd);
 		if ( WIFEXITED(status) )
 			return WEXITSTATUS(status);
 		else if ( WIFSIGNALED(status) )
