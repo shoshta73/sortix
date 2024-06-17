@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021, 2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -62,7 +62,9 @@ static void pstree(pid_t pid,
                    const char* prefix,
                    bool continuation,
                    bool show_pgid,
-                   bool show_pid)
+                   bool show_pid,
+                   bool show_sid,
+                   bool show_init)
 {
 	while ( pid != -1 )
 	{
@@ -90,15 +92,24 @@ static void pstree(pid_t pid,
 			fputs("─", stdout);
 		}
 		size_t item_length = printf("%s", path);
-		if ( show_pid || show_pgid )
+		if ( show_pid || show_pgid || show_sid || show_init )
 		{
+			size_t sep = 0;
 			item_length += printf("(");
 			if ( show_pid )
-				item_length += printf("%" PRIiPID, pid);
-			if ( show_pid && show_pgid )
-				item_length += printf(",");
+				item_length += (sep = printf("%" PRIiPID, pid));
+			if ( show_pgid && sep )
+				item_length += printf(","), sep = 0;
 			if ( show_pgid )
-				item_length += printf("%" PRIiPID, psst.pgid);
+				item_length += (sep = printf("%" PRIiPID, psst.pgid));
+			if ( show_sid && sep )
+				item_length += printf(","), sep = 0;
+			if ( show_sid )
+				item_length += (sep = printf("%" PRIiPID, psst.sid));
+			if ( show_init && sep )
+				item_length += printf(","), sep = 0;
+			if ( show_init )
+				item_length += (sep = printf("%" PRIiPID, psst.init));
 			item_length += printf(")");
 		}
 		if ( psst.ppid_first != -1 )
@@ -127,7 +138,8 @@ static void pstree(pid_t pid,
 					new_prefix[i] = ' ';
 				new_prefix[item_length] = '\0';
 			}
-			pstree(psst.ppid_first, new_prefix, true, show_pgid, show_pid);
+			pstree(psst.ppid_first, new_prefix, true, show_pgid, show_pid,
+			       show_sid, show_init);
 			free(new_prefix);
 		}
 		else
@@ -142,14 +154,18 @@ int main(int argc, char* argv[])
 {
 	bool show_pgid = false;
 	bool show_pid = false;
+	bool show_sid = false;
+	bool show_init = false;
 
 	int opt;
-	while ( (opt = getopt(argc, argv, "gp")) != -1 )
+	while ( (opt = getopt(argc, argv, "gips")) != -1 )
 	{
 		switch ( opt )
 		{
 		case 'g': show_pgid = true; break;
+		case 'i': show_init = true; break;
 		case 'p': show_pid = true; break;
+		case 's': show_sid = true; break;
 		default: return 1;
 		}
 	}
@@ -157,7 +173,7 @@ int main(int argc, char* argv[])
 	if ( optind < argc )
 		errx(1, "extra operand: %s", argv[optind]);
 
-	pstree(1, "", true, show_pgid, show_pid);
+	pstree(1, "", true, show_pgid, show_pid, show_sid, show_init);
 
 	return ferror(stdout) || fflush(stdout) == EOF ? 1 : 0;
 }
