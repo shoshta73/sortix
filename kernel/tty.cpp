@@ -324,6 +324,17 @@ void TTY::hup()
 	poll_channel.Signal(POLLHUP);
 }
 
+void TTY::winch() // termlock taken
+{
+	ScopedLock family_lock(&process_family_lock);
+	if ( 0 < foreground_pgid )
+	{
+		Process* process = CurrentProcess()->GetPTable()->Get(foreground_pgid);
+		if ( process )
+			process->DeliverGroupSignal(SIGWINCH);
+	}
+}
+
 void TTY::ProcessUnicode(uint32_t unicode)
 {
 	mbstate_t ps;

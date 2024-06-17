@@ -656,6 +656,7 @@ int PTY::master_ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 		const struct winsize* user_ws = (const struct winsize*) arg;
 		if ( !ctx->copy_from_src(&ws, user_ws, sizeof(ws)) )
 			return -1;
+		winch();
 		return 0;
 	}
 	return ioctl(ctx, cmd, arg);

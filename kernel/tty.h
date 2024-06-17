@@ -78,6 +78,7 @@ public:
 
 public:
 	void hup();
+	void winch();
 
 protected:
 	void tty_output(const char* str)
