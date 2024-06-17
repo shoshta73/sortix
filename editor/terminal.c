@@ -102,7 +102,19 @@ void update_terminal(FILE* fp,
                      struct terminal_state* desired,
                      struct terminal_state* current)
 {
-	// TODO: If terminal size has changed!
+	if ( desired->width != current->width ||
+	     desired->height != current->height )
+	{
+		current->width = desired->width;
+		current->height = desired->height;
+		size_t data_length = current->width * current->height;
+		size_t data_size = sizeof(struct terminal_datum) * data_length;
+		current->data = (struct terminal_datum*) malloc(data_size);
+		for ( size_t i = 0; i < data_length; i++ )
+			current->data[i].character = L' ',
+		current->data[i].vgacolor = 0;
+		reset_terminal_state(fp, current);
+	}
 	for ( int y = 0; y < current->height; y++ )
 	{
 		for ( int x = 0; x < current->width; x++ )
