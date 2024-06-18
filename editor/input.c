@@ -353,12 +353,22 @@ void editor_input_process_byte(struct editor_input* editor_input,
 	}
 }
 
+extern volatile sig_atomic_t had_sigwinch;
+
 void editor_input_process(struct editor_input* editor_input,
                           struct editor* editor)
 {
+	sigset_t sigset;
+	sigemptyset(&sigset);
 	struct pollfd pfd = { .fd = 0, .events = POLLIN };
-	do editor_input_process_byte(editor_input, editor);
-	while ( poll(&pfd, 1, 0) == 1 );
+	struct timespec timeout = { .tv_sec = 0 };
+	struct timespec* timeout_ptr = NULL;
+	while ( !had_sigwinch && ppoll(&pfd, 1, timeout_ptr, &sigset) == 1 )
+	{
+		editor_input_process_byte(editor_input, editor);
+		timeout_ptr = &timeout;
+	}
+	had_sigwinch = 0;
 }
 
 void editor_input_end(struct editor_input* editor_input)

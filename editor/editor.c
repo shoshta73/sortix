@@ -25,6 +25,7 @@
 #include <limits.h>
 #include <locale.h>
 #include <pwd.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -270,6 +271,14 @@ bool editor_save_file(struct editor* editor, const char* path)
 	return fclose(fp) != EOF;
 }
 
+volatile sig_atomic_t had_sigwinch = 0;
+
+static void sigwinch(int signum)
+{
+	(void) signum;
+	had_sigwinch = 1;
+}
+
 int main(int argc, char* argv[])
 {
 	setlocale(LC_ALL, "");
@@ -278,6 +287,13 @@ int main(int argc, char* argv[])
 		err(1, "standard input");
 	if ( !isatty(1) )
 		err(1, "standard output");
+
+	sigset_t sigwinch_set;
+	sigemptyset(&sigwinch_set);
+	sigaddset(&sigwinch_set, SIGWINCH);
+	sigprocmask(SIG_BLOCK, &sigwinch_set, NULL);
+	struct sigaction sa = { .sa_handler = sigwinch };
+	sigaction(SIGWINCH, &sa, NULL);
 
 	struct editor editor;
 	initialize_editor(&editor);
