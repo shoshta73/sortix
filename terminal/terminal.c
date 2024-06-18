@@ -930,12 +930,15 @@ void on_resize(void* ctx, uint32_t window_id, uint32_t width, uint32_t height)
 	pthread_mutex_lock(&scrollback_mutex);
 	size_t new_rows = height / FONT_HEIGHT;
 	size_t new_columns = width / FONT_WIDTH;
-	scrollback_resize(new_rows, new_columns);
-	struct winsize ws;
-	ws.ws_row = rows;
-	ws.ws_col = columns;
-	if ( ioctl(master_fd, TIOCSWINSZ, &ws) < 0 )
-		warn("TIOCSWINSZ");
+	if ( rows != new_rows || columns != new_columns )
+	{
+		scrollback_resize(new_rows, new_columns);
+		struct winsize ws;
+		ws.ws_row = rows;
+		ws.ws_col = columns;
+		if ( ioctl(master_fd, TIOCSWINSZ, &ws) < 0 )
+			warn("TIOCSWINSZ");
+	}
 	pthread_mutex_unlock(&scrollback_mutex);
 	need_redraw = true;
 	WINDOW_WIDTH = width;

@@ -40,6 +40,7 @@
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/poll.h>
 #include <sortix/kernel/process.h>
+#include <sortix/kernel/ptable.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/signal.h>
 #include <sortix/kernel/syscall.h>
@@ -652,10 +653,14 @@ int PTY::master_ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 {
 	if ( cmd == TIOCSWINSZ )
 	{
-		ScopedLock lock(&termlock);
+		ScopedLock lock1(&termlock);
 		const struct winsize* user_ws = (const struct winsize*) arg;
 		if ( !ctx->copy_from_src(&ws, user_ws, sizeof(ws)) )
 			return -1;
+
+		ScopedLock lock2(&process_family_lock);
+		if ( Process* process = CurrentProcess()->GetPTable()->Get(foreground_pgid) )
+			process->DeliverGroupSignal(SIGWINCH);
 		return 0;
 	}
 	return ioctl(ctx, cmd, arg);
