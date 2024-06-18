@@ -314,11 +314,11 @@ void TTY::hup()
 	ScopedLock lock(&termlock);
 	ScopedLock family_lock(&process_family_lock);
 	hungup = true;
-	if ( 0 < sid )
+	if ( 0 < foreground_pgid )
 	{
-		Process* process = CurrentProcess()->GetPTable()->Get(sid);
+		Process* process = CurrentProcess()->GetPTable()->Get(foreground_pgid);
 		if ( process )
-			process->DeliverSessionSignal(SIGHUP);
+			process->DeliverGroupSignal(SIGHUP);
 	}
 	kthread_cond_broadcast(&datacond);
 	poll_channel.Signal(POLLHUP);
