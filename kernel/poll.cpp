@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015, 2018, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2018, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -207,41 +207,28 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 	if ( !FetchTimespec(&timeout_ts, user_timeout_ts) )
 		return -1;
 
-	sigset_t oldsigmask;
-	if ( user_sigmask )
-	{
-		sigset_t sigmask;
-		if ( !CopyFromUser(&sigmask, user_sigmask, sizeof(sigset_t)) )
-			return -1;
-		Signal::UpdateMask(SIG_SETMASK, &sigmask, &oldsigmask);
-		if ( Signal::IsPending() )
-		{
-			// The pending signal might only be pending with the temporary
-			// signal mask, so don't restore it. Instead ask for the real signal
-			// mask to be restored after the signal has been processed.
-			Thread* thread = CurrentThread();
-			thread->has_saved_signal_mask = true;
-			memcpy(&thread->saved_signal_mask, &oldsigmask, sizeof(sigset_t));
-			assert(Signal::IsPending());
-			return errno = EINTR, -1;
-		}
-	}
-
 	struct pollfd* fds = CopyFdsFromUser(user_fds, nfds);
 	if ( !fds )
-	{
-		if ( user_sigmask )
-			Signal::UpdateMask(SIG_SETMASK, &oldsigmask, NULL);
 		return -1;
-	}
 
 	PollNode* nodes = new PollNode[nfds];
 	if ( !nodes )
 	{
 		delete[] fds;
-		if ( user_sigmask )
-			Signal::UpdateMask(SIG_SETMASK, &oldsigmask, NULL);
 		return -1;
+	}
+
+	sigset_t oldsigmask;
+	if ( user_sigmask )
+	{
+		sigset_t sigmask;
+		if ( !CopyFromUser(&sigmask, user_sigmask, sizeof(sigset_t)) )
+		{
+			delete[] nodes;
+			delete[] fds;
+			return -1;
+		}
+		Signal::UpdateMask(SIG_SETMASK, &sigmask, &oldsigmask);
 	}
 
 	Process* process = CurrentProcess();
@@ -249,11 +236,8 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 	kthread_mutex_t wakeup_mutex = KTHREAD_MUTEX_INITIALIZER;
 	kthread_cond_t wakeup_cond = KTHREAD_COND_INITIALIZER;
 
-	int ret = -1;
 	bool self_woken = false;
 	bool remote_woken = false;
-	bool unexpected_error = false;
-	bool deliver_signal = false;
 
 	Timer timer;
 	struct poll_timeout pts;
@@ -270,7 +254,7 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 	}
 
 	size_t reqs;
-	for ( reqs = 0; !unexpected_error && reqs < nfds; )
+	for ( reqs = 0; reqs < nfds; )
 	{
 		PollNode* node = nodes + reqs;
 		if ( fds[reqs].fd < 0 )
@@ -293,13 +277,15 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 		node->wake_cond = &wakeup_cond;
 		node->woken = &remote_woken;
 		reqs++;
-		// TODO: How should errors be handled?
 		if ( desc->poll(&ctx, node) == 0 )
 			self_woken = true;
 		else if ( errno == EAGAIN )
 			errno = 0;
 		else
-			unexpected_error = self_woken = true;
+		{
+			node->revents = POLLERR;
+			self_woken = true;
+		}
 	}
 
 	if ( timeout_ts.tv_sec == 0 && timeout_ts.tv_nsec == 0 )
@@ -310,11 +296,7 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 	while ( !(self_woken || remote_woken) )
 	{
 		if ( !kthread_cond_wait_signal(&wakeup_cond, &wakeup_mutex) )
-		{
-			errno = -EINTR;
 			self_woken = true;
-			deliver_signal = true;
-		}
 	}
 
 	kthread_mutex_unlock(&wakeup_mutex);
@@ -329,25 +311,21 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 		timer.Detach();
 	}
 
-	if ( !unexpected_error )
+	int ret = 0;
+	errno = 0;
+	for ( size_t i = 0; i < reqs; i++ )
 	{
-		int num_events = 0;
-		for ( size_t i = 0; i < reqs; i++ )
-		{
-			if ( (fds[i].revents = nodes[i].revents) )
-				num_events++;
-		}
-
-		if ( CopyFdsToUser(user_fds, fds, nfds) )
-			ret = num_events;
+		if ( (fds[i].revents = nodes[i].revents) )
+			ret++;
 	}
+
+	if ( !CopyFdsToUser(user_fds, fds, nfds) )
+		ret = -1;
 
 	delete[] nodes;
 	delete[] fds;
 
-	if ( 0 <= ret )
-		errno = 0;
-
+	bool deliver_signal = Signal::IsPending();
 	if ( user_sigmask )
 	{
 		if ( !deliver_signal )
@@ -357,12 +335,14 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 			// The pending signal might only be pending with the temporary
 			// signal mask, so don't restore it. Instead ask for the real signal
 			// mask to be restored after the signal has been processed.
-			assert(Signal::IsPending());
 			Thread* thread = CurrentThread();
 			thread->has_saved_signal_mask = true;
 			memcpy(&thread->saved_signal_mask, &oldsigmask, sizeof(sigset_t));
 		}
 	}
+
+	if ( !ret && deliver_signal )
+		return errno = EINTR, -1;
 
 	return ret;
 }
