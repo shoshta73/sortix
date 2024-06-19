@@ -295,7 +295,7 @@ int TTY::tcsetpgrp(ioctx_t* /*ctx*/, pid_t pgid)
 	Process* process = CurrentProcess()->GetPTable()->Get(pgid);
 	if ( !process )
 		return errno = ESRCH, -1;
-	if ( !process->groupfirst )
+	if ( !process->group_first )
 		return errno = EINVAL, -1;
 	foreground_pgid = pgid;
 	return 0;
@@ -865,7 +865,7 @@ int TTY::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 			return errno = EPERM, -1;
 		ScopedLock family_lock(&process_family_lock);
 		Process* process = CurrentProcess();
-		if ( !force && !process->sessionfirst )
+		if ( !force && !process->session_first )
 			return errno = EPERM, -1;
 		Process* session = process->session;
 		Process* group = process->group;

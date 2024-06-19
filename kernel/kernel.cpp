@@ -372,17 +372,17 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	ptable.Reset();
 	system->addrspace = Memory::GetAddressSpace();
 	system->group = system;
-	system->groupprev = NULL;
-	system->groupnext = NULL;
-	system->groupfirst = system;
+	system->group_prev = NULL;
+	system->group_next = NULL;
+	system->group_first = system;
 	system->session = system;
-	system->sessionprev = NULL;
-	system->sessionnext = NULL;
-	system->sessionfirst = system;
+	system->session_prev = NULL;
+	system->session_next = NULL;
+	system->session_first = system;
 	system->init = NULL;
-	system->initprev = NULL;
-	system->initnext = NULL;
-	system->initfirst = NULL;
+	system->init_prev = NULL;
+	system->init_next = NULL;
+	system->init_first = NULL;
 
 	if ( !(system->program_image_path = String::Clone("<kernel process>")) )
 		Panic("Unable to clone string for system process name");
@@ -394,10 +394,10 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	Thread* idlethread = new Thread();
 	idlethread->name = "idle";
 	idlethread->process = system;
-	idlethread->kernelstackpos = (addr_t) stack;
-	idlethread->kernelstacksize = STACK_SIZE;
-	idlethread->kernelstackmalloced = false;
-	system->firstthread = idlethread;
+	idlethread->kernel_stack_pos = (addr_t) stack;
+	idlethread->kernel_stack_size = STACK_SIZE;
+	idlethread->kernel_stack_malloced = false;
+	system->first_thread = idlethread;
 	system->threads_not_exiting_count = 1;
 	Scheduler::SetIdleThread(idlethread);
 
@@ -665,23 +665,23 @@ static void BootThread(void* /*user*/)
 	kthread_mutex_lock(&process_family_lock);
 	Process* kernel_process = CurrentProcess();
 	init->parent = kernel_process;
-	init->nextsibling = kernel_process->firstchild;
-	init->prevsibling = NULL;
-	if ( kernel_process->firstchild )
-		kernel_process->firstchild->prevsibling = init;
-	kernel_process->firstchild = init;
+	init->next_sibling = kernel_process->first_child;
+	init->prev_sibling = NULL;
+	if ( kernel_process->first_child )
+		kernel_process->first_child->prev_sibling = init;
+	kernel_process->first_child = init;
 	init->group = init;
-	init->groupprev = NULL;
-	init->groupnext = NULL;
-	init->groupfirst = init;
+	init->group_prev = NULL;
+	init->group_next = NULL;
+	init->group_first = init;
 	init->session = init;
-	init->sessionprev = NULL;
-	init->sessionnext = NULL;
-	init->sessionfirst = init;
+	init->session_prev = NULL;
+	init->session_next = NULL;
+	init->session_first = init;
 	init->init = init;
-	init->initprev = NULL;
-	init->initnext = NULL;
-	init->initfirst = init;
+	init->init_prev = NULL;
+	init->init_next = NULL;
+	init->init_first = init;
 	kthread_mutex_unlock(&process_family_lock);
 
 	// TODO: Why don't we fork from pid=0 and this is done for us?

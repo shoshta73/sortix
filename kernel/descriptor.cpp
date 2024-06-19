@@ -679,9 +679,9 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
                                  mode_t mode)
 {
 	Process* process = CurrentProcess();
-	kthread_mutex_lock(&process->idlock);
+	kthread_mutex_lock(&process->id_lock);
 	mode &= ~process->umask;
-	kthread_mutex_unlock(&process->idlock);
+	kthread_mutex_unlock(&process->id_lock);
 
 	if ( !filename[0] )
 		return errno = ENOENT, Ref<Descriptor>();
@@ -840,9 +840,9 @@ Ref<Descriptor> Descriptor::open_elem(ioctx_t* ctx, const char* filename,
 int Descriptor::mkdir(ioctx_t* ctx, const char* filename, mode_t mode)
 {
 	Process* process = CurrentProcess();
-	kthread_mutex_lock(&process->idlock);
+	kthread_mutex_lock(&process->id_lock);
 	mode &= ~process->umask;
-	kthread_mutex_unlock(&process->idlock);
+	kthread_mutex_unlock(&process->id_lock);
 
 	char* final;
 	Ref<Descriptor> dir = OpenDirContainingPath(ctx, Ref<Descriptor>(this),

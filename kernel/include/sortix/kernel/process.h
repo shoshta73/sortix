@@ -66,17 +66,17 @@ public:
 	pid_t pid;
 
 public:
-	kthread_mutex_t nicelock;
+	kthread_mutex_t nice_lock;
 	int nice;
 
 public:
-	kthread_mutex_t idlock;
+	kthread_mutex_t id_lock;
 	uid_t uid, euid;
 	gid_t gid, egid;
 	mode_t umask;
 
 private:
-	kthread_mutex_t ptrlock;
+	kthread_mutex_t ptr_lock;
 	Ref<Descriptor> tty;
 	Ref<Descriptor> root;
 	Ref<Descriptor> cwd;
@@ -112,34 +112,34 @@ public:
 
 public:
 	Process* parent;
-	Process* prevsibling;
-	Process* nextsibling;
-	Process* firstchild;
-	Process* zombiechild;
+	Process* prev_sibling;
+	Process* next_sibling;
+	Process* first_child;
+	Process* zombie_child;
 	Process* group;
-	Process* groupprev;
-	Process* groupnext;
-	Process* groupfirst;
+	Process* group_prev;
+	Process* group_next;
+	Process* group_first;
 	Process* session;
-	Process* sessionprev;
-	Process* sessionnext;
-	Process* sessionfirst;
+	Process* session_prev;
+	Process* session_next;
+	Process* session_first;
 	Process* init;
-	Process* initprev;
-	Process* initnext;
-	Process* initfirst;
-	kthread_mutex_t childlock;
-	kthread_mutex_t parentlock;
-	kthread_cond_t zombiecond;
-	bool iszombie;
-	bool nozombify;
+	Process* init_prev;
+	Process* init_next;
+	Process* init_first;
+	kthread_mutex_t child_lock;
+	kthread_mutex_t parent_lock;
+	kthread_cond_t zombie_cond;
+	bool is_zombie;
+	bool no_zombify;
 	bool limbo;
 	bool is_init_exiting;
 	int exit_code;
 
 public:
-	Thread* firstthread;
-	kthread_mutex_t threadlock;
+	Thread* first_thread;
+	kthread_mutex_t thread_lock;
 	size_t threads_not_exiting_count;
 	bool threads_exiting;
 

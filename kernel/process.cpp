@@ -79,15 +79,15 @@ Process::Process()
 	addrspace = 0;
 	pid = 0;
 
-	nicelock = KTHREAD_MUTEX_INITIALIZER;
+	nice_lock = KTHREAD_MUTEX_INITIALIZER;
 	nice = 0;
 
-	idlock = KTHREAD_MUTEX_INITIALIZER;
+	id_lock = KTHREAD_MUTEX_INITIALIZER;
 	uid = euid = 0;
 	gid = egid = 0;
 	umask = 0022;
 
-	ptrlock = KTHREAD_MUTEX_INITIALIZER;
+	ptr_lock = KTHREAD_MUTEX_INITIALIZER;
 	// tty set to null reference in the member constructor.
 	// root set to null reference in the member constructor.
 	// cwd set to null reference in the member constructor.
@@ -116,31 +116,31 @@ Process::Process()
 	sigreturn = NULL;
 
 	parent = NULL;
-	prevsibling = NULL;
-	nextsibling = NULL;
-	firstchild = NULL;
-	zombiechild = NULL;
+	prev_sibling = NULL;
+	next_sibling = NULL;
+	first_child = NULL;
+	zombie_child = NULL;
 	group = NULL;
-	groupprev = NULL;
-	groupnext = NULL;
-	groupfirst = NULL;
+	group_prev = NULL;
+	group_next = NULL;
+	group_first = NULL;
 	session = NULL;
-	sessionprev = NULL;
-	sessionnext = NULL;
-	sessionfirst = NULL;
+	session_prev = NULL;
+	session_next = NULL;
+	session_first = NULL;
 	init = NULL;
-	initprev = NULL;
-	initnext = NULL;
-	initfirst = NULL;
-	zombiecond = KTHREAD_COND_INITIALIZER;
-	iszombie = false;
-	nozombify = false;
+	init_prev = NULL;
+	init_next = NULL;
+	init_first = NULL;
+	zombie_cond = KTHREAD_COND_INITIALIZER;
+	is_zombie = false;
+	no_zombify = false;
 	limbo = false;
 	is_init_exiting = false;
 	exit_code = -1;
 
-	firstthread = NULL;
-	threadlock = KTHREAD_MUTEX_INITIALIZER;
+	first_thread = NULL;
+	thread_lock = KTHREAD_MUTEX_INITIALIZER;
 	threads_not_exiting_count = 0;
 	threads_exiting = false;
 
@@ -170,15 +170,15 @@ Process::~Process() // process_family_lock taken
 	if ( alarm_timer.IsAttached() )
 		alarm_timer.Detach();
 	delete[] program_image_path;
-	assert(!zombiechild);
+	assert(!zombie_child);
 	assert(!init);
 	assert(!session);
 	assert(!group);
 	assert(!parent);
-	assert(!initfirst);
-	assert(!sessionfirst);
-	assert(!groupfirst);
-	assert(!firstchild);
+	assert(!init_first);
+	assert(!session_first);
+	assert(!group_first);
+	assert(!first_child);
 	assert(!addrspace);
 	assert(!segments);
 	assert(!dtable);
@@ -195,7 +195,7 @@ Process::~Process() // process_family_lock taken
 
 void Process::BootstrapTables(Ref<DescriptorTable> dtable, Ref<MountTable> mtable)
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(!this->dtable);
 	assert(!this->mtable);
 	this->dtable = dtable;
@@ -204,7 +204,7 @@ void Process::BootstrapTables(Ref<DescriptorTable> dtable, Ref<MountTable> mtabl
 
 void Process::BootstrapDirectories(Ref<Descriptor> root)
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(!this->root);
 	assert(!this->cwd);
 	this->root = root;
@@ -223,43 +223,43 @@ void Process::OnLastThreadExit()
 		// Forbid any more processes and threads from being created, so this
 		// loop will always terminate.
 		is_init_exiting = true;
-		Process* process = firstchild;
+		Process* process = first_child;
 		while ( process )
 		{
 			if ( process->pid != 0 )
 				process->DeliverSignal(SIGKILL);
 			if ( process->init == process )
 				process->is_init_exiting = true;
-			if ( process->firstchild )
-				process = process->firstchild;
-			while ( process && process != this && !process->nextsibling )
+			if ( process->first_child )
+				process = process->first_child;
+			while ( process && process != this && !process->next_sibling )
 				process = process->parent;
 			if ( process == this )
 				break;
-			process = process->nextsibling;
+			process = process->next_sibling;
 		}
-		// NotifyChildExit always signals zombiecond for init when
+		// NotifyChildExit always signals zombie_cond for init when
 		// is_init_exiting is true.
-		while ( firstchild )
-			kthread_cond_wait(&zombiecond, &process_family_lock);
+		while ( first_child )
+			kthread_cond_wait(&zombie_cond, &process_family_lock);
 	}
 }
 
 void Process::OnThreadDestruction(Thread* thread)
 {
 	assert(thread->process == this);
-	kthread_mutex_lock(&threadlock);
-	if ( thread->prevsibling )
-		thread->prevsibling->nextsibling = thread->nextsibling;
-	if ( thread->nextsibling )
-		thread->nextsibling->prevsibling = thread->prevsibling;
-	if ( thread == firstthread )
-		firstthread = thread->nextsibling;
-	if ( firstthread )
-		firstthread->prevsibling = NULL;
-	thread->prevsibling = thread->nextsibling = NULL;
-	bool threadsleft = firstthread;
-	kthread_mutex_unlock(&threadlock);
+	kthread_mutex_lock(&thread_lock);
+	if ( thread->prev_sibling )
+		thread->prev_sibling->next_sibling = thread->next_sibling;
+	if ( thread->next_sibling )
+		thread->next_sibling->prev_sibling = thread->prev_sibling;
+	if ( thread == first_thread )
+		first_thread = thread->next_sibling;
+	if ( first_thread )
+		first_thread->prev_sibling = NULL;
+	thread->prev_sibling = thread->next_sibling = NULL;
+	bool threadsleft = first_thread;
+	kthread_mutex_unlock(&thread_lock);
 
 	// We are called from the threads destructor, let it finish before we
 	// we handle the situation by killing ourselves.
@@ -275,7 +275,7 @@ void Process__AfterLastThreadExit(void* user)
 void Process::ScheduleDeath()
 {
 	// All our threads must have exited at this point.
-	assert(!firstthread);
+	assert(!first_thread);
 	Worker::Schedule(Process__AfterLastThreadExit, this);
 }
 
@@ -284,7 +284,7 @@ void Process::ScheduleDeath()
 // process after this call as another thread may garbage collect it.
 void Process::AbortConstruction()
 {
-	nozombify = true;
+	no_zombify = true;
 	ScheduleDeath();
 }
 
@@ -311,7 +311,7 @@ void Process::LastPrayer()
 {
 	assert(this);
 	// This must never be called twice.
-	assert(!iszombie);
+	assert(!is_zombie);
 
 	// This must be called from a thread using another address space as the
 	// address space of this process is about to be destroyed.
@@ -319,7 +319,7 @@ void Process::LastPrayer()
 	assert(curthread->process != this);
 
 	// This can't be called if the process is still alive.
-	assert(!firstthread);
+	assert(!first_thread);
 
 	// Disarm and detach all the timers in the process.
 	DeleteTimers();
@@ -348,7 +348,7 @@ void Process::LastPrayer()
 
 	ScopedLock family_lock(&process_family_lock);
 
-	iszombie = true;
+	is_zombie = true;
 
 	// Init is nice and will gladly raise our orphaned children and zombies.
 	// Child processes can't be reparented away if we're init. OnLastThreadExit
@@ -358,33 +358,33 @@ void Process::LastPrayer()
 	if ( init == this )
 	{
 		assert(is_init_exiting);
-		assert(!firstchild);
+		assert(!first_child);
 	}
 
-	while ( firstchild )
+	while ( first_child )
 	{
-		Process* process = firstchild;
-		firstchild = process->nextsibling;
+		Process* process = first_child;
+		first_child = process->next_sibling;
 		process->parent = init;
-		process->prevsibling = NULL;
-		process->nextsibling = init->firstchild;
-		if ( init->firstchild )
-			init->firstchild->prevsibling = process;
-		init->firstchild = process;
-		process->nozombify = true;
+		process->prev_sibling = NULL;
+		process->next_sibling = init->first_child;
+		if ( init->first_child )
+			init->first_child->prev_sibling = process;
+		init->first_child = process;
+		process->no_zombify = true;
 	}
 	// Since we have no more children (they are with init now), we don't
 	// have to worry about new zombie processes showing up, so just collect
-	// those that are left. Then we satisfiy the invariant !zombiechild that
+	// those that are left. Then we satisfiy the invariant !zombie_child that
 	// applies on process termination.
-	while ( zombiechild )
+	while ( zombie_child )
 	{
-		Process* zombie = zombiechild;
-		zombiechild = zombie->nextsibling;
-		zombie->nextsibling = NULL;
-		if ( zombiechild )
-			zombiechild->prevsibling = NULL;
-		zombie->nozombify = true;
+		Process* zombie = zombie_child;
+		zombie_child = zombie->next_sibling;
+		zombie->next_sibling = NULL;
+		if ( zombie_child )
+			zombie_child->prev_sibling = NULL;
+		zombie->no_zombify = true;
 		zombie->WaitedFor();
 	}
 	// Remove ourself from our process group.
@@ -397,7 +397,7 @@ void Process::LastPrayer()
 	if ( init )
 		init->InitRemoveMember(this);
 
-	bool zombify = !nozombify;
+	bool zombify = !no_zombify;
 
 	// This class instance will be destroyed by our parent process when it
 	// has received and acknowledged our death.
@@ -413,7 +413,7 @@ void Process::WaitedFor() // process_family_lock taken
 {
 	parent = NULL;
 	limbo = false;
-	if ( groupfirst || sessionfirst || initfirst )
+	if ( group_first || session_first || init_first )
 		limbo = true;
 	if ( !limbo )
 		delete this;
@@ -439,12 +439,12 @@ void Process::ResetAddressSpace()
 void Process::GroupRemoveMember(Process* child) // process_family_lock taken
 {
 	assert(child->group == this);
-	if ( child->groupprev )
-		child->groupprev->groupnext = child->groupnext;
+	if ( child->group_prev )
+		child->group_prev->group_next = child->group_next;
 	else
-		groupfirst = child->groupnext;
-	if ( child->groupnext )
-		child->groupnext->groupprev = child->groupprev;
+		group_first = child->group_next;
+	if ( child->group_next )
+		child->group_next->group_prev = child->group_prev;
 	child->group = NULL;
 	if ( IsLimboDone() )
 		delete this;
@@ -453,17 +453,17 @@ void Process::GroupRemoveMember(Process* child) // process_family_lock taken
 void Process::SessionRemoveMember(Process* child) // process_family_lock taken
 {
 	assert(child->session == this);
-	if ( child->sessionprev )
-		child->sessionprev->sessionnext = child->sessionnext;
+	if ( child->session_prev )
+		child->session_prev->session_next = child->session_next;
 	else
-		sessionfirst = child->sessionnext;
-	if ( child->sessionnext )
-		child->sessionnext->sessionprev = child->sessionprev;
+		session_first = child->session_next;
+	if ( child->session_next )
+		child->session_next->session_prev = child->session_prev;
 	child->session = NULL;
-	if ( !sessionfirst )
+	if ( !session_first )
 	{
 		// Remove reference to tty when session is empty.
-		ScopedLock lock(&ptrlock);
+		ScopedLock lock(&ptr_lock);
 		tty.Reset();
 	}
 	if ( IsLimboDone() )
@@ -473,12 +473,12 @@ void Process::SessionRemoveMember(Process* child) // process_family_lock taken
 void Process::InitRemoveMember(Process* child) // process_family_lock taken
 {
 	assert(child->init == this);
-	if ( child->initprev )
-		child->initprev->initnext = child->initnext;
+	if ( child->init_prev )
+		child->init_prev->init_next = child->init_next;
 	else
-		initfirst = child->initnext;
-	if ( child->initnext )
-		child->initnext->initprev = child->initprev;
+		init_first = child->init_next;
+	if ( child->init_next )
+		child->init_next->init_prev = child->init_prev;
 	child->init = NULL;
 	if ( IsLimboDone() )
 		delete this;
@@ -486,28 +486,28 @@ void Process::InitRemoveMember(Process* child) // process_family_lock taken
 
 bool Process::IsLimboDone() // process_family_lock taken
 {
-	return limbo && !groupfirst && !sessionfirst && !initfirst;
+	return limbo && !group_first && !session_first && !init_first;
 }
 
 // process_family_lock taken
 void Process::NotifyChildExit(Process* child, bool zombify)
 {
-	if ( child->prevsibling )
-		child->prevsibling->nextsibling = child->nextsibling;
-	if ( child->nextsibling )
-		child->nextsibling->prevsibling = child->prevsibling;
-	if ( firstchild == child )
-		firstchild = child->nextsibling;
-	if ( firstchild )
-		firstchild->prevsibling = NULL;
+	if ( child->prev_sibling )
+		child->prev_sibling->next_sibling = child->next_sibling;
+	if ( child->next_sibling )
+		child->next_sibling->prev_sibling = child->prev_sibling;
+	if ( first_child == child )
+		first_child = child->next_sibling;
+	if ( first_child )
+		first_child->prev_sibling = NULL;
 
 	if ( zombify )
 	{
-		if ( zombiechild )
-			zombiechild->prevsibling = child;
-		child->prevsibling = NULL;
-		child->nextsibling = zombiechild;
-		zombiechild = child;
+		if ( zombie_child )
+			zombie_child->prev_sibling = child;
+		child->prev_sibling = NULL;
+		child->next_sibling = zombie_child;
+		zombie_child = child;
 	}
 
 	// Notify this parent process about the child exiting if it's meant to
@@ -516,7 +516,7 @@ void Process::NotifyChildExit(Process* child, bool zombify)
 	// every child exiting.
 	DeliverSignal(SIGCHLD);
 	if ( zombify || is_init_exiting )
-		kthread_cond_broadcast(&zombiecond);
+		kthread_cond_broadcast(&zombie_cond);
 }
 
 pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
@@ -528,7 +528,7 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 	ScopedLock lock(&process_family_lock);
 
 	// A process can only wait if it has children.
-	if ( !firstchild && !zombiechild )
+	if ( !first_child && !zombie_child )
 		return errno = ECHILD, -1;
 
 	// Processes can only wait for their own children to exit.
@@ -537,11 +537,11 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 		// TODO: This is a slow but multithread safe way to verify that the
 		// target process has the correct parent.
 		bool found = false;
-		for ( Process* p = firstchild; !found && p; p = p->nextsibling )
-			if ( p->pid == thepid && !p->nozombify )
+		for ( Process* p = first_child; !found && p; p = p->next_sibling )
+			if ( p->pid == thepid && !p->no_zombify )
 				found = true;
-		for ( Process* p = zombiechild; !found && p; p = p->nextsibling )
-			if ( p->pid == thepid && !p->nozombify )
+		for ( Process* p = zombie_child; !found && p; p = p->next_sibling )
+			if ( p->pid == thepid && !p->no_zombify )
 				found = true;
 		if ( !found )
 			return errno = ECHILD, -1;
@@ -550,26 +550,26 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 	Process* zombie = NULL;
 	while ( !zombie )
 	{
-		for ( zombie = zombiechild; zombie; zombie = zombie->nextsibling )
-			if ( (thepid == -1 || thepid == zombie->pid) && !zombie->nozombify )
+		for ( zombie = zombie_child; zombie; zombie = zombie->next_sibling )
+			if ( (thepid == -1 || thepid == zombie->pid) && !zombie->no_zombify )
 				break;
 		if ( zombie )
 			break;
 		if ( options & WNOHANG )
 			return 0;
-		if ( !kthread_cond_wait_signal(&zombiecond, &process_family_lock) )
+		if ( !kthread_cond_wait_signal(&zombie_cond, &process_family_lock) )
 			return errno = EINTR, -1;
 	}
 
 	// Remove from the list of zombies.
-	if ( zombie->prevsibling )
-		zombie->prevsibling->nextsibling = zombie->nextsibling;
-	if ( zombie->nextsibling )
-		zombie->nextsibling->prevsibling = zombie->prevsibling;
-	if ( zombiechild == zombie )
-		zombiechild = zombie->nextsibling;
-	if ( zombiechild )
-		zombiechild->prevsibling = NULL;
+	if ( zombie->prev_sibling )
+		zombie->prev_sibling->next_sibling = zombie->next_sibling;
+	if ( zombie->next_sibling )
+		zombie->next_sibling->prev_sibling = zombie->prev_sibling;
+	if ( zombie_child == zombie )
+		zombie_child = zombie->next_sibling;
+	if ( zombie_child )
+		zombie_child->prev_sibling = NULL;
 
 	thepid = zombie->pid;
 
@@ -608,7 +608,7 @@ void Process::ExitThroughSignal(int signal)
 
 void Process::ExitWithCode(int requested_exit_code)
 {
-	ScopedLock lock(&threadlock);
+	ScopedLock lock(&thread_lock);
 	if ( exit_code == -1 )
 		exit_code = requested_exit_code;
 
@@ -616,74 +616,74 @@ void Process::ExitWithCode(int requested_exit_code)
 	// of process termination. We simply can't stop the threads as they may
 	// be running in kernel mode doing dangerous stuff. This thread will be
 	// destroyed by SIGKILL once the system call returns.
-	for ( Thread* t = firstthread; t; t = t->nextsibling )
+	for ( Thread* t = first_thread; t; t = t->next_sibling )
 		t->DeliverSignal(SIGKILL);
 }
 
 Ref<MountTable> Process::GetMTable()
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(mtable);
 	return mtable;
 }
 
 Ref<DescriptorTable> Process::GetDTable()
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(dtable);
 	return dtable;
 }
 
 Ref<ProcessTable> Process::GetPTable()
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(ptable);
 	return ptable;
 }
 
 Ref<Descriptor> Process::GetTTY()
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	return tty;
 }
 
 Ref<Descriptor> Process::GetRoot()
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(root);
 	return root;
 }
 
 Ref<Descriptor> Process::GetCWD()
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(cwd);
 	return cwd;
 }
 
 void Process::SetTTY(Ref<Descriptor> newtty)
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	tty = newtty;
 }
 
 void Process::SetRoot(Ref<Descriptor> newroot)
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(newroot);
 	root = newroot;
 }
 
 void Process::SetCWD(Ref<Descriptor> newcwd)
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(newcwd);
 	cwd = newcwd;
 }
 
 Ref<Descriptor> Process::GetDescriptor(int fd)
 {
-	ScopedLock lock(&ptrlock);
+	ScopedLock lock(&ptr_lock);
 	assert(dtable);
 	return dtable->Get(fd);
 }
@@ -745,32 +745,32 @@ Process* Process::Fork()
 
 	// Remember the relation to the child process.
 	clone->parent = this;
-	clone->nextsibling = firstchild;
-	clone->prevsibling = NULL;
-	if ( firstchild )
-		firstchild->prevsibling = clone;
-	firstchild = clone;
+	clone->next_sibling = first_child;
+	clone->prev_sibling = NULL;
+	if ( first_child )
+		first_child->prev_sibling = clone;
+	first_child = clone;
 
 	// Add the new process to the current process group.
 	clone->group = group;
-	clone->groupprev = NULL;
-	if ( (clone->groupnext = group->groupfirst) )
-		group->groupfirst->groupprev = clone;
-	group->groupfirst = clone;
+	clone->group_prev = NULL;
+	if ( (clone->group_next = group->group_first) )
+		group->group_first->group_prev = clone;
+	group->group_first = clone;
 
 	// Add the new process to the current session.
 	clone->session = session;
-	clone->sessionprev = NULL;
-	if ( (clone->sessionnext = session->sessionfirst) )
-		session->sessionfirst->sessionprev = clone;
-	session->sessionfirst = clone;
+	clone->session_prev = NULL;
+	if ( (clone->session_next = session->session_first) )
+		session->session_first->session_prev = clone;
+	session->session_first = clone;
 
 	// Add the new process to the current init.
 	clone->init = init;
-	clone->initprev = NULL;
-	if ( (clone->initnext = init->initfirst) )
-		init->initfirst->initprev = clone;
-	init->initfirst = clone;
+	clone->init_prev = NULL;
+	if ( (clone->init_next = init->init_first) )
+		init->init_first->init_prev = clone;
+	init->init_first = clone;
 
 	kthread_mutex_unlock(&process_family_lock);
 
@@ -780,22 +780,22 @@ Process* Process::Fork()
 		clone->resource_limits[i] = resource_limits[i];
 	kthread_mutex_unlock(&resource_limits_lock);
 
-	kthread_mutex_lock(&nicelock);
+	kthread_mutex_lock(&nice_lock);
 	clone->nice = nice;
-	kthread_mutex_unlock(&nicelock);
+	kthread_mutex_unlock(&nice_lock);
 
-	kthread_mutex_lock(&ptrlock);
+	kthread_mutex_lock(&ptr_lock);
 	clone->root = root;
 	clone->cwd = cwd;
-	kthread_mutex_unlock(&ptrlock);
+	kthread_mutex_unlock(&ptr_lock);
 
-	kthread_mutex_lock(&idlock);
+	kthread_mutex_lock(&id_lock);
 	clone->uid = uid;
 	clone->gid = gid;
 	clone->euid = euid;
 	clone->egid = egid;
 	clone->umask = umask;
-	kthread_mutex_unlock(&idlock);
+	kthread_mutex_unlock(&id_lock);
 
 	kthread_mutex_lock(&signal_lock);
 	memcpy(&clone->signal_actions, &signal_actions, sizeof(signal_actions));
@@ -806,13 +806,13 @@ Process* Process::Fork()
 	// Initialize things that can fail and abort if needed.
 	bool failure = false;
 
-	kthread_mutex_lock(&ptrlock);
+	kthread_mutex_lock(&ptr_lock);
 	if ( !(clone->dtable = dtable->Fork()) )
 		failure = true;
 	//if ( !(clone->mtable = mtable->Fork()) )
 	//	failure = true;
 	clone->mtable = mtable;
-	kthread_mutex_unlock(&ptrlock);
+	kthread_mutex_unlock(&ptr_lock);
 
 	if ( !(clone->program_image_path = String::Clone(program_image_path)) )
 		failure = true;
@@ -1504,13 +1504,13 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 
 	// TODO: Is it a hack to create a new kernel stack here?
 	Thread* curthread = CurrentThread();
-	size_t newkernelstacksize = curthread->kernelstacksize;
-	uint8_t* newkernelstack = new uint8_t[newkernelstacksize + stack_alignment];
+	size_t newkernel_stack_size = curthread->kernel_stack_size;
+	uint8_t* newkernelstack = new uint8_t[newkernel_stack_size + stack_alignment];
 	if ( !newkernelstack )
 		return -1;
 
 	uintptr_t stack_aligned = (uintptr_t) newkernelstack;
-	size_t stack_aligned_size = newkernelstacksize;
+	size_t stack_aligned_size = newkernel_stack_size;
 
 	if ( ((uintptr_t) stack_aligned) & (stack_alignment-1) )
 		stack_aligned = (stack_aligned + 16) & ~(stack_alignment-1);
@@ -1592,9 +1592,9 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 		return -1;
 	}
 
-	thread->kernelstackpos = (addr_t) newkernelstack;
-	thread->kernelstacksize = newkernelstacksize;
-	thread->kernelstackmalloced = true;
+	thread->kernel_stack_pos = (addr_t) newkernelstack;
+	thread->kernel_stack_size = newkernel_stack_size;
+	thread->kernel_stack_malloced = true;
 	memcpy(&thread->signal_mask, &regs.sigmask, sizeof(sigset_t));
 	memcpy(&thread->signal_stack, &regs.altstack, sizeof(stack_t));
 
@@ -1687,13 +1687,13 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 		return errno = EPERM, -1;
 	// The process must not be a process group leader.
 	// TODO: Maybe POSIX actually allows this.
-	if ( process->groupfirst )
+	if ( process->group_first )
 		return errno = EPERM, -1;
 	// The process must not be a session leader.
-	if ( process->sessionfirst )
+	if ( process->session_first )
 		return errno = EPERM, -1;
 	// The group must either exist or be the process itself.
-	if ( !group->groupfirst && group != process )
+	if ( !group->group_first && group != process )
 		return errno = EPERM, -1;
 
 	// Exit early if this is a noop.
@@ -1705,11 +1705,11 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 		process->group->GroupRemoveMember(process);
 
 	// Insert the process into its new process group.
-	process->groupprev = NULL;
-	process->groupnext = group->groupfirst;
-	if ( group->groupfirst )
-		group->groupfirst->groupprev = process;
-	group->groupfirst = process;
+	process->group_prev = NULL;
+	process->group_next = group->group_first;
+	if ( group->group_first )
+		group->group_first->group_prev = process;
+	group->group_first = process;
 	process->group = group;
 
 	return 0;
@@ -1734,15 +1734,15 @@ pid_t sys_setsid(void)
 		process->session->SessionRemoveMember(process);
 
 	// Insert the process into its new session.
-	process->sessionprev = NULL;
-	process->sessionnext = NULL;
-	process->sessionfirst = process;
+	process->session_prev = NULL;
+	process->session_next = NULL;
+	process->session_first = process;
 	process->session = process;
 
 	// Insert the process into its new process group.
-	process->groupprev = NULL;
-	process->groupnext = NULL;
-	process->groupfirst = process;
+	process->group_prev = NULL;
+	process->group_next = NULL;
+	process->group_first = process;
 	process->group = process;
 
 	return process->pid;
@@ -1771,21 +1771,21 @@ int sys_setinit(void)
 		process->init->InitRemoveMember(process);
 
 	// Insert the process into its new init.
-	process->initprev = NULL;
-	process->initnext = NULL;
-	process->initfirst = process;
+	process->init_prev = NULL;
+	process->init_next = NULL;
+	process->init_first = process;
 	process->init = process;
 
 	// Insert the process into its new session.
-	process->sessionprev = NULL;
-	process->sessionnext = NULL;
-	process->sessionfirst = process;
+	process->session_prev = NULL;
+	process->session_next = NULL;
+	process->session_first = process;
 	process->session = process;
 
 	// Insert the process into its new process group.
-	process->groupprev = NULL;
-	process->groupnext = NULL;
-	process->groupfirst = process;
+	process->group_prev = NULL;
+	process->group_next = NULL;
+	process->group_first = process;
 	process->group = process;
 
 	return process->pid;
@@ -1799,7 +1799,7 @@ size_t sys_getpagesize(void)
 mode_t sys_umask(mode_t newmask)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	mode_t oldmask = process->umask;
 	process->umask = newmask & 0666;
 	return oldmask;
@@ -1808,7 +1808,7 @@ mode_t sys_umask(mode_t newmask)
 mode_t sys_getumask(void)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	return process->umask;
 }
 

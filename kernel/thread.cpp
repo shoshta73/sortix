@@ -59,18 +59,18 @@ Thread::Thread()
 	yield_to_tid = 0;
 	id = 0; // TODO: Make a thread id.
 	process = NULL;
-	prevsibling = NULL;
-	nextsibling = NULL;
+	prev_sibling = NULL;
+	next_sibling = NULL;
 	scheduler_list_prev = NULL;
 	scheduler_list_next = NULL;
 	state = NONE;
 	memset(&registers, 0, sizeof(registers));
-	kernelstackpos = 0;
-	kernelstacksize = 0;
+	kernel_stack_pos = 0;
+	kernel_stack_size = 0;
 	signal_count = 0;
 	signal_single_frame = 0;
 	signal_canary = 0;
-	kernelstackmalloced = false;
+	kernel_stack_malloced = false;
 	pledged_destruction = false;
 	force_no_signals = false;
 	signal_single = false;
@@ -99,8 +99,8 @@ Thread::~Thread()
 	if ( process )
 		process->OnThreadDestruction(this);
 	assert(CurrentThread() != this);
-	if ( kernelstackmalloced )
-		delete[] (uint8_t*) kernelstackpos;
+	if ( kernel_stack_malloced )
+		delete[] (uint8_t*) kernel_stack_pos;
 }
 
 Thread* CreateKernelThread(Process* process,
@@ -116,7 +116,7 @@ Thread* CreateKernelThread(Process* process,
 		return errno = EINVAL, (Thread*) NULL;
 #endif
 
-	kthread_mutex_lock(&process->threadlock);
+	kthread_mutex_lock(&process->thread_lock);
 
 	// Note: Only allow the process itself to make threads, except the initial
 	// thread. This requirement is because kthread_exit() needs to know when
@@ -124,7 +124,7 @@ Thread* CreateKernelThread(Process* process,
 	// and that no more threads will appear, so it can run some final process
 	// termination steps without any interference. It's always allowed to create
 	// threads in the kernel process as it never exits.
-	assert(!process->firstthread ||
+	assert(!process->first_thread ||
 	       process == CurrentProcess() ||
 	       process == Scheduler::GetKernelProcess());
 
@@ -137,14 +137,14 @@ Thread* CreateKernelThread(Process* process,
 
 	// Create the family tree.
 	thread->process = process;
-	Thread* firsty = process->firstthread;
+	Thread* firsty = process->first_thread;
 	if ( firsty )
-		firsty->prevsibling = thread;
-	thread->nextsibling = firsty;
-	process->firstthread = thread;
+		firsty->prev_sibling = thread;
+	thread->next_sibling = firsty;
+	process->first_thread = thread;
 	process->threads_not_exiting_count++;
 
-	kthread_mutex_unlock(&process->threadlock);
+	kthread_mutex_unlock(&process->thread_lock);
 
 	return thread;
 }
@@ -260,9 +260,9 @@ Thread* CreateKernelThread(Process* process, void (*entry)(void*), void* user,
 	Thread* thread = CreateKernelThread(process, &regs, name);
 	if ( !thread ) { delete[] stack; return NULL; }
 
-	thread->kernelstackpos = (uintptr_t) stack;
-	thread->kernelstacksize = stacksize;
-	thread->kernelstackmalloced = true;
+	thread->kernel_stack_pos = (uintptr_t) stack;
+	thread->kernel_stack_size = stacksize;
+	thread->kernel_stack_malloced = true;
 
 	return thread;
 }
@@ -335,11 +335,11 @@ int sys_exit_thread(int requested_exit_code,
 
 	extended.unmap_size = Page::AlignUp(extended.unmap_size);
 
-	kthread_mutex_lock(&thread->process->threadlock);
+	kthread_mutex_lock(&thread->process->thread_lock);
 	bool is_others = false;
-	for ( Thread* iter = thread->process->firstthread;
+	for ( Thread* iter = thread->process->first_thread;
 	      !is_others && iter;
-	     iter = iter->nextsibling )
+	     iter = iter->next_sibling )
 	{
 		if ( iter == thread )
 			continue;
@@ -355,7 +355,7 @@ int sys_exit_thread(int requested_exit_code,
 		process->threads_exiting = true;
 	else if ( process->threads_exiting )
 		are_threads_exiting = true;
-	kthread_mutex_unlock(&thread->process->threadlock);
+	kthread_mutex_unlock(&thread->process->thread_lock);
 
 	// Self-destruct if another thread began exiting the process.
 	if ( are_threads_exiting )

@@ -39,7 +39,7 @@ static int GetProcessPriority(pid_t who)
 	Process* process = who ? CurrentProcess()->GetPTable()->Get(who) : CurrentProcess();
 	if ( !process )
 		return errno = ESRCH, -1;
-	ScopedLock lock(&process->nicelock);
+	ScopedLock lock(&process->nice_lock);
 	return process->nice;
 }
 
@@ -50,7 +50,7 @@ static int SetProcessPriority(pid_t who, int prio)
 	Process* process = who ? CurrentProcess()->GetPTable()->Get(who) : CurrentProcess();
 	if ( !process )
 		return errno = ESRCH, -1;
-	ScopedLock lock(&process->nicelock);
+	ScopedLock lock(&process->nice_lock);
 	process->nice = prio;
 	return 0;
 }
@@ -68,9 +68,9 @@ static int GetProcessGroupPriority(pid_t who)
 	if ( !group )
 		return errno = ESRCH, -1;
 	int lowest = INT_MAX;
-	for ( Process* process = group->groupfirst; process; process = process->groupnext )
+	for ( Process* process = group->group_first; process; process = process->group_next )
 	{
-		ScopedLock lock(&process->nicelock);
+		ScopedLock lock(&process->nice_lock);
 		if ( process->nice < lowest )
 			lowest = process->nice;
 	}
@@ -84,9 +84,9 @@ static int SetProcessGroupPriority(pid_t who, int prio)
 	Process* group = who ? CurrentProcess()->GetPTable()->Get(who) : CurrentProcessGroup();
 	if ( !group )
 		return errno = ESRCH, -1;
-	for ( Process* process = group->groupfirst; process; process = process->groupnext )
+	for ( Process* process = group->group_first; process; process = process->group_next )
 	{
-		ScopedLock lock(&process->nicelock);
+		ScopedLock lock(&process->nice_lock);
 		process->nice = prio;
 	}
 	return 0;

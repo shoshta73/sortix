@@ -181,8 +181,8 @@ extern "C" void fake_interrupt(void);
 static void FakeInterruptedContext(struct interrupt_context* intctx, int int_no)
 {
 #if defined(__i386__)
-	uintptr_t stack = current_thread->kernelstackpos +
-	                  current_thread->kernelstacksize;
+	uintptr_t stack = current_thread->kernel_stack_pos +
+	                  current_thread->kernel_stack_size;
 	stack -= sizeof(struct interrupt_context);
 	struct interrupt_context* fakectx = (struct interrupt_context*) stack;
 	memcpy(fakectx, intctx, sizeof(struct interrupt_context));
@@ -209,8 +209,8 @@ static void FakeInterruptedContext(struct interrupt_context* intctx, int int_no)
 	intctx->esp = stack;
 	intctx->ss = KDS | KRPL;
 #elif defined(__x86_64__)
-	uintptr_t stack = current_thread->kernelstackpos +
-	                  current_thread->kernelstacksize;
+	uintptr_t stack = current_thread->kernel_stack_pos +
+	                  current_thread->kernel_stack_size;
 	stack -= sizeof(struct interrupt_context);
 	struct interrupt_context* fakectx = (struct interrupt_context*) stack;
 	memcpy(fakectx, intctx, sizeof(struct interrupt_context));

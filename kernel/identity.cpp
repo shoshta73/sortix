@@ -29,14 +29,14 @@ namespace Sortix {
 uid_t sys_getuid()
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	return process->uid;
 }
 
 int sys_setuid(uid_t uid)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	// TODO: Implement security checks in many place across the operating system
 	//       and until then allow anyone to do this to not pretend to be secure.
 	process->uid = uid;
@@ -47,14 +47,14 @@ int sys_setuid(uid_t uid)
 gid_t sys_getgid()
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	return process->gid;
 }
 
 int sys_setgid(gid_t gid)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	// TODO: Implement security checks in many place across the operating system
 	//       and until then allow anyone to do this to not pretend to be secure.
 	process->gid = gid;
@@ -65,14 +65,14 @@ int sys_setgid(gid_t gid)
 uid_t sys_geteuid()
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	return process->euid;
 }
 
 int sys_seteuid(uid_t euid)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	// TODO: Implement security checks in many place across the operating system
 	//       and until then allow anyone to do this to not pretend to be secure.
 	process->euid = euid;
@@ -82,14 +82,14 @@ int sys_seteuid(uid_t euid)
 gid_t sys_getegid()
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	return process->egid;
 }
 
 int sys_setegid(gid_t egid)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	// TODO: Implement security checks in many place across the operating system
 	//       and until then allow anyone to do this to not pretend to be secure.
 	process->egid = egid;

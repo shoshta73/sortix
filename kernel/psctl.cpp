@@ -72,8 +72,8 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		{
 			Process* parent = process->parent;
 			psst.ppid = parent->pid;
-			psst.ppid_prev = process->prevsibling ? process->prevsibling->pid : -1;
-			psst.ppid_next = process->nextsibling ? process->nextsibling->pid : -1;
+			psst.ppid_prev = process->prev_sibling ? process->prev_sibling->pid : -1;
+			psst.ppid_next = process->next_sibling ? process->next_sibling->pid : -1;
 		}
 		else
 		{
@@ -81,13 +81,13 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 			psst.ppid_prev = -1;
 			psst.ppid_next = -1;
 		}
-		psst.ppid_first = process->firstchild ? process->firstchild->pid : -1;
+		psst.ppid_first = process->first_child ? process->first_child->pid : -1;
 		if ( process->group )
 		{
 			Process* group = process->group;
 			psst.pgid = group->pid;
-			psst.pgid_prev = process->groupprev ? process->groupprev->pid : -1;
-			psst.pgid_next = process->groupnext ? process->groupnext->pid : -1;
+			psst.pgid_prev = process->group_prev ? process->group_prev->pid : -1;
+			psst.pgid_next = process->group_next ? process->group_next->pid : -1;
 		}
 		else
 		{
@@ -95,13 +95,13 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 			psst.pgid_prev = -1;
 			psst.pgid_next = -1;
 		}
-		psst.pgid_first = process->groupfirst ? process->groupfirst->pid : -1;
+		psst.pgid_first = process->group_first ? process->group_first->pid : -1;
 		if ( process->session )
 		{
 			Process* session = process->session;
 			psst.sid = session->pid;
-			psst.sid_prev = process->sessionprev ? process->sessionprev->pid : -1;
-			psst.sid_next = process->sessionnext ? process->sessionnext->pid : -1;
+			psst.sid_prev = process->session_prev ? process->session_prev->pid : -1;
+			psst.sid_next = process->session_next ? process->session_next->pid : -1;
 		}
 		else
 		{
@@ -109,14 +109,14 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 			psst.sid_prev = -1;
 			psst.sid_next = -1;
 		}
-		psst.sid_first = process->sessionfirst ? process->sessionfirst->pid : -1;
+		psst.sid_first = process->session_first ? process->session_first->pid : -1;
 
 		if ( process->init )
 		{
 			Process* init = process->init;
 			psst.init = init->pid;
-			psst.init_prev = process->initprev ? process->initprev->pid : -1;
-			psst.init_next = process->initnext ? process->initnext->pid : -1;
+			psst.init_prev = process->init_prev ? process->init_prev->pid : -1;
+			psst.init_next = process->init_next ? process->init_next->pid : -1;
 		}
 		else
 		{
@@ -124,19 +124,19 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 			psst.init_prev = -1;
 			psst.init_next = -1;
 		}
-		psst.init_first = process->initfirst ? process->initfirst->pid : -1;
-		kthread_mutex_lock(&process->idlock);
+		psst.init_first = process->init_first ? process->init_first->pid : -1;
+		kthread_mutex_lock(&process->id_lock);
 		psst.uid = process->uid;
 		psst.euid = process->euid;
 		psst.gid = process->gid;
 		psst.egid = process->egid;
-		kthread_mutex_unlock(&process->idlock);
-		kthread_mutex_lock(&process->threadlock);
+		kthread_mutex_unlock(&process->id_lock);
+		kthread_mutex_lock(&process->thread_lock);
 		psst.status = process->exit_code;
-		kthread_mutex_unlock(&process->threadlock);
-		kthread_mutex_lock(&process->nicelock);
+		kthread_mutex_unlock(&process->thread_lock);
+		kthread_mutex_lock(&process->nice_lock);
 		psst.nice = process->nice;
-		kthread_mutex_unlock(&process->nicelock);
+		kthread_mutex_unlock(&process->nice_lock);
 		kthread_mutex_lock(&process->segment_lock);
 		// TODO: Cache these.
 		for ( size_t i = 0; i < process->segments_used; i++ )

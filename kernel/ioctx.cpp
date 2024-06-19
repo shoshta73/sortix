@@ -27,7 +27,7 @@ namespace Sortix {
 void SetupUserIOCtx(ioctx_t* ctx)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	ctx->uid = ctx->auth_uid = process->uid;
 	ctx->gid = ctx->auth_gid = process->gid;
 	ctx->copy_to_dest = CopyToUser;
@@ -39,7 +39,7 @@ void SetupUserIOCtx(ioctx_t* ctx)
 void SetupKernelIOCtx(ioctx_t* ctx)
 {
 	Process* process = CurrentProcess();
-	ScopedLock lock(&process->idlock);
+	ScopedLock lock(&process->id_lock);
 	ctx->uid = ctx->auth_uid = process->uid;
 	ctx->gid = ctx->auth_gid = process->gid;
 	ctx->copy_to_dest = CopyToKernel;

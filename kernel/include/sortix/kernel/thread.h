@@ -79,8 +79,8 @@ public:
 	struct thread_registers registers;
 	size_t id;
 	Process* process;
-	Thread* prevsibling;
-	Thread* nextsibling;
+	Thread* prev_sibling;
+	Thread* next_sibling;
 	Thread* scheduler_list_prev;
 	Thread* scheduler_list_next;
 	volatile ThreadState state;
@@ -88,12 +88,12 @@ public:
 	sigset_t signal_mask;
 	sigset_t saved_signal_mask;
 	stack_t signal_stack;
-	addr_t kernelstackpos;
-	size_t kernelstacksize;
+	addr_t kernel_stack_pos;
+	size_t kernel_stack_size;
 	size_t signal_count;
 	uintptr_t signal_single_frame;
 	uintptr_t signal_canary;
-	bool kernelstackmalloced;
+	bool kernel_stack_malloced;
 	bool pledged_destruction;
 	bool force_no_signals;
 	bool signal_single;

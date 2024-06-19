@@ -258,9 +258,9 @@ void kthread_exit()
 	// only threads in this process, except the initial thread. Otherwise more
 	// threads may appear, and we can't conclude whether this is the last thread
 	// in the process to exit.
-	kthread_mutex_lock(&process->threadlock);
+	kthread_mutex_lock(&process->thread_lock);
 	bool is_last_to_exit = --process->threads_not_exiting_count == 0;
-	kthread_mutex_unlock(&process->threadlock);
+	kthread_mutex_unlock(&process->thread_lock);
 	// All other threads in the process have committed to exiting, though they
 	// might not have exited yet. However, we know they are only running the
 	// below code that schedules thread termination. It's therefore safe to run

@@ -202,10 +202,10 @@ PingSocket::PingSocket(int af)
 	dev = (dev_t) this;
 	ino = (ino_t) this;
 	type = S_IFSOCK;
-	kthread_mutex_lock(&process->idlock);
+	kthread_mutex_lock(&process->id_lock);
 	stat_uid = process->uid;
 	stat_gid = process->gid;
-	kthread_mutex_unlock(&process->idlock);
+	kthread_mutex_unlock(&process->id_lock);
 	stat_mode = 0600 | this->type;
 	supports_iovec = true;
 	socket_lock = KTHREAD_MUTEX_INITIALIZER;

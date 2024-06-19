@@ -144,8 +144,8 @@ int sys_sigaction(int signum,
 		memcpy(kact, &newact, sizeof(struct sigaction));
 
 		// Signals may become discarded because of the new handler.
-		ScopedLock threads_lock(&process->threadlock);
-		for ( Thread* t = process->firstthread; t; t = t->nextsibling )
+		ScopedLock threads_lock(&process->thread_lock);
+		for ( Thread* t = process->first_thread; t; t = t->next_sibling )
 			UpdatePendingSignals(t);
 	}
 
@@ -315,9 +315,9 @@ int sys_kill(pid_t pid, int signum)
 
 bool Process::DeliverGroupSignal(int signum) // process_family_lock held
 {
-	if ( !groupfirst )
+	if ( !group_first )
 		return errno = ESRCH, false;
-	for ( Process* iter = groupfirst; iter; iter = iter->groupnext )
+	for ( Process* iter = group_first; iter; iter = iter->group_next )
 	{
 		int saved_errno = errno;
 		if ( !iter->DeliverSignal(signum) && errno != ESIGPENDING )
@@ -331,9 +331,9 @@ bool Process::DeliverGroupSignal(int signum) // process_family_lock held
 
 bool Process::DeliverSessionSignal(int signum) // process_family_lock held
 {
-	if ( !sessionfirst )
+	if ( !session_first )
 		return errno = ESRCH, false;
-	for ( Process* iter = sessionfirst; iter; iter = iter->sessionnext )
+	for ( Process* iter = session_first; iter; iter = iter->session_next )
 	{
 		int saved_errno = errno;
 		if ( !iter->DeliverSignal(signum) && errno != ESIGPENDING )
@@ -347,16 +347,16 @@ bool Process::DeliverSessionSignal(int signum) // process_family_lock held
 
 bool Process::DeliverSignal(int signum)
 {
-	ScopedLock lock(&threadlock);
+	ScopedLock lock(&thread_lock);
 
-	if ( !firstthread )
+	if ( !first_thread )
 		return errno = EINIT, false;
 
 	// Broadcast particular signals to all the threads in the process.
 	if ( signum == SIGCONT || signum == SIGSTOP || signum == SIGKILL )
 	{
 		int saved_errno = errno;
-		for ( Thread* t = firstthread; t; t = t->nextsibling )
+		for ( Thread* t = first_thread; t; t = t->next_sibling )
 		{
 			if ( !t->DeliverSignal(signum) && errno != ESIGPENDING )
 			{
@@ -371,7 +371,7 @@ bool Process::DeliverSignal(int signum)
 	// TODO: This isn't how signals should be routed to a particular thread.
 	if ( CurrentThread()->process == this )
 		return CurrentThread()->DeliverSignal(signum);
-	return firstthread->DeliverSignal(signum);
+	return first_thread->DeliverSignal(signum);
 }
 
 int sys_raise(int signum)
