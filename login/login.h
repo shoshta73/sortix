@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2023, 2024 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -39,12 +39,14 @@ struct check
 enum special_action
 {
 	SPECIAL_ACTION_NONE,
+	SPECIAL_ACTION_EXIT,
 	SPECIAL_ACTION_POWEROFF,
 	SPECIAL_ACTION_REBOOT,
 	SPECIAL_ACTION_HALT,
 	SPECIAL_ACTION_REINIT,
 };
 
+void on_interrupt_signal(int signum);
 bool login(const char* username, const char* session);
 bool check_real(const char* username, const char* password);
 bool check_begin(struct check* chk,
@@ -61,5 +63,8 @@ bool parse_username(const char* input,
                     char** out_session,
                     enum special_action* action);
 void handle_special(enum special_action action);
+
+extern pid_t forward_sigterm_to;
+extern volatile sig_atomic_t got_sigterm;
 
 #endif

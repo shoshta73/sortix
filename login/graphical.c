@@ -63,6 +63,7 @@ enum stage
 	STAGE_USERNAME,
 	STAGE_PASSWORD,
 	STAGE_CHECKING,
+	STAGE_EXITING,
 };
 
 struct textbox
@@ -111,6 +112,7 @@ struct glogin
 	enum stage stage;
 	bool animating;
 	const char* warning;
+	const char* announcement;
 	bool pointer_working;
 	struct termios old_tio;
 	bool has_old_tio;
@@ -499,6 +501,33 @@ static void render_progress(struct framebuffer fb)
 	}
 }
 
+static void render_exit(struct framebuffer fb)
+{
+	assert(state.announcement);
+
+	for ( int yoff = -1; yoff <= 1; yoff++ )
+	{
+		for ( int xoff = -1; xoff <= 1; xoff++ )
+		{
+			struct framebuffer msgfb = fb;
+			int y = (fb.yres - FONT_HEIGHT) / 2 + yoff;
+			msgfb = framebuffer_cut_top_y(msgfb, y);
+			int w = strlen(state.announcement) * (FONT_WIDTH+1);
+			int x = (fb.xres - w) / 2 + xoff;
+			msgfb = framebuffer_cut_left_x(msgfb, x);
+			render_text(msgfb, state.announcement, make_color_a(0, 0, 0, 64));
+		}
+	}
+
+	struct framebuffer msgfb = fb;
+	int y = (fb.yres - FONT_HEIGHT) / 2;
+	msgfb = framebuffer_cut_top_y(msgfb, y);
+	int w = strlen(state.announcement) * (FONT_WIDTH+1);
+	int x = (fb.xres - w) / 2;
+	msgfb = framebuffer_cut_left_x(msgfb, x);
+	render_text(msgfb, state.announcement, make_color(255, 255, 255));
+}
+
 static void render_login(struct framebuffer fb)
 {
 	render_background(fb);
@@ -509,6 +538,7 @@ static void render_login(struct framebuffer fb)
 	case STAGE_USERNAME: render_form(fb); break;
 	case STAGE_PASSWORD: render_form(fb); break;
 	case STAGE_CHECKING: render_progress(fb); break;
+	case STAGE_EXITING: render_exit(fb); break;
 	}
 	if ( state.pointer_working )
 		render_pointer(fb);
@@ -669,6 +699,52 @@ static bool render(struct glogin* state)
 	return true;
 }
 
+static void handle_special_graphical(struct glogin* state,
+                                     enum special_action special_action)
+{
+	switch ( special_action )
+	{
+	case SPECIAL_ACTION_NONE:
+		state->announcement = NULL;
+		break;
+	case SPECIAL_ACTION_EXIT:
+		state->announcement = "Exiting...";
+		break;
+	case SPECIAL_ACTION_POWEROFF:
+		state->announcement = "Powering off...";
+		break;
+	case SPECIAL_ACTION_REBOOT:
+		state->announcement = "Rebooting...";
+		break;
+	case SPECIAL_ACTION_HALT:
+		state->announcement = "Halting...";
+		break;
+	case SPECIAL_ACTION_REINIT:
+		state->announcement = "Reinitializing operating system...";
+		break;
+	}
+	if ( state->announcement )
+	{
+		state->stage = STAGE_EXITING;
+		state->fading_from = false;
+		render(state);
+	}
+	handle_special(special_action);
+}
+
+static int get_init_exit_plan(void)
+{
+	FILE* fp = popen("/sbin/service default exit-code", "r");
+	if ( !fp )
+		return -1;
+	int result = -1;
+	char buffer[sizeof(int) * 3];
+	if ( fgets(buffer, sizeof(buffer), fp) && buffer[0] )
+		result = atoi(buffer);
+	pclose(fp);
+	return result;
+}
+
 static void think(struct glogin* state)
 {
 	if ( state->stage == STAGE_CHECKING )
@@ -679,6 +755,7 @@ static void think(struct glogin* state)
 			sched_yield();
 			return;
 		}
+		forward_sigterm_to = 0;
 		if ( result )
 		{
 			if ( !login(username, session) )
@@ -695,6 +772,21 @@ static void think(struct glogin* state)
 			else
 				state->warning = strerror(errno);
 		}
+	}
+
+	if ( got_sigterm )
+	{
+		int exit_code = get_init_exit_plan();
+		enum special_action action = SPECIAL_ACTION_EXIT;
+		if ( exit_code == 0 )
+			action = SPECIAL_ACTION_POWEROFF;
+		else if ( exit_code == 1 )
+			action = SPECIAL_ACTION_REBOOT;
+		else if ( exit_code == 2 )
+			action = SPECIAL_ACTION_HALT;
+		else if ( exit_code == 3 )
+			action = SPECIAL_ACTION_REINIT;
+		handle_special_graphical(state, action);
 	}
 }
 
@@ -717,7 +809,7 @@ static void keyboard_event(struct glogin* state, uint32_t codepoint)
 				state->warning = "Invalid username";
 				break;
 			}
-			handle_special(action);
+			handle_special_graphical(state, action);
 			state->stage = STAGE_PASSWORD;
 			textbox_reset(&textbox_password);
 			break;
@@ -729,8 +821,10 @@ static void keyboard_event(struct glogin* state, uint32_t codepoint)
 				state->stage = STAGE_USERNAME;
 				state->warning = strerror(errno);
 			}
+			forward_sigterm_to = state->chk.pid;
 			break;
 		case STAGE_CHECKING:
+		case STAGE_EXITING:
 			break;
 		}
 		return;
@@ -741,6 +835,7 @@ static void keyboard_event(struct glogin* state, uint32_t codepoint)
 	case STAGE_USERNAME: textbox = &textbox_username; break;
 	case STAGE_PASSWORD: textbox = &textbox_password; break;
 	case STAGE_CHECKING: break;
+	case STAGE_EXITING: break;
 	}
 	if ( textbox && codepoint < 128 )
 	{
@@ -871,6 +966,12 @@ bool glogin_init(struct glogin* state)
 		struct timespec duration = timespec_make(0, 150*1000*1000);
 		state->fade_from_end = timespec_add(state->fade_from_begin, duration);
 	}
+	sigset_t sigterm;
+	sigemptyset(&sigterm);
+	sigaddset(&sigterm, SIGTERM);
+	sigprocmask(SIG_BLOCK, &sigterm, NULL);
+	struct sigaction sa = { .sa_handler = on_interrupt_signal };
+	sigaction(SIGTERM, &sa, NULL);
 	return true;
 }
 
@@ -900,9 +1001,14 @@ int glogin_main(struct glogin* state)
 		nfds_t nfds = 2;
 		struct timespec wake_now_ts = timespec_make(0, 0);
 		struct timespec* wake = state->animating ? &wake_now_ts : NULL;
-		int num_events = ppoll(pfds, nfds, wake, NULL);
+		sigset_t pollmask;
+		sigprocmask(SIG_SETMASK, NULL, &pollmask);
+		sigdelset(&pollmask, SIGTERM);
+		int num_events = ppoll(pfds, nfds, wake, &pollmask);
 		if ( num_events < 0 )
 		{
+			if ( errno == EINTR )
+				continue;
 			warn("poll");
 			break;
 		}

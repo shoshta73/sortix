@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2018, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2018, 2022, 2023, 2024 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -46,12 +46,21 @@
 
 #include "login.h"
 
-static void on_interrupt_signal(int signum)
+pid_t forward_sigterm_to = 0;
+volatile sig_atomic_t got_sigterm = 0;
+
+void on_interrupt_signal(int signum)
 {
 	if ( signum == SIGINT )
 		dprintf(1, "^C");
 	if ( signum == SIGQUIT )
 		dprintf(1, "^\\");
+	if ( signum == SIGTERM )
+	{
+		got_sigterm = 1;
+		if ( forward_sigterm_to )
+			kill(forward_sigterm_to, SIGTERM);
+	}
 }
 
 bool check_real(const char* username, const char* password)
@@ -112,8 +121,10 @@ bool check_begin(struct check* chk,
 	{
 		sigdelset(&chk->oldset, SIGINT);
 		sigdelset(&chk->oldset, SIGQUIT);
+		sigdelset(&chk->oldset, SIGTERM);
 		signal(SIGINT, SIG_DFL);
 		signal(SIGQUIT, SIG_DFL);
+		signal(SIGTERM, SIG_DFL);
 		unsigned int termmode = TERMMODE_UNICODE | TERMMODE_SIGNAL |
 		                        TERMMODE_UTF8 | TERMMODE_LINEBUFFER |
 		                        TERMMODE_ECHO;
@@ -144,6 +155,17 @@ bool check_end(struct check* chk, bool* result, bool try)
 		fcntl(chk->pipe, F_SETFL, fcntl(chk->pipe, F_GETFL) | O_NONBLOCK);
 		chk->pipe_nonblock = true;
 	}
+	sigset_t sigterm, oldset;
+	sigemptyset(&sigterm);
+	sigaddset(&sigterm, SIGTERM);
+	struct sigaction sa = { .sa_handler = on_interrupt_signal }, old_sa;
+	if ( !try )
+	{
+		sigprocmask(SIG_BLOCK, &sigterm, &oldset);
+		forward_sigterm_to = chk->pid;
+		sigaction(SIGTERM, &sa, &old_sa);
+		sigprocmask(SIG_UNBLOCK, &sigterm, NULL);
+	}
 	while ( chk->errnum_done < sizeof(chk->errnum_bytes) )
 	{
 		ssize_t amount = read(chk->pipe, chk->errnum_bytes + chk->errnum_done,
@@ -155,6 +177,13 @@ bool check_end(struct check* chk, bool* result, bool try)
 			break;
 		}
 		chk->errnum_done += amount;
+	}
+	if ( !try )
+	{
+		sigprocmask(SIG_BLOCK, &sigterm, NULL);
+		forward_sigterm_to = 0;
+		sigaction(SIGTERM, &old_sa, NULL);
+		sigprocmask(SIG_SETMASK, &oldset, NULL);
 	}
 	int code;
 	pid_t wait_ret = waitpid(chk->pid, &code, try ? WNOHANG : 0);
@@ -230,11 +259,17 @@ bool login(const char* username, const char* session)
 		return free(login_shell), close(pipe_fds[0]), close(pipe_fds[1]), false;
 	if ( child_pid == 0 )
 	{
+		sigset_t sigterm;
+		sigemptyset(&sigterm);
+		sigaddset(&sigterm, SIGTERM);
+		sigprocmask(SIG_UNBLOCK, &sigterm, NULL);
 		sigdelset(&oldset, SIGINT);
 		sigdelset(&oldset, SIGQUIT);
+		sigdelset(&oldset, SIGTERM);
 		sigdelset(&oldset, SIGTSTP);
 		signal(SIGINT, SIG_DFL);
 		signal(SIGQUIT, SIG_DFL);
+		signal(SIGTERM, SIG_DFL);
 		(void) (
 		setpgid(0, 0) < 0 ||
 		close(pipe_fds[0]) < 0 ||
@@ -269,13 +304,33 @@ bool login(const char* username, const char* session)
 	}
 	free(login_shell);
 	close(pipe_fds[1]);
+
+	sigset_t sigterm;
+	sigemptyset(&sigterm);
+	sigaddset(&sigterm, SIGTERM);
+	sigprocmask(SIG_BLOCK, &sigterm, NULL);
+	struct sigaction sa = { .sa_handler = on_interrupt_signal }, old_sa;
+	forward_sigterm_to = child_pid;
+	sigaction(SIGTERM, &sa, &old_sa);
+	sigprocmask(SIG_UNBLOCK, &sigterm, NULL);
+
 	int errnum;
 	if ( readall(pipe_fds[0], &errnum, sizeof(errnum)) < (ssize_t) sizeof(errnum) )
 		errnum = 0;
 	close(pipe_fds[0]);
 	int child_status;
-	if ( waitpid(child_pid, &child_status, 0) < 0 )
+	while ( waitpid(child_pid, &child_status, 0) < 0 )
+	{
+		if ( errno == EINTR )
+			continue;
 		errnum = errno;
+		break;
+	}
+
+	sigprocmask(SIG_BLOCK, &sigterm, NULL);
+	forward_sigterm_to = 0;
+	sigaction(SIGTERM, &old_sa, NULL);
+
 	tcsetattr(0, TCSAFLUSH, &tio);
 	tcsetpgrp(0, getpgid(0));
 	sigprocmask(SIG_SETMASK, &oldset, NULL);
@@ -334,7 +389,7 @@ bool parse_username(const char* input,
 	*session = NULL;
 	*action = SPECIAL_ACTION_NONE;
 	if ( !strcmp(input, "exit") )
-		return *action = SPECIAL_ACTION_POWEROFF, true;
+		return *action = SPECIAL_ACTION_EXIT, true;
 	else if ( !strcmp(input, "poweroff") )
 		return *action = SPECIAL_ACTION_POWEROFF, true;
 	else if ( !strcmp(input, "reboot") )
@@ -376,6 +431,7 @@ void handle_special(enum special_action action)
 	switch ( action )
 	{
 	case SPECIAL_ACTION_NONE: return;
+	case SPECIAL_ACTION_EXIT: exit(0);
 	case SPECIAL_ACTION_POWEROFF: exit(0);
 	case SPECIAL_ACTION_REBOOT: exit(1);
 	case SPECIAL_ACTION_HALT: exit(2);
@@ -394,7 +450,7 @@ int textual(void)
 	char* username = NULL;
 	char* session = NULL;
 
-	while ( true )
+	while ( !got_sigterm )
 	{
 		char hostname[HOST_NAME_MAX + 1];
 		hostname[0] = '\0';
@@ -459,6 +515,9 @@ int textual(void)
 			printf("\n");
 			continue;
 		}
+
+		if ( got_sigterm )
+			break;
 
 		if ( !login(username, session) )
 		{
