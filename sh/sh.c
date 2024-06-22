@@ -2042,7 +2042,7 @@ static int run(FILE* fp,
 			read_command_non_interactive(&sh_read_command, fp);
 
 		if ( sh_read_command.abort_condition )
-			continue;
+			break;
 
 		if ( sh_read_command.eof_condition )
 		{
