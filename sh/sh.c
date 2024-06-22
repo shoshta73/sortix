@@ -1183,6 +1183,8 @@ struct execute_result execute(char** tokens,
 		return result;
 	}
 
+	signal(SIGHUP, SIG_DFL);
+
 	setpgid(0, pgid != -1 ? pgid : 0);
 	if ( interactive && pgid == -1 )
 	{
@@ -2137,6 +2139,9 @@ static int top(FILE* fp,
 		if ( *script_exited || (status != 0 && exit_on_error) )
 			return status;
 
+		// Receive read EOF instead so we save the shell history.
+		signal(SIGHUP, SIG_IGN);
+
 		edit_line_history_load(&edit_state, getenv("HISTFILE"));
 	}
 
@@ -2144,7 +2149,10 @@ static int top(FILE* fp,
 	             status);
 
 	if ( interactive )
+	{
 		edit_line_history_save(&edit_state, getenv("HISTFILE"));
+		signal(SIGHUP, SIG_DFL);
+	}
 
 	return status;
 }
