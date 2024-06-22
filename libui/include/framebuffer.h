@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * framebuffer.h
- * Framebuffer functions.
+ * Framebuffer utilities.
  */
 
 #ifndef FRAMEBUFFER_H
@@ -59,5 +59,22 @@ void framebuffer_copy_to_framebuffer(const struct framebuffer dst,
                                      const struct framebuffer src);
 void framebuffer_copy_to_framebuffer_blend(const struct framebuffer dst,
                                            const struct framebuffer src);
+struct framebuffer framebuffer_crop_int(struct framebuffer fb,
+                                        int left,
+                                        int top,
+                                        int width,
+                                        int height);
+struct framebuffer framebuffer_cut_left_x(struct framebuffer fb, int offset);
+struct framebuffer framebuffer_cut_right_x(struct framebuffer fb, int offset);
+struct framebuffer framebuffer_cut_top_y(struct framebuffer fb, int offset);
+struct framebuffer framebuffer_cut_bottom_y(struct framebuffer fb, int offset);
+struct framebuffer framebuffer_center_x(struct framebuffer fb, int x, int width);
+struct framebuffer framebuffer_center_y(struct framebuffer fb, int y, int height);
+struct framebuffer framebuffer_right_x(struct framebuffer fb, int x, int width);
+struct framebuffer framebuffer_bottom_y(struct framebuffer fb, int y, int height);
+struct framebuffer framebuffer_center_text_x(struct framebuffer fb, int x, const char* str);
+struct framebuffer framebuffer_center_text_y(struct framebuffer fb, int y, const char* str);
+struct framebuffer framebuffer_right_text_x(struct framebuffer fb, int x, const char* str);
+struct framebuffer framebuffer_bottom_text_y(struct framebuffer fb, int y, const char* str);
 
 #endif
