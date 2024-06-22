@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2017, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014-2017, 2022-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -119,5 +119,5 @@ int main(int argc, char* argv[])
 
 	server_mainloop(&server);
 
-	return 0;
+	return display.exit_code;
 }

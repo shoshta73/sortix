@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2022, 2023, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -68,14 +68,19 @@ struct display
 	bool key_rsuper;
 	bool codepoint_discard;
 	bool redraw;
+	bool running;
 	int pointer_x;
 	int pointer_y;
 	enum mouse_state mouse_state;
 	size_t mouse_byte_count;
 	uint8_t mouse_bytes[MOUSE_PACKET_SIZE];
+	const char* announcement;
+	int exit_code;
+
 };
 
 void display_initialize(struct display* display);
+void display_exit(struct display* display, int exit_code);
 void assert_is_well_formed_display_list(struct display* display);
 void assert_is_well_formed_display(struct display* display);
 void display_link_window_at_top(struct display* display, struct window* window);

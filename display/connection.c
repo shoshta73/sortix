@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2023, 2024 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -149,15 +149,15 @@ CONNECTION_MESSAGE_HANDLER_NO_AUX(shutdown)
 {
 	(void) connection;
 	if ( msg->code == 0 )
-		exit(0);
+		display_exit(server->display, 0);
 	else if ( msg->code == 1 )
-		exit(1);
+		display_exit(server->display, 1);
 	else if ( msg->code == 2 )
-		exit(2);
+		display_exit(server->display, 2);
 	else if ( msg->code == 3 )
-		exit(3);
+		display_exit(server->display, 3);
 	else
-		exit(0);
+		display_exit(server->display, 0);
 }
 
 CONNECTION_MESSAGE_HANDLER_NO_AUX(create_window)

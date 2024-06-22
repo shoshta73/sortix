@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2023, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,6 +40,14 @@
 #include "display.h"
 #include "server.h"
 #include "vgafont.h"
+
+static volatile sig_atomic_t got_sigterm;
+
+static void on_sigterm(int signum)
+{
+	(void) signum;
+	got_sigterm = 1;
+}
 
 static int open_local_server_socket(const char* path, int flags)
 {
@@ -196,9 +205,24 @@ void server_poll(struct server* server)
 	}
 	size_t pfds_used = cpfd_off + connections_polled;
 
-	int num_events = ppoll(pfds, pfds_used, NULL, NULL);
+	sigset_t mask;
+	sigprocmask(SIG_SETMASK, NULL, &mask);
+	sigdelset(&mask, SIGTERM);
+
+	int num_events = ppoll(pfds, pfds_used, NULL, &mask);
+
+	if ( got_sigterm )
+	{
+		display_exit(server->display, -1);
+		got_sigterm = 0;
+	}
+
 	if ( num_events < 0 )
+	{
+		if ( errno == EINTR )
+			return;
 		err(1, "poll");
+	}
 
 	if ( pfds[0].revents )
 	{
@@ -273,9 +297,20 @@ void server_poll(struct server* server)
 
 void server_mainloop(struct server* server)
 {
-	while ( true )
+	sigset_t sigterm, oldset;
+	sigemptyset(&sigterm);
+	sigaddset(&sigterm, SIGTERM);
+	sigprocmask(SIG_BLOCK, &sigterm, &oldset);
+	struct sigaction sa = { .sa_handler = on_sigterm }, old_sa;
+	sigaction(SIGTERM, &sa, &old_sa);
+
+	while ( server->display->running )
 	{
 		display_render(server->display);
 		server_poll(server);
 	}
+	display_render(server->display);
+
+	sigaction(SIGTERM, &old_sa, NULL);
+	sigprocmask(SIG_SETMASK, &oldset, NULL);
 }

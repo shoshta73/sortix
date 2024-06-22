@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 
 #include <display-protocol.h>
 
+#include "display.h"
 #include "server.h"
 #include "window.h"
 

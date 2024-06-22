@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2018, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014-2016, 2018, 2022-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,8 @@
 
 #include <assert.h>
 #include <err.h>
+#include <inttypes.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -46,6 +48,43 @@ extern struct framebuffer arrow_framebuffer;
 void display_initialize(struct display* display)
 {
 	memset(display, 0, sizeof(*display));
+	display->redraw = true;
+	display->running = true;
+}
+
+static int get_init_exit_plan(void)
+{
+	FILE* fp = popen("/sbin/service default exit-code", "r");
+	if ( !fp )
+		return -1;
+	int result = -1;
+	char buffer[sizeof(int) * 3];
+	if ( fgets(buffer, sizeof(buffer), fp) && buffer[0] )
+		result = atoi(buffer);
+	pclose(fp);
+	return result;
+}
+
+void display_exit(struct display* display, int exit_code)
+{
+	display->running = false;
+	display->exit_code = exit_code;
+	int plan = exit_code == -1 ? get_init_exit_plan() : exit_code;
+	display->announcement = "Exiting...";
+	if ( plan == 0 )
+		display->announcement = "Powering off...";
+	else if ( plan == 1 )
+		display->announcement = "Rebooting...";
+	else if ( plan == 2 )
+		display->announcement = "Halting...";
+	else if ( plan == 3 )
+		display->announcement = "Reinitializing operating system...";
+	else if ( getenv("LOGIN_PID") ) // TODO: display -l?
+	{
+		intmax_t login_pid = strtoimax(getenv("LOGIN_PID"), NULL, 10);
+		if ( login_pid == getppid() )
+			display->announcement = "Logging out...";
+	}
 	display->redraw = true;
 }
 
@@ -281,6 +320,31 @@ static void wallpaper(struct framebuffer fb)
 	}
 }
 
+static void display_render_exit(struct display* display, struct framebuffer fb)
+{
+	for ( int yoff = -1; yoff <= 1; yoff++ )
+	{
+		for ( int xoff = -1; xoff <= 1; xoff++ )
+		{
+			struct framebuffer msgfb = fb;
+			int y = (fb.yres - FONT_HEIGHT) / 2 + yoff;
+			msgfb = framebuffer_cut_top_y(msgfb, y);
+			int w = strlen(display->announcement) * (FONT_WIDTH+1);
+			int x = (fb.xres - w) / 2 + xoff;
+			msgfb = framebuffer_cut_left_x(msgfb, x);
+			render_text(msgfb, display->announcement, make_color_a(0, 0, 0, 64));
+		}
+	}
+
+	struct framebuffer msgfb = fb;
+	int y = (fb.yres - FONT_HEIGHT) / 2;
+	msgfb = framebuffer_cut_top_y(msgfb, y);
+	int w = strlen(display->announcement) * (FONT_WIDTH+1);
+	int x = (fb.xres - w) / 2;
+	msgfb = framebuffer_cut_left_x(msgfb, x);
+	render_text(msgfb, display->announcement, make_color(255, 255, 255));
+}
+
 void display_composit(struct display* display, struct framebuffer fb)
 {
 	struct damage_rect damage_rect = display->damage_rect;
@@ -300,6 +364,12 @@ void display_composit(struct display* display, struct framebuffer fb)
 #endif
 
 	framebuffer_copy_to_framebuffer(fb, display->wallpaper);
+
+	if ( display->announcement )
+	{
+		display_render_exit(display, fb);
+		return;
+	}
 
 	for ( struct window* window = display->bottom_window;
 	      window;
@@ -482,11 +552,15 @@ void display_keyboard_event(struct display* display, uint32_t codepoint)
 		case KBKEY_RSUPER: display->key_rsuper = kbkey > 0; break;
 		}
 		if ( display->key_lctrl && display->key_lalt && kbkey == KBKEY_DELETE )
-			exit(0);
+			display_exit(display, -1);
 		if ( display->key_lctrl && display->key_lalt && kbkey == KBKEY_T )
 		{
 			if ( !fork() )
 			{
+				sigset_t sigterm;
+				sigemptyset(&sigterm);
+				sigaddset(&sigterm, SIGTERM);
+				sigprocmask(SIG_UNBLOCK, &sigterm, NULL);
 				execlp("terminal", "terminal", (char*) NULL);
 				_exit(127);
 			}
