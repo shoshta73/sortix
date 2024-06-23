@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2016, 2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,6 +26,10 @@
 #define HOST_NAME_MAX 255
 #define TTY_NAME_MAX 32
 #define IOV_MAX 1024
+#endif
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+#define GETENTROPY_MAX 256
 #endif
 
 #endif

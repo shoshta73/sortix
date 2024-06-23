@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <string.h>
 
 #include <sortix/clock.h>
+#include <sortix/limits.h>
 
 #include <sortix/kernel/addralloc.h>
 #include <sortix/kernel/copy.h>
@@ -162,7 +163,7 @@ namespace Sortix {
 
 int sys_getentropy(void* user_buffer, size_t size)
 {
-	unsigned char buffer[256];
+	unsigned char buffer[GETENTROPY_MAX];
 	if ( sizeof(buffer) < size )
 		return errno = EIO, -1;
 	arc4random_buf(buffer, size);
