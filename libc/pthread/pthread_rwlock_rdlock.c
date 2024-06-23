@@ -21,12 +21,5 @@
 
 int pthread_rwlock_rdlock(pthread_rwlock_t* rwlock)
 {
-	pthread_mutex_lock(&rwlock->request_mutex);
-	rwlock->pending_readers++;
-	while ( rwlock->num_writers || rwlock->pending_writers )
-		pthread_cond_wait(&rwlock->reader_condition, &rwlock->request_mutex);
-	rwlock->pending_readers--;
-	rwlock->num_readers++;
-	pthread_mutex_unlock(&rwlock->request_mutex);
-	return 0;
+	return pthread_rwlock_timedrdlock(rwlock, NULL);
 }

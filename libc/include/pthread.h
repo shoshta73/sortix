@@ -252,7 +252,8 @@ int pthread_mutex_init(pthread_mutex_t* __restrict,
                        const pthread_mutexattr_t* __restrict);
 int pthread_mutex_lock(pthread_mutex_t*);
 /* TODO: pthread_mutex_setprioceiling */
-/* TODO: pthread_mutex_timedlock */
+int pthread_mutex_timedlock(pthread_mutex_t* __restrict,
+                            const struct timespec* __restrict);
 int pthread_mutex_trylock(pthread_mutex_t*);
 int pthread_mutex_unlock(pthread_mutex_t*);
 int pthread_mutexattr_destroy(pthread_mutexattr_t*);
@@ -272,8 +273,10 @@ int pthread_rwlock_destroy(pthread_rwlock_t*);
 int pthread_rwlock_init(pthread_rwlock_t* __restrict,
                         const pthread_rwlockattr_t* __restrict);
 int pthread_rwlock_rdlock(pthread_rwlock_t*);
-/* TODO: pthread_rwlock_timedrdlock */
-/* TODO: pthread_rwlock_timedwrlock */
+int pthread_rwlock_timedrdlock(pthread_rwlock_t* __restrict,
+                               const struct timespec* __restrict);
+int pthread_rwlock_timedwrlock(pthread_rwlock_t* __restrict,
+                               const struct timespec* __restrict);
 int pthread_rwlock_tryrdlock(pthread_rwlock_t*);
 int pthread_rwlock_trywrlock(pthread_rwlock_t*);
 int pthread_rwlock_unlock(pthread_rwlock_t*);
@@ -295,6 +298,18 @@ int pthread_setspecific(pthread_key_t, const void*);
 /* TODO: pthread_spin_trylock */
 /* TODO: pthread_spin_unlock */
 /* TODO: pthread_testcancel */
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+int pthread_cond_clockwait(pthread_cond_t* __restrict,
+                           pthread_mutex_t* __restrict, clockid_t,
+                           const struct timespec* __restrict);
+int pthread_mutex_clocklock(pthread_mutex_t* __restrict, clockid_t,
+                            const struct timespec* __restrict);
+int pthread_rwlock_clockrdlock(pthread_rwlock_t* __restrict, clockid_t,
+                               const struct timespec* __restrict);
+int pthread_rwlock_clockwrlock(pthread_rwlock_t* __restrict, clockid_t,
+                               const struct timespec* __restrict);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

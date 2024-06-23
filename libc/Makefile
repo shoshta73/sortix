@@ -436,6 +436,7 @@ pthread/pthread_condattr_getclock.o \
 pthread/pthread_condattr_init.o \
 pthread/pthread_condattr_setclock.o \
 pthread/pthread_cond_broadcast.o \
+pthread/pthread_cond_clockwait.o \
 pthread/pthread_cond_destroy.o \
 pthread/pthread_cond_init.o \
 pthread/pthread_cond_signal.o \
@@ -454,15 +455,21 @@ pthread/pthread_mutexattr_destroy.o \
 pthread/pthread_mutexattr_gettype.o \
 pthread/pthread_mutexattr_init.o \
 pthread/pthread_mutexattr_settype.o \
+pthread/pthread_mutex_clocklock.o \
 pthread/pthread_mutex_destroy.o \
 pthread/pthread_mutex_init.o \
 pthread/pthread_mutex_lock.o \
+pthread/pthread_mutex_timedlock.o \
 pthread/pthread_mutex_trylock.o \
 pthread/pthread_mutex_unlock.o \
 pthread/pthread_once.o \
+pthread/pthread_rwlock_clockrdlock.o \
+pthread/pthread_rwlock_clockwrlock.o \
 pthread/pthread_rwlock_destroy.o \
 pthread/pthread_rwlock_init.o \
 pthread/pthread_rwlock_rdlock.o \
+pthread/pthread_rwlock_timedrdlock.o \
+pthread/pthread_rwlock_timedwrlock.o \
 pthread/pthread_rwlock_tryrdlock.o \
 pthread/pthread_rwlock_trywrlock.o \
 pthread/pthread_rwlock_unlock.o \
@@ -486,6 +493,7 @@ pwd/setpwent.o \
 sched/sched_yield.o \
 pty/openpty.o \
 scram/scram.o \
+semaphore/sem_clockwait.o \
 semaphore/sem_destroy.o \
 semaphore/sem_getvalue.o \
 semaphore/sem_init.o \

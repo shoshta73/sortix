@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,12 +21,5 @@
 
 int pthread_rwlock_wrlock(pthread_rwlock_t* rwlock)
 {
-	pthread_mutex_lock(&rwlock->request_mutex);
-	rwlock->pending_writers++;
-	while ( rwlock->num_readers || rwlock->num_writers )
-		pthread_cond_wait(&rwlock->writer_condition, &rwlock->request_mutex);
-	rwlock->pending_writers--;
-	rwlock->num_writers = 1;
-	pthread_mutex_unlock(&rwlock->request_mutex);
-	return 0;
+	return pthread_rwlock_timedwrlock(rwlock, NULL);
 }

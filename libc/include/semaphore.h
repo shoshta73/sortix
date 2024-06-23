@@ -22,7 +22,7 @@
 
 #include <sys/cdefs.h>
 
-#include <sortix/timespec.h>
+#include <time.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +51,11 @@ int sem_timedwait(sem_t* __restrict, const struct timespec* __restrict);
 int sem_trywait(sem_t*);
 /*int sem_unlink(const char*);*/
 int sem_wait(sem_t*);
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+int sem_clockwait(sem_t* __restrict, clockid_t clock,
+                  const struct timespec* __restrict);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

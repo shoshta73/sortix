@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,13 +13,14 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * semaphore/sem_timedwait.c
- * Lock a semaphore with a timeout.
+ * pthread/pthread_rwlock_timedwrlock.c
+ * Acquires write access to a read-write lock or waits for a timeout.
  */
 
-#include <semaphore.h>
+#include <pthread.h>
 
-int sem_timedwait(sem_t* restrict sem, const struct timespec* restrict abstime)
+int pthread_rwlock_timedwrlock(pthread_rwlock_t* rwlock,
+                               const struct timespec* abstime)
 {
-	return sem_clockwait(sem, CLOCK_REALTIME, abstime);
+	return pthread_rwlock_clockwrlock(rwlock, CLOCK_REALTIME, abstime);
 }
