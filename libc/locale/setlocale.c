@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char* current_locales[LC_NUM_CATEGORIES] = { NULL };
+char* __current_locales[LC_NUM_CATEGORIES] = { NULL };
 
 char* setlocale(int category, const char* locale)
 {
@@ -32,7 +32,7 @@ char* setlocale(int category, const char* locale)
 	int from = category != LC_ALL ? category : 0;
 	int to = category != LC_ALL ? category : LC_NUM_CATEGORIES - 1;
 	if ( !locale )
-		return current_locales[to] ? current_locales[to] : (char*) "C";
+		return __current_locales[to] ? __current_locales[to] : (char*) "C";
 	for ( int i = from; i <= to; i++ )
 	{
 		if ( !(new_strings[i] = strdup(locale)) )
@@ -44,8 +44,8 @@ char* setlocale(int category, const char* locale)
 	}
 	for ( int i = from; i <= to; i++ )
 	{
-		free(current_locales[i]);
-		current_locales[i] = new_strings[i];
+		free(__current_locales[i]);
+		__current_locales[i] = new_strings[i];
 	}
 	return (char*) locale;
 }

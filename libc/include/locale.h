@@ -64,12 +64,29 @@ struct lconv
 #define LC_ALL 6
 #define LC_NUM_CATEGORIES LC_ALL
 
+#if __USE_SORTIX || __USE_POSIX
+#define LC_GLOBAL_LOCALE ((locale_t) -1)
+#endif
+
+#if __USE_SORTIX || __USE_POSIX
+#ifndef __locale_t_defined
+#define __locale_t_defined
+/* TODO: figure out what this does and typedef it properly. This is just a
+         temporary assignment. */
+typedef int __locale_t;
+typedef __locale_t locale_t;
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 char* setlocale(int category, const char* locale);
 struct lconv* localeconv(void);
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+const char* getlocalename_l(int, locale_t);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
