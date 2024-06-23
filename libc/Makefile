@@ -702,6 +702,7 @@ unistd/fchownat.o \
 unistd/fchown.o \
 unistd/fchrootat.o \
 unistd/fchroot.o \
+unistd/_Fork.o \
 unistd/fork.o \
 unistd/fpathconf.o \
 unistd/fsync.o \

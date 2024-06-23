@@ -533,6 +533,7 @@ int unlinkat(int, const char*, int);
 
 /* Functions from POSIX 2024. */
 #if __USE_SORTIX || 202405L <= __USE_POSIX
+pid_t _Fork(void);
 int dup3(int, int, int);
 int getentropy(void*, size_t);
 int pipe2(int [2], int);

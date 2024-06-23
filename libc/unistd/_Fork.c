@@ -13,13 +13,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * unistd/fork.c
+ * unistd/_Fork.c
  * Create a new task inheriting some properties from the current task.
  */
 
 #include <unistd.h>
 
-pid_t fork(void)
+pid_t _Fork(void)
 {
-	return _Fork();
+	return sfork(SFFORK);
 }
