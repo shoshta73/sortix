@@ -199,6 +199,28 @@ The
 .Xr ioctl 2
 interface is fine and this alternative function is rejected in this operating
 system as it is optional in POSIX 2024.
+.Ss posix_getdents
+.Xr readdir 3
+should be used instead.
+.Xr readdirents 2
+is a similar Sortix-specific system call that will likely be replaced with
+something else in the future.
+This new
+.Ft posix_getdents
+function is due to a mess of diverent
+.Fn getdents
+functions.
+It is unfortunate they used
+.Vt struct posix_dent
+instead of
+.Vt struct dirent
+as they did not want to mandate the addition of the common
+.Vt d_type
+field in
+.Vt struct dirent .
+However,
+.Vt posix_getdents
+is decent and may be implemented in the future.
 .Ss printf
 .Xr printf 3
 is implemented, however floating point formatting is not currently implemented
