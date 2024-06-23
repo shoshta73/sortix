@@ -22,6 +22,8 @@
 
 #include <sys/cdefs.h>
 
+#include <sortix/__/sigset.h>
+
 #if __USE_SORTIX || __USE_POSIX
 #define HOST_NAME_MAX 255
 #define TTY_NAME_MAX 32
@@ -30,6 +32,7 @@
 
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 #define GETENTROPY_MAX 256
+#define NSIG_MAX __SIGSET_NUM_SIGNALS
 #endif
 
 #endif
