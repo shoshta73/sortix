@@ -168,6 +168,8 @@ struct pthread_cond_elem
 
 #define PTHREAD_ONCE_INIT { PTHREAD_NORMAL_MUTEX_INITIALIZER_NP, 0 }
 
+#define PTHREAD_NULL ((pthread_t) 0)
+
 #if defined(__is_sortix_libc)
 
 struct pthread_key
