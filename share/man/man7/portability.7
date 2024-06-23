@@ -91,6 +91,22 @@ and
 .Xr setpgid 3
 are the standard portable replacements without disagreement on the function
 signatures.
+.Ss getresgid, getresuid, setresgid, setresuid
+These are not implemented yet as multi-user security is not yet implemented
+in this operating system.
+The kernel does not have a saved uid and saved gid concept at this time.
+The
+.Xr getuid 2 ,
+.Xr getgid 2 ,
+.Xr geteuid 2 ,
+.Xr getegid 2 ,
+.Xr setuid 2 ,
+.Xr setgid 2 ,
+.Xr seteuid 2 ,
+and
+.Xr setegid 2
+system calls can be used to retrieve and manipulate the implemented concepts as
+a workaround.
 .Ss gettimeofday
 .Xr gettimeofday 2
 is implemented but the second parameter is defunct and is typed
