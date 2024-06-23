@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,6 +47,8 @@ extern "C" {
 #define WIFCONTINUED(status) __WIFCONTINUED(status)
 
 #define WSTOPSIG(status) __WSTOPSIG(status)
+
+#define WCOREDUMP(status) __WCOREDUMP(status)
 
 #define WCONSTRUCT(nature, exitcode, signal) \
         __WCONSTRUCT(nature, exitcode, signal)
