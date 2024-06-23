@@ -74,6 +74,7 @@ sha2/sha512_256hl.o \
 sha2/sha512_256.o \
 sha2/sha512hl.o \
 sha2/sha512.o \
+signal/sig2str.o \
 signal/sigaddset.o \
 signal/sigandset.o \
 signal/sigdelset.o \
@@ -83,6 +84,7 @@ signal/sigisemptyset.o \
 signal/sigismember.o \
 signal/signotset.o \
 signal/sigorset.o \
+signal/str2sig.o \
 ssp/__stack_chk_fail.o \
 stdio/asprintf.o \
 stdio/cbprintf.o \

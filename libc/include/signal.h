@@ -87,6 +87,10 @@ typedef int sig_atomic_t;
 #define MINSIGSTKSZ 2048
 #define SIGSTKSZ 8192
 
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+#define SIG2STR_MAX 16
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -120,6 +124,11 @@ int sigsuspend(const sigset_t*);
                           const struct timespec* __restrict); */
 /* TODO: int sigwait(const sigset_t* __restrict, int* __restrict); */
 /* TODO: int sigwaitinfo(const sigset_t* __restrict, siginfo_t* __restrict); */
+#endif
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+int sig2str(int, char*);
+int str2sig(const char* __restrict, int* __restrict);
 #endif
 
 #ifdef __cplusplus
