@@ -144,6 +144,7 @@ int mkostemp(char*, int);
 int ptsname_r(int, char*, size_t);
 void qsort_r(void*, size_t, size_t, int (*)(const void*, const void*, void*), void*);
 void* reallocarray(void*, size_t, size_t);
+char* secure_getenv(const char*);
 #endif
 
 #if defined(__is_sortix_libc)

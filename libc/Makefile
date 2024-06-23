@@ -191,6 +191,7 @@ stdlib/qsort.o \
 stdlib/qsort_r.o \
 stdlib/reallocarray.o \
 stdlib/realloc.o \
+stdlib/secure_getenv.o \
 stdlib/strtod.o \
 stdlib/strtof.o \
 stdlib/strtold.o \
