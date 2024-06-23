@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,30 +45,30 @@ char* nl_langinfo_l(nl_item item, locale_t locale)
 	case ABDAY_5: return "Thu";
 	case ABDAY_6: return "Fri";
 	case ABDAY_7: return "Sat";
-	case MON_1: return "January";
-	case MON_2: return "February";
-	case MON_3: return "March";
-	case MON_4: return "April";
-	case MON_5: return "May";
-	case MON_6: return "June";
-	case MON_7: return "July";
-	case MON_8: return "August";
-	case MON_9: return "September";
-	case MON_10: return "October";
-	case MON_11: return "November";
-	case MON_12: return "December";
-	case ABMON_1: return "Jan";
-	case ABMON_2: return "Feb";
-	case ABMON_3: return "Mar";
-	case ABMON_4: return "Apr";
-	case ABMON_5: return "May";
-	case ABMON_6: return "Jun";
-	case ABMON_7: return "Jul";
-	case ABMON_8: return "Aug";
-	case ABMON_9: return "Sep";
-	case ABMON_10: return "Oct";
-	case ABMON_11: return "Nov";
-	case ABMON_12: return "Dec";
+	case MON_1: case ALTMON_1: return "January";
+	case MON_2: case ALTMON_2: return "February";
+	case MON_3: case ALTMON_3: return "March";
+	case MON_4: case ALTMON_4: return "April";
+	case MON_5: case ALTMON_5: return "May";
+	case MON_6: case ALTMON_6: return "June";
+	case MON_7: case ALTMON_7: return "July";
+	case MON_8: case ALTMON_8: return "August";
+	case MON_9: case ALTMON_9: return "September";
+	case MON_10: case ALTMON_10: return "October";
+	case MON_11: case ALTMON_11: return "November";
+	case MON_12: case ALTMON_12: return "December";
+	case ABMON_1: case ABALTMON_1: return "Jan";
+	case ABMON_2: case ABALTMON_2: return "Feb";
+	case ABMON_3: case ABALTMON_3: return "Mar";
+	case ABMON_4: case ABALTMON_4: return "Apr";
+	case ABMON_5: case ABALTMON_5: return "May";
+	case ABMON_6: case ABALTMON_6: return "Jun";
+	case ABMON_7: case ABALTMON_7: return "Jul";
+	case ABMON_8: case ABALTMON_8: return "Aug";
+	case ABMON_9: case ABALTMON_9: return "Sep";
+	case ABMON_10: case ABALTMON_10: return "Oct";
+	case ABMON_11: case ABALTMON_11: return "Nov";
+	case ABMON_12: case ABALTMON_12: return "Dec";
 	case ERA: return "";
 	case ERA_D_FMT: return "";
 	case ERA_D_T_FMT: return "";

@@ -88,6 +88,30 @@ typedef int nl_item;
 #define YESEXPR 53
 #define NOEXPR 54
 #define CRNCYSTR 55
+#define ALTMON_1 56
+#define ALTMON_2 57
+#define ALTMON_3 58
+#define ALTMON_4 59
+#define ALTMON_5 60
+#define ALTMON_6 61
+#define ALTMON_7 62
+#define ALTMON_8 63
+#define ALTMON_9 64
+#define ALTMON_10 65
+#define ALTMON_11 66
+#define ALTMON_12 67
+#define ABALTMON_1 69
+#define ABALTMON_2 70
+#define ABALTMON_3 71
+#define ABALTMON_4 72
+#define ABALTMON_5 73
+#define ABALTMON_6 74
+#define ABALTMON_7 75
+#define ABALTMON_8 76
+#define ABALTMON_9 77
+#define ABALTMON_10 78
+#define ABALTMON_11 79
+#define ABALTMON_12 80
 
 #ifdef __cplusplus
 extern "C" {
