@@ -185,6 +185,20 @@ is rejected in this operating system.
 .Xr close 2
 never fails with
 .Ev EINTR on this operating system.
+.Ss posix_devctl
+.Xr ioctl 2
+should be used instead.
+POSIX 2024 defined this optional function as a replacement for
+.Xr ioctl 2
+but never defined any way for portable applications to actually use it.
+The
+.Fa dev_info_ptr
+parameter is especially useless as its semantics are not defined, and often
+the desired output does not necessarily fit in an int type.
+The
+.Xr ioctl 2
+interface is fine and this alternative function is rejected in this operating
+system as it is optional in POSIX 2024.
 .Ss printf
 .Xr printf 3
 is implemented, however floating point formatting is not currently implemented
