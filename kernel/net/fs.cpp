@@ -679,7 +679,7 @@ Ref<Inode> Socket(int type, int protocol)
 	switch ( type )
 	{
 	case SOCK_STREAM: return Ref<Inode>(new StreamSocket(0, 0, 0600, manager));
-	default: return errno = EPROTOTYPE, Ref<Inode>(NULL);
+	default: return errno = ESOCKTNOSUPPORT, Ref<Inode>(NULL);
 	}
 }
 

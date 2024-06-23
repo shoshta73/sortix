@@ -111,6 +111,7 @@ char* strerror(int errnum)
 	case ENOMOUNT: return "No such mountpoint";
 	case ENOMEDIUM: return "No medium found";
 	case EHOSTDOWN: return "Host is down";
+	case ESOCKTNOSUPPORT: return "Socket type is not supported";
 	default: return "Unknown error condition";
 	}
 }

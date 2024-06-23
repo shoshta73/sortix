@@ -445,7 +445,7 @@ Ref<Inode> Socket(int type, int protocol)
 		if ( protocol == 0 || protocol == IPPROTO_TCP )
 			return TCP::Socket(AF_INET);
 		return errno = EPROTONOSUPPORT, Ref<Inode>(NULL);
-	default: return errno = EPROTOTYPE, Ref<Inode>(NULL);
+	default: return errno = ESOCKTNOSUPPORT, Ref<Inode>(NULL);
 	}
 }
 
