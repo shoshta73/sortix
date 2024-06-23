@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,7 @@
 #define MAP_PRIVATE (1<<1)
 
 #define MAP_ANONYMOUS (1<<2)
+#define MAP_ANON MAP_ANONYMOUS
 #define MAP_FIXED (1<<3)
 
 #define MAP_FAILED ((void*) -1)
