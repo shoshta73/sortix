@@ -34,12 +34,6 @@ const char* inet_ntop(int, const void* __restrict, char* __restrict, socklen_t);
 int inet_pton(int, const char* __restrict, void* __restrict);
 #endif
 
-/* Functions copied from elsewhere. */
-#if __USE_SORTIX
-/* TODO: int inet_aton(const char*, struct in_addr*); */
-/* TODO: char* inet_neta(in_addr_t, char*, size_t); */
-#endif
-
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
