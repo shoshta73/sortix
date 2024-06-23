@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,13 @@
 #include <dlfcn.h>
 
 static const char* dlerrormsg = NULL;
+
+int dladdr(const void* restrict addr, Dl_info_t* restrict dlip)
+{
+	(void) addr;
+	(void) dlip;
+	return 0;
+}
 
 void* dlopen(const char* filename, int mode)
 {

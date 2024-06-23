@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,19 +22,32 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define RTLD_LAZY (1<<0)
 #define RTLD_NOW (1<<1)
 #define RTLD_GLOBAL (1<<8)
 #define RTLD_LOCAL 0 /* Bit 8 is not set. */
 
-int dlclose(void* handle);
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+typedef struct
+{
+	const char* dli_fname;
+	void* dli_fbase;
+	const char* dli_sname;
+	void* dli_saddr;
+} Dl_info_t;
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+int dladdr(const void* restrict, Dl_info_t* __restrict);
+#endif
+int dlclose(void*);
 char* dlerror(void);
-void* dlopen(const char* filename, int mode);
-void* dlsym(void* handle, const char* name);
+void* dlopen(const char*, int);
+void* dlsym(void*, const char*);
 
 #ifdef __cplusplus
 } /* extern "C" */
