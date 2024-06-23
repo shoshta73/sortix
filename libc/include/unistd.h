@@ -43,10 +43,10 @@ extern "C" {
 #define _POSIX_VERSION  __USE_POSIX /* C bindings */
 #define _POSIX2_VERSION __USE_POSIX /* Shell utilities. */
 
-/* The native API is based on POSIX 2008. */
+/* The native API is based on POSIX 2024. */
 #elif __USE_SORTIX
-#define _POSIX_VERSION  200809L /* C bindings */
-#define _POSIX2_VERSION 200809L /* Shell utilities. */
+#define _POSIX_VERSION  202405L /* C bindings */
+#define _POSIX2_VERSION 202405L /* Shell utilities. */
 
 /* That's odd. This is a POSIX header, but the POSIX API is not visible. The
    best option is probably to just say we are the 1990 POSIX standard, since it
@@ -67,95 +67,86 @@ extern "C" {
 #define _XOPEN_VERSION 4
 #endif
 
-/* #define _POSIX_ADVISORY_INFO 200809L
+/* #define _POSIX_ADVISORY_INFO 202405L
    TODO: Uncomment when posix_fadvise(), posix_fallocate(), posix_madvise(),
          posix_memalign() has been added. */
-#define _POSIX_ASYNCHRONOUS_IO 200809L
-#define _POSIX_BARRIERS 200809L
+#define _POSIX_ASYNCHRONOUS_IO 202405L
+#define _POSIX_BARRIERS 202405L
 /* TODO: _POSIX_CHOWN_RESTRICTED - Decide when security policies are implemented. */
-#define _POSIX_CLOCK_SELECTION 200809L
-#define _POSIX_CPUTIME 200809L
-#define _POSIX_FSYNC 200809L
-#define _POSIX_IPV6 200809L
-#define _POSIX_JOB_CONTROL
+#define _POSIX_CLOCK_SELECTION 202405L
+#define _POSIX_CPUTIME 202405L
+/* #undef _POSIX_DEVICE_CONTROL - posix_devctl won't be implemented */
+#define _POSIX_FSYNC 202405L
+#define _POSIX_IPV6 202405L
+#define _POSIX_JOB_CONTROL 1
+/*TODO: _POSIX_MAPPED_FILES - Needs to be implemented */
 /*TODO: _POSIX_MEMLOCK - Research what this is. */
 /*TODO: _POSIX_MEMLOCK_RANGE - Research what this is. */
-#define _POSIX_MEMORY_PROTECTION 200809L
+#define _POSIX_MEMORY_PROTECTION 202405L
 /*TODO: _POSIX_MESSAGE_PASSING - Research what this is. */
-#define _POSIX_MONOTONIC_CLOCK 200809L
+#define _POSIX_MONOTONIC_CLOCK 202405L
 #define _POSIX_NO_TRUNC 1
 /*TODO: _POSIX_PRIORITIZED_IO - Research what this is. */
 /*TODO: _POSIX_PRIORITY_SCHEDULING - Research what this is. */
 /*TODO: _POSIX_RAW_SOCKETS - Research what this is. */
-#define _POSIX_READER_WRITER_LOCKS 200809L
-#define _POSIX_REALTIME_SIGNALS 200809L
-/* #define _POSIX_REGEXP 1
-   TODO: Uncomment when regular expressions are implemented. */
+#define _POSIX_READER_WRITER_LOCKS 202405L
+#define _POSIX_REALTIME_SIGNALS 202405L
+#define _POSIX_REGEXP 1
 /* #define _POSIX_SAVED_IDS 1
    TODO: Uncomment when saved ids are implemented. I forgot if they already are. */
-#define _POSIX_SEMAPHORES 200809L
+#define _POSIX_SEMAPHORES 202405L
 /*TODO: _POSIX_SHARED_MEMORY_OBJECTS - Research what this is. */
 #define _POSIX_SHELL 1
 /*TODO: _POSIX_SPAWN - Research what this is. */
-#define _POSIX_SPIN_LOCKS 200809L
+#define _POSIX_SPIN_LOCKS 202405L
 /*TODO: _POSIX_SPORADIC_SERVER - Research what this is. */
 /*TODO: _POSIX_SYNCHRONIZED_IO - Research what this is. */
 /*TODO: _POSIX_THREAD_ATTR_STACKADDR - Research what this is. */
-/*TODO: _POSIX_THREAD_ATTR_STACKSIZE - Research what this is. */
-#define _POSIX_THREAD_CPUTIME 200809L
+#define _POSIX_THREAD_ATTR_STACKSIZE 202405L
+#define _POSIX_THREAD_CPUTIME 202405L
 /*TODO: _POSIX_THREAD_PRIO_INHERIT - Research what this is. */
 /*TODO: _POSIX_THREAD_PRIO_PROTECT - Research what this is. */
 /*TODO: _POSIX_THREAD_PRIORITY_SCHEDULING - Research what this is. */
 /*TODO: _POSIX_THREAD_PROCESS_SHARED - Research what this is. */
 /*TODO: _POSIX_THREAD_ROBUST_PRIO_INHERIT - Research what this is. */
 /*TODO: _POSIX_THREAD_ROBUST_PRIO_PROTECT - Research what this is. */
-#define _POSIX_THREAD_SAFE_FUNCTIONS 200809L
+#define _POSIX_THREAD_SAFE_FUNCTIONS 202405L
 /*TODO: _POSIX_THREAD_SPORADIC_SERVER - Research what this is. */
-#define _POSIX_THREADS 200809L
-#define _POSIX_TIMEOUTS 200809L
-#define _POSIX_TIMERS 200809L
-/* TODO: _POSIX_TRACE (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_TRACE_EVENT_FILTER (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_TRACE_INHERIT (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_TRACE_LOG (Obsolescent) - Research what this is. */
-/* TODO: TYPED_MEMORY_OBJECTS - Research what this is. */
-/* TODO: _POSIX_V6_ILP32_OFF32 (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V6_ILP32_OFFBIG (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V6_LP64_OFF64 (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V6_LPBIG_OFFBIG (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V7_ILP32_OFF32 - Research what this is. */
-/* TODO: _POSIX_V7_ILP32_OFFBIG - Research what this is. */
-/* TODO: _POSIX_V7_LP64_OFF64 - Research what this is. */
-/* TODO: _POSIX_V7_LPBIG_OFFBIG - Research what this is. */
+#define _POSIX_THREADS 202405L
+#define _POSIX_TIMEOUTS 202405L
+#define _POSIX_TIMERS 202405L
+/* TODO: _POSIX_TYPED_MEMORY_OBJECTS - Research what this is. */
+/* TODO: _POSIX_V7_ILP32_OFF32 (Obsolescent) - Research what this is. */
+/* TODO: _POSIX_V7_ILP32_OFFBIG (Obsolescent) - Research what this is. */
+/* TODO: _POSIX_V7_LP64_OFF64 (Obsolescent) - Research what this is. */
+/* TODO: _POSIX_V7_LPBIG_OFFBIG (Obsolescent) - Research what this is. */
+/* TODO: _POSIX_V8_ILP32_OFF32 - Research what this is. */
+/* TODO: _POSIX_V8_ILP32_OFFBIG - Research what this is. */
+/* TODO: _POSIX_V8_LP64_OFF64 - Research what this is. */
+/* TODO: _POSIX_V8_LPBIG_OFFBIG - Research what this is. */
 #define _POSIX2_C_BIND _POSIX2_VERSION
 #define _POSIX2_C_DEV _POSIX2_VERSION
 #define _POSIX2_CHAR_TERM 1
 /* TODO: _POSIX2_FORT_RUN - When fortran becomes supported. */
-/* #define _POSIX2_LOCALEDEF __POSIX2_THIS_VERSION
+/* #define _POSIX2_LOCALEDEF 202405L
    TODO: Uncomment when locales are implemented. */
-/* TODO: _POSIX2_PBS (Obsolescent) - Research what this is. */
-/* TODO: _POSIX2_PBS_ACCOUNTING (Obsolescent) - Research what this is. */
-/* TODO: _POSIX2_PBS_CHECKPOINT (Obsolescent) - Research what this is. */
-/* TODO: _POSIX2_PBS_LOCATE (Obsolescent) - Research what this is. */
-/* TODO: _POSIX2_PBS_MESSAGE (Obsolescent) - Research what this is. */
-/* TODO: _POSIX2_PBS_TRACK (Obsolescent) - Research what this is. */
-/* TODO: _POSIX2_SW_DEV - Research what this is. (Define to _POSIX2_VERSION) */
-/* #define _POSIX2_UPE 200809L
+/* TODO: _POSIX2_SW_DEV - Research what this is. */
+/* #define _POSIX2_UPE 202405L
    TODO: Uncomment when bg, ex, fc, fg, jobs, more, talk, vi are implemented. */
 /* TODO: _XOPEN_CRYPT - Research what this is. */
 #define _XOPEN_ENH_I18N 1
 #define _XOPEN_REALTIME 1
-#define _XOPEN_REALTIME 1
-/* TODO: _XOPEN_STREAMS (Obsolescent) - Probably don't want to support this. */
+#define _XOPEN_REALTIME_THREADS 1
 /* TODO: _XOPEN_UNIX - Decide whether we actually support this (probably not),
                        but also whether this header should lie. */
 /* TODO: _XOPEN_UUCP - Research what this is. */
 
 /* TODO: _POSIX_ASYNC_IO - Research what exactly this is. */
+/* TODO: _POSIX_FALLOC - Research what exactly this is. */
 /* TODO: _POSIX_PRIO_IO - Research what exactly this is. */
 /* TODO: _POSIX_SYNC_IO - Research what exactly this is. */
-/* TODO: _POSIX_TIMESTAMP_RESOLUTION - Research what exactly this is. */
-/* TODO: _POSIX2_SYMLINKS - Research what exactly this is. */
+#define _POSIX_TIMESTAMP_RESOLUTION 1
+#define _POSIX2_SYMLINKS 1
 
 #ifndef NULL
 #define __need_NULL
@@ -163,35 +154,35 @@ extern "C" {
 #endif
 
 #define _CS_PATH 0
-#define _CS_POSIX_V7_ILP32_OFF32_CFLAGS 1
-#define _CS_POSIX_V7_ILP32_OFF32_LDFLAGS 2
-#define _CS_POSIX_V7_ILP32_OFF32_LIBS 3
-#define _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS 4
-#define _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS 5
-#define _CS_POSIX_V7_ILP32_OFFBIG_LIBS 6
-#define _CS_POSIX_V7_LP64_OFF64_CFLAGS 7
-#define _CS_POSIX_V7_LP64_OFF64_LDFLAGS 8
-#define _CS_POSIX_V7_LP64_OFF64_LIBS 9
-#define _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS 10
-#define _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS 11
-#define _CS_POSIX_V7_LPBIG_OFFBIG_LIBS 12
-#define _CS_POSIX_V7_THREADS_CFLAGS 13
-#define _CS_POSIX_V7_THREADS_LDFLAGS 14
-#define _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS 15
+#define _CS_POSIX_V8_ILP32_OFF32_CFLAGS 1
+#define _CS_POSIX_V8_ILP32_OFF32_LDFLAGS 2
+#define _CS_POSIX_V8_ILP32_OFF32_LIBS 3
+#define _CS_POSIX_V8_ILP32_OFFBIG_CFLAGS 4
+#define _CS_POSIX_V8_ILP32_OFFBIG_LDFLAGS 5
+#define _CS_POSIX_V8_ILP32_OFFBIG_LIBS 6
+#define _CS_POSIX_V8_LP64_OFF64_CFLAGS 7
+#define _CS_POSIX_V8_LP64_OFF64_LDFLAGS 8
+#define _CS_POSIX_V8_LP64_OFF64_LIBS 9
+#define _CS_POSIX_V8_LPBIG_OFFBIG_CFLAGS 10
+#define _CS_POSIX_V8_LPBIG_OFFBIG_LDFLAGS 11
+#define _CS_POSIX_V8_LPBIG_OFFBIG_LIBS 12
+#define _CS_POSIX_V8_THREADS_CFLAGS 13
+#define _CS_POSIX_V8_THREADS_LDFLAGS 14
+#define _CS_POSIX_V8_WIDTH_RESTRICTED_ENVS 15
 #define _CS_V7_ENV 16
-#define _CS_POSIX_V6_ILP32_OFF32_CFLAGS 17 /* obsolescent */
-#define _CS_POSIX_V6_ILP32_OFF32_LDFLAGS 18 /* obsolescent */
-#define _CS_POSIX_V6_ILP32_OFF32_LIBS 19 /* obsolescent */
-#define _CS_POSIX_V6_ILP32_OFFBIG_CFLAGS 20 /* obsolescent */
-#define _CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS 21 /* obsolescent */
-#define _CS_POSIX_V6_ILP32_OFFBIG_LIBS 22 /* obsolescent */
-#define _CS_POSIX_V6_LP64_OFF64_CFLAGS 23 /* obsolescent */
-#define _CS_POSIX_V6_LP64_OFF64_LDFLAGS 24 /* obsolescent */
-#define _CS_POSIX_V6_LP64_OFF64_LIBS 25 /* obsolescent */
-#define _CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS 26 /* obsolescent */
-#define _CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS 27 /* obsolescent */
-#define _CS_POSIX_V6_LPBIG_OFFBIG_LIBS 28 /* obsolescent */
-#define _CS_POSIX_V6_WIDTH_RESTRICTED_ENVS 29 /* obsolescent */
+#define _CS_POSIX_V7_ILP32_OFF32_CFLAGS 17 /* obsolescent */
+#define _CS_POSIX_V7_ILP32_OFF32_LDFLAGS 18 /* obsolescent */
+#define _CS_POSIX_V7_ILP32_OFF32_LIBS 19 /* obsolescent */
+#define _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS 20 /* obsolescent */
+#define _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS 21 /* obsolescent */
+#define _CS_POSIX_V7_ILP32_OFFBIG_LIBS 22 /* obsolescent */
+#define _CS_POSIX_V7_LP64_OFF64_CFLAGS 23 /* obsolescent */
+#define _CS_POSIX_V7_LP64_OFF64_LDFLAGS 24 /* obsolescent */
+#define _CS_POSIX_V7_LP64_OFF64_LIBS 25 /* obsolescent */
+#define _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS 26 /* obsolescent */
+#define _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS 27 /* obsolescent */
+#define _CS_POSIX_V7_LPBIG_OFFBIG_LIBS 28 /* obsolescent */
+#define _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS 29 /* obsolescent */
 #define _CS_V6_ENV 30 /* obsolescent */
 
 /* Sortix will not support POSIX advisory locks and doesn't declare:
@@ -221,6 +212,8 @@ extern "C" {
 #define _PC_SYNC_IO 19
 #define _PC_TIMESTAMP_RESOLUTION 20
 #define _PC_VDISABLE 21
+#define _PC_FALLOC 22
+#define _PC_TEXTDOMAIN_MAX 23
 
 #define _SC_AIO_LISTIO_MAX 0
 #define _SC_AIO_MAX 1
@@ -347,6 +340,9 @@ extern "C" {
 #define _SC_XOPEN_UNIX 132
 #define _SC_XOPEN_UUCP 133
 #define _SC_XOPEN_VERSION 134
+#define _SC_NPROCESSORS_CONF 135
+#define _SC_NPROCESSORS_ONLN 136
+#define _SC_NSIG 137
 
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
@@ -535,6 +531,13 @@ int symlinkat(const char*, int, const char*);
 int unlinkat(int, const char*, int);
 #endif
 
+/* Functions from POSIX 2024. */
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+int dup3(int, int, int);
+int getentropy(void*, size_t);
+int pipe2(int [2], int);
+#endif
+
 #if __USE_SORTIX || !(200112L <= __USE_POSIX || 600 <= __USE_XOPEN)
 size_t getpagesize(void);
 #endif
@@ -545,11 +548,8 @@ int chroot(const char*);
 int closefrom(int);
 int crypt_checkpass(const char*, const char*);
 int crypt_newhash(const char*, const char*, char*, size_t);
-int dup3(int, int, int);
 int execvpe(const char*, char* const [], char* const []);
 char* get_current_dir_name(void);
-int getentropy(void*, size_t);
-int pipe2(int [2], int);
 int sethostname(const char*, size_t);
 typedef unsigned int useconds_t;
 int usleep(useconds_t useconds);

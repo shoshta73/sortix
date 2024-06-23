@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -105,13 +105,10 @@ size_t mbstowcs(wchar_t* __restrict, const char* __restrict, size_t);
 int mbtowc(wchar_t *__restrict, const char* __restrict, size_t);
 char* mkdtemp(char*);
 char* mkdtemps(char*, size_t);
-int mkostemp(char*, int);
-int mkostemps(char*, int, int);
 int mkstemp(char*);
 int mkstemps(char*, int);
 int on_exit(void (*function)(int, void*), void* arg);
 void qsort(void*, size_t, size_t, int (*)(const void*, const void*));
-void qsort_r(void*, size_t, size_t, int (*)(const void*, const void*, void*), void*);
 #if !defined(__is_sortix_libc) /* not a warning inside libc */
 __attribute__((__warning__("rand() isn't random, use arc4random()")))
 #endif
@@ -139,6 +136,14 @@ long long llabs(long long);
 lldiv_t lldiv(long long, long long);
 unsigned long long strtoull(const char* __restrict, char** __restrict, int);
 long long strtoll(const char* __restrict, char** __restrict, int);
+#endif
+
+/* Functions from POSIX 2024. */
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+int mkostemp(char*, int);
+int ptsname_r(int, char*, size_t);
+void qsort_r(void*, size_t, size_t, int (*)(const void*, const void*, void*), void*);
+void* reallocarray(void*, size_t, size_t);
 #endif
 
 #if defined(__is_sortix_libc)
@@ -189,8 +194,7 @@ int posix_openpt(int);
 uint32_t arc4random(void);
 void arc4random_buf(void*, size_t);
 uint32_t arc4random_uniform(uint32_t);
-void* reallocarray(void*, size_t, size_t);
-int ptsname_r(int, char*, size_t);
+int mkostemps(char*, int, int);
 #endif
 
 #ifdef __cplusplus

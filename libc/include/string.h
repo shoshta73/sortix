@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -83,6 +83,7 @@ int strncasecmp(const char* a, const char* b, size_t n);
 /* Functions from early XOPEN. */
 #if __USE_SORTIX || __USE_XOPEN
 void* memccpy(void* __restrict, const void* __restrict, int, size_t);
+int ffs(int);
 #endif
 
 /* Functions from XOPEN 420 gone into POSIX 2008. */
@@ -92,7 +93,6 @@ char* strdup(const char*);
 
 /* Functions from POSIX 2001. */
 #if __USE_SORTIX || 200112L <= __USE_POSIX
-int ffs(int);
 char* strerror_l(int, locale_t);
 int strerror_r(int, char*, size_t);
 char* strtok_r(char* __restrict, const char* __restrict, char** __restrict);
@@ -109,25 +109,29 @@ char* strsignal(int signum);
 size_t strxfrm_l(char* __restrict, const char* __restrict, size_t, locale_t);
 #endif
 
+/* Functions from POSIX 2024. */
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+size_t strlcat(char* __restrict, const char* __restrict, size_t);
+size_t strlcpy(char* __restrict, const char* __restrict, size_t);
+#endif
+
+#if __USE_SORTIX || 800 <= __USE_XOPEN
+int ffsl(long int);
+int ffsll(long long int);
+#endif
+
 /* Functions copied from elsewhere. */
 #if __USE_SORTIX
 void explicit_bzero(void*, size_t);
-int ffsl(long int);
+
 void* memrchr(const void*, int, size_t);
 /* TODO: strcasecmp_l */
 char* strchrnul(const char* str, int c);
 char* stresep(char**, const char*, int);
-size_t strlcat(char* __restrict, const char* __restrict, size_t);
-size_t strlcpy(char* __restrict, const char* __restrict, size_t);
 /* TODO: strncasecmp_l */
 char* strsep(char**, const char*);
 int strverscmp(const char*, const char*);
 int timingsafe_memcmp(const void*, const void*, size_t);
-#endif
-
-/* Functions that are Sortix extensions. */
-#if __USE_SORTIX
-int ffsll(long long int);
 #endif
 
 #if __USE_SORTIX

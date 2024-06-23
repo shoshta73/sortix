@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,28 +24,23 @@
 
 #include <sys/__/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifndef __time_t_defined
-#define __time_t_defined
-typedef __time_t time_t;
-#endif
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 #include <sortix/poll.h>
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
 #include <sortix/sigset.h>
 #include <sortix/timespec.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 int poll(struct pollfd* fds, nfds_t nfds, int timeout);
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
 int ppoll(struct pollfd* fds, nfds_t nfds, const struct timespec* timeout,
           const sigset_t* sigmask);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

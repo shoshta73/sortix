@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -207,6 +207,12 @@ size_t wcsnrtombs(char* __restrict, const wchar_t** __restrict, size_t, size_t, 
 /* TODO: size_t wcsxfrm_l(wchar_t* __restrict, const wchar_t* __restrict, size_t, locale_t); */
 #endif
 
+/* Functions from POSIX 2024. */
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+size_t wcslcat(wchar_t* __restrict, const wchar_t* __restrict, size_t);
+size_t wcslcpy(wchar_t* __restrict, const wchar_t* __restrict, size_t);
+#endif
+
 /* Functions copied from elsewhere. */
 #if __USE_SORTIX
 /* TODO: getwc_unlocked */
@@ -219,8 +225,6 @@ size_t wcsnrtombs(char* __restrict, const wchar_t** __restrict, size_t, size_t, 
 /* TODO: fputws_unlocked */
 wchar_t* wcschrnul(const wchar_t*, wchar_t);
 /* TODO: wcsftime_l */
-size_t wcslcat(wchar_t* __restrict, const wchar_t* __restrict, size_t);
-size_t wcslcpy(wchar_t* __restrict, const wchar_t* __restrict, size_t);
 /* TODO: wchar_t* wmempcpy(wchar_t* __restrict, const wchar_t* __restrict, size_t); */
 /* TODO: wcstod_l? */
 /* TODO: wcstof_l? */

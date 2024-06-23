@@ -62,7 +62,7 @@
 		#define _C11_SOURCE
 	#endif
 	#if !defined(_POSIX_C_SOURCE)
-		#define _POSIX_C_SOURCE 200809L
+		#define _POSIX_C_SOURCE 202405L
 	#endif
 	#if !defined(_XOPEN_SOURCE)
 		#define _XOPEN_SOURCE 700
@@ -93,7 +93,10 @@
 
 /* Particular XSI revisions imply certain POSIX revisions. */
 #if defined(_XOPEN_SOURCE)
-	#if 700 <= _XOPEN_SOURCE - 0
+	#if 800 <= _XOPEN_SOURCE - 0
+		#undef _POSIX_C_SOURCE
+		#define _POSIX_C_SOURCE 202405L
+	#elif 700 <= _XOPEN_SOURCE - 0
 		#undef _POSIX_C_SOURCE
 		#define _POSIX_C_SOURCE 200809L
 	#elif 600 <= _XOPEN_SOURCE - 0
@@ -155,7 +158,9 @@
 
 /* Determine which revision of POSIX is used. */
 #ifdef _POSIX_C_SOURCE
-	#if 200809L <= _POSIX_C_SOURCE - 0
+	#if 202405L <= _POSIX_C_SOURCE - 0
+		#define __USE_POSIX 202405L
+	#elif 200809L <= _POSIX_C_SOURCE - 0
 		#define __USE_POSIX 200809L
 	#elif 200112L <= _POSIX_C_SOURCE - 0
 		#define __USE_POSIX 200112L
