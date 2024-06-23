@@ -166,6 +166,25 @@ is implemented in
 per POSIX, however some operating systems have a
 .In sys/poll.h
 alias which is not implemented.
+.Ss posix_close
+.Xr close 2
+should be used instead.
+POSIX 2024 defined this replacement interface because some broken legacy
+operating systems could fail with
+.Ev EINTR
+in
+.Xr close 2
+on slow devices,
+instead of returning 0 and either completing the operating in the background
+or aborting it.
+However, this means most programs need to be updated to use the more
+complicated alternative function instead for no practical gain, which isn't
+going to happen.
+The standard has added a lot of complexity where none needs to exist, which
+is rejected in this operating system.
+.Xr close 2
+never fails with
+.Ev EINTR on this operating system.
 .Ss printf
 .Xr printf 3
 is implemented, however floating point formatting is not currently implemented
