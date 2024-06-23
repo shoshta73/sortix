@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2020-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2020-2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,11 +17,10 @@
  * Convert error code to a string.
  */
 
-#define __SORTIX_STDLIB_REDIRECTS 0
 #include <errno.h>
 #include <string.h>
 
-const char* sortix_strerror(int errnum)
+char* strerror(int errnum)
 {
 	switch ( errnum )
 	{
@@ -116,7 +115,9 @@ const char* sortix_strerror(int errnum)
 	}
 }
 
-char* strerror(int errnum)
-{
-	return (char*) sortix_strerror(errnum);
-}
+// TODO: After releasing Sortix 1.1, or after fixing ffmpeg, remove this symbol
+//       retained for compatibility. ffmpeg has a native sysroot issue where it
+//       accidentally taints it with the local system's headers instead of the
+//       sysroot headers, which accidentally pulls in an old removed symbol when
+//       bootstrapping on an old system.
+weak_alias(strerror, sortix_strerror);

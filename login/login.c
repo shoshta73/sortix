@@ -49,6 +49,8 @@
 pid_t forward_sigterm_to = 0;
 volatile sig_atomic_t got_sigterm = 0;
 
+const char* sortix_strerror(int);
+
 void on_interrupt_signal(int signum)
 {
 	if ( signum == SIGINT )
@@ -510,7 +512,7 @@ int textual(void)
 		{
 			const char* msg = "Invalid username/password";
 			if ( errno != EACCES )
-				msg = strerror(errno);
+				msg = sortix_strerror(errno);
 			printf("%s\n", msg);
 			printf("\n");
 			continue;

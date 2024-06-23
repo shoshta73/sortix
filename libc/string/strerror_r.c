@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +22,7 @@
 
 int strerror_r(int errnum, char* dest, size_t dest_len)
 {
-	const char* msg = sortix_strerror(errnum);
+	const char* msg = strerror(errnum);
 	if ( !msg )
 		return -1;
 	if ( dest_len < strlen(msg) + 1 )

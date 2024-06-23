@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,11 +17,10 @@
  * Convert signal number to a string.
  */
 
-#define __SORTIX_STDLIB_REDIRECTS 0
 #include <signal.h>
 #include <string.h>
 
-const char* sortix_strsignal(int signum)
+char* strsignal(int signum)
 {
 	switch ( signum )
 	{
@@ -60,9 +59,4 @@ const char* sortix_strsignal(int signum)
 		return "Real-time signal";
 
 	return "Unknown signal value";
-}
-
-char* strsignal(int signum)
-{
-	return (char*) sortix_strsignal(signum);
 }

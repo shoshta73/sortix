@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -69,7 +69,6 @@
 	#endif
 	#if !defined(_SORTIX_SOURCE)
 		#define _SORTIX_SOURCE 1
-		#define __IMPLICIT_SORTIX_SOURCE
 	#endif
 #endif
 
@@ -90,7 +89,6 @@
 /* Use the Sortix API if the default API was requested. */
 #if defined(_DEFAULT_SOURCE) && !defined(_SORTIX_SOURCE)
 	#define _SORTIX_SOURCE 1
-	#define __IMPLICIT_SORTIX_SOURCE
 #endif
 
 /* Particular XSI revisions imply certain POSIX revisions. */
@@ -190,15 +188,6 @@
 #define __USE_SORTIX 1
 #else
 #define __USE_SORTIX 0
-#endif
-
-/* Whether to override some "standard" functions with Sortix alternatives. */
-#if !defined(__SORTIX_STDLIB_REDIRECTS)
-	#if __USE_SORTIX && !defined(__IMPLICIT_SORTIX_SOURCE)
-		#define __SORTIX_STDLIB_REDIRECTS 1
-	#else
-		#define __SORTIX_STDLIB_REDIRECTS 0
-	#endif
 #endif
 
 /* Provide the restrict keyword when building system components. */

@@ -62,11 +62,7 @@ int strcmp(const char*, const char*);
 int strcoll(const char*, const char*);
 char* strcpy(char* __restrict, const char* __restrict);
 size_t strcspn(const char*, const char*);
-#if __USE_SORTIX && __SORTIX_STDLIB_REDIRECTS
-const char* strerror(int errnum) __asm__ ("sortix_strerror");
-#else
 char* strerror(int errnum);
-#endif
 size_t strlen(const char*);
 char* strncat(char* __restrict, const char* __restrict, size_t);
 int strncmp(const char*, const char*, size_t);
@@ -97,11 +93,7 @@ char* strdup(const char*);
 /* Functions from POSIX 2001. */
 #if __USE_SORTIX || 200112L <= __USE_POSIX
 int ffs(int);
-#if __USE_SORTIX && __SORTIX_STDLIB_REDIRECTS
-const char* strerror_l(int, locale_t) __asm__ ("sortix_strerror_l");
-#else
 char* strerror_l(int, locale_t);
-#endif
 int strerror_r(int, char*, size_t);
 char* strtok_r(char* __restrict, const char* __restrict, char** __restrict);
 #endif
@@ -113,11 +105,7 @@ char* stpncpy(char* __restrict, const char* __restrict, size_t);
 int strcoll_l(const char*, const char*, locale_t);
 char* strndup(const char*, size_t);
 size_t strnlen(const char*, size_t);
-#if __USE_SORTIX && __SORTIX_STDLIB_REDIRECTS
-const char* strsignal(int signum) __asm__ ("sortix_strsignal");
-#else
 char* strsignal(int signum);
-#endif
 size_t strxfrm_l(char* __restrict, const char* __restrict, size_t, locale_t);
 #endif
 
@@ -140,9 +128,6 @@ int timingsafe_memcmp(const void*, const void*, size_t);
 /* Functions that are Sortix extensions. */
 #if __USE_SORTIX
 int ffsll(long long int);
-const char* sortix_strerror(int errnum);
-const char* sortix_strerror_l(int, locale_t);
-const char* sortix_strsignal(int signum);
 #endif
 
 #if __USE_SORTIX

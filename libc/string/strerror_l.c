@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,16 +17,10 @@
  * Convert error code to a string.
  */
 
-#define __SORTIX_STDLIB_REDIRECTS 0
 #include <string.h>
-
-const char* sortix_strerror_l(int errnum, locale_t locale)
-{
-	(void) locale;
-	return sortix_strerror(errnum);
-}
 
 char* strerror_l(int errnum, locale_t locale)
 {
-	return (char*) sortix_strerror_l(errnum, locale);
+	(void) locale;
+	return (char*) strerror(errnum);
 }
