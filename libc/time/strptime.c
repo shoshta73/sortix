@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,7 @@
 
 #include <ctype.h>
 #include <limits.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -81,7 +82,7 @@ char* strptime(const char* restrict str,
 {
 	bool pm = false;
 	bool need_mktime = false;
-	int year_high = -1, year_low = -1;
+	int year_high = -1, year_low = -1, dummy;
 	for ( size_t i = 0; format[i]; )
 	{
 		if ( isspace((unsigned char) format[i]) )
@@ -133,6 +134,16 @@ char* strptime(const char* restrict str,
 			need_mktime = true;
 			break;
 		case 'D': str = strptime(str, "%m/%d/%y", tm); break;
+		case 'F': str = strptime(str, "%Y-%m-%d", tm); break;
+		case 'g': str = strptime_num(str, &dummy, 0, 99, 1, 2, 0); break;
+		case 'G':
+			// POSIX divergence: Avoid year 10k problem by allowing more than
+			// four characters by default.
+			if ( !has_width )
+				width = SIZE_MAX;
+			// TODO: Allow leading + and - per POSIX.
+			str = strptime_num(str, &dummy, INT_MIN, INT_MAX, 1, width, -1900);
+			break;
 		case 'H': str = strptime_num(str, &tm->tm_hour, 0, 23, 1, 2, 0); break;
 		case 'I':
 			str = strptime_num(str, &tm->tm_hour, 1, 12, 1, 2, 0);
@@ -162,11 +173,29 @@ char* strptime(const char* restrict str,
 			break;
 		case 'r': str = strptime(str, "%I:%M:%S %p", tm); break;
 		case 'R': str = strptime(str, "%H:%M", tm); break;
+		case 's':
+			// TODO: What timezone should be used to for this conversion? Use
+			//       the timezone in %z and %Z if set?
+			if ( !(str[0] == '-' || ('0' <= str[0] && str[0] <= '9')) )
+				return 0;
+			char* end;
+			intmax_t value = strtoimax(str, &end, 10);
+			time_t timestamp = (time_t) value;
+			if ( value != timestamp )
+				return NULL;
+			localtime_r(&timestamp, tm);
+			str = (const char*) end;
+			break;
 		case 'S': str = strptime_num(str, &tm->tm_sec, 0, 60, 1, 2, 0); break;
 		case 'T': str = strptime(str, "%H:%M:%S", tm); break;
-		// TODO: %U week number
+		case 'u':
+			str = strptime_num(str, &tm->tm_wday, 1, 7, 1, 1, 0);
+			if ( tm->tm_wday == 7 )
+				tm->tm_wday = 0;
+			break;
+		case 'V': str = strptime_num(str, &dummy, 0, 53, 1, 2, 0); break;
 		case 'w': str = strptime_num(str, &tm->tm_wday, 0, 6, 1, 1, 0); break;
-		// TODO: %W week number
+		case 'W': str = strptime_num(str, &dummy, 0, 53, 1, 2, 0); break;
 		case 'x': str = strptime(str, "%m/%d/%Y", tm); break;
 		case 'X': str = strptime(str, "%H:%M:%S", tm); break;
 		case 'y': str = strptime_num(str, &year_low, 0, 99, 1, 2, 0); break;
