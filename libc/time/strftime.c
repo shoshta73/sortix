@@ -297,7 +297,7 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 			OUTPUT_CHAR(':');
 			OUTPUT_INT_PADDED(tm->tm_sec, 2, STRFTIME_L('0'));
 			break;
-		case STRFTIME_L('u'): OUTPUT_INT(tm->tm_yday); break; /*O*/
+		case STRFTIME_L('u'): OUTPUT_INT(tm->tm_wday ? tm->tm_wday : 7); break; /*O*/
 		case STRFTIME_L('U'): /*O*/
 			// TODO: These require a bit of intelligence.
 			OUTPUT_CHAR('%');
