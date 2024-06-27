@@ -115,7 +115,7 @@ size_t strftime_convert_uintmax(STRFTIME_CHAR* destination, uintmax_t value)
 }
 
 static
-size_t strftime_convert_int(STRFTIME_CHAR* destination, int value)
+size_t strftime_convert_intmax(STRFTIME_CHAR* destination, intmax_t value)
 {
 	if ( value < 0 )
 	{
@@ -153,7 +153,7 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 		STRFTIME_CHAR pad = (padexpr); \
 		STRFTIME_CHAR str[sizeof(int) * 3]; \
 		str[0] = STRFTIME_L('\0'); \
-		size_t got = strftime_convert_int(str, val); \
+		size_t got = strftime_convert_intmax(str, val); \
 		while ( pad && got < width-- ) \
 			OUTPUT_CHAR(pad); \
 		OUTPUT_STRING(str); \
@@ -288,6 +288,14 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 			OUTPUT_CHAR(':');
 			OUTPUT_INT_PADDED(tm->tm_min, 2, STRFTIME_L('0'));
 			break;
+		case STRFTIME_L('s'):
+		{
+			struct tm copy = *tm;
+			time_t timestamp = mktime(&copy);
+			STRFTIME_CHAR str[sizeof(intmax_t) * 3];
+			strftime_convert_intmax(str, timestamp);
+			OUTPUT_STRING(str);
+		}
 		case STRFTIME_L('S'): OUTPUT_INT_PADDED(tm->tm_sec, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('t'): OUTPUT_CHAR(STRFTIME_L('\t')); break;
 		case STRFTIME_L('T'):
