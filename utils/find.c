@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -118,6 +118,7 @@ struct expr_links
 struct expr_name
 {
 	const char* pattern;
+	int flags;
 };
 
 struct expr_newer
@@ -523,7 +524,8 @@ static int evaluate(const struct expr* expr,
 			        st->st_nlink > expr->expr_links.n :
 			        st->st_nlink == expr->expr_links.n;
 		else if ( expr->kind == EXPR_NAME )
-			value = fnmatch(expr->expr_name.pattern, name, 0) == 0;
+			value = fnmatch(expr->expr_name.pattern, name,
+			                expr->expr_name.flags) == 0;
 		else if ( expr->kind == EXPR_NEWER )
 		{
 			const struct timespec* ts = pick_time(st, expr->expr_newer.t);
@@ -760,6 +762,7 @@ static bool find(const struct expr* expr,
                  bool depth,
                  enum symderef symderef,
                  bool xdev,
+                 bool mount,
                  size_t mindepth,
                  size_t maxdepth)
 {
@@ -779,8 +782,8 @@ static bool find(const struct expr* expr,
 		new_state.relpath = state->relpath + offset;
 		new_state.path = state->path;
 		new_state.type = state->type;
-		bool result =
-			find(expr, &new_state, depth, symderef, xdev, mindepth, maxdepth);
+		bool result = find(expr, &new_state, depth, symderef, xdev, mount,
+		                   mindepth, maxdepth);
 		if ( new_dirfd != state->dirfd )
 			close(new_dirfd);
 		return result;
@@ -813,7 +816,7 @@ static bool find(const struct expr* expr,
 				goto next;
 			}
 			state->has_stat = true;
-			if ( xdev && state->parent &&
+			if ( (xdev || mount) && state->parent &&
 				 state->st.st_dev != state->parent->st.st_dev )
 				goto next;
 		}
@@ -859,8 +862,9 @@ static bool find(const struct expr* expr,
 				symderef = SYMDEREF_NONE;
 			fstat(state->fd, &state->st);
 			state->has_stat = true;
-			if ( xdev && state->parent &&
-				 state->st.st_dev != state->parent->st.st_dev )
+			bool is_mount_point =
+				state->parent && state->st.st_dev != state->parent->st.st_dev;
+			if ( mount && is_mount_point )
 			{
 				close(state->fd);
 				goto next;
@@ -888,7 +892,7 @@ static bool find(const struct expr* expr,
 				state->flags &= ~SUCCESS;
 				goto next;
 			}
-			if ( !(state->flags & PRUNED) )
+			if ( !(state->flags & PRUNED) && !(xdev && is_mount_point) )
 			{
 				state->num_entries =
 					list_directory(state->dir, &state->entries);
@@ -980,6 +984,7 @@ int main(int argc, char* argv[])
 {
 	bool depth = false;
 	bool ere = false;
+	bool mount = false;
 	enum symderef symderef = SYMDEREF_NONE;
 	bool xdev = false;
 	size_t mindepth = 0;
@@ -1280,13 +1285,20 @@ int main(int argc, char* argv[])
 			subexpr->kind = EXPR_TRUE;
 			mindepth = (size_t) value;
 		}
-		else if ( !strcmp(arg, "-name") )
+		else if ( !strcmp(arg, "-mount") )
+		{
+			mount = true;
+			subexpr->kind = EXPR_TRUE;
+		}
+		else if ( !strcmp(arg, "-name") || !strcmp(arg, "-iname") )
 		{
 			if ( i + 1 == argc )
 				errx(1, "missing parameter to %s", arg);
 			const char* param = argv[++i];
 			subexpr->kind = EXPR_NAME;
 			subexpr->expr_name.pattern = param;
+			subexpr->expr_name.flags =
+				!strcmp(arg, "-iname") ? FNM_CASEFOLD : 0;
 		}
 		else if ( !strcmp(arg, "-nogroup") )
 			subexpr->kind = EXPR_NOGROUP;
@@ -1496,7 +1508,8 @@ int main(int argc, char* argv[])
 		state.relpath = ".";
 		state.path = ".";
 		state.type = DT_UNKNOWN;
-		result = find(root, &state, depth, symderef, xdev, mindepth, maxdepth);
+		result = find(root, &state, depth, symderef, xdev, mount, mindepth,
+		              maxdepth);
 	}
 	else
 	{
@@ -1512,7 +1525,7 @@ int main(int argc, char* argv[])
 			state.relpath = arg;
 			state.path = arg;
 			state.type = DT_UNKNOWN;
-			if ( !find(root, &state, depth, symderef, xdev, mindepth,
+			if ( !find(root, &state, depth, symderef, xdev, mount, mindepth,
 			           maxdepth) )
 				result = false;
 			free(argdup);
