@@ -1,5 +1,6 @@
+
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -146,6 +147,7 @@ static void version(FILE* fp, const char* argv0)
 int main(int argc, char* argv[])
 {
 	const char* argv0 = argv[0];
+	bool directory = false;
 	bool force = false;
 	bool recursive = false;
 	bool verbose = false;
@@ -162,6 +164,7 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
+			case 'd': directory = true; break;
 			case 'f': force = true; break;
 			case 'r': recursive = true; break;
 			case 'R': recursive = true; break;
@@ -172,6 +175,8 @@ int main(int argc, char* argv[])
 				exit(1);
 			}
 		}
+		else if ( !strcmp(arg, "--directory") )
+			directory = true;
 		else if ( !strcmp(arg, "--force") )
 			force = true;
 		else if ( !strcmp(arg, "--recursive") )
@@ -195,11 +200,12 @@ int main(int argc, char* argv[])
 	if ( argc < 2 && !force )
 		error(1, 0, "missing operand");
 
+	int flags = (directory ? AT_REMOVEDIR : 0) | AT_REMOVEFILE;
 	int main_ret = 0;
 	for ( int i = 1; i < argc; i++ )
 	{
 		const char* arg = argv[i];
-		if ( unlink(arg) < 0 )
+		if ( unlinkat(AT_FDCWD, arg, flags) < 0 )
 		{
 			if ( !recursive || errno != EISDIR )
 			{
