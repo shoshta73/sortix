@@ -27,7 +27,7 @@
 #include <sys/__/types.h>
 
 #include <sortix/termios.h>
-#if __USE_SORTIX
+#if __USE_SORTIX || 202405L <= __USE_POSIX
 #include <sortix/winsize.h>
 #endif
 
@@ -67,13 +67,17 @@ pid_t tcgetsid(int);
 int tcsendbreak(int, int);
 int tcsetattr(int, int, const struct termios*);
 
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+int tcgetwinsize(int, struct winsize*);
+int tcsetwinsize(int, const struct winsize*);
+#endif
+
 /* Functions that are Sortix extensions. */
 #if __USE_SORTIX
 int mkpty(int*, int*, int);
 ssize_t tcgetblob(int, const char*, void*, size_t);
 ssize_t tcsetblob(int, const char*, const void*, size_t);
 int tcgetwincurpos(int, struct wincurpos*);
-int tcgetwinsize(int, struct winsize*);
 #endif
 
 #ifdef __cplusplus

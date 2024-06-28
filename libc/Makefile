@@ -661,6 +661,7 @@ termios/tcgetwinsize.o \
 termios/tcsendbreak.o \
 termios/tcsetattr.o \
 termios/tcsetblob.o \
+termios/tcsetwinsize.o \
 time/clock_getres.o \
 time/clock_gettime.o \
 time/clock_gettimeres.o \
