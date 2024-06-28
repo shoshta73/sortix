@@ -161,6 +161,7 @@ int main(int argc, char* argv[])
 			//case 'U': break;
 			// TODO: -o or some better more standard design for this.
 			case 'v': show_memory = true; break;
+			case 'w': /* TODO: Support COLUMNS. */ break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
