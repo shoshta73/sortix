@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
  * Filename matching.
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <fnmatch.h>
 #include <stdbool.h>
@@ -70,9 +71,13 @@ static bool matches_bracket_pattern(char c, const char* pattern, int flags)
 	bool matched_any = false;
 	while ( escaped || pattern[pi] != ']' )
 	{
-		if ( !escaped && pattern[pi] == '\\' )
+		unsigned char pc = pattern[pi];
+		unsigned char sc = c;
+		if ( flags & FNM_CASEFOLD )
+			pc = tolower(pc), sc = tolower(sc);
+		if ( !escaped && pc == '\\' )
 			escaped = true;
-		else if ( pattern[pi] == c )
+		else if ( pc == sc )
 		{
 			if ( negated )
 				return false;
@@ -121,9 +126,13 @@ int fnmatch(const char* pattern, const char* string, int flags)
 	{
 		if ( !pattern[1] )
 			return errno = EINVAL, -1;
-		if ( pattern[1] == string[0] )
+		unsigned char pc = pattern[1];
+		unsigned char sc = string[0];
+		if ( flags & FNM_CASEFOLD )
+			pc = tolower(pc), sc = tolower(sc);
+		if ( pc == sc )
 		{
-			if ( (flags & FNM_PATHNAME) && string[0] == '/' )
+			if ( (flags & FNM_PATHNAME) && pc == '/' )
 				next_flags &= ~__FNM_NOT_LEADING;
 			return fnmatch(pattern + 2, string + 1, next_flags);
 		}
@@ -137,9 +146,13 @@ int fnmatch(const char* pattern, const char* string, int flags)
 			return FNM_NOMATCH;
 		return fnmatch(pattern + 1, string + 1, next_flags);
 	}
-	else if ( pattern[0] == string[0] )
+	unsigned char pc = pattern[0];
+	unsigned char sc = string[0];
+	if ( flags & FNM_CASEFOLD )
+		pc = tolower(pc), sc = tolower(sc);
+	if ( pc == sc )
 	{
-		if ( (flags & FNM_PATHNAME) && string[0] == '/' )
+		if ( (flags & FNM_PATHNAME) && sc == '/' )
 			next_flags &= ~__FNM_NOT_LEADING;
 		return fnmatch(pattern + 1, string + 1, next_flags);
 	}

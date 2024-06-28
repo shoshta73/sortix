@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,15 +22,19 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define FNM_NOMATCH 1
 
 #define FNM_PATHNAME (1 << 0)
 #define FNM_NOESCAPE (1 << 1)
 #define FNM_PERIOD (1 << 2)
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+#define FNM_CASEFOLD (1 << 3)
+#define FNM_IGNORECASE FNM_CASEFOLD
+#endif
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int fnmatch(const char*, const char*, int);
 
