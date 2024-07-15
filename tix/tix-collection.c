@@ -53,6 +53,7 @@ static void version(FILE* fp, const char* argv0)
 int main(int argc, char* argv[])
 {
 	char* collection = NULL;
+	char* conf_from_prefix = NULL;
 	char* platform = NULL;
 	char* prefix = NULL;
 	char* generation_string = strdup(DEFAULT_GENERATION);
@@ -82,6 +83,7 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--version") )
 			version(stdout, argv0), exit(0);
 		else if ( GET_OPTION_VARIABLE("--collection", &collection) ) { }
+		else if ( GET_OPTION_VARIABLE("--conf-from", &conf_from_prefix) ) { }
 		else if ( GET_OPTION_VARIABLE("--platform", &platform) ) { }
 		else if ( GET_OPTION_VARIABLE("--prefix", &prefix) ) { }
 		else if ( GET_OPTION_VARIABLE("--generation", &generation_string) ) { }
@@ -128,9 +130,42 @@ int main(int argc, char* argv[])
 	if ( !prefix )
 		prefix = strdup(collection);
 
+	string_array_t conf = string_array_make();
+	if ( strcmp(argv[1], "create") != 0 )
+	{
+		char* conf_path = join_paths(collection, "tix/collection.conf");
+		if ( !conf_path )
+			err(1, "malloc");
+		switch ( variables_append_file_path(&conf, conf_path) )
+		{
+		case -1: err(1, "%s", conf_path);
+		case -2: errx(1, "%s: Syntax error", conf_path);
+		}
+		free(conf_path);
+	}
+
+	string_array_t conf_from = string_array_make();
+	if ( conf_from_prefix )
+	{
+		char* conf_from_path =
+			join_paths(conf_from_prefix, "tix/collection.conf");
+		if ( !conf_from_path )
+			err(1, "malloc");
+		switch ( variables_append_file_path(&conf_from, conf_from_path) )
+		{
+		case -1: err(1, "%s", conf_from_path);
+		case -2: errx(1, "%s: Syntax error", conf_from_path);
+		}
+		free(conf_from_path);
+	}
+
 	const char* cmd = argv[1];
 	if ( !strcmp(cmd, "create") )
 	{
+		if ( platform && dictionary_get(&conf, "PLATFORM") &&
+		     !(platform = strdup(dictionary_get(&conf, "PLATFORM"))) )
+			err(1, "malloc");
+
 		if ( !platform && !(platform = GetBuildTriplet()) )
 			err(1, "unable to determine platform, use --platform");
 
@@ -167,6 +202,19 @@ int main(int argc, char* argv[])
 			fwrite_variable(conf_fp, "PREFIX",
 			                !strcmp(prefix, "/") ? "" : prefix);
 			fwrite_variable(conf_fp, "PLATFORM", platform);
+			for ( size_t i = 0; i < conf_from.length; i++ )
+			{
+				char* key = conf_from.strings[i];
+				char* eq = strchr(key, '=');
+				assert(eq);
+				*eq = '\0';
+				char* value = eq + 1;
+				if ( !strcmp(key, "TIX_COLLECTION_VERSION") ||
+				     !strcmp(key, "PREFIX") ||
+				     !strcmp(key, "PLATFORM") )
+					continue;
+				fwrite_variable(conf_fp, key, value);
+			}
 		}
 		// TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
 		else
@@ -198,6 +246,52 @@ int main(int argc, char* argv[])
 		}
 
 		return 0;
+	}
+	else if ( !strcmp(cmd, "set") )
+	{
+		// TODO: Apply options like --platform.
+		char* conf_path = join_paths(collection, "tix/collection.conf");
+		char* conf_path_new = join_paths(collection, "tix/collection.conf.new");
+		if ( !conf_path || !conf_path_new )
+			err(1, "malloc");
+		FILE* conf_fp = fopen(conf_path_new, "w");
+		if ( !conf_fp )
+			err(1, "%s", conf_path_new);
+		for ( size_t i = 0; i < conf.length; i++ )
+		{
+			char* key = conf.strings[i];
+			char* eq = strchr(key, '=');
+			assert(eq);
+			*eq = '\0';
+			char* value = eq + 1;
+			if ( !strcmp(key, "TIX_COLLECTION_VERSION") ||
+			     !strcmp(key, "PREFIX") ||
+			     !dictionary_get(&conf_from, key) )
+				fwrite_variable(conf_fp, key, value);
+			*eq = '=';
+		}
+		for ( size_t i = 0; i < conf_from.length; i++ )
+		{
+			char* key = conf_from.strings[i];
+			char* eq = strchr(key, '=');
+			assert(eq);
+			*eq = '\0';
+			char* value = eq + 1;
+			if ( strcmp(key, "TIX_COLLECTION_VERSION") != 0 &&
+			     strcmp(key, "PREFIX") != 0 )
+				fwrite_variable(conf_fp, key, value);
+			*eq = '=';
+		}
+		if ( ferror(conf_fp) || fflush(conf_fp) == EOF )
+			err(1, "%s", conf_path_new);
+		struct stat st;
+		if ( stat(conf_path, &st) < 0 )
+			err(1, "stat: %s", conf_path);
+		fchmod(fileno(conf_fp), st.st_mode & 07777);
+		(void) fchown(fileno(conf_fp), st.st_uid, st.st_gid);
+		fclose(conf_fp);
+		if ( rename(conf_path_new, conf_path) < 0 )
+			err(1, "rename: %s -> %s", conf_path_new, conf_path);
 	}
 	else
 	{
