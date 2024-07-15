@@ -152,6 +152,8 @@ the build tools compile
 .Sy ( verify-build-tools ) ,
 that everything compiles without warnings on all architectures
 .Sy ( verify-build ) ,
+the sysroot-source target includes all the sources
+.Sy ( verify-sysroot-source ) ,
 and the system headers works in all supported configurations
 .Sy ( verify-headers ) .
 .It Sy release
@@ -258,6 +260,9 @@ and defaults to
 Upstream releases of ports are downloaded from this mirror, defaulting to the
 official mirror, and falling back to the upstream release site if the mirror
 failed.
+.It Ev SORTIX_RELEASE_ADDITIONAL
+Optionally can be set to a directory that contains addition files that are
+copied into the release directory.
 .El
 .Ss Components
 The operating systems components, such as libc and the kernel, each have their

@@ -57,6 +57,12 @@ SORTIX_ISO_COMPRESSION?=xz
 
 SORTIX_PORTS_MIRROR?=https://pub.sortix.org/mirror
 
+# TODO: Update development(7).
+
+SORTIX_RELEASE_ADDITIONAL?=
+SORTIX_RELEASE_MANHTML?=yes
+SORTIX_RELEASE_SOURCE?=yes
+
 SORTIX_INCLUDE_SOURCE_GIT_REPO?=$(shell test -d .git && echo "file://`pwd`")
 SORTIX_INCLUDE_SOURCE_GIT_REPO:=$(SORTIX_INCLUDE_SOURCE_GIT_REPO)
 SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=https://sortix.org/sortix.git
@@ -270,7 +276,9 @@ else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
 	cp README -t "$(SYSROOT)/src"
 	cp -RT build-aux "$(SYSROOT)/src/build-aux"
 	cp -RT share "$(SYSROOT)/src/share"
-	(for D in $(MODULES); do (cp -R $$D -t "$(SYSROOT)/src" && $(MAKE) -C "$(SYSROOT)/src/$$D" clean) || exit $$?; done)
+	cp -RT ports "$(SYSROOT)/src/ports"
+	(for D in $(MODULES); do cp -R $$D -t "$(SYSROOT)/src" || exit $$?; done)
+	$(MAKE) -C "$(SYSROOT)/src" distclean
 endif
 	(cd "$(SYSROOT)" && find .) | sed 's/\.//' | \
 	grep -E '^/src(/.*)?$$' | \
@@ -435,7 +443,7 @@ everything-all-archs:
 .PHONY: release-all-archs
 release-all-archs:
 	$(MAKE) clean clean-sysroot
-	$(MAKE) release HOST=i686-sortix
+	$(MAKE) release-arch HOST=i686-sortix
 	$(MAKE) clean clean-sysroot
 	$(MAKE) release HOST=x86_64-sortix
 
@@ -633,16 +641,42 @@ release-man: $(SORTIX_RELEASE_DIR)/$(RELEASE)/man/ports.list
 
 .PHONY: release-man-html
 release-man-html: release-man
+ifeq ($(SORTIX_RELEASE_MANHTML),yes)
 	RELEASE="$(RELEASE)" build-aux/manhtml.sh $(SORTIX_RELEASE_DIR)/$(RELEASE)/man
+endif
 
 .PHONY: release-readme
 release-readme: $(SORTIX_RELEASE_DIR)/$(RELEASE)/README
 
+.PHONY: release-additional
+release-additional:
+ifneq ($(SORTIX_RELEASE_ADDITIONAL),)
+	cp -RT $(SORTIX_RELEASE_ADDITIONAL) $(SORTIX_RELEASE_DIR)/$(RELEASE)
+endif
+
 .PHONY: release-arch
-release-arch: release-builds release-readme release-repository
+release-arch: release-builds release-repository
+
+# Depend on sysroot-ports because sysroot-ports would race with mirror and the
+# build must be offline if the local mirror is already populated.
+.PHONY: release-source
+ifeq ($(SORTIX_RELEASE_SOURCE),yes)
+release-source: sysroot-source sysroot-ports
+	rm -rf $(SORTIX_RELEASE_DIR)/$(RELEASE)/source
+	mkdir -p $(SORTIX_RELEASE_DIR)/$(RELEASE)/source
+	cp -RT "$(SYSROOT)/src" $(SORTIX_RELEASE_DIR)/$(RELEASE)/source/sortix-$(RELEASE)
+	rm -rf $(SORTIX_RELEASE_DIR)/$(RELEASE)/source/sortix-$(RELEASE)/.git
+	cd $(SORTIX_RELEASE_DIR)/$(RELEASE)/source && tar -f sortix-$(RELEASE).tar.xz -cJ sortix-$(RELEASE)
+	mv $(SORTIX_RELEASE_DIR)/$(RELEASE)/source/sortix-$(RELEASE) $(SORTIX_RELEASE_DIR)/$(RELEASE)/source/sortix-$(RELEASE)-full
+	SORTIX_PORTS_MIRROR=`realpath $(SORTIX_MIRROR_DIR)` $(MAKE) -C $(SORTIX_RELEASE_DIR)/$(RELEASE)/source/sortix-$(RELEASE)-full mirror
+	cd $(SORTIX_RELEASE_DIR)/$(RELEASE)/source && tar -f sortix-$(RELEASE)-full.tar.xz -cJ sortix-$(RELEASE)-full
+	rm -rf $(SORTIX_RELEASE_DIR)/$(RELEASE)/source/sortix-$(RELEASE)-full
+else
+release-source:
+endif
 
 .PHONY: release-shared
-release-shared: release-man release-man-html release-readme release-scripts
+release-shared: release-man release-man-html release-readme release-scripts release-additional release-source
 
 .PHONY: release
 release: release-arch release-shared
@@ -665,6 +699,7 @@ else
 	$(MAKE) verify-build HOST=i686-sortix
 	$(MAKE) verify-build HOST=x86_64-sortix
 endif
+	$(MAKE) verify-sysroot-source
 	$(MAKE) verify-headers
 	@echo ok
 
@@ -680,6 +715,14 @@ verify-manual:
 verify-build-tools:
 	$(MAKE) clean-build-tools
 	$(MAKE) OPTLEVEL='-O2 -g -Werror -Werror=strict-prototypes' build-tools
+
+verify-sysroot-source:
+	$(MAKE) clean-sysroot
+	$(MAKE) sysroot-source SORTIX_INCLUDE_SOURCE=yes
+	git ls-files | sort > "$(SYSROOT)/src.want"
+	(cd "$(SYSROOT)/src" && find '!' -type d | sort | sed -E 's,^\./,,') > "$(SYSROOT)/src.got"
+	diff -u "$(SYSROOT)/src.want" "$(SYSROOT)/src.got"
+	rm -f "$(SYSROOT)/src.want" "$(SYSROOT)/src.got"
 
 verify-build:
 	$(MAKE) mostlyclean
