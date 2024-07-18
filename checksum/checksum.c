@@ -299,10 +299,10 @@ static int checklist_fp(FILE* fp,
 	explicit_bzero(checksum, sizeof(checksum));
 	free(checklist);
 	free(checklist_sorted);
-	if ( read_failures )
+	if ( !silent && read_failures )
 		warnx("WARNING: %zu listed %s could not be read",
 		      read_failures, read_failures == 1 ? "file" : "files");
-	if ( check_failures )
+	if ( !silent && check_failures )
 		warnx("WARNING: %zu computed %s did NOT match",
 		      check_failures, check_failures == 1 ? "checksum" : "checksums");
 	return read_failures ? 1 : check_failures ? 2 : 0;
