@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,6 +35,7 @@
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/log.h>
 #include <sortix/kernel/memorymanagement.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/signal.h>
 #include <sortix/kernel/time.h>
 
@@ -277,6 +278,7 @@ bool Port::FinishInitialize()
 	transfer_in_progress = false;
 
 	memcpy(identify_data, (void*) dma_alloc.from, sizeof(identify_data));
+	Random::Mix(Random::SOURCE_WEAK, identify_data, sizeof(identify_data));
 
 	little_uint16_t* words = (little_uint16_t*) dma_alloc.from;
 

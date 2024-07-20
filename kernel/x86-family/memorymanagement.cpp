@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015, 2017, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2012, 2014-2015, 2017, 2022-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,7 @@
 #include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/panic.h>
 #include <sortix/kernel/pat.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/syscall.h>
 
 #include "multiboot.h"
@@ -157,6 +158,8 @@ void Init(multiboot_info_t* bootinfo)
 	      (addr_t) mmap < bootinfo->mmap_addr + bootinfo->mmap_length;
 	      mmap = (mmap_t) ((addr_t) mmap + mmap->size + sizeof(mmap->size)) )
 	{
+		Random::Mix(Random::SOURCE_WEAK, mmap, sizeof(*mmap));
+
 		// Check that we can use this kind of RAM.
 		if ( mmap->type != 1 )
 			continue;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/if.h>
 #include <sortix/kernel/packet.h>
+#include <sortix/kernel/random.h>
 
 #include "arp.h"
 #include "ether.h"
@@ -44,6 +45,7 @@ size_t GetMTU(NetworkInterface* netif)
 
 void Handle(Ref<Packet> pkt, bool checksum_offloaded)
 {
+	Random::MixNow(Random::SOURCE_NETWORK);
 	assert(pkt->netif);
 	assert(pkt->offset <= pkt->length);
 	const unsigned char* in = pkt->from + pkt->offset;
@@ -61,6 +63,8 @@ void Handle(Ref<Packet> pkt, bool checksum_offloaded)
 		ftr.ether_crc = le32toh(ftr.ether_crc);
 		if ( ftr.ether_crc != crc32(0, in, inlen) )
 			return;
+		Random::Mix(Random::SOURCE_NETWORK, &ftr.ether_crc,
+		            sizeof(ftr.ether_crc));
 	}
 	else if ( inlen < sizeof(hdr) /* ETHER_HDR_LEN */ )
 		return;
@@ -104,6 +108,7 @@ bool Send(Ref<Packet> pktin,
           uint16_t ether_type,
           NetworkInterface* netif)
 {
+	Random::MixNow(Random::SOURCE_NETWORK);
 	if ( ETHERMTU < pktin->length )
 		return errno = EMSGSIZE, false;
 	Ref<Packet> pkt = GetPacket();
@@ -131,6 +136,8 @@ bool Send(Ref<Packet> pktin,
 	{
 		ftr.ether_crc = htole32(crc32(0, out, pkt->length));
 		memcpy(out + sizeof(hdr) + inlen + padding, &ftr, sizeof(ftr));
+		Random::Mix(Random::SOURCE_NETWORK, &ftr.ether_crc,
+		            sizeof(ftr.ether_crc));
 	}
 	return netif->Send(pkt);
 }

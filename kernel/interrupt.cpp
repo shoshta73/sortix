@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/thread.h>
+#include <sortix/kernel/random.h>
 
 namespace Sortix {
 namespace Interrupt {
@@ -59,6 +60,11 @@ void WorkerThread(void* /*user*/)
 		}
 		while ( work )
 		{
+			Random::MixNow(Random::SOURCE_INTERRUPT_WORKER);
+			uintptr_t hash = (uintptr_t) work->next ^
+			                 (uintptr_t) work->handler ^
+			                 (uintptr_t) work->context;
+			Random::Mix(Random::SOURCE_INTERRUPT_WORKER, &hash, sizeof(hash));
 			struct interrupt_work* next_work = work->next;
 			work->handler(work->context);
 			work = next_work;

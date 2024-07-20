@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2022, 2023, 2024 Jonas 'Sortie' Termansen.
  * Copyright (c) 2015 Meisaka Yukara.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -41,6 +41,7 @@
 #include <sortix/kernel/panic.h>
 #include <sortix/kernel/pci.h>
 #include <sortix/kernel/pci-mmio.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/time.h>
 
@@ -817,6 +818,7 @@ bool EM::Reset()
 		ifinfo.addr[5] = macd[1] >> 8  & 0xFF;
 	}
 	memcpy(&cfg.ether.address, ifinfo.addr, sizeof(struct ether_addr));
+	Random::Mix(Random::SOURCE_WEAK, ifinfo.addr, sizeof(ifinfo.addr));
 
 	// Enable bus mastering so the card can read/write memory.
 	PCI::EnableBusMaster(devaddr);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 #include <sortix/kernel/cpu.h>
 #include <sortix/kernel/ioport.h>
 #include <sortix/kernel/kernel.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/time.h>
 
 namespace Sortix {
@@ -144,6 +145,8 @@ void Init()
 
 	struct timespec current_time = timespec_make(now, 0);
 	Time::GetClock(CLOCK_REALTIME)->Set(&current_time, NULL);
+
+	Random::Mix(Random::SOURCE_WEAK, &current_time, sizeof(current_time));
 }
 
 } // namespace CMOS

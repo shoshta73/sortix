@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/pci.h>
+#include <sortix/kernel/random.h>
 
 namespace Sortix {
 namespace PCI {
@@ -485,8 +486,20 @@ uint8_t GetInterruptIndex(uint32_t devaddr)
 	return Interrupt::IRQ0 + line;
 }
 
+static bool SeedRandom(uint32_t devaddr, const pciid_t* id,
+                       const pcitype_t* type, void* /*context*/,
+                       void* /*pattern_context*/)
+{
+	Random::Mix(Random::SOURCE_WEAK, &devaddr, sizeof(devaddr));
+	Random::Mix(Random::SOURCE_WEAK, id, sizeof(*id));
+	Random::Mix(Random::SOURCE_WEAK, type, sizeof(*type));
+	return true;
+}
+
 void Init()
 {
+	pcifind_t everything(NULL, 0xFFFF, 0xFFFF);
+	Search(SeedRandom, NULL, &everything, 1);
 }
 
 } // namespace PCI

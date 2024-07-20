@@ -227,6 +227,8 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 			Memory::Unmap(alloc.from + i);
 		Memory::Flush();
 		FreeKernelAddress(&alloc);
+
+		Random::Mix(Random::SOURCE_WEAK, cmdline, strlen(cmdline));
 	}
 
 	if ( !(kernel_options = strdup(cmdline ? cmdline : "")) )

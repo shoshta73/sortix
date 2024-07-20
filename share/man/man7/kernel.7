@@ -112,7 +112,8 @@ The module contains random data used to seed the kernel entropy gathering.
 This file is supposed to contain 256 bytes of secret randomness that hasn't been
 used before.
 Recycling the random seed is dangerous and insecure.
-Omitting the random seed will cause the kernel entropy to be insecurely seeded
+Omitting the random seed will cause the kernel entropy to be collected in the
+background, which will take some time and system usage before it is secure.
 with the current time and other readily available information.
 The bootloader normally loads the random seed from
 .Pa /boot/random.seed .

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2018, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/if.h>
 #include <sortix/kernel/packet.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/refcount.h>
 
 #include "arp.h"
@@ -288,6 +289,7 @@ void Handle(Ref<Packet> pkt,
 	hdr.identification = be16toh(hdr.identification);
 	hdr.fragment = be16toh(hdr.fragment);
 	hdr.checksum = be16toh(hdr.checksum);
+	Random::Mix(Random::SOURCE_NETWORK, &hdr.checksum, sizeof(hdr.checksum));
 	// Verify the packet is Internet Protocol Version 4.
 	if ( IPV4_VERSION(hdr.version_ihl) != 4 )
 		return;
@@ -363,6 +365,8 @@ bool Send(Ref<Packet> pktin,
 	hdr.checksum = htobe16(ipsum(&hdr, sizeof(hdr)));
 	memcpy(out, &hdr, sizeof(hdr));
 	memcpy(out + sizeof(struct ipv4), in, pktin->length);
+
+	Random::Mix(Random::SOURCE_NETWORK, &hdr.checksum, sizeof(hdr.checksum));
 
 	NetworkInterface* netif = LocateInterface(src, dst, ifindex);
 	if ( !netif )

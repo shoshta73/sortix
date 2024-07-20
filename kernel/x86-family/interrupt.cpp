@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/process.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/scheduler.h>
 #include <sortix/kernel/signal.h>
 #include <sortix/kernel/syscall.h>
@@ -348,6 +349,10 @@ extern "C" void interrupt_handler(struct interrupt_context* intctx)
 		UserCrashHandler(intctx);
 	else
 	{
+		unsigned char int_hash = int_no;
+		Random::MixNow(Random::SOURCE_INTERRUPT);
+		Random::Mix(Random::SOURCE_INTERRUPT, &int_hash, sizeof(int_hash));
+
 		for ( struct interrupt_handler* iter = interrupt_handlers[int_no];
 		      iter;
 		      iter = iter->next )

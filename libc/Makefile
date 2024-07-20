@@ -64,15 +64,10 @@ regex/regcomp.o \
 regex/regerror.o \
 regex/regexec.o \
 regex/regfree.o \
-sha2/sha224hl.o \
 sha2/sha224.o \
-sha2/sha256hl.o \
 sha2/sha256.o \
-sha2/sha384hl.o \
 sha2/sha384.o \
-sha2/sha512_256hl.o \
 sha2/sha512_256.o \
-sha2/sha512hl.o \
 sha2/sha512.o \
 signal/sig2str.o \
 signal/sigaddset.o \
@@ -504,6 +499,11 @@ semaphore/sem_post.o \
 semaphore/sem_timedwait.o \
 semaphore/sem_trywait.o \
 semaphore/sem_wait.o \
+sha2/sha224hl.o \
+sha2/sha256hl.o \
+sha2/sha384hl.o \
+sha2/sha512_256hl.o \
+sha2/sha512hl.o \
 signal/kill.o \
 signal/killpg.o \
 signal/psiginfo.o \

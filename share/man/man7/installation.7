@@ -91,8 +91,9 @@ live environment daemons are started by default, deploy ssh keys so secure shell
 connections are trusted on the first connection, configure automatic
 installation and upgrading, and so on.
 .Pp
-Warning: The live environment does not come with any random entropy and entropy
-gathering is not yet implemented.
+Warning: The live environment does not come with any random entropy and it will
+take some time and system usage before enough entropy is collected for secure
+random number generation.
 To keep your system secure, it is recommended to use the release modification
 procedure to add a
 .Pa /boot/random.seed

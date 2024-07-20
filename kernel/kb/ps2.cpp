@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <sortix/kernel/keyboard.h>
 #include <sortix/kernel/ps2.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/random.h>
 
 #include "ps2.h"
 
@@ -90,6 +91,9 @@ void PS2Keyboard::PS2DeviceInitialize(void* send_ctx, bool (*send)(void*, uint8_
 
 void PS2Keyboard::PS2DeviceOnByte(uint8_t byte)
 {
+	Random::MixNow(Random::SOURCE_INPUT);
+	Random::Mix(Random::SOURCE_INPUT, &byte, 1);
+
 	ScopedLock lock(&kblock);
 
 	if ( state == STATE_INIT )

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,7 @@
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/log.h>
 #include <sortix/kernel/memorymanagement.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/signal.h>
 #include <sortix/kernel/time.h>
 
@@ -253,6 +254,7 @@ retry_identify_packet:
 		identify_data[2*i + 0] = value >> 0 & 0xFF;
 		identify_data[2*i + 1] = value >> 8 & 0xFF;
 	}
+	Random::Mix(Random::SOURCE_WEAK, identify_data, sizeof(identify_data));
 
 	little_uint16_t* words = (little_uint16_t*) identify_data;
 

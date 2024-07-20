@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,10 +27,39 @@ typedef struct multiboot_info multiboot_info_t;
 namespace Sortix {
 namespace Random {
 
+enum Source
+{
+	// Random data provided from a previous boot.
+	SOURCE_SEED,
+
+	// Non-random data that an attacker would have difficulty guessing, such as
+	// the exact hardware tree, MAC addresses, serial numbers, boot time, etc.
+	SOURCE_WEAK,
+
+	// Keyboard and mouse input and timing data.
+	SOURCE_INPUT,
+
+	// Network checksums and timing data.
+	SOURCE_NETWORK,
+
+	// Registers whenever a thread is preempted (interrupts disabled).
+	SOURCE_PREEMPTION,
+
+	// Details and timing data on interrupts (interrupts disabled).
+	SOURCE_INTERRUPT,
+
+	// Tasks and timing data in the interrupt worker thread.
+	SOURCE_INTERRUPT_WORKER,
+
+	SOURCE_MAX,
+};
+
 void Init(multiboot_info_t* bootinfo);
 bool HasEntropy(size_t amount);
 void GetEntropy(void* buffer, size_t size);
 int GetFallbackStatus();
+void Mix(enum Source source, const void* buffer, size_t size);
+void MixNow(enum Source source);
 
 } // namespace Random
 } // namespace Sortix

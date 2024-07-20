@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015, 2021-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2015, 2021-2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,6 +35,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/memorymanagement.h>
 #include <sortix/kernel/process.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/registers.h>
 #include <sortix/kernel/scheduler.h>
 #include <sortix/kernel/signal.h>
@@ -255,6 +256,7 @@ static void SwitchRegisters(struct interrupt_context* intctx,
 	if ( prev == next )
 		return;
 
+	Random::Mix(Random::SOURCE_PREEMPTION, intctx, sizeof(*intctx));
 	SaveInterruptedContext(intctx, &prev->registers);
 	if ( !prev->registers.cr3 )
 		Log::PrintF("Thread %p had cr3=0x%zx\n", prev, prev->registers.cr3);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,6 +31,7 @@
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/if.h>
 #include <sortix/kernel/packet.h>
+#include <sortix/kernel/random.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/time.h>
 #include <sortix/kernel/timer.h>
@@ -589,6 +590,8 @@ void Handle(Ref<Packet> pkt,
 	hdr.hrd = be16toh(hdr.hrd);
 	hdr.pro = be16toh(hdr.pro);
 	hdr.op = be16toh(hdr.op);
+
+	Random::Mix(Random::SOURCE_NETWORK, &hdr, sizeof(hdr));
 
 	// Drop unsupported or invalid packets.
 	if ( !(hdr.hrd == ETHERTYPE_ETHER && hdr.hln == 6) )

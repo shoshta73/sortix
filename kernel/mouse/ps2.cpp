@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,7 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/ps2.h>
+#include <sortix/kernel/random.h>
 
 #include "ps2.h"
 
@@ -79,6 +80,8 @@ void PS2Mouse::PS2DeviceInitialize(void* send_ctx, bool (*send)(void*, uint8_t),
 
 void PS2Mouse::PS2DeviceOnByte(uint8_t byte)
 {
+	Random::MixNow(Random::SOURCE_INPUT);
+	Random::Mix(Random::SOURCE_INPUT, &byte, 1);
 	ScopedLock lock(&mlock);
 
 	if ( state == STATE_INIT )
