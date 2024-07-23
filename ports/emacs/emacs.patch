@@ -1,3 +1,34 @@
+diff -Paur --no-dereference -- emacs.upstream/Makefile.in emacs/Makefile.in
+--- emacs.upstream/Makefile.in
++++ emacs/Makefile.in
+@@ -687,9 +687,6 @@
+ 	  dest=`echo "$${page}" | sed -e 's/\.1$$//' -e '$(TRANSFORM)'`.1; \
+ 	  (cd "$${thisdir}"; \
+ 	   ${INSTALL_DATA} ${mansrcdir}/$${page} "$(DESTDIR)${man1dir}/$${dest}"); \
+-	  [ -n "${GZIP_PROG}" ] || continue ; \
+-	  rm -f "$(DESTDIR)${man1dir}/$${dest}.gz"; \
+-	  ${GZIP_PROG} -9n "$(DESTDIR)${man1dir}/$${dest}" || true; \
+ 	done
+ 
+ ## Install those items from etc/ that need to end up elsewhere.
+@@ -712,16 +709,7 @@
+ 	  ${srcdir}/etc/emacs.appdata.xml > $${tmp}; \
+ 	${INSTALL_DATA} $${tmp} "$(DESTDIR)${appdatadir}/${EMACS_NAME}.appdata.xml"; \
+ 	rm -f $${tmp}
+-	umask 022; $(MKDIR_P) "$(DESTDIR)$(systemdunitdir)"
+-	tmp=etc/emacs.tmpservice; rm -f $${tmp}; \
+-	client_name=`echo emacsclient | sed '$(TRANSFORM)'`${EXEEXT}; \
+-	sed -e '/^##/d' \
+-	  -e "/^Documentation/ s/emacs(1)/${EMACS_NAME}(1)/" \
+-	  -e "/^ExecStart/ s|emacs|${bindir}/${EMACS}|" \
+-	  -e "/^ExecStop/ s|emacsclient|${bindir}/$${client_name}|" \
+-	  ${srcdir}/etc/emacs.service > $${tmp}; \
+-	$(INSTALL_DATA) $${tmp} "$(DESTDIR)$(systemdunitdir)/${EMACS_NAME}.service"; \
+-	rm -f $${tmp}
++	# Patch: Don't install systemd emacs.service.
+ 	thisdir=`/bin/pwd`; \
+ 	cd ${iconsrcdir} || exit 1; umask 022 ; \
+ 	for dir in */*/apps */*/mimetypes; do \
 diff -Paur --no-dereference -- emacs.upstream/configure emacs/configure
 --- emacs.upstream/configure
 +++ emacs/configure
@@ -213,6 +244,39 @@ diff -Paur --no-dereference -- emacs.upstream/configure emacs/configure
  
          $as_echo "#define PTY_NAME_SPRINTF /**/" >>confdefs.h
  
+diff -Paur --no-dereference -- emacs.upstream/lib-src/Makefile.in emacs/lib-src/Makefile.in
+--- emacs.upstream/lib-src/Makefile.in
++++ emacs/lib-src/Makefile.in
+@@ -20,13 +20,20 @@
+ 
+ SHELL = @SHELL@
+ 
++cross_compiling = @cross_compiling@
++
+ # Following ../lisp/Makefile.in.
++ifeq ($(cross_compiling),yes)
++EMACS = emacs
++else
+ EMACS = ../src/emacs${EXEEXT}
++endif
+ EMACSOPT = -batch --no-site-file --no-site-lisp
+ 
+ # ==================== Things 'configure' will edit ====================
+ 
+ CC=@CC@
++CC_FOR_BUILD?=cc
+ CFLAGS=@CFLAGS@
+ CPPFLAGS = @CPPFLAGS@
+ LDFLAGS = @LDFLAGS@
+@@ -389,7 +396,7 @@
+ 	  $(NTLIB) $(LOADLIBES) $(LIB_CLOCK_GETTIME) -o $@
+ 
+ make-docfile${EXEEXT}: ${srcdir}/make-docfile.c $(NTLIB) $(config_h)
+-	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< $(NTLIB) $(LOADLIBES) -o $@
++	$(AM_V_CCLD)$(CC_FOR_BUILD) -std=gnu11 ${ALL_CFLAGS} $< $(NTLIB) $(LOADLIBES) -o $@
+ 
+ movemail${EXEEXT}: ${srcdir}/movemail.c pop.o $(NTLIB) $(config_h)
+ 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} ${MOVE_FLAGS} $< pop.o \
 diff -Paur --no-dereference -- emacs.upstream/lib-src/emacsclient.c emacs/lib-src/emacsclient.c
 --- emacs.upstream/lib-src/emacsclient.c
 +++ emacs/lib-src/emacsclient.c
@@ -266,39 +330,6 @@ diff -Paur --no-dereference -- emacs.upstream/lib-src/emacsclient.c emacs/lib-sr
        pid_t tcpgrp = tcgetpgrp (1);
        if (0 <= tcpgrp && tcpgrp != pgrp)
  	kill (-pgrp, SIGTTIN);
-diff -Paur --no-dereference -- emacs.upstream/lib-src/Makefile.in emacs/lib-src/Makefile.in
---- emacs.upstream/lib-src/Makefile.in
-+++ emacs/lib-src/Makefile.in
-@@ -20,13 +20,20 @@
- 
- SHELL = @SHELL@
- 
-+cross_compiling = @cross_compiling@
-+
- # Following ../lisp/Makefile.in.
-+ifeq ($(cross_compiling),yes)
-+EMACS = emacs
-+else
- EMACS = ../src/emacs${EXEEXT}
-+endif
- EMACSOPT = -batch --no-site-file --no-site-lisp
- 
- # ==================== Things 'configure' will edit ====================
- 
- CC=@CC@
-+CC_FOR_BUILD?=cc
- CFLAGS=@CFLAGS@
- CPPFLAGS = @CPPFLAGS@
- LDFLAGS = @LDFLAGS@
-@@ -389,7 +396,7 @@
- 	  $(NTLIB) $(LOADLIBES) $(LIB_CLOCK_GETTIME) -o $@
- 
- make-docfile${EXEEXT}: ${srcdir}/make-docfile.c $(NTLIB) $(config_h)
--	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} $< $(NTLIB) $(LOADLIBES) -o $@
-+	$(AM_V_CCLD)$(CC_FOR_BUILD) -std=gnu11 ${ALL_CFLAGS} $< $(NTLIB) $(LOADLIBES) -o $@
- 
- movemail${EXEEXT}: ${srcdir}/movemail.c pop.o $(NTLIB) $(config_h)
- 	$(AM_V_CCLD)$(CC) ${ALL_CFLAGS} ${MOVE_FLAGS} $< pop.o \
 diff -Paur --no-dereference -- emacs.upstream/lib-src/movemail.c emacs/lib-src/movemail.c
 --- emacs.upstream/lib-src/movemail.c
 +++ emacs/lib-src/movemail.c
@@ -362,37 +393,30 @@ diff -Paur --no-dereference -- emacs.upstream/lisp/Makefile.in emacs/lisp/Makefi
  
  maintainer-clean: distclean bootstrap-clean
  	rm -f TAGS
-diff -Paur --no-dereference -- emacs.upstream/Makefile.in emacs/Makefile.in
---- emacs.upstream/Makefile.in
-+++ emacs/Makefile.in
-@@ -687,9 +687,6 @@
- 	  dest=`echo "$${page}" | sed -e 's/\.1$$//' -e '$(TRANSFORM)'`.1; \
- 	  (cd "$${thisdir}"; \
- 	   ${INSTALL_DATA} ${mansrcdir}/$${page} "$(DESTDIR)${man1dir}/$${dest}"); \
--	  [ -n "${GZIP_PROG}" ] || continue ; \
--	  rm -f "$(DESTDIR)${man1dir}/$${dest}.gz"; \
--	  ${GZIP_PROG} -9n "$(DESTDIR)${man1dir}/$${dest}" || true; \
- 	done
+diff -Paur --no-dereference -- emacs.upstream/src/Makefile.in emacs/src/Makefile.in
+--- emacs.upstream/src/Makefile.in
++++ emacs/src/Makefile.in
+@@ -25,6 +25,8 @@
  
- ## Install those items from etc/ that need to end up elsewhere.
-@@ -712,16 +709,7 @@
- 	  ${srcdir}/etc/emacs.appdata.xml > $${tmp}; \
- 	${INSTALL_DATA} $${tmp} "$(DESTDIR)${appdatadir}/${EMACS_NAME}.appdata.xml"; \
- 	rm -f $${tmp}
--	umask 022; $(MKDIR_P) "$(DESTDIR)$(systemdunitdir)"
--	tmp=etc/emacs.tmpservice; rm -f $${tmp}; \
--	client_name=`echo emacsclient | sed '$(TRANSFORM)'`${EXEEXT}; \
--	sed -e '/^##/d' \
--	  -e "/^Documentation/ s/emacs(1)/${EMACS_NAME}(1)/" \
--	  -e "/^ExecStart/ s|emacs|${bindir}/${EMACS}|" \
--	  -e "/^ExecStop/ s|emacsclient|${bindir}/$${client_name}|" \
--	  ${srcdir}/etc/emacs.service > $${tmp}; \
--	$(INSTALL_DATA) $${tmp} "$(DESTDIR)$(systemdunitdir)/${EMACS_NAME}.service"; \
--	rm -f $${tmp}
-+	# Patch: Don't install systemd emacs.service.
- 	thisdir=`/bin/pwd`; \
- 	cd ${iconsrcdir} || exit 1; umask 022 ; \
- 	for dir in */*/apps */*/mimetypes; do \
+ SHELL = @SHELL@
+ 
++cross_compiling = @cross_compiling@
++
+ # Here are the things that we expect ../configure to edit.
+ # We use $(srcdir) explicitly in dependencies so as not to depend on VPATH.
+ srcdir = @srcdir@
+@@ -501,7 +503,11 @@
+ ## in practice this rule was always run anyway.
+ $(srcdir)/macuvs.h $(lispsource)/international/charprop.el: \
+   bootstrap-emacs$(EXEEXT) FORCE
++ifeq ($(cross_compiling),yes)
++	$(MAKE) -C ../admin/unidata all EMACS=emacs
++else
+ 	$(MAKE) -C ../admin/unidata all EMACS="../$(bootstrap_exe)"
++endif
+ 
+ ## We require charprop.el to exist before ucs-normalize.el is
+ ## byte-compiled, because ucs-normalize.el needs to load 2 uni-*.el files.
 diff -Paur --no-dereference -- emacs.upstream/src/buffer.c emacs/src/buffer.c
 --- emacs.upstream/src/buffer.c
 +++ emacs/src/buffer.c
@@ -512,30 +536,6 @@ diff -Paur --no-dereference -- emacs.upstream/src/lread.c emacs/src/lread.c
  #include <errno.h>
  #include <math.h>
  #include <stat-time.h>
-diff -Paur --no-dereference -- emacs.upstream/src/Makefile.in emacs/src/Makefile.in
---- emacs.upstream/src/Makefile.in
-+++ emacs/src/Makefile.in
-@@ -25,6 +25,8 @@
- 
- SHELL = @SHELL@
- 
-+cross_compiling = @cross_compiling@
-+
- # Here are the things that we expect ../configure to edit.
- # We use $(srcdir) explicitly in dependencies so as not to depend on VPATH.
- srcdir = @srcdir@
-@@ -501,7 +503,11 @@
- ## in practice this rule was always run anyway.
- $(srcdir)/macuvs.h $(lispsource)/international/charprop.el: \
-   bootstrap-emacs$(EXEEXT) FORCE
-+ifeq ($(cross_compiling),yes)
-+	$(MAKE) -C ../admin/unidata all EMACS=emacs
-+else
- 	$(MAKE) -C ../admin/unidata all EMACS="../$(bootstrap_exe)"
-+endif
- 
- ## We require charprop.el to exist before ucs-normalize.el is
- ## byte-compiled, because ucs-normalize.el needs to load 2 uni-*.el files.
 diff -Paur --no-dereference -- emacs.upstream/src/process.c emacs/src/process.c
 --- emacs.upstream/src/process.c
 +++ emacs/src/process.c
@@ -621,6 +621,17 @@ diff -Paur --no-dereference -- emacs.upstream/src/sysdep.c emacs/src/sysdep.c
  #ifdef CS8
    if (tty_out->meta_key)
      {
+@@ -1792,6 +1793,10 @@
+ 
+ /* Alternate stack used by SIGSEGV handler below.  */
+ 
++/* PATCH: Work around SIGSTKSZ not being a constant on modern glibc, needed when
++          cross-compiling emacs with a local bootstrap phase. */
++#undef SIGSTKSZ
++#define SIGSTKSZ 65536
+ static unsigned char sigsegv_stack[SIGSTKSZ];
+ 
+ 
 diff -Paur --no-dereference -- emacs.upstream/src/term.c emacs/src/term.c
 --- emacs.upstream/src/term.c
 +++ emacs/src/term.c
