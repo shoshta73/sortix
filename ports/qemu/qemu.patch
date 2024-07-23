@@ -1,3 +1,14 @@
+diff -Paur --no-dereference -- qemu.upstream/Makefile qemu/Makefile
+--- qemu.upstream/Makefile
++++ qemu/Makefile
+@@ -396,6 +396,7 @@
+ 	rm -f config.log
+ 	rm -f linux-headers/asm
+ 	rm -f qemu-tech.info qemu-tech.aux qemu-tech.cp qemu-tech.dvi qemu-tech.fn qemu-tech.info qemu-tech.ky qemu-tech.log qemu-tech.pdf qemu-tech.pg qemu-tech.toc qemu-tech.tp qemu-tech.vr
++	rm -f trace-events-all qemu-version.h.tmp
+ 	for d in $(TARGET_DIRS); do \
+ 	rm -rf $$d || exit 1 ; \
+         done
 diff -Paur --no-dereference -- qemu.upstream/block/raw-posix.c qemu/block/raw-posix.c
 --- qemu.upstream/block/raw-posix.c
 +++ qemu/block/raw-posix.c
@@ -109,6 +120,15 @@ diff -Paur --no-dereference -- qemu.upstream/configure qemu/configure
  *)
    audio_drv_list="oss"
    audio_possible_drivers="oss alsa sdl pa"
+@@ -686,7 +710,7 @@
+ 
+ : ${make=${MAKE-make}}
+ : ${install=${INSTALL-install}}
+-: ${python=${PYTHON-python}}
++: ${python=${PYTHON-python3}}
+ : ${smbd=${SMBD-/usr/sbin/smbd}}
+ 
+ # Default objcc to clang if available, otherwise use CC
 @@ -731,6 +755,8 @@
    ;;
    --prefix=*) prefix="$optarg"
@@ -440,17 +460,6 @@ diff -Paur --no-dereference -- qemu.upstream/main-loop.c qemu/main-loop.c
      sigaddset(&set, SIGALRM);
      sigaddset(&set, SIGBUS);
      /* SIGINT cannot be handled via signalfd, so that ^C can be used
-diff -Paur --no-dereference -- qemu.upstream/Makefile qemu/Makefile
---- qemu.upstream/Makefile
-+++ qemu/Makefile
-@@ -396,6 +396,7 @@
- 	rm -f config.log
- 	rm -f linux-headers/asm
- 	rm -f qemu-tech.info qemu-tech.aux qemu-tech.cp qemu-tech.dvi qemu-tech.fn qemu-tech.info qemu-tech.ky qemu-tech.log qemu-tech.pdf qemu-tech.pg qemu-tech.toc qemu-tech.tp qemu-tech.vr
-+	rm -f trace-events-all qemu-version.h.tmp
- 	for d in $(TARGET_DIRS); do \
- 	rm -rf $$d || exit 1 ; \
-         done
 diff -Paur --no-dereference -- qemu.upstream/migration/savevm.c qemu/migration/savevm.c
 --- qemu.upstream/migration/savevm.c
 +++ qemu/migration/savevm.c
@@ -574,6 +583,21 @@ diff -Paur --no-dereference -- qemu.upstream/net/socket.c qemu/net/socket.c
              return -1;
          param_localaddr = &localaddr;
      } else {
+diff -Paur --no-dereference -- qemu.upstream/net/tap-haiku.c qemu/net/tap-haiku.c
+--- qemu.upstream/net/tap-haiku.c
++++ qemu/net/tap-haiku.c
+@@ -29,7 +29,11 @@
+ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
+              int vnet_hdr_required, int mq_required, Error **errp)
+ {
++#ifdef __sortix__
++    error_setg(errp, "no tap on Sortix");
++#else
+     error_setg(errp, "no tap on Haiku");
++#endif
+     return -1;
+ }
+ 
 diff -Paur --no-dereference -- qemu.upstream/net/tap.c qemu/net/tap.c
 --- qemu.upstream/net/tap.c
 +++ qemu/net/tap.c
@@ -593,21 +617,6 @@ diff -Paur --no-dereference -- qemu.upstream/net/tap.c qemu/net/tap.c
  
  #include "net/net.h"
  #include "clients.h"
-diff -Paur --no-dereference -- qemu.upstream/net/tap-haiku.c qemu/net/tap-haiku.c
---- qemu.upstream/net/tap-haiku.c
-+++ qemu/net/tap-haiku.c
-@@ -29,7 +29,11 @@
- int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
-              int vnet_hdr_required, int mq_required, Error **errp)
- {
-+#ifdef __sortix__
-+    error_setg(errp, "no tap on Sortix");
-+#else
-     error_setg(errp, "no tap on Haiku");
-+#endif
-     return -1;
- }
- 
 diff -Paur --no-dereference -- qemu.upstream/os-posix.c qemu/os-posix.c
 --- qemu.upstream/os-posix.c
 +++ qemu/os-posix.c
@@ -660,28 +669,6 @@ diff -Paur --no-dereference -- qemu.upstream/os-posix.c qemu/os-posix.c
  
      return ret;
  }
-diff -Paur --no-dereference -- qemu.upstream/pc-bios/optionrom/kvmvapic.S qemu/pc-bios/optionrom/kvmvapic.S
---- qemu.upstream/pc-bios/optionrom/kvmvapic.S
-+++ qemu/pc-bios/optionrom/kvmvapic.S
-@@ -104,7 +104,8 @@
- 	reenable_vtpr
- 	push %ecx
- 
--	fs/movzbl pcr_cpu, %eax
-+	# PATCH: Work around Sortix as(1) considering slashes as comment starters.
-+	fs movzbl pcr_cpu, %eax
- 
- 	mov vcpu_shift, %ecx	; fixup
- 	shl %cl, %eax
-@@ -178,7 +179,7 @@
- 	reenable_vtpr
- 
- mp_set_tpr_failed:
--	fs/movzbl pcr_cpu, %edx
-+	fs movzbl pcr_cpu, %edx
- 
- 	mov vcpu_shift, %ecx	; fixup
- 	shl %cl, %edx
 diff -Paur --no-dereference -- qemu.upstream/pc-bios/optionrom/Makefile qemu/pc-bios/optionrom/Makefile
 --- qemu.upstream/pc-bios/optionrom/Makefile
 +++ qemu/pc-bios/optionrom/Makefile
@@ -713,6 +700,28 @@ diff -Paur --no-dereference -- qemu.upstream/pc-bios/optionrom/Makefile qemu/pc-
  
  build-all: multiboot.bin linuxboot.bin linuxboot_dma.bin kvmvapic.bin
  
+diff -Paur --no-dereference -- qemu.upstream/pc-bios/optionrom/kvmvapic.S qemu/pc-bios/optionrom/kvmvapic.S
+--- qemu.upstream/pc-bios/optionrom/kvmvapic.S
++++ qemu/pc-bios/optionrom/kvmvapic.S
+@@ -104,7 +104,8 @@
+ 	reenable_vtpr
+ 	push %ecx
+ 
+-	fs/movzbl pcr_cpu, %eax
++	# PATCH: Work around Sortix as(1) considering slashes as comment starters.
++	fs movzbl pcr_cpu, %eax
+ 
+ 	mov vcpu_shift, %ecx	; fixup
+ 	shl %cl, %eax
+@@ -178,7 +179,7 @@
+ 	reenable_vtpr
+ 
+ mp_set_tpr_failed:
+-	fs/movzbl pcr_cpu, %edx
++	fs movzbl pcr_cpu, %edx
+ 
+ 	mov vcpu_shift, %ecx	; fixup
+ 	shl %cl, %edx
 diff -Paur --no-dereference -- qemu.upstream/qemu-char.c qemu/qemu-char.c
 --- qemu.upstream/qemu-char.c
 +++ qemu/qemu-char.c
@@ -1077,21 +1086,6 @@ diff -Paur --no-dereference -- qemu.upstream/ui/sdl.c qemu/ui/sdl.c
  
  static uint8_t sdl_keyevent_to_keycode(const SDL_KeyboardEvent *ev)
  {
-diff -Paur --no-dereference -- qemu.upstream/ui/vnc.c qemu/ui/vnc.c
---- qemu.upstream/ui/vnc.c
-+++ qemu/ui/vnc.c
-@@ -2481,10 +2481,8 @@
- {
-     int i;
- 
--    srand(time(NULL)+getpid()+getpid()*987654+rand());
--
-     for (i = 0 ; i < sizeof(vs->challenge) ; i++)
--        vs->challenge[i] = (int) (256.0*rand()/(RAND_MAX+1.0));
-+        vs->challenge[i] = (int) (256.0*arc4random()/(UINT32_MAX+1.0));
- }
- 
- static int protocol_client_auth_vnc(VncState *vs, uint8_t *data, size_t len)
 diff -Paur --no-dereference -- qemu.upstream/ui/vnc-enc-tight.c qemu/ui/vnc-enc-tight.c
 --- qemu.upstream/ui/vnc-enc-tight.c
 +++ qemu/ui/vnc-enc-tight.c
@@ -1108,6 +1102,21 @@ diff -Paur --no-dereference -- qemu.upstream/ui/vnc-enc-tight.c qemu/ui/vnc-enc-
  #include <jpeglib.h>
  #endif
  
+diff -Paur --no-dereference -- qemu.upstream/ui/vnc.c qemu/ui/vnc.c
+--- qemu.upstream/ui/vnc.c
++++ qemu/ui/vnc.c
+@@ -2481,10 +2481,8 @@
+ {
+     int i;
+ 
+-    srand(time(NULL)+getpid()+getpid()*987654+rand());
+-
+     for (i = 0 ; i < sizeof(vs->challenge) ; i++)
+-        vs->challenge[i] = (int) (256.0*rand()/(RAND_MAX+1.0));
++        vs->challenge[i] = (int) (256.0*arc4random()/(UINT32_MAX+1.0));
+ }
+ 
+ static int protocol_client_auth_vnc(VncState *vs, uint8_t *data, size_t len)
 diff -Paur --no-dereference -- qemu.upstream/util/compatfd.c qemu/util/compatfd.c
 --- qemu.upstream/util/compatfd.c
 +++ qemu/util/compatfd.c
