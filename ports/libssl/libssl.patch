@@ -217,7 +217,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/openssl/s_socket.c libssl/ap
 diff -Paur --no-dereference -- libssl.upstream/configure libssl/configure
 --- libssl.upstream/configure
 +++ libssl/configure
-@@ -12178,6 +12178,10 @@
+@@ -12180,6 +12180,10 @@
  		HOST_OS=midipix
  		CPPFLAGS="$CPPFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
  		;;
@@ -231,7 +231,7 @@ diff -Paur --no-dereference -- libssl.upstream/configure libssl/configure
 diff -Paur --no-dereference -- libssl.upstream/crypto/Makefile.in libssl/crypto/Makefile.in
 --- libssl.upstream/crypto/Makefile.in
 +++ libssl/crypto/Makefile.in
-@@ -1640,7 +1640,8 @@
+@@ -1573,7 +1573,8 @@
  CC = @CC@
  CCAS = @CCAS@
  CCASDEPMODE = @CCASDEPMODE@
