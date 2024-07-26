@@ -1,217 +1,7 @@
-diff -Paur --no-dereference -- python.upstream/config.sub python/config.sub
---- python.upstream/config.sub
-+++ python/config.sub
-@@ -1360,7 +1360,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* | -plan9* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
-diff -Paur --no-dereference -- python.upstream/configure python/configure
---- python.upstream/configure
-+++ python/configure
-@@ -3253,6 +3253,9 @@
- 	*-*-cygwin*)
- 		ac_sys_system=Cygwin
- 		;;
-+	*-*-sortix*)
-+		ac_sys_system=Sortix
-+		;;
- 	*)
- 		# for now, limit cross builds to known configurations
- 		MACHDEP="unknown"
-@@ -3299,9 +3302,8 @@
- 		_host_cpu=
- 		;;
- 	*)
--		# for now, limit cross builds to known configurations
--		MACHDEP="unknown"
--		as_fn_error $? "cross build not supported for $host" "$LINENO" 5
-+		_host_cpu=$host_cpu
-+		;;
- 	esac
- 	_PYTHON_HOST_PLATFORM="$MACHDEP${_host_cpu:+-$_host_cpu}"
- fi
-@@ -9279,7 +9281,9 @@
- 	CYGWIN*)
- 		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
- 		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
--	*)	LDSHARED="ld";;
-+	*)
-+		LDSHARED='$(CC) -shared'
-+		LDCXXSHARED='$(CXX) -shared';;
- 	esac
- fi
- { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LDSHARED" >&5
-@@ -9619,6 +9623,50 @@
- 						# pthread (first!) on Linux
- fi
- 
-+# check if we need libiconv for iconv functions
-+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libiconv in -liconv" >&5
-+$as_echo_n "checking for libiconv in -liconv... " >&6; }
-+if ${ac_cv_lib_iconv_iconv+:} false; then :
-+  $as_echo_n "(cached) " >&6
-+else
-+  ac_check_lib_save_LIBS=$LIBS
-+LIBS="-liconv  $LIBS"
-+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-+/* end confdefs.h.  */
-+
-+/* Override any GCC internal prototype to avoid an error.
-+   Use char because int might match the return type of a GCC
-+   builtin and then its argument prototype would still apply.  */
-+#ifdef __cplusplus
-+extern "C"
-+#endif
-+char libiconv ();
-+int
-+main ()
-+{
-+return libiconv ();
-+  ;
-+  return 0;
-+}
-+_ACEOF
-+if ac_fn_c_try_link "$LINENO"; then :
-+  ac_cv_lib_iconv_libiconv=yes
-+else
-+  ac_cv_lib_iconv_libiconv=no
-+fi
-+rm -f core conftest.err conftest.$ac_objext \
-+    conftest$ac_exeext conftest.$ac_ext
-+LIBS=$ac_check_lib_save_LIBS
-+fi
-+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_iconv_libiconv" >&5
-+$as_echo "$ac_cv_lib_iconv_libiconv" >&6; }
-+if test "x$ac_cv_lib_iconv_libiconv" = xyes; then :
-+
-+$as_echo "#define WITH_LIBICONV 1" >>confdefs.h
-+
-+        LIBS="-liconv $LIBS"
-+fi
-+
- # check if we need libintl for locale functions
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking for textdomain in -lintl" >&5
- $as_echo_n "checking for textdomain in -lintl... " >&6; }
-@@ -12709,7 +12757,7 @@
- if test "${enable_ipv6+set}" = set; then
-   ac_cv_buggy_getaddrinfo="no -- configured with --(en|dis)able-ipv6"
- else
--  ac_cv_buggy_getaddrinfo=yes
-+  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
- fi
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -12808,7 +12856,7 @@
- if ac_fn_c_try_run "$LINENO"; then :
-   ac_cv_buggy_getaddrinfo=no
- else
--  ac_cv_buggy_getaddrinfo=yes
-+  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
- fi
- rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
-   conftest.$ac_objext conftest.beam conftest.$ac_ext
-@@ -15712,7 +15760,7 @@
- 
- # first curses header check
- ac_save_cppflags="$CPPFLAGS"
--CPPFLAGS="$CPPFLAGS -I/usr/include/ncursesw"
-+# PATCH: Removed cross-compilation unsafe include path addition.
- 
- for ac_header in curses.h ncurses.h
- do :
-@@ -15908,6 +15956,12 @@
- 
- if test "x$cross_compiling" = xyes; then
-   if test "${ac_cv_file__dev_ptmx+set}" != set; then
-+    ac_cv_file__dev_ptmx=yes
-+  fi
-+  if test "${ac_cv_file__dev_ptc+set}" != set; then
-+    ac_cv_file__dev_ptc=no
-+  fi
-+  if test "${ac_cv_file__dev_ptmx+set}" != set; then
-     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for /dev/ptmx" >&5
- $as_echo_n "checking for /dev/ptmx... " >&6; }
-     { $as_echo "$as_me:${as_lineno-$LINENO}: result: not set" >&5
-diff -Paur --no-dereference -- python.upstream/configure.ac python/configure.ac
---- python.upstream/configure.ac
-+++ python/configure.ac
-@@ -385,6 +385,9 @@
- 	*-*-cygwin*)
- 		ac_sys_system=Cygwin
- 		;;
-+	*-*-sortix*)
-+		ac_sys_system=Sortix
-+		;;
- 	*)
- 		# for now, limit cross builds to known configurations
- 		MACHDEP="unknown"
-@@ -431,9 +434,8 @@
- 		_host_cpu=
- 		;;
- 	*)
--		# for now, limit cross builds to known configurations
--		MACHDEP="unknown"
--		AC_MSG_ERROR([cross build not supported for $host])
-+		_host_cpu=$host_cpu
-+		;;
- 	esac
- 	_PYTHON_HOST_PLATFORM="$MACHDEP${_host_cpu:+-$_host_cpu}"
- fi
-@@ -2535,7 +2537,9 @@
- 	CYGWIN*)
- 		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
- 		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
--	*)	LDSHARED="ld";;
-+	*)
-+		LDSHARED='$(CC) -shared'
-+		LDCXXSHARED='$(CXX) -shared';;
- 	esac
- fi
- AC_MSG_RESULT($LDSHARED)
-@@ -2679,6 +2683,12 @@
- 						# pthread (first!) on Linux
- fi
- 
-+# check if we need libiconv for iconv functions
-+AC_CHECK_LIB(iconv, libiconv,
-+	[AC_DEFINE(WITH_ICONV, 1,
-+	[Define to 1 if libiconv is needed for iconv functions.])
-+        LIBS="-liconv $LIBS"])
-+
- # check if we need libintl for locale functions
- AC_CHECK_LIB(intl, textdomain,
- 	[AC_DEFINE(WITH_LIBINTL, 1,
-@@ -3871,7 +3881,7 @@
- if test "${enable_ipv6+set}" = set; then
-   ac_cv_buggy_getaddrinfo="no -- configured with --(en|dis)able-ipv6"
- else
--  ac_cv_buggy_getaddrinfo=yes
-+  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
- fi]))
- fi
- 
-@@ -4980,6 +4990,12 @@
- dnl NOTE: Inform user how to proceed with files when cross compiling.
- if test "x$cross_compiling" = xyes; then
-   if test "${ac_cv_file__dev_ptmx+set}" != set; then
-+    ac_cv_file__dev_ptmx=yes
-+  fi
-+  if test "${ac_cv_file__dev_ptc+set}" != set; then
-+    ac_cv_file__dev_ptc=no
-+  fi
-+  if test "${ac_cv_file__dev_ptmx+set}" != set; then
-     AC_MSG_CHECKING([for /dev/ptmx])
-     AC_MSG_RESULT([not set])
-     AC_MSG_ERROR([set ac_cv_file__dev_ptmx to yes/no in your CONFIG_SITE file when cross compiling])
 diff -Paur --no-dereference -- python.upstream/Include/py_curses.h python/Include/py_curses.h
 --- python.upstream/Include/py_curses.h
 +++ python/Include/py_curses.h
-@@ -48,18 +48,25 @@
+@@ -48,22 +48,29 @@
  #include <ncurses.h>
  #else
  #include <curses.h>
@@ -228,15 +18,22 @@ diff -Paur --no-dereference -- python.upstream/Include/py_curses.h python/Includ
  #ifdef HAVE_NCURSES_H
  /* configure was checking <curses.h>, but we will
     use <ncurses.h>, which has all these features. */
-+/* PATCH: Sortix's libcurses doesn't have a public _ISPAD */
+-#ifndef WINDOW_HAS_FLAGS
+-#define WINDOW_HAS_FLAGS 1
+-#endif
++/* PATCH: Sortix's libcurses doesn't have a public _ISPAD. */
++/* PATCH: The above statement doesn't appear to be true anymore, the
++          bootstrap python build is failing because ncurses doesn't
++          seem to expose the typedef anymore. */
 +#ifdef _ISPAD
- #ifndef WINDOW_HAS_FLAGS
- #define WINDOW_HAS_FLAGS 1
- #endif
-+#endif
  #ifndef MVWDELCH_IS_EXPRESSION
  #define MVWDELCH_IS_EXPRESSION 1
  #endif
+ #endif
++#endif
+ 
+ #ifdef __cplusplus
+ extern "C" {
 diff -Paur --no-dereference -- python.upstream/Lib/ctypes/__init__.py python/Lib/ctypes/__init__.py
 --- python.upstream/Lib/ctypes/__init__.py
 +++ python/Lib/ctypes/__init__.py
@@ -315,6 +112,216 @@ diff -Paur --no-dereference -- python.upstream/Makefile.pre.in python/Makefile.p
  
  # Check for smelly exported symbols (not starting with Py/_Py)
  smelly: all
+diff -Paur --no-dereference -- python.upstream/Modules/Setup.dist python/Modules/Setup.dist
+--- python.upstream/Modules/Setup.dist
++++ python/Modules/Setup.dist
+@@ -97,6 +97,8 @@
+ COREPYTHONPATH=$(DESTPATH)$(SITEPATH)$(TESTPATH)$(MACHDEPPATH)$(EXTRAMACHDEPPATH)
+ PYTHONPATH=$(COREPYTHONPATH)
+ 
++# PATCH: Build all the modules into the python binary rather than shared libs.
++
+ 
+ # The modules listed here can't be built as shared libraries for
+ # various reasons; therefore they are listed here instead of in the
+@@ -164,45 +166,44 @@
+ # it, depending on your system -- see the GNU readline instructions.
+ # It's okay for this to be a shared library, too.
+ 
+-#readline readline.c -lreadline -ltermcap
++readline readline.c -lreadline -ltermcap
+ 
+ 
+ # Modules that should always be present (non UNIX dependent):
+ 
+-#array arraymodule.c	# array objects
+-#cmath cmathmodule.c _math.c # -lm # complex math library functions
+-#math mathmodule.c _math.c # -lm # math library functions, e.g. sin()
+-#_struct _struct.c	# binary structure packing/unpacking
+-#_weakref _weakref.c	# basic weak reference support
++array arraymodule.c	# array objects
++cmath cmathmodule.c	# -lm # complex math library functions
++math mathmodule.c _math.c # -lm # math library functions, e.g. sin()
++_struct _struct.c	# binary structure packing/unpacking
+ #_testcapi _testcapimodule.c    # Python C API test module
+-#_random _randommodule.c	# Random number generator
+-#_elementtree -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI _elementtree.c	# elementtree accelerator
+-#_pickle _pickle.c	# pickle accelerator
+-#_datetime _datetimemodule.c	# datetime accelerator
+-#_bisect _bisectmodule.c	# Bisection algorithms
+-#_heapq _heapqmodule.c	# Heap queue algorithm
+-#_asyncio _asynciomodule.c  # Fast asyncio Future
++_random _randommodule.c	# Random number generator
++_elementtree -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI _elementtree.c	# elementtree accelerator
++_pickle _pickle.c	# pickle accelerator
++_datetime _datetimemodule.c	# datetime accelerator
++_bisect _bisectmodule.c	# Bisection algorithms
++_heapq _heapqmodule.c	# Heap queue algorithm
++_asyncio _asynciomodule.c  # Fast asyncio Future
+ 
+-#unicodedata unicodedata.c    # static Unicode character database
++unicodedata unicodedata.c    # static Unicode character database
+ 
+ 
+ # Modules with some UNIX dependencies -- on by default:
+ # (If you have a really backward UNIX, select and socket may not be
+ # supported...)
+ 
+-#fcntl fcntlmodule.c	# fcntl(2) and ioctl(2)
++fcntl fcntlmodule.c	# fcntl(2) and ioctl(2)
+ #spwd spwdmodule.c		# spwd(3)
+-#grp grpmodule.c		# grp(3)
+-#select selectmodule.c	# select(2); not on ancient System V
++grp grpmodule.c		# grp(3)
++select selectmodule.c	# select(2); not on ancient System V
+ 
+ # Memory-mapped files (also works on Win32).
+-#mmap mmapmodule.c
++mmap mmapmodule.c
+ 
+ # CSV file helper
+-#_csv _csv.c
++_csv _csv.c
+ 
+ # Socket module helper for socket(2)
+-#_socket socketmodule.c
++_socket socketmodule.c
+ 
+ # Socket module helper for SSL support; you must comment out the other
+ # socket line above, and possibly edit the SSL variable:
+@@ -210,6 +211,7 @@
+ #_ssl _ssl.c \
+ #	-DUSE_SSL -I$(SSL)/include -I$(SSL)/include/openssl \
+ #	-L$(SSL)/lib -lssl -lcrypto
++_ssl _ssl.c -DUSE_SSL -lssl -lcrypto
+ 
+ # The crypt module is now disabled by default because it breaks builds
+ # on many systems (where -lcrypt is needed), e.g. Linux (I believe).
+@@ -223,10 +225,10 @@
+ # are not supported by all UNIX systems:
+ 
+ #nis nismodule.c -lnsl	# Sun yellow pages -- not everywhere
+-#termios termios.c	# Steen Lumholt's termios module
+-#resource resource.c	# Jeremy Hylton's rlimit interface
++termios termios.c	# Steen Lumholt's termios module
++resource resource.c	# Jeremy Hylton's rlimit interface
+ 
+-#_posixsubprocess _posixsubprocess.c  # POSIX subprocess module helper
++_posixsubprocess _posixsubprocess.c  # POSIX subprocess module helper
+ 
+ # Multimedia modules -- off by default.
+ # These don't work for 64-bit platforms!!!
+@@ -242,17 +244,18 @@
+ # The _md5 module implements the RSA Data Security, Inc. MD5
+ # Message-Digest Algorithm, described in RFC 1321.
+ 
+-#_md5 md5module.c
++_md5 md5module.c
+ 
+ 
+ # The _sha module implements the SHA checksum algorithms.
+ # (NIST's Secure Hash Algorithms.)
+-#_sha1 sha1module.c
+-#_sha256 sha256module.c
+-#_sha512 sha512module.c
++_sha1 sha1module.c
++_sha256 sha256module.c
++_sha512 sha512module.c
++_sha3 _sha3/sha3module.c
+ 
+ # _blake module
+-#_blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
++_blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
+ 
+ # The _tkinter module.
+ #
+@@ -298,7 +301,7 @@
+ #	-lX11
+ 
+ # Lance Ellinghaus's syslog module
+-#syslog syslogmodule.c		# syslog daemon interface
++syslog syslogmodule.c		# syslog daemon interface
+ 
+ 
+ # Curses support, requiring the System V version of curses, often
+@@ -307,9 +310,9 @@
+ #
+ # First, look at Setup.config; configure may have set this for you.
+ 
+-#_curses _cursesmodule.c -lcurses -ltermcap
++_curses _cursesmodule.c -lcurses -ltermcap
+ # Wrapper for the panel library that's part of ncurses and SYSV curses.
+-#_curses_panel _curses_panel.c -lpanel -lncurses
++_curses_panel _curses_panel.c -lpanel -lncurses
+ 
+ 
+ # Modules that provide persistent dictionary-like semantics.  You will
+@@ -336,10 +339,10 @@
+ 
+ 
+ # Helper module for various ascii-encoders
+-#binascii binascii.c
++binascii binascii.c
+ 
+ # Fred Drake's interface to the Python parser
+-#parser parsermodule.c
++parser parsermodule.c
+ 
+ 
+ # Lee Busby's SIGFPE modules.
+@@ -357,12 +360,12 @@
+ #fpectl fpectlmodule.c ...
+ 
+ # Test module for fpectl.  No extra libraries needed.
+-#fpetest fpetestmodule.c
++fpetest fpetestmodule.c
+ 
+ # Andrew Kuchling's zlib module.
+ # This require zlib 1.1.3 (or later).
+ # See http://www.gzip.org/zlib/
+-#zlib zlibmodule.c -I$(prefix)/include -L$(exec_prefix)/lib -lz
++zlib zlibmodule.c -lz
+ 
+ # Interface to the Expat XML parser
+ #
+@@ -375,22 +378,29 @@
+ #
+ # More information on Expat can be found at www.libexpat.org.
+ #
+-#pyexpat expat/xmlparse.c expat/xmlrole.c expat/xmltok.c pyexpat.c -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
++pyexpat expat/xmlparse.c expat/xmlrole.c expat/xmltok.c pyexpat.c -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
+ 
+ # Hye-Shik Chang's CJKCodecs
+ 
+ # multibytecodec is required for all the other CJK codec modules
+-#_multibytecodec cjkcodecs/multibytecodec.c
++_multibytecodec cjkcodecs/multibytecodec.c
+ 
+-#_codecs_cn cjkcodecs/_codecs_cn.c
+-#_codecs_hk cjkcodecs/_codecs_hk.c
+-#_codecs_iso2022 cjkcodecs/_codecs_iso2022.c
+-#_codecs_jp cjkcodecs/_codecs_jp.c
+-#_codecs_kr cjkcodecs/_codecs_kr.c
+-#_codecs_tw cjkcodecs/_codecs_tw.c
++_codecs_cn cjkcodecs/_codecs_cn.c
++_codecs_hk cjkcodecs/_codecs_hk.c
++_codecs_iso2022 cjkcodecs/_codecs_iso2022.c
++_codecs_jp cjkcodecs/_codecs_jp.c
++_codecs_kr cjkcodecs/_codecs_kr.c
++_codecs_tw cjkcodecs/_codecs_tw.c
+ 
+ # Example -- included for reference only:
+ # xx xxmodule.c
+ 
+ # Another example -- the 'xxsubtype' module shows C-level subtyping in action
+ xxsubtype xxsubtype.c
++
++# PATCH: The rest of the modules that weren't mentioned in this file.
++_bz2 _bz2module.c -lbz2
++_ctypes _ctypes/callbacks.c _ctypes/callproc.c _ctypes/cfield.c _ctypes/_ctypes.c _ctypes/_ctypes_test.c _ctypes/malloc_closure.c _ctypes/stgdict.c -lffi
++_lsprof _lsprof.c rotatingtree.c
++_lzma _lzmamodule.c -llzma
++_opcode _opcode.c
 diff -Paur --no-dereference -- python.upstream/Modules/_cursesmodule.c python/Modules/_cursesmodule.c
 --- python.upstream/Modules/_cursesmodule.c
 +++ python/Modules/_cursesmodule.c
@@ -537,6 +544,28 @@ diff -Paur --no-dereference -- python.upstream/Modules/_cursesmodule.c python/Mo
  #ifndef STRICT_SYSV_CURSES
      {"use_default_colors",  (PyCFunction)PyCurses_Use_Default_Colors, METH_NOARGS},
  #endif
+diff -Paur --no-dereference -- python.upstream/Modules/_ssl.c python/Modules/_ssl.c
+--- python.upstream/Modules/_ssl.c
++++ python/Modules/_ssl.c
+@@ -101,6 +101,9 @@
+ 
+ #if (OPENSSL_VERSION_NUMBER >= 0x10100000L) && !defined(LIBRESSL_VERSION_NUMBER)
+ #  define OPENSSL_VERSION_1_1 1
++/* PATCH: The libressl shipped with Sortix is new enough.*/
++#elif !defined(OPENSSL_VERSION_1_1) && defined(LIBRESSL_VERSION_NUMBER) && 0x3000200fL <= LIBRESSL_VERSION_NUMBER
++#  define OPENSSL_VERSION_1_1 1
+ #endif
+ 
+ /* Openssl comes with TLSv1.1 and TLSv1.2 between 1.0.0h and 1.0.1
+@@ -616,7 +619,7 @@
+     Py_INCREF(sslctx);
+ 
+     /* Make sure the SSL error state is initialized */
+-    (void) ERR_get_state();
++    /* PATCH: ERR_get_state is now private, ERR_clear_error calls it anyway. */
+     ERR_clear_error();
+ 
+     PySSL_BEGIN_ALLOW_THREADS
 diff -Paur --no-dereference -- python.upstream/Modules/expat/xmlparse.c python/Modules/expat/xmlparse.c
 --- python.upstream/Modules/expat/xmlparse.c
 +++ python/Modules/expat/xmlparse.c
@@ -716,216 +745,6 @@ diff -Paur --no-dereference -- python.upstream/Modules/resource.c python/Modules
  
      if (PyErr_Occurred()) {
          Py_DECREF(result);
-diff -Paur --no-dereference -- python.upstream/Modules/Setup.dist python/Modules/Setup.dist
---- python.upstream/Modules/Setup.dist
-+++ python/Modules/Setup.dist
-@@ -97,6 +97,8 @@
- COREPYTHONPATH=$(DESTPATH)$(SITEPATH)$(TESTPATH)$(MACHDEPPATH)$(EXTRAMACHDEPPATH)
- PYTHONPATH=$(COREPYTHONPATH)
- 
-+# PATCH: Build all the modules into the python binary rather than shared libs.
-+
- 
- # The modules listed here can't be built as shared libraries for
- # various reasons; therefore they are listed here instead of in the
-@@ -164,45 +166,44 @@
- # it, depending on your system -- see the GNU readline instructions.
- # It's okay for this to be a shared library, too.
- 
--#readline readline.c -lreadline -ltermcap
-+readline readline.c -lreadline -ltermcap
- 
- 
- # Modules that should always be present (non UNIX dependent):
- 
--#array arraymodule.c	# array objects
--#cmath cmathmodule.c _math.c # -lm # complex math library functions
--#math mathmodule.c _math.c # -lm # math library functions, e.g. sin()
--#_struct _struct.c	# binary structure packing/unpacking
--#_weakref _weakref.c	# basic weak reference support
-+array arraymodule.c	# array objects
-+cmath cmathmodule.c	# -lm # complex math library functions
-+math mathmodule.c _math.c # -lm # math library functions, e.g. sin()
-+_struct _struct.c	# binary structure packing/unpacking
- #_testcapi _testcapimodule.c    # Python C API test module
--#_random _randommodule.c	# Random number generator
--#_elementtree -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI _elementtree.c	# elementtree accelerator
--#_pickle _pickle.c	# pickle accelerator
--#_datetime _datetimemodule.c	# datetime accelerator
--#_bisect _bisectmodule.c	# Bisection algorithms
--#_heapq _heapqmodule.c	# Heap queue algorithm
--#_asyncio _asynciomodule.c  # Fast asyncio Future
-+_random _randommodule.c	# Random number generator
-+_elementtree -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI _elementtree.c	# elementtree accelerator
-+_pickle _pickle.c	# pickle accelerator
-+_datetime _datetimemodule.c	# datetime accelerator
-+_bisect _bisectmodule.c	# Bisection algorithms
-+_heapq _heapqmodule.c	# Heap queue algorithm
-+_asyncio _asynciomodule.c  # Fast asyncio Future
- 
--#unicodedata unicodedata.c    # static Unicode character database
-+unicodedata unicodedata.c    # static Unicode character database
- 
- 
- # Modules with some UNIX dependencies -- on by default:
- # (If you have a really backward UNIX, select and socket may not be
- # supported...)
- 
--#fcntl fcntlmodule.c	# fcntl(2) and ioctl(2)
-+fcntl fcntlmodule.c	# fcntl(2) and ioctl(2)
- #spwd spwdmodule.c		# spwd(3)
--#grp grpmodule.c		# grp(3)
--#select selectmodule.c	# select(2); not on ancient System V
-+grp grpmodule.c		# grp(3)
-+select selectmodule.c	# select(2); not on ancient System V
- 
- # Memory-mapped files (also works on Win32).
--#mmap mmapmodule.c
-+mmap mmapmodule.c
- 
- # CSV file helper
--#_csv _csv.c
-+_csv _csv.c
- 
- # Socket module helper for socket(2)
--#_socket socketmodule.c
-+_socket socketmodule.c
- 
- # Socket module helper for SSL support; you must comment out the other
- # socket line above, and possibly edit the SSL variable:
-@@ -210,6 +211,7 @@
- #_ssl _ssl.c \
- #	-DUSE_SSL -I$(SSL)/include -I$(SSL)/include/openssl \
- #	-L$(SSL)/lib -lssl -lcrypto
-+_ssl _ssl.c -DUSE_SSL -lssl -lcrypto
- 
- # The crypt module is now disabled by default because it breaks builds
- # on many systems (where -lcrypt is needed), e.g. Linux (I believe).
-@@ -223,10 +225,10 @@
- # are not supported by all UNIX systems:
- 
- #nis nismodule.c -lnsl	# Sun yellow pages -- not everywhere
--#termios termios.c	# Steen Lumholt's termios module
--#resource resource.c	# Jeremy Hylton's rlimit interface
-+termios termios.c	# Steen Lumholt's termios module
-+resource resource.c	# Jeremy Hylton's rlimit interface
- 
--#_posixsubprocess _posixsubprocess.c  # POSIX subprocess module helper
-+_posixsubprocess _posixsubprocess.c  # POSIX subprocess module helper
- 
- # Multimedia modules -- off by default.
- # These don't work for 64-bit platforms!!!
-@@ -242,17 +244,18 @@
- # The _md5 module implements the RSA Data Security, Inc. MD5
- # Message-Digest Algorithm, described in RFC 1321.
- 
--#_md5 md5module.c
-+_md5 md5module.c
- 
- 
- # The _sha module implements the SHA checksum algorithms.
- # (NIST's Secure Hash Algorithms.)
--#_sha1 sha1module.c
--#_sha256 sha256module.c
--#_sha512 sha512module.c
-+_sha1 sha1module.c
-+_sha256 sha256module.c
-+_sha512 sha512module.c
-+_sha3 _sha3/sha3module.c
- 
- # _blake module
--#_blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
-+_blake2 _blake2/blake2module.c _blake2/blake2b_impl.c _blake2/blake2s_impl.c
- 
- # The _tkinter module.
- #
-@@ -298,7 +301,7 @@
- #	-lX11
- 
- # Lance Ellinghaus's syslog module
--#syslog syslogmodule.c		# syslog daemon interface
-+syslog syslogmodule.c		# syslog daemon interface
- 
- 
- # Curses support, requiring the System V version of curses, often
-@@ -307,9 +310,9 @@
- #
- # First, look at Setup.config; configure may have set this for you.
- 
--#_curses _cursesmodule.c -lcurses -ltermcap
-+_curses _cursesmodule.c -lcurses -ltermcap
- # Wrapper for the panel library that's part of ncurses and SYSV curses.
--#_curses_panel _curses_panel.c -lpanel -lncurses
-+_curses_panel _curses_panel.c -lpanel -lncurses
- 
- 
- # Modules that provide persistent dictionary-like semantics.  You will
-@@ -336,10 +339,10 @@
- 
- 
- # Helper module for various ascii-encoders
--#binascii binascii.c
-+binascii binascii.c
- 
- # Fred Drake's interface to the Python parser
--#parser parsermodule.c
-+parser parsermodule.c
- 
- 
- # Lee Busby's SIGFPE modules.
-@@ -357,12 +360,12 @@
- #fpectl fpectlmodule.c ...
- 
- # Test module for fpectl.  No extra libraries needed.
--#fpetest fpetestmodule.c
-+fpetest fpetestmodule.c
- 
- # Andrew Kuchling's zlib module.
- # This require zlib 1.1.3 (or later).
- # See http://www.gzip.org/zlib/
--#zlib zlibmodule.c -I$(prefix)/include -L$(exec_prefix)/lib -lz
-+zlib zlibmodule.c -lz
- 
- # Interface to the Expat XML parser
- #
-@@ -375,22 +378,29 @@
- #
- # More information on Expat can be found at www.libexpat.org.
- #
--#pyexpat expat/xmlparse.c expat/xmlrole.c expat/xmltok.c pyexpat.c -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
-+pyexpat expat/xmlparse.c expat/xmlrole.c expat/xmltok.c pyexpat.c -I$(srcdir)/Modules/expat -DHAVE_EXPAT_CONFIG_H -DUSE_PYEXPAT_CAPI
- 
- # Hye-Shik Chang's CJKCodecs
- 
- # multibytecodec is required for all the other CJK codec modules
--#_multibytecodec cjkcodecs/multibytecodec.c
-+_multibytecodec cjkcodecs/multibytecodec.c
- 
--#_codecs_cn cjkcodecs/_codecs_cn.c
--#_codecs_hk cjkcodecs/_codecs_hk.c
--#_codecs_iso2022 cjkcodecs/_codecs_iso2022.c
--#_codecs_jp cjkcodecs/_codecs_jp.c
--#_codecs_kr cjkcodecs/_codecs_kr.c
--#_codecs_tw cjkcodecs/_codecs_tw.c
-+_codecs_cn cjkcodecs/_codecs_cn.c
-+_codecs_hk cjkcodecs/_codecs_hk.c
-+_codecs_iso2022 cjkcodecs/_codecs_iso2022.c
-+_codecs_jp cjkcodecs/_codecs_jp.c
-+_codecs_kr cjkcodecs/_codecs_kr.c
-+_codecs_tw cjkcodecs/_codecs_tw.c
- 
- # Example -- included for reference only:
- # xx xxmodule.c
- 
- # Another example -- the 'xxsubtype' module shows C-level subtyping in action
- xxsubtype xxsubtype.c
-+
-+# PATCH: The rest of the modules that weren't mentioned in this file.
-+_bz2 _bz2module.c -lbz2
-+_ctypes _ctypes/callbacks.c _ctypes/callproc.c _ctypes/cfield.c _ctypes/_ctypes.c _ctypes/_ctypes_test.c _ctypes/malloc_closure.c _ctypes/stgdict.c -lffi
-+_lsprof _lsprof.c rotatingtree.c
-+_lzma _lzmamodule.c -llzma
-+_opcode _opcode.c
 diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Modules/socketmodule.c
 --- python.upstream/Modules/socketmodule.c
 +++ python/Modules/socketmodule.c
@@ -1021,19 +840,6 @@ diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Mod
  }
  
  #if defined(HAVE_INET_PTON) || defined(MS_WINDOWS)
-diff -Paur --no-dereference -- python.upstream/Modules/_ssl.c python/Modules/_ssl.c
---- python.upstream/Modules/_ssl.c
-+++ python/Modules/_ssl.c
-@@ -101,6 +101,9 @@
- 
- #if (OPENSSL_VERSION_NUMBER >= 0x10100000L) && !defined(LIBRESSL_VERSION_NUMBER)
- #  define OPENSSL_VERSION_1_1 1
-+/* PATCH: The libressl shipped with Sortix is new enough.*/
-+#elif !defined(OPENSSL_VERSION_1_1) && defined(LIBRESSL_VERSION_NUMBER) && 0x3000200fL <= LIBRESSL_VERSION_NUMBER
-+#  define OPENSSL_VERSION_1_1 1
- #endif
- 
- /* Openssl comes with TLSv1.1 and TLSv1.2 between 1.0.0h and 1.0.1
 diff -Paur --no-dereference -- python.upstream/Modules/timemodule.c python/Modules/timemodule.c
 --- python.upstream/Modules/timemodule.c
 +++ python/Modules/timemodule.c
@@ -1214,3 +1020,213 @@ diff -Paur --no-dereference -- python.upstream/Python/random.c python/Python/ran
      /* nothing to clean */
  #else
      dev_urandom_close();
+diff -Paur --no-dereference -- python.upstream/config.sub python/config.sub
+--- python.upstream/config.sub
++++ python/config.sub
+@@ -1360,7 +1360,7 @@
+ 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
+ 	      | -sym* | -kopensolaris* | -plan9* \
+ 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
+-	      | -aos* | -aros* \
++	      | -aos* | -aros* | -sortix* \
+ 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
+ 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
+ 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+diff -Paur --no-dereference -- python.upstream/configure python/configure
+--- python.upstream/configure
++++ python/configure
+@@ -3253,6 +3253,9 @@
+ 	*-*-cygwin*)
+ 		ac_sys_system=Cygwin
+ 		;;
++	*-*-sortix*)
++		ac_sys_system=Sortix
++		;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+ 		MACHDEP="unknown"
+@@ -3299,9 +3302,8 @@
+ 		_host_cpu=
+ 		;;
+ 	*)
+-		# for now, limit cross builds to known configurations
+-		MACHDEP="unknown"
+-		as_fn_error $? "cross build not supported for $host" "$LINENO" 5
++		_host_cpu=$host_cpu
++		;;
+ 	esac
+ 	_PYTHON_HOST_PLATFORM="$MACHDEP${_host_cpu:+-$_host_cpu}"
+ fi
+@@ -9279,7 +9281,9 @@
+ 	CYGWIN*)
+ 		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
+ 		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
+-	*)	LDSHARED="ld";;
++	*)
++		LDSHARED='$(CC) -shared'
++		LDCXXSHARED='$(CXX) -shared';;
+ 	esac
+ fi
+ { $as_echo "$as_me:${as_lineno-$LINENO}: result: $LDSHARED" >&5
+@@ -9619,6 +9623,50 @@
+ 						# pthread (first!) on Linux
+ fi
+ 
++# check if we need libiconv for iconv functions
++{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for libiconv in -liconv" >&5
++$as_echo_n "checking for libiconv in -liconv... " >&6; }
++if ${ac_cv_lib_iconv_iconv+:} false; then :
++  $as_echo_n "(cached) " >&6
++else
++  ac_check_lib_save_LIBS=$LIBS
++LIBS="-liconv  $LIBS"
++cat confdefs.h - <<_ACEOF >conftest.$ac_ext
++/* end confdefs.h.  */
++
++/* Override any GCC internal prototype to avoid an error.
++   Use char because int might match the return type of a GCC
++   builtin and then its argument prototype would still apply.  */
++#ifdef __cplusplus
++extern "C"
++#endif
++char libiconv ();
++int
++main ()
++{
++return libiconv ();
++  ;
++  return 0;
++}
++_ACEOF
++if ac_fn_c_try_link "$LINENO"; then :
++  ac_cv_lib_iconv_libiconv=yes
++else
++  ac_cv_lib_iconv_libiconv=no
++fi
++rm -f core conftest.err conftest.$ac_objext \
++    conftest$ac_exeext conftest.$ac_ext
++LIBS=$ac_check_lib_save_LIBS
++fi
++{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_iconv_libiconv" >&5
++$as_echo "$ac_cv_lib_iconv_libiconv" >&6; }
++if test "x$ac_cv_lib_iconv_libiconv" = xyes; then :
++
++$as_echo "#define WITH_LIBICONV 1" >>confdefs.h
++
++        LIBS="-liconv $LIBS"
++fi
++
+ # check if we need libintl for locale functions
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for textdomain in -lintl" >&5
+ $as_echo_n "checking for textdomain in -lintl... " >&6; }
+@@ -12709,7 +12757,7 @@
+ if test "${enable_ipv6+set}" = set; then
+   ac_cv_buggy_getaddrinfo="no -- configured with --(en|dis)able-ipv6"
+ else
+-  ac_cv_buggy_getaddrinfo=yes
++  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
+ fi
+ else
+   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -12808,7 +12856,7 @@
+ if ac_fn_c_try_run "$LINENO"; then :
+   ac_cv_buggy_getaddrinfo=no
+ else
+-  ac_cv_buggy_getaddrinfo=yes
++  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
+ fi
+ rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+   conftest.$ac_objext conftest.beam conftest.$ac_ext
+@@ -15712,7 +15760,7 @@
+ 
+ # first curses header check
+ ac_save_cppflags="$CPPFLAGS"
+-CPPFLAGS="$CPPFLAGS -I/usr/include/ncursesw"
++# PATCH: Removed cross-compilation unsafe include path addition.
+ 
+ for ac_header in curses.h ncurses.h
+ do :
+@@ -15908,6 +15956,12 @@
+ 
+ if test "x$cross_compiling" = xyes; then
+   if test "${ac_cv_file__dev_ptmx+set}" != set; then
++    ac_cv_file__dev_ptmx=yes
++  fi
++  if test "${ac_cv_file__dev_ptc+set}" != set; then
++    ac_cv_file__dev_ptc=no
++  fi
++  if test "${ac_cv_file__dev_ptmx+set}" != set; then
+     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for /dev/ptmx" >&5
+ $as_echo_n "checking for /dev/ptmx... " >&6; }
+     { $as_echo "$as_me:${as_lineno-$LINENO}: result: not set" >&5
+diff -Paur --no-dereference -- python.upstream/configure.ac python/configure.ac
+--- python.upstream/configure.ac
++++ python/configure.ac
+@@ -385,6 +385,9 @@
+ 	*-*-cygwin*)
+ 		ac_sys_system=Cygwin
+ 		;;
++	*-*-sortix*)
++		ac_sys_system=Sortix
++		;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+ 		MACHDEP="unknown"
+@@ -431,9 +434,8 @@
+ 		_host_cpu=
+ 		;;
+ 	*)
+-		# for now, limit cross builds to known configurations
+-		MACHDEP="unknown"
+-		AC_MSG_ERROR([cross build not supported for $host])
++		_host_cpu=$host_cpu
++		;;
+ 	esac
+ 	_PYTHON_HOST_PLATFORM="$MACHDEP${_host_cpu:+-$_host_cpu}"
+ fi
+@@ -2535,7 +2537,9 @@
+ 	CYGWIN*)
+ 		LDSHARED="gcc -shared -Wl,--enable-auto-image-base"
+ 		LDCXXSHARED="g++ -shared -Wl,--enable-auto-image-base";;
+-	*)	LDSHARED="ld";;
++	*)
++		LDSHARED='$(CC) -shared'
++		LDCXXSHARED='$(CXX) -shared';;
+ 	esac
+ fi
+ AC_MSG_RESULT($LDSHARED)
+@@ -2679,6 +2683,12 @@
+ 						# pthread (first!) on Linux
+ fi
+ 
++# check if we need libiconv for iconv functions
++AC_CHECK_LIB(iconv, libiconv,
++	[AC_DEFINE(WITH_ICONV, 1,
++	[Define to 1 if libiconv is needed for iconv functions.])
++        LIBS="-liconv $LIBS"])
++
+ # check if we need libintl for locale functions
+ AC_CHECK_LIB(intl, textdomain,
+ 	[AC_DEFINE(WITH_LIBINTL, 1,
+@@ -3871,7 +3881,7 @@
+ if test "${enable_ipv6+set}" = set; then
+   ac_cv_buggy_getaddrinfo="no -- configured with --(en|dis)able-ipv6"
+ else
+-  ac_cv_buggy_getaddrinfo=yes
++  ac_cv_buggy_getaddrinfo="no -- because you assume correctness when cross-compiling"
+ fi]))
+ fi
+ 
+@@ -4980,6 +4990,12 @@
+ dnl NOTE: Inform user how to proceed with files when cross compiling.
+ if test "x$cross_compiling" = xyes; then
+   if test "${ac_cv_file__dev_ptmx+set}" != set; then
++    ac_cv_file__dev_ptmx=yes
++  fi
++  if test "${ac_cv_file__dev_ptc+set}" != set; then
++    ac_cv_file__dev_ptc=no
++  fi
++  if test "${ac_cv_file__dev_ptmx+set}" != set; then
+     AC_MSG_CHECKING([for /dev/ptmx])
+     AC_MSG_RESULT([not set])
+     AC_MSG_ERROR([set ac_cv_file__dev_ptmx to yes/no in your CONFIG_SITE file when cross compiling])
