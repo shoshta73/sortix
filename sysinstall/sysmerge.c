@@ -418,6 +418,15 @@ int main(int argc, char* argv[])
 		install_manifests_detect(source, prefix, system, ports, full);
 	}
 
+	if ( has_system && booting )
+	{
+		char* path;
+		if ( asprintf(&path, "%s/bin:%s/sbin", target, target) < 0 ||
+		     setenv("PATH", path, 1) < 0 )
+			err(1, "malloc");
+		free(path);
+	}
+
 	if ( wait )
 	{
 		printf(" - Scheduling upgrade on next boot...\n");

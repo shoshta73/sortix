@@ -273,6 +273,23 @@ struct communication
 	};
 };
 
+static const char* prefix;
+static const char* static_prefix;
+static char* bin_path;
+static char* etc_path;
+static char* etc_init_path;
+static char* log_path;
+static char* run_path;
+static char* sbin_path;
+static char* share_init_path;
+static char* tmp_path;
+static char* var_path;
+static char* random_seed_path;
+static char* chain_path;
+static bool chain_path_made;
+static char* chain_dev_path;
+static bool chain_dev_path_made;
+
 static pid_t main_pid;
 static pid_t forward_signal_pid = -1;
 
@@ -317,11 +334,6 @@ static size_t pfds_length = 0;
 
 static struct communication* communications = NULL;
 static size_t communications_length = 0;
-
-static bool chain_location_made = false;
-static char chain_location[] = "/tmp/fs.XXXXXX";
-static bool chain_location_dev_made = false;
-static char chain_location_dev[] = "/tmp/fs.XXXXXX/dev";
 
 static void signal_handler(int signum)
 {
@@ -442,13 +454,13 @@ static void log_close(struct log* log)
 	log->buffer = NULL;
 }
 
-static void log_error(struct log* log, const char* prefix, const char* path)
+static void log_error(struct log* log, const char* logprefix, const char* path)
 {
 	// TODO: Log to the init log unless about the init log.
 	if ( !errno )
-		warnx("%s%s", prefix, path ? path : log->path);
+		warnx("%s%s", logprefix, path ? path : log->path);
 	else if ( errno != log->last_errno )
-		warn("%s%s", prefix, path ? path : log->path);
+		warn("%s%s", logprefix, path ? path : log->path);
 	log->last_errno = errno;
 }
 
@@ -575,7 +587,7 @@ static bool log_initialize(struct log* log,
 	log->name = strdup(name);
 	if ( !log->name )
 		return false;
-	if ( asprintf(&log->path, "/var/log/%s.log", name) < 0 )
+	if ( asprintf(&log->path, "%s/%s.log", log_path, name) < 0 )
 		return free(log->name), false;
 	// Preallocate the paths used when renaming log files so there's no error
 	// conditions when cycling logs.
@@ -1511,8 +1523,8 @@ static bool daemon_config_load_search(struct daemon_config* daemon_config,
 	// recursion.
 	const char* search_paths[] =
 	{
-		"/etc/init",
-		"/share/init",
+		etc_init_path,
+		share_init_path,
 	};
 	size_t search_paths_count = sizeof(search_paths) / sizeof(search_paths[0]);
 	for ( size_t i = next_search_path_index; i < search_paths_count; i++ )
@@ -2587,24 +2599,24 @@ static void init(void)
 
 static void write_random_seed(void)
 {
+	// This function is as robust as possible to ensure randomness doesn't fail.
 	const char* will_not = "next boot will not have fresh randomness";
-	const char* path = "/boot/random.seed";
-	int fd = open(path, O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
+	int fd = open(random_seed_path, O_RDWR | O_CREAT | O_NOFOLLOW, 0600);
 	if ( fd < 0 )
 	{
 		if ( errno != ENOENT && errno != EROFS )
-			warning("%s: %s: %m", will_not, path);
+			warning("%s: %s: %m", will_not, random_seed_path);
 		return;
 	}
 	if ( fchown(fd, 0, 0) < 0 )
 	{
-		warning("%s: chown: %s: %m", will_not, path);
+		warning("%s: chown: %s: %m", will_not, random_seed_path);
 		close(fd);
 		return;
 	}
 	if ( fchmod(fd, 0600) < 0 )
 	{
-		warning("%s: chown: %s: %m", will_not, path);
+		warning("%s: chown: %s: %m", will_not, random_seed_path);
 		close(fd);
 		return;
 	}
@@ -2625,13 +2637,13 @@ static void write_random_seed(void)
 	explicit_bzero(buf, sizeof(buf));
 	if ( done < sizeof(buf) )
 	{
-		warning("%s: write: %s: %m", will_not, path);
+		warning("%s: write: %s: %m", will_not, random_seed_path);
 		close(fd);
 		return;
 	}
 	if ( ftruncate(fd, sizeof(buf)) < 0  )
 	{
-		warning("%s: truncate: %s: %m", will_not, path);
+		warning("%s: truncate: %s: %m", will_not, random_seed_path);
 		close(fd);
 		return;
 	}
@@ -2810,12 +2822,16 @@ static int sort_mountpoint(const void* a_ptr, const void* b_ptr)
 
 static void load_fstab(void)
 {
-	FILE* fp = fopen("/etc/fstab", "r");
+	char* fstab_path = join_paths(etc_path, "fstab");
+	if ( !fstab_path )
+		fatal("malloc: %m");
+	FILE* fp = fopen(fstab_path, "r");
 	if ( !fp )
 	{
-		if ( errno == ENOENT )
-			return;
-		fatal("/etc/fstab: %m");
+		if ( errno != ENOENT )
+			fatal("%s: %m", fstab_path);
+		free(fstab_path);
+		return;
 	}
 	char* line = NULL;
 	size_t line_size;
@@ -2849,27 +2865,44 @@ static void load_fstab(void)
 		line_size = 0;
 	}
 	if ( ferror(fp) )
-		fatal("/etc/fstab: %m");
+		fatal("%s: %m", fstab_path);
 	free(line);
 	fclose(fp);
 	qsort(mountpoints, mountpoints_used, sizeof(struct mountpoint),
 	      sort_mountpoint);
+	free(fstab_path);
+}
+
+static char* read_configuration(const char* name, const char* action)
+{
+	char* path = join_paths(etc_path, name);
+	if ( !path )
+		fatal("malloc: %m");
+	FILE* fp = fopen(path, "r");
+	if ( !fp )
+	{
+		if ( errno != ENOENT )
+			warning("%s: %s: %m", action, name);
+		free(path);
+		return NULL;
+	}
+	char* value = read_single_line(fp);
+	fclose(fp);
+	if ( !value )
+		warning("%s: %s: %m", action, path);
+	free(path);
+	return value;
 }
 
 static void set_hostname(void)
 {
-	FILE* fp = fopen("/etc/hostname", "r");
-	if ( !fp && errno == ENOENT )
-		return;
-	if ( !fp )
-		return warning("unable to set hostname: /etc/hostname: %m");
-	char* hostname = read_single_line(fp);
-	fclose(fp);
+	char* action = "unable to set hostname";
+	char* hostname = read_configuration("hostname", action);
 	if ( !hostname )
-		return warning("unable to set hostname: /etc/hostname: %m");
+		return;
 	int ret = sethostname(hostname, strlen(hostname));
 	if ( ret < 0 )
-		warning("unable to set hostname: `%s': %m", hostname);
+		warning("%s: `%s': %m", action, hostname);
 	free(hostname);
 }
 
@@ -2883,31 +2916,26 @@ static void set_kblayout(void)
 	close(tty_fd);
 	if ( unsupported )
 		return;
-	FILE* fp = fopen("/etc/kblayout", "r");
-	if ( !fp && errno == ENOENT )
-		return;
-	if ( !fp )
-		return warning("unable to set keyboard layout: /etc/kblayout: %m");
-	char* kblayout = read_single_line(fp);
-	fclose(fp);
+	char* action = "unable to set keyboard layout";
+	char* kblayout = read_configuration("kblayout", action);
 	if ( !kblayout )
-		return warning("unable to set keyboard layout: /etc/kblayout: %m");
+		return;
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
-	{
-		free(kblayout);
 		warning("unable to set keyboard layout: fork: %m");
-		return;
-	}
-	if ( !child_pid )
+	else if ( !child_pid )
 	{
 		uninstall_signal_handler();
-		execlp("chkblayout", "chkblayout", "--", kblayout, (const char*) NULL);
+		execlp("chkblayout", "chkblayout", "--", kblayout,
+		       (const char*) NULL);
 		warning("setting keyboard layout: chkblayout: %m");
 		_exit(127);
 	}
-	int status;
-	waitpid(child_pid, &status, 0);
+	else
+	{
+		int status;
+		waitpid(child_pid, &status, 0);
+	}
 	free(kblayout);
 }
 
@@ -2926,21 +2954,16 @@ static void set_videomode(void)
 	close(tty_fd);
 	if ( unsupported )
 		return;
-	FILE* fp = fopen("/etc/videomode", "r");
-	if ( !fp && errno == ENOENT )
-		return;
-	if ( !fp )
-		return warning("unable to set video mode: /etc/videomode: %m");
-	char* videomode = read_single_line(fp);
-	fclose(fp);
+	char* action = "unable to set video mode";
+	char* videomode = read_configuration("videomode", action);
 	if ( !videomode )
-		return warning("unable to set video mode: /etc/videomode: %m");
+		return;
 	unsigned int xres = 0;
 	unsigned int yres = 0;
 	unsigned int bpp = 0;
 	if ( sscanf(videomode, "%ux%ux%u", &xres, &yres, &bpp) != 3 )
 	{
-		warning("/etc/videomode: Invalid video mode `%s'", videomode);
+		warning("Invalid video mode `%s'", videomode);
 		free(videomode);
 		return;
 	}
@@ -2981,8 +3004,7 @@ static void set_videomode(void)
 	set_mode.mode.end_y = 0;
 	set_mode.mode.desktop_height = yres;
 	if ( dispmsg_issue(&set_mode, sizeof(set_mode)) < 0 )
-		warning("/etc/videomode: Failed to set video mode `%ux%ux%u': %m",
-		        xres, yres, bpp);
+		warning("Failed to set video mode `%ux%ux%u': %m", xres, yres, bpp);
 }
 
 static int no_dot_nor_dot_dot(const struct dirent* entry, void* ctx)
@@ -3391,26 +3413,30 @@ static void niht(void)
 	cbprintf(&init_log, log_callback, "Finished operating system.\n");
 	log_close(&init_log);
 
-	if ( chain_location_dev_made )
+	if ( chain_dev_path_made )
 	{
-		unmount(chain_location_dev, 0);
-		chain_location_dev_made = false;
+		unmount(chain_dev_path, 0);
+		chain_dev_path_made = false;
 	}
 
 	mountpoints_unmount();
 
-	if ( chain_location_made )
+	if ( chain_path_made )
 	{
-		rmdir(chain_location);
-		chain_location_made = false;
+		rmdir(chain_path);
+		chain_path_made = false;
 	}
 }
 
 static void reinit(void)
 {
 	niht();
+	// Drop the static prefix on reinit and boot with defaults.
 	const char* argv[] = { "init", NULL };
-	execv("/sbin/init", (char* const*) argv);
+	char* init_path = join_paths(prefix, "sbin/init");
+	if ( !init_path )
+		fatal("malloc: %m");
+	execv(init_path, (char* const*) argv);
 	fatal("Failed to load init during reinit: %s: %m", argv[0]);
 }
 
@@ -3424,9 +3450,11 @@ int main(int argc, char* argv[])
 
 	const struct option longopts[] =
 	{
-		{"target", required_argument, NULL, 't'},
+		{"prefix", required_argument, NULL, 'p'},
 		{"quiet", no_argument, NULL, 'q'},
 		{"silent", no_argument, NULL, 's'},
+		{"static-prefix", required_argument, NULL, 'P'},
+		{"target", required_argument, NULL, 't'},
 		{"verbose", no_argument, NULL, 'v'},
 		{0, 0, 0, 0}
 	};
@@ -3436,9 +3464,11 @@ int main(int argc, char* argv[])
 	{
 		switch ( opt )
 		{
-		case 't': target_name = optarg; break;
+		case 'p': prefix = optarg; break;
+		case 'P': static_prefix = optarg; break;
 		case 'q': verbosity = VERBOSITY_QUIET; break;
 		case 's': verbosity = VERBOSITY_SILENT; break;
+		case 't': target_name = optarg; break;
 		case 'v': verbosity = VERBOSITY_VERBOSE; break;
 		default: return 2;
 		}
@@ -3452,6 +3482,23 @@ int main(int argc, char* argv[])
 	if ( atexit(niht) != 0 )
 		fatal("atexit: %m");
 
+	// Determine the directory structure.
+	if ( !prefix ) prefix = "";
+	if ( !static_prefix ) static_prefix = prefix;
+	if ( !(bin_path = join_paths(static_prefix, "bin")) ||
+	     !(sbin_path = join_paths(static_prefix, "sbin")) ||
+	     !(var_path = join_paths(prefix, "var")) ||
+	     !(log_path = join_paths(var_path, "log")) ||
+	     !(run_path = join_paths(var_path, "run")) ||
+	     !(tmp_path = join_paths(prefix, "tmp")) ||
+	     !(etc_path = join_paths(prefix, "etc")) ||
+	     !(etc_init_path = join_paths(etc_path, "init")) ||
+	     !(share_init_path = join_paths(static_prefix, "share/init")) ||
+	     !(random_seed_path = join_paths(prefix, "boot/random.seed")) ||
+	     !(chain_path = join_paths(tmp_path, "fs.XXXXXX")) ||
+	     !(chain_dev_path = join_paths(chain_path, "dev")) )
+		fatal("malloc: %m");
+
 	// Handle signals but block them until the safe points where we handle them.
 	// All child processes have to uninstall the signal handler and unblock the
 	// signals or they keep blocking the signals.
@@ -3460,7 +3507,10 @@ int main(int argc, char* argv[])
 	// The default daemon brings up the operating system and supplies default
 	// values for the other daemon configuration files.
 	struct daemon_config* default_daemon_config = NULL;
-	if ( !access("/etc/init/default", F_OK) || errno != ENOENT )
+	char* default_path = join_paths(etc_init_path, "default");
+	if ( !default_path )
+		fatal("malloc: %m");
+	if ( !access(default_path, F_OK) || errno != ENOENT )
 	{
 		if ( !(default_daemon_config = daemon_config_load("default")) )
 			fatal("Failed to load default daemon configuration");
@@ -3513,7 +3563,8 @@ int main(int argc, char* argv[])
 			fatal("malloc: %m");
 	}
 	else if ( !default_daemon_config )
-		fatal("Failed to load /etc/init/default: %m");
+		fatal("Failed to load %s: %m", default_path);
+	free(default_path);
 
 	// Instantiate the default daemon from its configuration.
 	struct daemon* default_daemon = daemon_create(default_daemon_config);
@@ -3535,21 +3586,25 @@ int main(int argc, char* argv[])
 
 	// Make sure that we have a /tmp directory.
 	umask(0000);
-	mkdir("/tmp", 01777);
-	clean_tmp("/tmp");
+	mkdir(tmp_path, 01777);
+	clean_tmp(tmp_path);
 
 	// Make sure that we have a /var/run directory.
 	umask(0000);
-	mkdir("/var", 0755);
-	mkdir("/var/run", 0755);
-	clean_tmp("/var/run");
+	mkdir(var_path, 0755);
+	mkdir(run_path, 0755);
+	clean_tmp(run_path);
 
 	// Set the default file creation mask.
 	umask(0022);
 
 	// Set up the PATH variable.
-	if ( setenv("PATH", "/bin:/sbin", 1) < 0 )
+	char* path;
+	if ( asprintf(&path, "%s:%s", bin_path, sbin_path) < 0 )
+		fatal("malloc: %m");
+	if ( setenv("PATH", path, 1) < 0 )
 		fatal("setenv: %m");
+	free(path);
 
 	// Load partition tables and create all the block devices.
 	prepare_block_devices();
@@ -3566,9 +3621,9 @@ int main(int argc, char* argv[])
 		char** next_argv = argv + optind;
 		// Create a temporary directory where the real root filesystem will be
 		// mounted.
-		if ( !mkdtemp(chain_location) )
-			fatal("mkdtemp: /tmp/fs.XXXXXX: %m");
-		chain_location_made = true;
+		if ( !mkdtemp(chain_path) )
+			fatal("mkdtemp: %s: %m", chain_path);
+		chain_path_made = true;
 		// Rewrite the filesystem table to mount inside the temporary directory.
 		bool found_root = false;
 		for ( size_t i = 0; i < mountpoints_used; i++ )
@@ -3576,7 +3631,7 @@ int main(int argc, char* argv[])
 			struct mountpoint* mountpoint = &mountpoints[i];
 			if ( !strcmp(mountpoint->entry.fs_file, "/") )
 				found_root = true;
-			char* absolute = join_paths(chain_location, mountpoint->absolute);
+			char* absolute = join_paths(chain_path, mountpoint->absolute);
 			if ( !absolute )
 				fatal("malloc: %m");
 			free(mountpoint->absolute);
@@ -3587,20 +3642,19 @@ int main(int argc, char* argv[])
 		// Mount the filesystem table entries marked for chain boot.
 		mountpoints_mount(true);
 		// Additionally bind the /dev filesystem inside the root filesystem.
-		snprintf(chain_location_dev, sizeof(chain_location_dev), "%s/dev",
-			     chain_location);
-		if ( mkdir(chain_location_dev, 0755) < 0 &&
+		memcpy(chain_dev_path, chain_path, strlen(chain_path));
+		if ( mkdir(chain_dev_path, 0755) < 0 &&
 		     errno != EEXIST && errno != EROFS )
-			fatal("mkdir: %s: %m", chain_location_dev);
+			fatal("mkdir: %s: %m", chain_dev_path);
 		int old_dev_fd = open("/dev", O_DIRECTORY | O_RDONLY);
 		if ( old_dev_fd < 0 )
 			fatal("%s: %m", "/dev");
-		int new_dev_fd = open(chain_location_dev, O_DIRECTORY | O_RDONLY);
+		int new_dev_fd = open(chain_dev_path, O_DIRECTORY | O_RDONLY);
 		if ( new_dev_fd < 0 )
-			fatal("%s: %m", chain_location_dev);
+			fatal("%s: %m", chain_dev_path);
 		if ( fsm_fsbind(old_dev_fd, new_dev_fd, 0) < 0 )
-			fatal("mount: `%s' onto `%s': %m", "/dev", chain_location_dev);
-		chain_location_dev_made = true;
+			fatal("mount: `%s' onto `%s': %m", "/dev", chain_dev_path);
+		chain_dev_path_made = true;
 		close(new_dev_fd);
 		close(old_dev_fd);
 		// TODO: Forward the early init log to the chain init.
@@ -3611,10 +3665,10 @@ int main(int argc, char* argv[])
 		if ( !child_pid )
 		{
 			uninstall_signal_handler();
-			if ( chroot(chain_location) < 0 )
-				fatal("chroot: %s: %m", chain_location);
+			if ( chroot(chain_path) < 0 )
+				fatal("chroot: %s: %m", chain_path);
 			if ( chdir("/") < 0 )
-				fatal("chdir: %s: %m", chain_location);
+				fatal("chdir: %s: %m", chain_path);
 			const char* program = next_argv[0];
 			char verbose_opt[] = {'-', "sqv"[verbosity], '\0'};
 			// Chain boot the operating system upgrade if needed.
@@ -3624,8 +3678,8 @@ int main(int argc, char* argv[])
 				// TODO: Concat next_argv onto this argv_next, so the arguments
 				//       can be passed to the final init.
 				next_argv =
-					(char*[]) { (char*) program, "--target=merge",
-					            verbose_opt, NULL };
+					(char*[]) { (char*) program, "--static-prefix=/sysmerge",
+					            "--target=merge", verbose_opt, NULL };
 			}
 			else if ( next_argc < 1 )
 			{
@@ -3661,8 +3715,8 @@ int main(int argc, char* argv[])
 	// TODO: After releasing Sortix 1.1, remove this compatibility since a
 	// sysmerge from 1.0 will not have a /var/log directory.
 	if ( !strcmp(first_requirement, "merge") &&
-	     access("/var/log", F_OK) < 0 )
-		mkdir("/var/log", 0755);
+	     access(log_path, F_OK) < 0 )
+		mkdir(log_path, 0755);
 
 	// Logging works now that the filesystems have been mounted. Reopen the init
 	// log and write the contents buffered up in memory.
@@ -3686,7 +3740,7 @@ int main(int argc, char* argv[])
 		{
 			uninstall_signal_handler();
 			const char* argv[] = { "sysmerge", "--booting", NULL };
-			execv("/sysmerge/sbin/sysmerge", (char* const*) argv);
+			execvp(argv[0], (char* const*) argv);
 			fatal("Failed to load system upgrade: %s: %m", argv[0]);
 		}
 		forward_signal_pid = child_pid;

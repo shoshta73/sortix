@@ -7,6 +7,8 @@
 .Sh SYNOPSIS
 .Nm init
 .Op Fl qsv
+.Op Fl \-prefix Ns "=" Ns Ar prefix
+.Op Fl \-static-prefix Ns "=" Ns Ar static-prefix
 .Op Fl \-target Ns "=" Ns Ar default-daemon
 .Op Fl \-
 .Op Ar chain-init ...
@@ -50,6 +52,33 @@ the system startup.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
+.It Fl p , \-prefix Ns "=" Ns Ar prefix
+Boot the system inside the
+.Ar prefix
+rather than the root directory.
+This option is not officially supported and does not
+.Xr chroot 2
+and is not communicated to the descendant processes, which by default would
+continue to use many files such as the
+.Xr passwd 5
+of the root directory.
+Use
+.Xr chroot 8
+to as the supported way to spawn a recursive
+.Nm .
+.It Fl P , \-static-prefix Ns "=" Ns Ar static-prefix
+Boot the operating system using the static data (programs, libraries, and
+default configuration) from the
+.Ar static-prefix
+rather than the
+.Fl \-prefix .
+This option is supported and sets the
+.Ev PATH
+environment variable and others accordingly.
+It is designed for
+.Xr sysmerge 8
+to run a new system with a new ABI using the local configuration files during
+the operating system upgrade.
 .It Fl q , \-quiet
 Write status updates to the terminal only about failed daemons.
 This behavior is the default.
@@ -122,8 +151,9 @@ if specified) of the target root filesystem is run inside a chroot.
 If the target is
 .Sy chain-merge ,
 then the
+.Fl \-static-prefix=/sysmerge
 .Fl \-target=merge
-option is passed to the next
+options are passed to the next
 .Nm .
 .Ss Mountpoints
 .Nm
