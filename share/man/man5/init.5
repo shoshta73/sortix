@@ -228,6 +228,14 @@ The # character starts a comment and the rest of the line is ignored.
 The working directory to run the deamon inside.
 (Default is
 .Pa / )
+.It Sy echo Oo Sy false "|" true Oc
+Whether to echo the output of the daemon to the console.
+.Pp
+The default is
+.Sy false
+inherited from the
+.Sy default
+deamon.
 .It Sy exec Ar command
 The command line that starts the daemon.
 The daemon becomes ready when it writes

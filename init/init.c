@@ -220,6 +220,7 @@ struct daemon
 	int readyfd;
 	int outputfd;
 	bool configured;
+	bool echo;
 	bool need_tty;
 	bool was_ready;
 	bool was_terminated;
@@ -243,6 +244,7 @@ struct daemon_config
 	int argc;
 	char** argv;
 	enum exit_code_meaning exit_code_meaning;
+	bool echo;
 	bool per_if;
 	bool need_tty;
 	enum log_method log_method;
@@ -1107,6 +1109,16 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 			return false;
 		}
 	}
+	else if ( !strcmp(argv[0], "echo") )
+	{
+		if ( !strcmp(argv[1], "true") )
+			daemon_config->echo = true;
+		else if ( !strcmp(argv[1], "false") )
+			daemon_config->echo = false;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, argv[0], argv[1]);
+	}
 	else if ( !strcmp(argv[0], "exec") )
 	{
 		for ( int i = 0; i < daemon_config->argc; i++ )
@@ -1329,6 +1341,8 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 			free(daemon_config->cd);
 			daemon_config->cd = NULL;
 		}
+		else if ( !strcmp(argv[1], "echo") )
+			daemon_config->echo = default_config.echo;
 		else if ( !strcmp(argv[1], "exec") )
 		{
 			for ( int i = 0; i < daemon_config->argc; i++ )
@@ -1845,6 +1859,7 @@ static void daemon_configure_sub(struct daemon* daemon,
 		fatal("malloc: %m");
 	if ( !log_initialize(&daemon->log, daemon->name, daemon_config) )
 		fatal("malloc: %m");
+	daemon->echo = daemon_config->echo;
 	daemon->need_tty = daemon_config->need_tty;
 	daemon->configured = true;
 }
@@ -2338,6 +2353,8 @@ static bool daemon_process_output(struct daemon* daemon)
 	else if ( amount == 0 )
 		return false;
 	log_formatted(&daemon->log, data, amount);
+	if ( daemon->echo )
+		writeall(1, data, amount);
 	return true;
 }
 
