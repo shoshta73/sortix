@@ -3632,7 +3632,7 @@ int main(int argc, char* argv[])
 	// If the default daemon's top level dependency is a chain boot target, then
 	// chain boot the actual root filesystem.
 	if ( !strcmp(first_requirement, "chain") ||
-	     !strcmp(first_requirement, "chain-merge") )
+	     !strcmp(first_requirement, "chain-sysmerge") )
 	{
 		int next_argc = argc - optind;
 		char** next_argv = argv + optind;
@@ -3689,14 +3689,14 @@ int main(int argc, char* argv[])
 			const char* program = next_argv[0];
 			char verbose_opt[] = {'-', "sqv"[verbosity], '\0'};
 			// Chain boot the operating system upgrade if needed.
-			if ( !strcmp(first_requirement, "chain-merge") )
+			if ( !strcmp(first_requirement, "chain-sysmerge") )
 			{
 				program = "/sysmerge/sbin/init";
 				// TODO: Concat next_argv onto this argv_next, so the arguments
 				//       can be passed to the final init.
 				next_argv =
 					(char*[]) { (char*) program, "--static-prefix=/sysmerge",
-					            "--target=merge", verbose_opt, NULL };
+					            "--target=sysmerge", verbose_opt, NULL };
 			}
 			else if ( next_argc < 1 )
 			{
@@ -3731,7 +3731,7 @@ int main(int argc, char* argv[])
 
 	// TODO: After releasing Sortix 1.1, remove this compatibility since a
 	// sysmerge from 1.0 will not have a /var/log directory.
-	if ( !strcmp(first_requirement, "merge") &&
+	if ( !strcmp(first_requirement, "sysmerge") &&
 	     access(log_path, F_OK) < 0 )
 		mkdir(log_path, 0755);
 
@@ -3746,41 +3746,6 @@ int main(int argc, char* argv[])
 	set_hostname();
 	set_kblayout();
 	set_videomode();
-
-	// Run the operating system upgrade if requested.
-	if ( !strcmp(first_requirement, "merge") )
-	{
-		pid_t child_pid = fork();
-		if ( child_pid < 0 )
-			fatal("fork: %m");
-		if ( !child_pid )
-		{
-			uninstall_signal_handler();
-			const char* argv[] = { "sysmerge", "--booting", NULL };
-			execvp(argv[0], (char* const*) argv);
-			fatal("Failed to load system upgrade: %s: %m", argv[0]);
-		}
-		forward_signal_pid = child_pid;
-		sigprocmask(SIG_UNBLOCK, &handled_signals, NULL);
-		int status;
-		while ( waitpid(child_pid, &status, 0) < 0 )
-		{
-			if ( errno != EINTR )
-				fatal("waitpid: %m");
-		}
-		sigprocmask(SIG_BLOCK, &handled_signals, NULL);
-		forward_signal_pid = -1; // Racy with waitpid.
-		if ( WIFEXITED(status) && WEXITSTATUS(status) != 0 )
-			fatal("Automatic upgrade failed: Exit status %i",
-			      WEXITSTATUS(status));
-		else if ( WIFSIGNALED(status) )
-			fatal("Automatic upgrade failed: %s", strsignal(WTERMSIG(status)));
-		else if ( !WIFEXITED(status) )
-			fatal("Automatic upgrade failed: Unexpected unusual termination");
-		// Soft reinit into the freshly upgraded operating system.
-		// TODO: Use next_argv here.
-		reinit();
-	}
 
 	// TODO: Use the arguments to specify additional things the default daemon
 	//       should depend on, as well as a denylist of things not to start

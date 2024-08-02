@@ -580,5 +580,6 @@ int main(int argc, char* argv[])
 	else
 		printf("Successfully upgraded %s.\n", target);
 
-	return 0;
+	// Reinitialize the operating system if upgrading on boot.
+	return booting ? 3 : 0;
 }

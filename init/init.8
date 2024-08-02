@@ -121,7 +121,7 @@ corresponding partition devices in
 If the target is
 .Sy chain
 or
-.Sy chain-merge ,
+.Sy chain-sysmerge ,
 then the real operating system is chain initialized.
 .Pp
 The root filesystem is mounted per
@@ -149,7 +149,7 @@ program (or
 .Ar chain-init
 if specified) of the target root filesystem is run inside a chroot.
 If the target is
-.Sy chain-merge ,
+.Sy chain-sysmerge ,
 then the
 .Fl \-static-prefix=/sysmerge
 .Fl \-target=merge

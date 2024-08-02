@@ -149,6 +149,12 @@ inside the
 graphical user interface environment.
 This operating system mode is insecure because it boots straight to root access
 without a password.
+.It Sy sysmerge
+Perform an already scheduled operating system upgrade by invoking
+.Xr sysmerge 8
+.Fl \-booting
+and then reinit into the freshly upgraded system.
+It does not depend on any daemons to minimize the upgrade environment.
 .It Sy sysupgrade
 Starts the operating system upgrader.
 This foreground daemon starts the

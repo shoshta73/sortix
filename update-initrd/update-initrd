@@ -85,7 +85,7 @@ cp "$sysroot/etc/fstab" "$tmp/etc/fstab"
 mkdir "$tmp/etc/init"
 if $sysmerge; then
   cat > "$tmp/etc/init/default" << EOF
-require chain-merge exit-code
+require chain-sysmerge exit-code
 EOF
 else
   cat > "$tmp/etc/init/default" << EOF

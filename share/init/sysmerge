@@ -1,0 +1,3 @@
+echo true
+exit-code-meaning poweroff-reboot
+exec sysmerge --booting
