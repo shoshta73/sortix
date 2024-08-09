@@ -250,11 +250,9 @@ a newline to the file descriptor mentioned in the
 environment variable as described in
 .Xr daemon 7 .
 .Pp
-If this property isn't specified, then the daemon is a virtual daemon.
-Virtual deamons become ready when all their dependencies are ready and finish
-when all their dependencies are finished.
-Virtual daemons exit 0 (success) if every dependency finished successfully,
-otherwise they exit 3 (failed).
+If this property isn't specified, then the daemon is a virtual daemon which
+does not have a daemon process and behave according to its
+.Sy type .
 .It Sy exit-code-meaning Oo Sy default "|" poweroff-reboot Oc
 This property specifies how to interpret the exit code.
 .Pp
@@ -510,8 +508,6 @@ Dependencies can be forgotten using
 .Sy unset require Ar dependency .
 Flags on a dependency can be be unset using
 .Sy unset require Ar dependency flag ... .
-.It Sy unset Ar property
-Reset the given property to its default value.
 .It Sy tty Ar device
 If the daemon is a foreground daemon
 .Sy ( need tty
@@ -522,6 +518,28 @@ The default value is the terminal
 .Xr init 8
 is attached to, usually
 .Pa tty1 .
+.It Sy type Ar type
+Select the kind of daemon:
+.Bl -tag -width "12345678"
+.It Sy daemon
+The daemon runs continuously and is started whenever it is required and stopped
+whenever it isn't required, unless the daemon has exited successfully.
+.Pp
+Virtual daemons run indefinitely and continue running after the dependencies
+have exited.
+.It Sy oneshot
+The daemon is a command that runs once per system boot when it is required and
+is not automatically restarted.
+.Pp
+Virtual oneshot daemons finish when all their dependencies are finished, and
+exit 0 (success) if every non-optional dependency finished successfully,
+otherwise they exit 3 (failed).
+.El
+.Pp
+The default type is
+.Sy daemon .
+.It Sy unset Ar property
+Reset the given property to its default value.
 .El
 .Sh ENVIRONMENT
 Daemons inherit their environment from

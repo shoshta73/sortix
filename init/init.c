@@ -93,6 +93,12 @@ enum exit_code_meaning
 	EXIT_CODE_MEANING_POWEROFF_REBOOT,
 };
 
+enum type
+{
+	TYPE_DAEMON,
+	TYPE_ONESHOT,
+};
+
 enum daemon_state
 {
 	// Daemon is not running and should not be running.
@@ -215,6 +221,7 @@ struct daemon
 	struct timespec timeout;
 	pid_t pid;
 	enum exit_code_meaning exit_code_meaning;
+	enum type type;
 	enum daemon_state state;
 	int exit_code;
 	int readyfd;
@@ -255,6 +262,7 @@ struct daemon_config
 	off_t log_line_size;
 	off_t log_size;
 	mode_t log_file_mode;
+	enum type type;
 };
 
 enum communication_type
@@ -1334,6 +1342,16 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 	{
 		// TODO: Implement.
 	}
+	else if ( !strcmp(argv[0], "type") )
+	{
+		if ( !strcmp(argv[1], "daemon") )
+			daemon_config->type = TYPE_DAEMON;
+		else if ( !strcmp(argv[1], "oneshot") )
+			daemon_config->type = TYPE_ONESHOT;
+		else
+			warning("%s:%ji: unknown %s: %s",
+			        path, (intmax_t) line_number, argv[0], argv[1]);
+	}
 	else if ( !strcmp(argv[0], "unset") )
 	{
 		if ( !strcmp(argv[1], "cd") )
@@ -1453,6 +1471,8 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 		{
 			// TODO: Implement.
 		}
+		else if ( !strcmp(argv[1], "type") )
+			daemon_config->type = TYPE_DAEMON;
 		else
 			warning("%s:%ji: unknown unset operation: %s",
 			        path, (intmax_t) line_number, argv[0]);
@@ -1861,6 +1881,7 @@ static void daemon_configure_sub(struct daemon* daemon,
 		fatal("malloc: %m");
 	daemon->echo = daemon_config->echo;
 	daemon->need_tty = daemon_config->need_tty;
+	daemon->type = daemon_config->type;
 	daemon->configured = true;
 }
 
@@ -2038,7 +2059,7 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 	if ( failed )
 		daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
 	if ( failed ||
-	    (!daemon->argv &&
+	    (!daemon->argv && daemon->type == TYPE_ONESHOT &&
 	     daemon->dependencies_finished == daemon->dependencies_used) )
 		daemon_on_finished(daemon);
 }
@@ -2142,10 +2163,9 @@ static void daemon_start(struct daemon* daemon)
 				daemon_on_finished(daemon);
 			}
 		}
-		else if ( daemon->dependencies_finished == daemon->dependencies_used )
-		{
+		else if ( daemon->type == TYPE_ONESHOT &&
+		          daemon->dependencies_finished == daemon->dependencies_used )
 			daemon_on_finished(daemon);
-		}
 		return;
 	}
 	if ( 0 < daemon->dependencies_failed )

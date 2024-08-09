@@ -1,3 +1,4 @@
 echo true
 exit-code-meaning poweroff-reboot
+type oneshot
 exec sysmerge --booting

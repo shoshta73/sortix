@@ -533,7 +533,8 @@ diff -Paur --no-dereference -- ssh.upstream/init/sshd ssh/init/sshd
 diff -Paur --no-dereference -- ssh.upstream/init/sshd-keygen ssh/init/sshd-keygen
 --- ssh.upstream/init/sshd-keygen
 +++ ssh/init/sshd-keygen
-@@ -0,0 +1 @@
+@@ -0,0 +2 @@
++type oneshot
 +exec ssh-keygen -A
 diff -Paur --no-dereference -- ssh.upstream/kex.h ssh/kex.h
 --- ssh.upstream/kex.h

@@ -4,5 +4,6 @@ require local no-await
 tty tty1
 need tty
 
-exec display terminal sysinstall
 exit-code-meaning poweroff-reboot
+type oneshot
+exec display terminal sysinstall

@@ -6,4 +6,5 @@ need tty
 
 cd "$HOME"
 exit-code-meaning poweroff-reboot
+type oneshot
 exec "$SHELL" -l
