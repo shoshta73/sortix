@@ -96,11 +96,14 @@ bool AddSegment(Process* process, const struct segment* new_segment)
 	}
 
 	// Add the new segment to the segment list.
-	process->segments[process->segments_used++] = *new_segment;
-
-	// Sort the segment list after address.
-	qsort(process->segments, process->segments_used, sizeof(struct segment),
-	      segmentcmp);
+	size_t i = 0;
+	while ( i < process->segments_used &&
+	        segmentcmp(&process->segments[i], new_segment) < 0 )
+		i++;
+	for ( size_t n = process->segments_used; i < n; n-- )
+		process->segments[n] = process->segments[n - 1];
+	process->segments[i] = *new_segment;
+	process->segments_used++;
 
 	return true;
 }

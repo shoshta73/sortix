@@ -127,14 +127,9 @@ void UnmapMemory(Process* process, uintptr_t addr, size_t size)
 			size_t conflict_index = conflict_offset / sizeof(struct segment);
 			Memory::UnmapRange(conflict->addr, conflict->size, PAGE_USAGE_USER_SPACE);
 			Memory::Flush();
-			if ( conflict_index + 1 == process->segments_used )
-			{
-				process->segments_used--;
-				continue;
-			}
-			process->segments[conflict_index] = process->segments[--process->segments_used];
-			qsort(process->segments, process->segments_used,
-			      sizeof(struct segment), segmentcmp);
+			process->segments_used--;
+			for ( size_t i = conflict_index; i < process->segments_used; i++ )
+				process->segments[i] = process->segments[i + 1];
 			continue;
 		}
 
