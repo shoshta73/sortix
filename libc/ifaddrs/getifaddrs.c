@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,9 +66,10 @@ int getifaddrs(struct ifaddrs** ifas_ptr)
 			freeifaddrs(ifas);
 			return -1;
 		}
-		struct if_status status;
 		struct if_config cfg;
-		if ( ioctl(fd, NIOC_GETCONFIG, &cfg) < 0 )
+		struct if_status status;
+		if ( ioctl(fd, NIOC_GETCONFIG, &cfg) < 0 ||
+		     ioctl(fd, NIOC_GETSTATUS, &status) < 0 )
 		{
 			close(fd);
 			if_freenameindex(ifs);
