@@ -288,7 +288,6 @@ int main(int argc, char* argv[])
 		char* old_machine = read_string_file(old_machine_path);
 		if ( !old_machine )
 			err(2, "%s", old_machine_path);
-		free(old_machine_path);
 		char* new_machine_path = join_paths(source, "etc/machine");
 		if ( !new_machine_path )
 			err(2, "malloc");
@@ -300,8 +299,9 @@ int main(int argc, char* argv[])
 			errx(2, "%s (%s) does not match %s (%s)", new_machine_path,
 				 new_machine, old_machine_path, old_machine);
 		free(old_machine);
-		free(new_machine_path);
+		free(old_machine_path);
 		free(new_machine);
+		free(new_machine_path);
 	}
 
 	// TODO: Check for version (skipping, downgrading).
