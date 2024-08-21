@@ -83,7 +83,7 @@ int main(int argc, char* argv[])
 	ready();
 
 	char* home_session = NULL;
-	char** session_argv = NULL;
+	char** session_argv = session_argv = (char*[]) {NULL, NULL};
 	if ( optind < argc )
 		session_argv = argv + optind;
 	else
@@ -99,7 +99,9 @@ int main(int argc, char* argv[])
 		else if ( !access("/etc/default/displayrc", F_OK) )
 			session_path = "/etc/default/displayrc";
 		if ( session_path )
-			session_argv = (char**) (const char*[]) {session_path, NULL};
+			session_argv[0] = (char*) session_path;
+		else
+			session_argv = NULL;
 	}
 
 	if ( session_argv )
