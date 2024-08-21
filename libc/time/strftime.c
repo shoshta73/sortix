@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -295,6 +295,7 @@ size_t STRFTIME(STRFTIME_CHAR* s,
 			STRFTIME_CHAR str[sizeof(intmax_t) * 3];
 			strftime_convert_intmax(str, timestamp);
 			OUTPUT_STRING(str);
+			break;
 		}
 		case STRFTIME_L('S'): OUTPUT_INT_PADDED(tm->tm_sec, 2, STRFTIME_L('0')); break; /*O*/
 		case STRFTIME_L('t'): OUTPUT_CHAR(STRFTIME_L('\t')); break;
