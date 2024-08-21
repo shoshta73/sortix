@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -67,7 +67,7 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
-			case 'z': eol = '\0';
+			case 'z': eol = '\0'; break;
 			default:
 				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
 				help(stderr, argv0);
