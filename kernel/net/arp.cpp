@@ -218,10 +218,10 @@ static struct arp_table* GetTable(NetworkInterface* netif)
 {
 	if ( netif->arp_table )
 		return netif->arp_table;
-	struct arp_table* table = new struct arp_table;
+	struct arp_table* table =
+		(struct arp_table*) calloc(1, sizeof(struct arp_table));
 	if ( !table )
 		return NULL;
-	memset(table, 0, sizeof(*table));
 	netif->arp_table = table;
 	table->netif = netif;
 	// Enter every entry into the table's unused linked list.
@@ -301,7 +301,9 @@ static void EvictEntry(struct arp_table* table, struct arp_entry* entry)
 	}
 
 	// Clear the entry.
-	memset(entry, 0, sizeof(*entry));
+	assert(!entry->pending_first);
+	assert(!entry->pending_last);
+	memset((char*) entry, 0, sizeof(*entry));
 	entry->table = table;
 
 	// Insert the entry into the table's unused linked list.

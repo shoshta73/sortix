@@ -43,27 +43,28 @@ static void pthread_entrance(struct pthread* thread)
 }
 
 #if defined(__i386__) || defined(__x86_64__)
-static const unsigned long FLAGS_CARRY        = 1 << 0; // 0x000001
-static const unsigned long FLAGS_RESERVED1    = 1 << 1; // 0x000002, read as one
-static const unsigned long FLAGS_PARITY       = 1 << 2; // 0x000004
-static const unsigned long FLAGS_RESERVED2    = 1 << 3; // 0x000008
-static const unsigned long FLAGS_AUX          = 1 << 4; // 0x000010
-static const unsigned long FLAGS_RESERVED3    = 1 << 5; // 0x000020
-static const unsigned long FLAGS_ZERO         = 1 << 6; // 0x000040
-static const unsigned long FLAGS_SIGN         = 1 << 7; // 0x000080
-static const unsigned long FLAGS_TRAP         = 1 << 8; // 0x000100
-static const unsigned long FLAGS_INTERRUPT    = 1 << 9; // 0x000200
-static const unsigned long FLAGS_DIRECTION    = 1 << 10; // 0x000400
-static const unsigned long FLAGS_OVERFLOW     = 1 << 11; // 0x000800
-static const unsigned long FLAGS_IOPRIVLEVEL  = 1 << 12 | 1 << 13;
-static const unsigned long FLAGS_NESTEDTASK   = 1 << 14; // 0x004000
-static const unsigned long FLAGS_RESERVED4    = 1 << 15; // 0x008000
-static const unsigned long FLAGS_RESUME       = 1 << 16; // 0x010000
-static const unsigned long FLAGS_VIRTUAL8086  = 1 << 17; // 0x020000
-static const unsigned long FLAGS_ALIGNCHECK   = 1 << 18; // 0x040000
-static const unsigned long FLAGS_VIRTINTR     = 1 << 19; // 0x080000
-static const unsigned long FLAGS_VIRTINTRPEND = 1 << 20; // 0x100000
-static const unsigned long FLAGS_ID           = 1 << 21; // 0x200000
+#define unused __attribute__((unused))
+unused static const unsigned long FLAGS_CARRY        = 1 << 0; // 0x000001
+unused static const unsigned long FLAGS_RESERVED1    = 1 << 1; // 0x000002, read as one
+unused static const unsigned long FLAGS_PARITY       = 1 << 2; // 0x000004
+unused static const unsigned long FLAGS_RESERVED2    = 1 << 3; // 0x000008
+unused static const unsigned long FLAGS_AUX          = 1 << 4; // 0x000010
+unused static const unsigned long FLAGS_RESERVED3    = 1 << 5; // 0x000020
+unused static const unsigned long FLAGS_ZERO         = 1 << 6; // 0x000040
+unused static const unsigned long FLAGS_SIGN         = 1 << 7; // 0x000080
+unused static const unsigned long FLAGS_TRAP         = 1 << 8; // 0x000100
+unused static const unsigned long FLAGS_INTERRUPT    = 1 << 9; // 0x000200
+unused static const unsigned long FLAGS_DIRECTION    = 1 << 10; // 0x000400
+unused static const unsigned long FLAGS_OVERFLOW     = 1 << 11; // 0x000800
+unused static const unsigned long FLAGS_IOPRIVLEVEL  = 1 << 12 | 1 << 13;
+unused static const unsigned long FLAGS_NESTEDTASK   = 1 << 14; // 0x004000
+unused static const unsigned long FLAGS_RESERVED4    = 1 << 15; // 0x008000
+unused static const unsigned long FLAGS_RESUME       = 1 << 16; // 0x010000
+unused static const unsigned long FLAGS_VIRTUAL8086  = 1 << 17; // 0x020000
+unused static const unsigned long FLAGS_ALIGNCHECK   = 1 << 18; // 0x040000
+unused static const unsigned long FLAGS_VIRTINTR     = 1 << 19; // 0x080000
+unused static const unsigned long FLAGS_VIRTINTRPEND = 1 << 20; // 0x100000
+unused static const unsigned long FLAGS_ID           = 1 << 21; // 0x200000
 #endif
 
 #if defined(__i386__)

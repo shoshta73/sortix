@@ -53,7 +53,7 @@ struct TextCharPOD
 
 struct TextChar
 {
-	TextChar() { }
+	TextChar() : c(0), vgacolor(0), attr(0), fg(0), bg(0) { }
 	TextChar(const TextCharPOD& o) :
 		c(o.c), vgacolor(o.vgacolor), attr(o.attr), fg(o.fg), bg(o.bg)  { }
 	TextChar(wchar_t c, uint8_t vgacolor, uint16_t attr, uint32_t fg, uint32_t bg) :

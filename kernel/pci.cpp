@@ -142,7 +142,12 @@ static void MakeCoarsePattern(pcifind_t* coarse,
 {
 	if ( pattern_count < 1 )
 	{
-		memset(coarse, 255, sizeof(*coarse));
+		coarse->vendorid = 0xffff;
+		coarse->deviceid = 0xffff;
+		coarse->classid = 0xff;
+		coarse->subclassid = 0xff;
+		coarse->progif = 0xff;
+		coarse->revid = 0xff;
 		return;
 	}
 	const pcifind_t* first = patterns;

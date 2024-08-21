@@ -39,7 +39,7 @@
 namespace Sortix {
 namespace VGA {
 
-uint8_t* const VGA = (uint8_t* const) 0xB8000;
+uint8_t* const VGA = (uint8_t*) 0xB8000;
 const unsigned WIDTH = 80;
 const unsigned HEIGHT = 25;
 const size_t VGA_SIZE = sizeof(uint16_t) * WIDTH * HEIGHT;

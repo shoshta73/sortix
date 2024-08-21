@@ -29,14 +29,14 @@ const size_t TRANSBITS = 9;
 
 PML* const PMLS[TOPPMLLEVEL + 1] =
 {
-	(PML* const) 0x0,
-	(PML* const) 0xFFFFFF8000000000UL,
-	(PML* const) 0xFFFFFF7FC0000000UL,
-	(PML* const) 0XFFFFFF7FBFE00000UL,
-	(PML* const) 0xFFFFFF7FBFDFF000UL,
+	(PML*) 0x0,
+	(PML*) 0xFFFFFF8000000000UL,
+	(PML*) 0xFFFFFF7FC0000000UL,
+	(PML*) 0XFFFFFF7FBFE00000UL,
+	(PML*) 0xFFFFFF7FBFDFF000UL,
 };
 
-PML* const FORKPML = (PML* const) 0xFFFFFF0000000000UL;
+PML* const FORKPML = (PML*) 0xFFFFFF0000000000UL;
 
 } // namespace Memory
 } // namespace Sortix
@@ -44,7 +44,7 @@ PML* const FORKPML = (PML* const) 0xFFFFFF0000000000UL;
 namespace Sortix {
 namespace Page {
 
-addr_t* const STACK = (addr_t* const) 0xFFFFFE8000000000UL;
+addr_t* const STACK = (addr_t*) 0xFFFFFE8000000000UL;
 const size_t MAXSTACKSIZE = (512UL*1024UL*1024UL*1024UL);
 const size_t MAXSTACKLENGTH = MAXSTACKSIZE / sizeof(addr_t);
 

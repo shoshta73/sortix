@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,7 +28,8 @@ public:
 	float z;
 
 public:
-	Vector(float x = 0.f, float y = 0.f, float z = 0.f) : x(x), y(y), z(z) { }
+	constexpr Vector(float x = 0.f, float y = 0.f, float z = 0.f) : x(x), y(y), z(z) { }
+	constexpr Vector(const Vector& v) : x(v.x), y(v.y), z(v.z) { }
 
 	Vector& operator=(const Vector& rhs)
 	{

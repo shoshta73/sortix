@@ -38,7 +38,7 @@
 #include <display.h>
 
 // Utility global variables every game will need.
-uint32_t window_id = 0;
+uint32_t my_window_id = 0;
 static size_t framesize;
 static uint32_t* fb;
 static bool game_running = true;
@@ -273,9 +273,9 @@ void render(struct display_connection* connection)
 		}
 	}
 
-	display_render_window(connection, window_id, 0, 0,
+	display_render_window(connection, my_window_id, 0, 0,
 	                      game_width, game_height, fb);
-	display_show_window(connection, window_id);
+	display_show_window(connection, my_window_id);
 }
 
 // ... to here. No need to edit stuff below.
@@ -331,7 +331,7 @@ void on_quit(void* ctx, uint32_t window_id)
 void on_resize(void* ctx, uint32_t window_id,  uint32_t width, uint32_t height)
 {
 	(void) ctx;
-	if ( window_id != window_id )
+	if ( window_id != my_window_id )
 		return;
 	game_width = width;
 	game_height = height;
@@ -341,7 +341,7 @@ void on_resize(void* ctx, uint32_t window_id,  uint32_t width, uint32_t height)
 void on_keyboard(void* ctx, uint32_t window_id, uint32_t codepoint)
 {
 	(void) ctx;
-	if ( window_id != window_id )
+	if ( window_id != my_window_id )
 		return;
 	int kbkey = KBKEY_DECODE(codepoint);
 	if ( !kbkey )
@@ -399,9 +399,9 @@ int main(int argc, char* argv[])
 	if ( !connection )
 		error(1, errno, "Could not connect to display server");
 
-	display_create_window(connection, window_id);
-	display_resize_window(connection, window_id, game_width, game_height);
-	display_title_window(connection, window_id, "Aquatinspitz");
+	display_create_window(connection, my_window_id);
+	display_resize_window(connection, my_window_id, game_width, game_height);
+	display_title_window(connection, my_window_id, "Aquatinspitz");
 
 	mainloop(connection);
 

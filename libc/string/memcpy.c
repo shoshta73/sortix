@@ -46,7 +46,7 @@ void* memcpy(void* restrict dst_ptr,
 		return dst_ptr;
 
 	void* dst_end = (char*) dst_ptr + size;
-	const void* src_end = (const const char*) src_ptr + size;
+	const void* src_end = (const char*) src_ptr + size;
 	if ( (dst_ptr < src_ptr && src_ptr < dst_end) ||
 	     (src_ptr < dst_ptr && dst_ptr < src_end) )
 	{

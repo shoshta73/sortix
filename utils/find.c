@@ -915,7 +915,7 @@ static bool find(const struct expr* expr,
 				char* new_path = join_paths(state->path, entry->d_name);
 				if ( !new_path )
 					err(1, "malloc");
-				struct state* new_state = calloc(sizeof(struct state), 1);
+				struct state* new_state = calloc(1, sizeof(struct state));
 				if ( !new_state )
 					err(1, "malloc");
 				new_state->parent = state;
@@ -1061,7 +1061,7 @@ int main(int argc, char* argv[])
 	for ( int i = predicates_offset; i < argc; i++ )
 	{
 		const char* arg = argv[i];
-		struct expr* subexpr = calloc(sizeof(struct expr), 1);
+		struct expr* subexpr = calloc(1, sizeof(struct expr));
 		if ( !subexpr )
 			err(1, "malloc");
 		struct expr** next_insert_at = NULL;
@@ -1070,7 +1070,7 @@ int main(int argc, char* argv[])
 			subexpr->kind = EXPR_PAREN;
 			subexpr->expr_not.expr = NULL;
 			struct parse_state* new_parse_state =
-				calloc(sizeof(struct parse_state), 1);
+				calloc(1, sizeof(struct parse_state));
 			if ( !new_parse_state )
 				err(1, "malloc");
 			new_parse_state->outer = parse_state;
@@ -1440,7 +1440,7 @@ int main(int argc, char* argv[])
 		}
 		else
 		{
-			struct expr* and_expr = calloc(sizeof(struct expr), 1);
+			struct expr* and_expr = calloc(1, sizeof(struct expr));
 			if ( !and_expr )
 				err(1, "malloc");
 			and_expr->kind = EXPR_AND;
@@ -1465,7 +1465,7 @@ int main(int argc, char* argv[])
 
 	if ( !found_action )
 	{
-		struct expr* print_expr = calloc(sizeof(struct expr), 1);
+		struct expr* print_expr = calloc(1, sizeof(struct expr));
 		if ( !print_expr )
 			err(1, "malloc");
 		print_expr->kind = EXPR_PRINT;
@@ -1474,7 +1474,7 @@ int main(int argc, char* argv[])
 			root = print_expr;
 		else
 		{
-			struct expr* and_expr = calloc(sizeof(struct expr), 1);
+			struct expr* and_expr = calloc(1, sizeof(struct expr));
 			if ( !and_expr )
 				err(1, "malloc");
 			and_expr->kind = EXPR_AND;

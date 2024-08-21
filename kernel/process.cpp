@@ -1391,10 +1391,9 @@ int sys_execve(const char* user_filename,
 		}
 	}
 
-	argv = new char*[argc+1];
+	argv = (char**) calloc(argc+1, sizeof(char*));
 	if ( !argv )
 		goto cleanup_filename;
-	memset(argv, 0, sizeof(char*) * (argc+1));
 
 	for ( int i = 0; i < argc; i++ )
 	{
@@ -1420,10 +1419,9 @@ int sys_execve(const char* user_filename,
 		}
 	}
 
-	envp = new char*[envc+1];
+	envp = (char**) calloc(envc+1, sizeof(char*));
 	if ( !envp )
 		goto cleanup_argv;
-	memset(envp, 0, sizeof(char*) * (envc+1));
 
 	for ( int i = 0; i < envc; i++ )
 	{
@@ -1439,11 +1437,11 @@ int sys_execve(const char* user_filename,
 cleanup_envp:
 	for ( int i = 0; i < envc; i++)
 		delete[] envp[i];
-	delete[] envp;
+	free(envp);
 cleanup_argv:
 	for ( int i = 0; i < argc; i++)
 		delete[] argv[i];
-	delete[] argv;
+	free(argv);
 cleanup_filename:
 	delete[] filename;
 cleanup_done:

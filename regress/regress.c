@@ -30,11 +30,11 @@
 #include <termios.h>
 #include <unistd.h>
 
-static const int VERBOSITY_SILENT = 0;
-static const int VERBOSITY_NO_OUTPUT = 1;
-static const int VERBOSITY_QUIET = 2;
-static const int VERBOSITY_NORMAL = 3;
-static const int VERBOSITY_VERBOSE = 4;
+__attribute__((unused)) static const int VERBOSITY_SILENT = 0;
+__attribute__((unused)) static const int VERBOSITY_NO_OUTPUT = 1;
+__attribute__((unused)) static const int VERBOSITY_QUIET = 2;
+__attribute__((unused)) static const int VERBOSITY_NORMAL = 3;
+__attribute__((unused)) static const int VERBOSITY_VERBOSE = 4;
 
 bool is_usable_terminal(int fd)
 {

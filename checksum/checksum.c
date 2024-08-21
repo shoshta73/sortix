@@ -205,8 +205,8 @@ static int checklist_fp(FILE* fp,
 	struct checklist** checklist_sorted = NULL;
 	if ( files )
 	{
-		checklist = calloc(sizeof(struct checklist), files_count);
-		checklist_sorted = calloc(sizeof(struct checklist*), files_count);
+		checklist = calloc(files_count, sizeof(struct checklist));
+		checklist_sorted = calloc(files_count, sizeof(struct checklist*));
 		if ( !checklist || !checklist_sorted )
 			err(1, "malloc");
 		for ( size_t i = 0; i < files_count; i++ )

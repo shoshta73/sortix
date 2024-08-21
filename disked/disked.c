@@ -453,7 +453,7 @@ static void remove_partition_devices(const char* path)
 	char* dir_path = strdup(path);
 	if ( !dir_path )
 	{
-		warn("%s", dir_path);
+		warn("malloc");
 		return; // TODO: Error.
 	}
 	dirname(dir_path);

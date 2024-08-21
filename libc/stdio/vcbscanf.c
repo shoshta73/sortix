@@ -180,6 +180,7 @@ int vcbscanf(void* fp,
 				if ( scan_type != TYPE_INT )
 					return errno = EINVAL, matched_items ? matched_items : EOF;
 				scan_type = TYPE_PTR;
+				// fallthrough
 			case 'X':
 			case 'x': base = 16; is_unsigned = true; break;
 			default: __builtin_unreachable();
@@ -321,12 +322,14 @@ int vcbscanf(void* fp,
 				if ( scan_type != TYPE_INT )
 					return errno = EINVAL, matched_items ? matched_items : EOF;
 				scan_type = TYPE_LONG;
+				// fallthrough
 			case 's': string = true; use_scanset = false; break;
 			case '[': string = true; use_scanset = true; break;
 			case 'C':
 				if ( scan_type != TYPE_INT )
 					return errno = EINVAL, matched_items ? matched_items : EOF;
 				scan_type = TYPE_LONG;
+				// fallthrough
 			case 'c': string = false; use_scanset = false; break;
 			default: __builtin_unreachable();
 			}

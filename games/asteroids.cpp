@@ -162,7 +162,8 @@ public:
 	float y;
 
 public:
-	Vector(float x = 0.0f, float y = 0.0f) : x(x), y(y) { }
+	constexpr Vector(float x = 0.0f, float y = 0.0f) : x(x), y(y) { }
+	constexpr Vector(const Vector& v) : x(v.x), y(v.y) { }
 
 	Vector& operator=(const Vector& rhs)
 	{

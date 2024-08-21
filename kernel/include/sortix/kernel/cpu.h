@@ -30,8 +30,8 @@ namespace Sortix {
 // Functions for 32-bit and 64-bit x86.
 #if defined(__i386__) || defined(__x86_64__)
 namespace CPU {
-void Reboot();
-void ShutDown();
+__attribute__((noreturn)) void Reboot();
+__attribute__((noreturn)) void ShutDown();
 } // namespace CPU
 #endif
 

@@ -348,7 +348,7 @@ ctanf.c \
 ctanh.c \
 ctanhf.c \
 
-CFLAGS:=$(CFLAGS) -std=gnu99 -Wall -Wextra
+CFLAGS:=$(CFLAGS) -std=gnu99 -Wall -Wextra -Wno-misleading-indentation -Wno-shift-negative-value -Wno-maybe-uninitialized
 CPPFLAGS:=$(CPPFLAGS) -I include -I src -I $(ARCH_SUBDIR)
 
 # TODO: Figure out whether these are the defines that we want to pass.

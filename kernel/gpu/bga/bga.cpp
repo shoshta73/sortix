@@ -619,15 +619,12 @@ static bool OnDevice(uint32_t devaddr, const pciid_t*, const pcitype_t*, void*,
 
 void Init()
 {
-	pcifind_t patterns[2];
-	memset(&patterns[0], 255, sizeof(patterns[0]));
-	patterns[0].vendorid = 0x1234;
-	patterns[0].deviceid = 0x1111;
-	memset(&patterns[1], 255, sizeof(patterns[1]));
-	patterns[1].vendorid = 0x80EE;
-	patterns[1].deviceid = 0xBEEF;
-
-	PCI::Search(OnDevice, NULL, patterns, 2);
+	pcifind_t patterns[2] =
+	{
+		{ NULL, 0x1234, 0x1111 },
+		{ NULL, 0x80EE, 0xBEEF },
+	};
+	PCI::Search(OnDevice, NULL, patterns, sizeof(patterns)/sizeof(patterns[0]));
 }
 
 } // namespace BGA

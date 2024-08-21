@@ -542,10 +542,7 @@ GuestAdditions* GetGuestAdditions()
 
 void Init()
 {
-	pcifind_t pcifind;
-	memset(&pcifind, 255, sizeof(pcifind));
-	pcifind.vendorid = 0x80EE;
-	pcifind.deviceid = 0xCAFE;
+	pcifind_t pcifind(NULL, 0x80EE, 0xCAFE);
 
 	uint32_t devaddr = PCI::SearchForDevices(pcifind, 0);
 	if ( !devaddr )

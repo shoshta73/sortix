@@ -267,6 +267,11 @@ void editor_input_process_byte(struct editor_input* editor_input,
 	if ( amount_read != sizeof(uc) )
 		return;
 
+	// TODO: Work around https://gcc.gnu.org/bugzilla/show_bug.cgi?id=110091
+	//       false positive warning on gcc 14.2.0 -O2.
+	#if defined(__GNUC__) && 12 <= __GNUC__
+	#pragma GCC diagnostic ignored "-Wdangling-pointer"
+	#endif
 	if ( editor_input->termseq_used < MAX_TERMSEQ_SIZE )
 		editor_input->termseq[editor_input->termseq_used++] = (char) uc;
 

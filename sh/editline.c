@@ -582,7 +582,7 @@ bool edit_line_history_save(struct edit_line* edit_state, const char* path)
 	}
 	// Merge with any updated history.
 	bool success = true;
-	char** history = calloc(sizeof(char*), histsize);
+	char** history = calloc(histsize, sizeof(char*));
 	if ( !history )
 		warn("malloc"), success = false;
 	size_t first = 0;

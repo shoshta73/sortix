@@ -85,7 +85,10 @@ int main(int argc, char* argv[])
 	bool ok = true;
 	bool stdout_ok = true;
 
-	int* fds = malloc(files_count * sizeof(*fds));
+	#if defined(__GNUC__) && 7 <= __GNUC__
+	#pragma GCC diagnostic ignored "-Walloc-size-larger-than="
+	#endif
+	int* fds = calloc(files_count, sizeof(*fds));
 	if ( !fds )
 		err(1, "malloc");
 

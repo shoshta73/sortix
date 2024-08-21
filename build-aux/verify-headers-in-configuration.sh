@@ -106,10 +106,10 @@ feature="$3"
    printf '%s:\n' "$header"
    case $std in
    *++*)
-     printf '\t@%s\n' "$target-g++ $std $feature -c $header -o /dev/null -O3 -Wall -Wextra -Wsystem-headers -Werror -I libc/include -I libm/include -I $libm_machine -I kernel/include"
+     printf '\t@%s\n' "$target-g++ $std $feature -c $header -o /dev/zero -O3 -Wall -Wextra -Wsystem-headers -Werror -I libc/include -I libm/include -I $libm_machine -I kernel/include"
      ;;
    *)
-     printf '\t@%s\n' "$target-gcc $std $feature -c $header -o /dev/null -O3 -Wall -Wextra -Wsystem-headers -Werror -I libc/include -I libm/include -I $libm_machine -I kernel/include"
+     printf '\t@%s\n' "$target-gcc $std $feature -c $header -o /dev/zero -O3 -Wall -Wextra -Wsystem-headers -Werror -I libc/include -I libm/include -I $libm_machine -I kernel/include"
      ;;
   esac
  done) | make -f - --no-print-directory

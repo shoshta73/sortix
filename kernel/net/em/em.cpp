@@ -495,7 +495,7 @@ bool EM::AddReceiveDescriptor(Ref<Packet> pkt) // ordered via interrupt worker
 	if ( next_desc == rx_prochead )
 		return false;
 	struct rx_desc* desc = &rdesc[rx_tail];
-	memset(desc, 0, sizeof(*desc));
+	*desc = rx_desc{0, 0, 0, 0, 0, 0};
 	desc->status = 0;
 	desc->address = pkt->pmap.phys;
 	rpackets[rx_tail] = pkt;

@@ -50,11 +50,7 @@ static void InitializeDevice(Ref<Descriptor> dev, const char* devpath,
 void Init(const char* devpath, Ref<Descriptor> dev)
 {
 	uint32_t devaddr;
-	pcifind_t filter;
-
-	memset(&filter, 255, sizeof(filter));
-	filter.classid = 0x01;
-	filter.subclassid = 0x01;
+	pcifind_t filter(NULL, 0xFFFF, 0xFFFF, 0x01, 0x01);
 	devaddr = 0;
 	while ( (devaddr = PCI::SearchForDevices(filter, devaddr)) )
 		InitializeDevice(dev, devpath, devaddr);

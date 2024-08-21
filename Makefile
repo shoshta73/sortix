@@ -714,7 +714,7 @@ verify-manual:
 
 verify-build-tools:
 	$(MAKE) clean-build-tools
-	$(MAKE) OPTLEVEL='-O2 -g -Werror -Werror=strict-prototypes' build-tools
+	CFLAGS='-O2 -g -Werror -Werror=strict-prototypes' CXXFLAGS='-O2 -g -Werror' $(MAKE) build-tools
 
 verify-sysroot-source:
 	$(MAKE) clean-sysroot
@@ -726,7 +726,7 @@ verify-sysroot-source:
 
 verify-build:
 	$(MAKE) mostlyclean
-	$(MAKE) OPTLEVEL='-O2 -g -Werror -Werror=strict-prototypes' PACKAGES=''
+	CFLAGS='-O2 -g -Werror -Werror=strict-prototypes' CXXFLAGS='-O2 -g -Werror' $(MAKE) PACKAGES=''
 
 verify-headers:
 # TODO: The gcc port doesn't ship with cross-compilers out of the box.

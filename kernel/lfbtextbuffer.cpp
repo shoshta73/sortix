@@ -106,7 +106,6 @@ LFBTextBuffer* CreateLFBTextBuffer(uint8_t* lfb, uint32_t lfbformat,
 	ret->columns = columns;
 	ret->rows = rows;
 	ret->font = font;
-	memset(chars, 0, sizeof(chars[0]) * columns * rows);
 	ret->chars = chars;
 	ret->cursorenabled = true;
 	ret->cursorpos = TextPos(0, 0);

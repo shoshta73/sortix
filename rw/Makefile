@@ -6,7 +6,7 @@ include ../build-aux/dirs.mak
 OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 CFLAGS?=$(OPTLEVEL)
 
-CFLAGS += -Wall -Wextra
+CFLAGS += -Wall -Wextra -Wno-format-truncation
 
 BINARIES = rw
 MANPAGES1 = rw.1

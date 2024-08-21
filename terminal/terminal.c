@@ -153,7 +153,7 @@ static void scrollback_resize(size_t new_rows, size_t new_columns)
 	// TODO: Recover gracefully if the scrollback fails.
 	// TODO: Overflow.
 	struct entry* new_scrollback =
-		calloc(sizeof(struct entry), new_rows * new_columns);
+		calloc(new_rows * new_columns, sizeof(struct entry));
 	if ( !new_scrollback )
 		err(1, "malloc");
 	size_t src_y_after_cursor = rows ? row + 1 : 0;
@@ -1057,8 +1057,8 @@ void on_keyboard(void* ctx, uint32_t window_id, uint32_t codepoint)
 
 void draw(struct display_connection* connection)
 {
-	uint32_t* framebuffer = (uint32_t*)
-		calloc(sizeof(uint32_t), WINDOW_WIDTH * WINDOW_HEIGHT);
+	uint32_t* framebuffer =
+		calloc(WINDOW_WIDTH * WINDOW_HEIGHT, sizeof(uint32_t));
 	assert(framebuffer);
 
 	struct framebuffer fb;
@@ -1155,7 +1155,7 @@ int main(int argc, char* argv[])
 	columns = 80;
 
 	// TODO: Overflow.
-	scrollback = calloc(sizeof(struct entry), rows * columns);
+	scrollback = calloc(rows * columns, sizeof(struct entry));
 	if ( !scrollback )
 		err(1, "malloc");
 
