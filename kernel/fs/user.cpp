@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021-2022, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1722,7 +1722,7 @@ int Unode::tcgetattr(ioctx_t* ctx, struct termios* io_tio)
 	struct fsm_resp_tcgetattr resp;
 	msg.ino = ino;
 	if ( SendMessage(channel, FSM_REQ_TCGETATTR, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_TCGETATTR, &msg, sizeof(msg)) &&
+	     RecvMessage(channel, FSM_RESP_TCGETATTR, &resp, sizeof(resp)) &&
 	     ctx->copy_to_dest(io_tio, &resp.tio, sizeof(resp.tio)) )
 		ret = 0;
 	channel->KernelClose();
@@ -1739,7 +1739,7 @@ pid_t Unode::tcgetsid(ioctx_t* ctx)
 	struct fsm_resp_tcgetsid resp;
 	msg.ino = ino;
 	if ( SendMessage(channel, FSM_REQ_TCGETSID, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_TCGETSID, &msg, sizeof(msg)) )
+	     RecvMessage(channel, FSM_RESP_TCGETSID, &resp, sizeof(resp)) )
 		ret = resp.sid;
 	channel->KernelClose();
 	return ret;
