@@ -2073,7 +2073,7 @@ static void daemon_wait(struct daemon* daemon)
 			           daemon->name);
 			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
 			daemon_on_startup_error(daemon);
-			return NULL;
+			return;
 		}
 		daemon_configure(daemon, daemon_config);
 		daemon_config_free(daemon_config);

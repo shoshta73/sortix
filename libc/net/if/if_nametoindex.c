@@ -28,7 +28,7 @@ unsigned int if_nametoindex(const char* name)
 {
 	struct if_nameindex* ifs = if_nameindex();
 	if ( !ifs )
-		return NULL;
+		return 0;
 	for ( size_t i = 0; ifs[i].if_index; i++ )
 	{
 		if ( !strcmp(ifs[i].if_name, name) )
