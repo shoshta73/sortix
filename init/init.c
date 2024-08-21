@@ -2204,7 +2204,7 @@ static void daemon_start(struct daemon* daemon)
 	//       this daemon.
 	char ppid_str[sizeof(pid_t) * 3];
 	snprintf(ppid_str, sizeof(ppid_str), "%" PRIiPID, ppid);
-	if ( (!daemon->need_tty && setenv("READYFD", "3", 1)) < 0 ||
+	if ( (!daemon->need_tty && setenv("READYFD", "3", 1) < 0) ||
 	     setenv("INIT_PID", ppid_str, 1) < 0 ||
 	     setenv("LOGNAME", pwd->pw_name, 1) < 0 ||
 	     setenv("USER", pwd->pw_name, 1) < 0 ||
