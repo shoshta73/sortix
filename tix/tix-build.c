@@ -134,6 +134,7 @@ struct metainfo
 	char* package_name;
 	char* prefix;
 	char* exec_prefix;
+	char* subdir;
 	char* sysroot;
 	char* tar;
 	char* target;
@@ -445,7 +446,6 @@ static void Configure(struct metainfo* minfo)
 {
 	if ( !fork_and_wait_or_recovery() )
 		return;
-	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* configure_raw =
 		metainfo_get_def(minfo, "CONFIGURE", "pkg.configure.cmd",
 		                 "./configure");
@@ -476,8 +476,8 @@ static void Configure(struct metainfo* minfo)
 			"pkg.configure.with-build-sysroot", "false"));
 	if ( chdir(minfo->build_dir) != 0 )
 		err(1, "chdir: `%s'", minfo->build_dir);
-	if ( subdir && chdir(subdir) != 0 )
-		err(1, "chdir: `%s/%s'", minfo->build_dir, subdir);
+	if ( minfo->subdir && chdir(minfo->subdir) != 0 )
+		err(1, "chdir: `%s/%s'", minfo->build_dir, minfo->subdir);
 	SetNeededVariables(minfo);
 	string_array_t env_vars = string_array_make();
 	string_array_append_token_string(&env_vars, conf_extra_vars);
@@ -540,11 +540,9 @@ static void Configure(struct metainfo* minfo)
 }
 
 static bool TestDirty(struct metainfo* minfo,
-                      const char* subdir,
                       const char* candidate)
 {
-	if ( !subdir )
-		subdir = ".";
+	const char* subdir = minfo->subdir ? minfo->subdir : ".";
 	char* path;
 	if ( asprintf(&path, "%s/%s/%s", minfo->build_dir, subdir, candidate) < 0 )
 		err(1, "asprintf");
@@ -556,19 +554,17 @@ static bool TestDirty(struct metainfo* minfo,
 static bool IsDirty(struct metainfo* minfo)
 {
 	const char* dirty_file = metainfo_get(minfo, "DIRTY_FILE", "pkg.dirty-file");
-	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	if ( dirty_file )
-		return TestDirty(minfo, subdir, dirty_file);
-	return TestDirty(minfo, subdir, "config.log") ||
-	       TestDirty(minfo, subdir, "Makefile") ||
-	       TestDirty(minfo, subdir, "makefile");
+		return TestDirty(minfo, dirty_file);
+	return TestDirty(minfo, "config.log") ||
+	       TestDirty(minfo, "Makefile") ||
+	       TestDirty(minfo, "makefile");
 }
 
 static void Make(struct metainfo* minfo,
                  const char* make_target,
                  const char* destdir,
-                 bool die_on_error,
-                 const char* subdir)
+                 bool die_on_error)
 {
 	if ( !(die_on_error ?
 	       fork_and_wait_or_recovery() :
@@ -589,8 +585,8 @@ static void Make(struct metainfo* minfo,
 	SetNeededVariables(minfo);
 	if ( chdir(minfo->build_dir) != 0 )
 		err(1, "chdir: `%s'", minfo->build_dir);
-	if ( subdir && chdir(subdir) != 0 )
-		err(1, "chdir: `%s/%s'", minfo->build_dir, subdir);
+	if ( minfo->subdir && chdir(minfo->subdir) != 0 )
+		err(1, "chdir: `%s/%s'", minfo->build_dir, minfo->subdir);
 	if ( !minfo->bootstrapping && destdir )
 		setenv("DESTDIR", destdir, 1);
 	setenv("BUILD", minfo->build, 1);
@@ -642,7 +638,6 @@ static void Make(struct metainfo* minfo,
 
 static void Clean(struct metainfo* minfo)
 {
-	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* build_system =
 		metainfo_get_def(minfo, "BUILD_SYSTEM", "pkg.build-system", "none");
 	const char* default_clean_target =
@@ -655,17 +650,16 @@ static void Clean(struct metainfo* minfo)
 		                 "pkg.make.ignore-clean-failure", "true");
 	bool ignore_clean_failure = parse_boolean(ignore_clean_failure_var);
 
-	Make(minfo, clean_target, NULL, !ignore_clean_failure, subdir);
+	Make(minfo, clean_target, NULL, !ignore_clean_failure);
 }
 
 static void Build(struct metainfo* minfo)
 {
-	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* build_target =
 		metainfo_get_def(minfo, "MAKE_BUILD_TARGET", "pkg.make.build-target",
 		                 "all");
 
-	Make(minfo, build_target, NULL, true, subdir);
+	Make(minfo, build_target, NULL, true);
 }
 
 static void CreateDestination(struct metainfo* minfo)
@@ -698,7 +692,6 @@ static void CreateDestination(struct metainfo* minfo)
 
 static void Install(struct metainfo* minfo)
 {
-	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* install_target =
 		metainfo_get_def(minfo, "MAKE_INSTALL_TARGET",
 		                 "pkg.make.install-target", "install");
@@ -710,7 +703,7 @@ static void Install(struct metainfo* minfo)
 	if ( !destdir )
 		err(1, "realpath: %s", tardir_rel);
 
-	Make(minfo, install_target, destdir, true, subdir);
+	Make(minfo, install_target, destdir, true);
 
 	free(tardir_rel);
 	free(destdir_rel);
@@ -727,7 +720,6 @@ static void PostInstall(struct metainfo* minfo)
 	if ( !fork_and_wait_or_recovery() )
 		return;
 
-	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	char* tardir_rel = join_paths(tmp_root, "tix");
 	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
 	char* destdir_rel = minfo->generation == 3 ? strdup(tardir_rel) :
@@ -739,8 +731,8 @@ static void PostInstall(struct metainfo* minfo)
 	SetNeededVariables(minfo);
 	if ( chdir(minfo->package_dir) != 0 )
 		err(1, "chdir: `%s'", minfo->package_dir);
-	if ( subdir && chdir(subdir) != 0 )
-		err(1, "chdir: `%s/%s'", minfo->build_dir, subdir);
+	if ( minfo->subdir && chdir(minfo->subdir) != 0 )
+		err(1, "chdir: `%s/%s'", minfo->build_dir, minfo->subdir);
 	setenv("TIX_BUILD_DIR", minfo->build_dir, 1);
 	setenv("TIX_SOURCE_DIR", minfo->package_dir, 1);
 	setenv("TIX_INSTALL_DIR", destdir, 1);
@@ -955,6 +947,7 @@ static void Compile(struct metainfo* minfo)
 		errx(1, "%s: pkg.build-system was not found", minfo->package_info_path);
 
 	// Determine whether need to do an out-of-directory build.
+	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");
 	const char* use_build_dir_var =
 		metainfo_get_def(minfo, "CONFIGURE_USE_BUILD_DIRECTORY",
 		                 "pkg.configure.use-build-directory", "false");
@@ -968,9 +961,15 @@ static void Compile(struct metainfo* minfo)
 			err(1, "malloc");
 		if ( mkdir(minfo->build_dir, 0777) < 0 )
 			err(1, "mkdir %s", minfo->build_dir);
+		if ( subdir )
+			minfo->package_dir = join_paths(minfo->package_dir, subdir);
 	}
 	else
+	{
 		minfo->build_dir = strdup(minfo->package_dir);
+		if ( subdir )
+			minfo->subdir = strdup(subdir);
+	}
 
 	// Reset the build directory if needed.
 	if ( SHOULD_DO_BUILD_STEP(BUILD_STEP_PRE_CLEAN, minfo) &&

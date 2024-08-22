@@ -69,6 +69,18 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Support combining CONFIGURE_USE_BUILD_DIRECTORY and SUBDIR
+.Xr tix-build 8
+now supports combining CONFIGURE_USE_BUILD_DIRECTORY and SUBDIR
+.Xr port 5
+variables to do an out-of-directory build in a subdirectory.
+.Pp
+Tix must be upgraded:
+.Bd -literal
+    cd /src/tix &&
+    make clean &&
+    make install
+.Ed
 .Ss Support system upgrades and configuration in GRUB
 The GRUB configuration now implements the
 .Pa /etc
