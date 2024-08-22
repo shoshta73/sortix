@@ -1,3 +1,45 @@
+diff -Paur --no-dereference -- bochs.upstream/Makefile.in bochs/Makefile.in
+--- bochs.upstream/Makefile.in
++++ bochs/Makefile.in
+@@ -35,7 +35,7 @@
+ top_builddir    = .
+ top_srcdir      = $(srcdir)
+ 
+-DESTDIR =
++DESTDIR ?=
+ 
+ VERSION=@VERSION@
+ VER_STRING=@VER_STRING@
+@@ -96,7 +96,7 @@
+ X_LIBS = @X_LIBS@
+ X_PRE_LIBS = @X_PRE_LIBS@
+ GUI_LINK_OPTS_X = $(X_LIBS) $(X_PRE_LIBS)
+-GUI_LINK_OPTS_SDL = `sdl-config --cflags --libs`
++GUI_LINK_OPTS_SDL = `$${PKG_CONFIG:-pkg-config} sdl --cflags --libs`
+ GUI_LINK_OPTS_SVGA =  -lvga -lvgagl
+ GUI_LINK_OPTS_RFB = @RFB_LIBS@
+ GUI_LINK_OPTS_AMIGAOS =
+@@ -623,6 +623,8 @@
+ 	@CD_UP_THREE@
+ 	@RMCOMMAND@ Makefile
+ 
++distclean: dist-clean
++
+ ###########################################
+ # Build app on MacOS X
+ ###########################################
+diff -Paur --no-dereference -- bochs.upstream/config.cc bochs/config.cc
+--- bochs.upstream/config.cc
++++ bochs/config.cc
+@@ -3258,7 +3258,7 @@
+ 
+     fprintf(fp, ", biosdetect=%s", SIM->get_param_enum("biosdetect", base)->get_selected());
+ 
+-    if (SIM->get_param_string("model", base)->getptr()>0) {
++    if (SIM->get_param_string("model", base)->getptr()) {
+         fprintf(fp, ", model=\"%s\"", SIM->get_param_string("model", base)->getptr());
+     }
+ 
 diff -Paur --no-dereference -- bochs.upstream/config.sub bochs/config.sub
 --- bochs.upstream/config.sub
 +++ bochs/config.sub
@@ -165,36 +207,6 @@ diff -Paur --no-dereference -- bochs.upstream/iodev/vgacore.cc bochs/iodev/vgaco
     ai[i] = BX_VGA_THIS s.CRTC.reg[i];
  
    h = (ai[1] + 1) * 8;
-diff -Paur --no-dereference -- bochs.upstream/Makefile.in bochs/Makefile.in
---- bochs.upstream/Makefile.in
-+++ bochs/Makefile.in
-@@ -35,7 +35,7 @@
- top_builddir    = .
- top_srcdir      = $(srcdir)
- 
--DESTDIR =
-+DESTDIR ?=
- 
- VERSION=@VERSION@
- VER_STRING=@VER_STRING@
-@@ -96,7 +96,7 @@
- X_LIBS = @X_LIBS@
- X_PRE_LIBS = @X_PRE_LIBS@
- GUI_LINK_OPTS_X = $(X_LIBS) $(X_PRE_LIBS)
--GUI_LINK_OPTS_SDL = `sdl-config --cflags --libs`
-+GUI_LINK_OPTS_SDL = `$${PKG_CONFIG:-pkg-config} sdl --cflags --libs`
- GUI_LINK_OPTS_SVGA =  -lvga -lvgagl
- GUI_LINK_OPTS_RFB = @RFB_LIBS@
- GUI_LINK_OPTS_AMIGAOS =
-@@ -623,6 +623,8 @@
- 	@CD_UP_THREE@
- 	@RMCOMMAND@ Makefile
- 
-+distclean: dist-clean
-+
- ###########################################
- # Build app on MacOS X
- ###########################################
 diff -Paur --no-dereference -- bochs.upstream/memory/misc_mem.cc bochs/memory/misc_mem.cc
 --- bochs.upstream/memory/misc_mem.cc
 +++ bochs/memory/misc_mem.cc
