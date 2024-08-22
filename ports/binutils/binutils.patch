@@ -1,0 +1,33 @@
+diff -Paur --no-dereference -- binutils.upstream/libiberty/pex-unix.c binutils/libiberty/pex-unix.c
+--- binutils.upstream/libiberty/pex-unix.c
++++ binutils/libiberty/pex-unix.c
+@@ -307,7 +307,7 @@
+ 				 int, int, int, int,
+ 				 const char **, int *);
+ static int pex_unix_close (struct pex_obj *, int);
+-static int pex_unix_wait (struct pex_obj *, pid_t, int *, struct pex_time *,
++static pid_t pex_unix_wait (struct pex_obj *, pid_t, int *, struct pex_time *,
+ 			  int, const char **, int *);
+ static int pex_unix_pipe (struct pex_obj *, int *, int);
+ static FILE *pex_unix_fdopenr (struct pex_obj *, int, int);
+@@ -725,7 +725,7 @@
+ 
+ /* Wait for a child process to complete.  */
+ 
+-static int
++static pid_t
+ pex_unix_wait (struct pex_obj *obj, pid_t pid, int *status,
+ 	       struct pex_time *time, int done, const char **errmsg,
+ 	       int *err)
+diff -Paur --no-dereference -- binutils.upstream/libiberty/vfork.c binutils/libiberty/vfork.c
+--- binutils.upstream/libiberty/vfork.c
++++ binutils/libiberty/vfork.c
+@@ -13,7 +13,7 @@
+ 
+ #include "ansidecl.h"
+ 
+-extern int fork (void);
++#include <unistd.h>
+ 
+ int
+ vfork (void)
