@@ -643,3 +643,19 @@ diff -Paur --no-dereference -- emacs.upstream/src/term.c emacs/src/term.c
  #include <sys/time.h>
  #include <unistd.h>
  
+diff -Paur --no-dereference -- emacs.upstream/src/terminfo.c emacs/src/terminfo.c
+--- emacs.upstream/src/terminfo.c
++++ emacs/src/terminfo.c
+@@ -21,12 +21,6 @@
+ 
+ #include "lisp.h"
+ 
+-/* Define these variables that serve as global parameters to termcap,
+-   so that we do not need to conditionalize the places in Emacs
+-   that set them.  */
+-
+-char *UP, *BC, PC;
+-
+ /* Interface to curses/terminfo library.
+    Turns out that all of the terminfo-level routines look
+    like their termcap counterparts except for tparm, which replaces
