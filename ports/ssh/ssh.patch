@@ -439,17 +439,18 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
 diff -Paur --no-dereference -- ssh.upstream/defines.h ssh/defines.h
 --- ssh.upstream/defines.h
 +++ ssh/defines.h
-@@ -56,7 +56,9 @@
+@@ -55,8 +55,9 @@
+ /*
   * Definitions for IP type of service (ip_tos)
   */
- #include <netinet/in_systm.h>
+-#include <netinet/in_systm.h>
 +#if __has_include(<netinet/ip.h>)
  #include <netinet/ip.h>
 +#endif
  #ifndef IPTOS_LOWDELAY
  # define IPTOS_LOWDELAY          0x10
  # define IPTOS_THROUGHPUT        0x08
-@@ -121,10 +123,14 @@
+@@ -121,10 +122,14 @@
  # ifdef PATH_MAX
  #  define MAXPATHLEN PATH_MAX
  # else /* PATH_MAX */
@@ -465,7 +466,7 @@ diff -Paur --no-dereference -- ssh.upstream/defines.h ssh/defines.h
  #ifndef HOST_NAME_MAX
  # include "netdb.h" /* for MAXHOSTNAMELEN */
  # if defined(_POSIX_HOST_NAME_MAX)
-@@ -216,7 +222,9 @@
+@@ -216,7 +221,9 @@
  /* (or die trying) */
  
  #ifndef HAVE_U_INT
@@ -490,20 +491,29 @@ diff -Paur --no-dereference -- ssh.upstream/dh.c ssh/dh.c
  }
  
  static int
+diff -Paur --no-dereference -- ssh.upstream/hostfile.c ssh/hostfile.c
+--- ssh.upstream/hostfile.c
++++ ssh/hostfile.c
+@@ -44,7 +44,6 @@
+ #include <netinet/in.h>
+ 
+ #include <errno.h>
+-#include <resolv.h>
+ #include <stdarg.h>
+ #include <stdio.h>
+ #include <stdlib.h>
 diff -Paur --no-dereference -- ssh.upstream/includes.h ssh/includes.h
 --- ssh.upstream/includes.h
 +++ ssh/includes.h
-@@ -109,7 +109,9 @@
+@@ -109,7 +109,6 @@
  #endif
  
  #include <netinet/in.h>
-+#if __has_include(<netinet/in_systm.h>)
- #include <netinet/in_systm.h> /* For typedefs */
-+#endif
+-#include <netinet/in_systm.h> /* For typedefs */
  #ifdef HAVE_RPC_TYPES_H
  # include <rpc/types.h> /* For INADDR_LOOPBACK */
  #endif
-@@ -152,6 +154,9 @@
+@@ -152,6 +151,9 @@
  #endif
  
  #include <errno.h>
@@ -593,7 +603,18 @@ diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
 diff -Paur --no-dereference -- ssh.upstream/misc.c ssh/misc.c
 --- ssh.upstream/misc.c
 +++ ssh/misc.c
-@@ -77,6 +77,33 @@
+@@ -51,8 +51,9 @@
+ #include <unistd.h>
+ 
+ #include <netinet/in.h>
+-#include <netinet/in_systm.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ #include <netinet/tcp.h>
+ #include <arpa/inet.h>
+ 
+@@ -77,6 +78,33 @@
  #include "ssherr.h"
  #include "platform.h"
  
@@ -627,7 +648,7 @@ diff -Paur --no-dereference -- ssh.upstream/misc.c ssh/misc.c
  /* remove newline at end of string */
  char *
  chop(char *s)
-@@ -2847,17 +2874,17 @@
+@@ -2847,17 +2875,17 @@
  
  		if (geteuid() == 0 &&
  		    initgroups(pw->pw_name, pw->pw_gid) == -1) {
@@ -864,6 +885,19 @@ diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/getrrsetbyname.h ssh/
  
  #ifndef HFIXEDSZ
  #define HFIXEDSZ 12
+diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/port-net.c ssh/openbsd-compat/port-net.c
+--- ssh.upstream/openbsd-compat/port-net.c
++++ ssh/openbsd-compat/port-net.c
+@@ -21,7 +21,9 @@
+ 
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ 
+ #include <errno.h>
+ #include <fcntl.h>
 diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/pwcache.c ssh/openbsd-compat/pwcache.c
 --- ssh.upstream/openbsd-compat/pwcache.c
 +++ ssh/openbsd-compat/pwcache.c
@@ -898,6 +932,19 @@ diff -Paur --no-dereference -- ssh.upstream/openbsd-compat/strptime.c ssh/openbs
  	int alt_format, i;
  	static int century, relyear;
  
+diff -Paur --no-dereference -- ssh.upstream/packet.c ssh/packet.c
+--- ssh.upstream/packet.c
++++ ssh/packet.c
+@@ -47,7 +47,9 @@
+ #endif
+ 
+ #include <netinet/in.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ #include <arpa/inet.h>
+ 
+ #include <errno.h>
 diff -Paur --no-dereference -- ssh.upstream/pathnames.h ssh/pathnames.h
 --- ssh.upstream/pathnames.h
 +++ ssh/pathnames.h
@@ -946,7 +993,18 @@ diff -Paur --no-dereference -- ssh.upstream/progressmeter.c ssh/progressmeter.c
 diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
 --- ssh.upstream/readconf.c
 +++ ssh/readconf.c
-@@ -517,6 +517,10 @@
+@@ -22,8 +22,9 @@
+ 
+ #include <net/if.h>
+ #include <netinet/in.h>
+-#include <netinet/in_systm.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ #include <arpa/inet.h>
+ 
+ #include <ctype.h>
+@@ -517,6 +518,10 @@
  int
  default_ssh_port(void)
  {
@@ -957,7 +1015,7 @@ diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
  	static int port;
  	struct servent *sp;
  
-@@ -525,6 +529,7 @@
+@@ -525,6 +530,7 @@
  		port = sp ? ntohs(sp->s_port) : SSH_DEFAULT_PORT;
  	}
  	return port;
@@ -1006,7 +1064,18 @@ diff -Paur --no-dereference -- ssh.upstream/scp.c ssh/scp.c
 diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
 --- ssh.upstream/servconf.c
 +++ ssh/servconf.c
-@@ -325,7 +325,10 @@
+@@ -20,8 +20,9 @@
+ #endif
+ 
+ #include <netinet/in.h>
+-#include <netinet/in_systm.h>
++#if __has_include(<netinet/ip.h>)
+ #include <netinet/ip.h>
++#endif
+ #ifdef HAVE_NET_ROUTE_H
+ #include <net/route.h>
+ #endif
+@@ -325,7 +326,10 @@
  	if (options->pid_file == NULL)
  		options->pid_file = xstrdup(_PATH_SSH_DAEMON_PID_FILE);
  	if (options->moduli_file == NULL)
@@ -1428,6 +1497,17 @@ diff -Paur --no-dereference -- ssh.upstream/ssh.c ssh/ssh.c
  		exit(255);
  	}
  	/* Take a copy of the returned structure. */
+diff -Paur --no-dereference -- ssh.upstream/sshbuf-misc.c ssh/sshbuf-misc.c
+--- ssh.upstream/sshbuf-misc.c
++++ ssh/sshbuf-misc.c
+@@ -28,7 +28,6 @@
+ #include <stdio.h>
+ #include <limits.h>
+ #include <string.h>
+-#include <resolv.h>
+ #include <ctype.h>
+ #include <unistd.h>
+ 
 diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
 --- ssh.upstream/sshconnect.c
 +++ ssh/sshconnect.c
@@ -1650,6 +1730,17 @@ diff -Paur --no-dereference -- ssh.upstream/sshd_config ssh/sshd_config
  #PermitEmptyPasswords no
  
  # Change to no to disable s/key passwords
+diff -Paur --no-dereference -- ssh.upstream/sshkey.c ssh/sshkey.c
+--- ssh.upstream/sshkey.c
++++ ssh/sshkey.c
+@@ -43,7 +43,6 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
+-#include <resolv.h>
+ #include <time.h>
+ #ifdef HAVE_UTIL_H
+ #include <util.h>
 diff -Paur --no-dereference -- ssh.upstream/sshpty.c ssh/sshpty.c
 --- ssh.upstream/sshpty.c
 +++ ssh/sshpty.c
