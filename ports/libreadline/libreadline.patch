@@ -35,3 +35,20 @@ diff -Paur --no-dereference -- libreadline.upstream/input.c libreadline/input.c
    sigset_t empty_set;
    fd_set readfds;
  #endif
+diff -Paur --no-dereference -- libreadline.upstream/terminal.c libreadline/terminal.c
+--- libreadline.upstream/terminal.c
++++ libreadline/terminal.c
+@@ -102,13 +102,6 @@
+ 
+ static int tcap_initialized;
+ 
+-#if !defined (__linux__) && !defined (NCURSES_VERSION)
+-#  if defined (__EMX__) || defined (NEED_EXTERN_PC)
+-extern 
+-#  endif /* __EMX__ || NEED_EXTERN_PC */
+-char PC, *BC, *UP;
+-#endif /* !__linux__ && !NCURSES_VERSION */
+-
+ /* Some strings to control terminal actions.  These are output by tputs (). */
+ char *_rl_term_clreol;
+ char *_rl_term_clrpag;
