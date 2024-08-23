@@ -128,29 +128,40 @@ clean-cross-compiler:
 	rm -rf ports/binutils/binutils.build
 	rm -rf ports/gcc/gcc.build
 
+ifeq ($(BUILD),$(TARGET))
+CROSS_COMPILER_WITH_SYSROOT=--with-sysroot=/
+else
+CROSS_COMPILER_WITH_SYSROOT=--with-sysroot="$(SYSROOT)"
+endif
+
 .PHONY: install-cross-compiler
 install-cross-compiler:
+	$(MAKE) clean-sysroot
+	$(MAKE) sysroot-base-headers HOST=$(TARGET) PREFIX=
 	PATH="$(PREFIX)/sbin:$(PREFIX)/bin:$(PATH)" \
 	$(MAKE) extract-ports PACKAGES='binutils gcc'
 	rm -rf ports/binutils/binutils.build
 	mkdir ports/binutils/binutils.build
 	cd ports/binutils/binutils.build && \
 	../binutils/configure \
+	  --build="$(BUILD)" \
 	  --target="$(TARGET)" \
 	  --prefix="$(PREFIX)" \
-	  --with-sysroot="$(SYSROOT)" \
+	  $(CROSS_COMPILER_WITH_SYSROOT) \
 	  --disable-werror
-	$(MAKE) -C ports/binutils/binutils.build
-	$(MAKE) -C ports/binutils/binutils.build install
+	V=1 $(MAKE) -C ports/binutils/binutils.build
+	V=1 $(MAKE) -C ports/binutils/binutils.build install
 	rm -rf ports/gcc/gcc.build
 	mkdir ports/gcc/gcc.build
 	cd ports/gcc/gcc.build && \
 	PATH="$(PREFIX)/bin:$(PATH)" \
 	../gcc/configure \
+	  --build="$(BUILD)" \
 	  --target="$(TARGET)" \
 	  --prefix="$(PREFIX)" \
-	  --with-sysroot="$(SYSROOT)" \
-	  --enable-languages=c,c++
+	  $(CROSS_COMPILER_WITH_SYSROOT) \
+	  --enable-languages=c,c++ \
+	  --with-system-zlib
 	PATH="$(PREFIX)/bin:$(PATH)" \
 	$(MAKE) -C ports/gcc/gcc.build all-gcc all-target-libgcc
 	PATH="$(PREFIX)/bin:$(PATH)" \
@@ -162,8 +173,6 @@ clean-cross-toolchain: clean-sysroot clean-build-tools clean-cross-compiler
 
 .PHONY: install-cross-toolchain
 install-cross-toolchain: install-build-tools
-	$(MAKE) clean-sysroot
-	$(MAKE) sysroot-base-headers HOST=$(TARGET) PREFIX=
 	$(MAKE) install-cross-compiler
 
 .PHONY: sysroot-fsh
