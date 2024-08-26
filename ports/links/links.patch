@@ -1,3 +1,15 @@
+diff -Paur --no-dereference -- links.upstream/Makefile.in links/Makefile.in
+--- links.upstream/Makefile.in
++++ links/Makefile.in
+@@ -35,8 +35,6 @@
+ includedir = @includedir@
+ oldincludedir = /usr/include
+ 
+-DESTDIR =
+-
+ pkgdatadir = $(datadir)/@PACKAGE@
+ pkglibdir = $(libdir)/@PACKAGE@
+ pkgincludedir = $(includedir)/@PACKAGE@
 diff -Paur --no-dereference -- links.upstream/configure links/configure
 --- links.upstream/configure
 +++ links/configure
@@ -39,15 +51,3 @@ diff -Paur --no-dereference -- links.upstream/language.c links/language.c
  	if (!lang) {
  		i = 0;
  		goto ret_i;
-diff -Paur --no-dereference -- links.upstream/Makefile.in links/Makefile.in
---- links.upstream/Makefile.in
-+++ links/Makefile.in
-@@ -35,8 +35,6 @@
- includedir = @includedir@
- oldincludedir = /usr/include
- 
--DESTDIR =
--
- pkgdatadir = $(datadir)/@PACKAGE@
- pkglibdir = $(libdir)/@PACKAGE@
- pkgincludedir = $(includedir)/@PACKAGE@
