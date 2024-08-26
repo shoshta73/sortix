@@ -349,6 +349,19 @@ diff -Paur --no-dereference -- ffmpeg.upstream/fftools/Makefile ffmpeg/fftools/M
  fftools/ffprobe.o fftools/cmdutils.o: libavutil/ffversion.h | fftools
  OUTDIRS += fftools
  
+diff -Paur --no-dereference -- ffmpeg.upstream/libavcodec/vp9_mc_template.c ffmpeg/libavcodec/vp9_mc_template.c
+--- ffmpeg.upstream/libavcodec/vp9_mc_template.c
++++ ffmpeg/libavcodec/vp9_mc_template.c
+@@ -27,6 +27,9 @@
+     (VP56mv) { .x = ROUNDED_DIV(a.x + b.x + c.x + d.x, 4), \
+                .y = ROUNDED_DIV(a.y + b.y + c.y + d.y, 4) }
+ 
++/* PATCH: Native i686-sortix-gcc 14.2.0 fails with
++internal compiler error: in copy_reference_ops_from_ref, at tree-ssa-sccvn.cc:1080 */
++__attribute__ ((optimize(1)))
+ static void FN(inter_pred)(VP9TileData *td)
+ {
+     static const uint8_t bwlog_tab[2][N_BS_SIZES] = {
 diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/codec2.c ffmpeg/libavformat/codec2.c
 --- ffmpeg.upstream/libavformat/codec2.c
 +++ ffmpeg/libavformat/codec2.c
