@@ -649,7 +649,7 @@ endif
 release-readme: $(SORTIX_RELEASE_DIR)/$(RELEASE)/README
 
 .PHONY: release-additional
-release-additional:
+release-additional: $(SORTIX_RELEASE_DIR)/$(RELEASE)
 ifneq ($(SORTIX_RELEASE_ADDITIONAL),)
 	cp -RT $(SORTIX_RELEASE_ADDITIONAL) $(SORTIX_RELEASE_DIR)/$(RELEASE)
 endif
