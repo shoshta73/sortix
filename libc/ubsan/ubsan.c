@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -87,7 +87,16 @@ ABORT_VARIANT(name, (void* a, void* b), (a, b))
 ABORT_VARIANT(name, (void* a, intptr_t b), (a, b))
 #define ABORT_VARIANT_VP_VP_VP(name) \
 ABORT_VARIANT(name, (void* a, void* b, void* c), (a, b, c))
+#define ABORT_VARIANT_VP_VP_UP(name) \
+ABORT_VARIANT(name, (void* a, void* b, uintptr_t c), (a, b, c))
+#define ABORT_VARIANT_VP_VP_VP_VP(name) \
+ABORT_VARIANT(name, (void* a, void* b, void* c, void* d), (a, b, c, d))
+#define ABORT_VARIANT_VP_VP_UP_VP(name) \
+ABORT_VARIANT(name, (void* a, void* b, uintptr_t c, void* d), (a, b, c, d))
 
+// TODO: After releasing Sortix 1.1, remove this compatibility for gcc 5.2.0,
+//       as __ubsan_handle_type_mismatch_v1 fixes the ABI.
+#if 1
 struct ubsan_type_mismatch_data
 {
 	struct ubsan_source_location location;
@@ -111,6 +120,58 @@ void __ubsan_handle_type_mismatch(void* data_raw,
 }
 
 ABORT_VARIANT_VP_VP(type_mismatch);
+#endif
+
+struct ubsan_type_mismatch_v1_data
+{
+	struct ubsan_source_location location;
+	struct ubsan_type_descriptor* type;
+	unsigned char log_alignment;
+	unsigned char type_check_kind;
+};
+
+void __ubsan_handle_type_mismatch_v1(void* data_raw,
+                                     void* pointer_raw)
+{
+	struct ubsan_type_mismatch_v1_data* data =
+		(struct ubsan_type_mismatch_v1_data*) data_raw;
+	ubsan_value_handle_t pointer = (ubsan_value_handle_t) pointer_raw;
+	uintptr_t alignment = (uintptr_t) 1UL << data->log_alignment;
+	const char* violation = "type mismatch";
+	if ( !pointer )
+		violation = "null pointer access";
+	else if ( alignment && (pointer & (alignment - 1)) )
+		violation = "unaligned access";
+	ubsan_abort(&data->location, violation);
+}
+
+ABORT_VARIANT_VP_VP(type_mismatch_v1);
+
+struct ubsan_alignment_assumption_data
+{
+	struct ubsan_source_location location;
+	struct ubsan_source_location assumption_location;
+	struct ubsan_type_descriptor* type;
+};
+
+void __ubsan_handle_alignment_assumption(void* data_raw,
+                                         void* pointer_raw,
+                                         void* alignment_raw,
+                                         void* offset_raw)
+{
+	struct ubsan_alignment_assumption_data* data =
+		(struct ubsan_alignment_assumption_data*) data_raw;
+	ubsan_value_handle_t pointer = (ubsan_value_handle_t) pointer_raw;
+	ubsan_value_handle_t alignment = (ubsan_value_handle_t) alignment_raw;
+	ubsan_value_handle_t offset = (ubsan_value_handle_t) offset_raw;
+	(void) pointer;
+	(void) alignment;
+	(void) offset;
+	const char* violation = "alignment assumption failed";
+	ubsan_abort(&data->location, violation);
+}
+
+ABORT_VARIANT_VP_VP_VP_VP(alignment_assumption);
 
 struct ubsan_overflow_data
 {
@@ -266,7 +327,7 @@ ABORT_VARIANT_VP_VP(vla_bound_not_positive);
 
 struct ubsan_float_cast_overflow_data
 {
-	// TODO: Remove this GCC 5.x compatibility after switching to GCC 6.x. The
+	// TODO: Remove this GCC 5.x compatibility after releasing Sortix 1.1. The
 	//       GCC developers accidentally forgot the source location. Their
 	//       libubsan probes to see if it looks like a path, but we don't need
 	//       to maintain compatibility with multiple gcc releases. See below.
@@ -311,6 +372,63 @@ void __ubsan_handle_load_invalid_value(void* data_raw,
 
 ABORT_VARIANT_VP_VP(load_invalid_value);
 
+struct ubsan_implicit_conversion_data
+{
+	struct ubsan_source_location location;
+	struct ubsan_type_descriptor* type;
+	struct ubsan_type_descriptor* from_type;
+	struct ubsan_type_descriptor* to_type;
+	unsigned char kind;
+};
+
+void __ubsan_handle_implicit_conversion(void* data_raw,
+                                        void* src_raw,
+                                        void* dst_raw)
+{
+	struct ubsan_implicit_conversion_data* data =
+		(struct ubsan_implicit_conversion_data*) data_raw;
+	ubsan_value_handle_t src = (ubsan_value_handle_t) src_raw;
+	ubsan_value_handle_t dst = (ubsan_value_handle_t) dst_raw;
+	(void) src;
+	(void) dst;
+	ubsan_abort(&data->location, "implicit conversion");
+}
+
+ABORT_VARIANT_VP_VP_VP(implicit_conversion);
+
+struct ubsan_invalid_builtin_data
+{
+	struct ubsan_source_location location;
+	unsigned char kind;
+};
+
+void __ubsan_handle_invalid_builtin(void* data_raw)
+{
+	struct ubsan_invalid_builtin_data* data =
+		(struct ubsan_invalid_builtin_data*) data_raw;
+	ubsan_abort(&data->location, "invalid builtin");
+}
+
+ABORT_VARIANT_VP(invalid_builtin);
+
+struct ubsan_invalid_objc_cast_data
+{
+	struct ubsan_source_location location;
+	struct ubsan_type_descriptor* expected_type;
+};
+
+void __ubsan_handle_invalid_objc_cast(void* data_raw,
+                                      void* pointer_raw)
+{
+	struct ubsan_invalid_builtin_data* data =
+		(struct ubsan_invalid_builtin_data*) data_raw;
+	ubsan_value_handle_t pointer = (ubsan_value_handle_t) pointer_raw;
+	(void) pointer;
+	ubsan_abort(&data->location, "invalid objc cast");
+}
+
+ABORT_VARIANT_VP_VP(invalid_objc_cast);
+
 struct ubsan_function_type_mismatch_data
 {
 	struct ubsan_source_location location;
@@ -329,9 +447,11 @@ void __ubsan_handle_function_type_mismatch(void* data_raw,
 
 ABORT_VARIANT_VP_VP(function_type_mismatch);
 
+// TODO: After releasing Sortix 1.1, remove this compatibility for gcc 5.2.0,
+//       as __ubsan_handle_nonnull_return_v1 fixes the ABI.
+#if 1
 struct ubsan_nonnull_return_data
 {
-	struct ubsan_source_location location;
 	struct ubsan_source_location attr_location;
 };
 
@@ -339,30 +459,103 @@ void __ubsan_handle_nonnull_return(void* data_raw)
 {
 	struct ubsan_nonnull_return_data* data =
 		(struct ubsan_nonnull_return_data*) data_raw;
-	ubsan_abort(&data->location, "null return");
+	ubsan_abort(&data->attr_location, "null return");
 }
 
 ABORT_VARIANT_VP(nonnull_return);
+#endif
+
+struct ubsan_nonnull_return_v1_data
+{
+	struct ubsan_source_location attr_location;
+};
+
+void __ubsan_handle_nonnull_return_v1(void* data_raw,
+                                      void* location_raw)
+{
+	struct ubsan_nonnull_return_data* data =
+		(struct ubsan_nonnull_return_data*) data_raw;
+	(void) data;
+	struct ubsan_source_location* location = location_raw;
+	ubsan_abort(location, "null return");
+}
+
+void __ubsan_handle_nullability_return_v1(void* data_raw,
+                                          void* location_raw)
+{
+	struct ubsan_nonnull_return_data* data =
+		(struct ubsan_nonnull_return_data*) data_raw;
+	(void) data;
+	struct ubsan_source_location* location = location_raw;
+	ubsan_abort(location, "nullability return");
+}
+
+ABORT_VARIANT_VP_VP(nonnull_return_v1);
+ABORT_VARIANT_VP_VP(nullability_return_v1);
 
 struct ubsan_nonnull_arg_data
 {
 	struct ubsan_source_location location;
 	struct ubsan_source_location attr_location;
+// TODO: After releasing Sortix 1.1, do this unconditionally for modern gcc.
+#if !(defined(__GNUC__) && __GNUC__< 6)
+	int arg_index;
+#endif
 };
 
-// TODO: GCC's libubsan does not have the second parameter, but its builtin
+// TODO: After releasing Sortix 1.1, do this unconditionally for modern gcc.
+//       Old GCC's libubsan does not have the second parameter, but its builtin
 //       somehow has it and conflict if we don't match it.
+#if !(defined(__GNUC__) && __GNUC__< 6)
+void __ubsan_handle_nonnull_arg(void* data_raw)
+#else
 void __ubsan_handle_nonnull_arg(void* data_raw,
                                 intptr_t index_raw)
+#endif
 {
 	struct ubsan_nonnull_arg_data* data =
 		(struct ubsan_nonnull_arg_data*) data_raw;
+#if !(defined(__GNUC__) && __GNUC__< 6)
+#else
 	ubsan_value_handle_t index = (ubsan_value_handle_t) index_raw;
 	(void) index;
+#endif
 	ubsan_abort(&data->location, "null argument");
 }
 
+void __ubsan_handle_nullability_arg(void* data_raw)
+{
+	struct ubsan_nonnull_arg_data* data =
+		(struct ubsan_nonnull_arg_data*) data_raw;
+	ubsan_abort(&data->location, "nullability argument");
+}
+
+#if !(defined(__GNUC__) && __GNUC__< 6)
+ABORT_VARIANT_VP(nonnull_arg);
+#else
 ABORT_VARIANT_VP_IP(nonnull_arg);
+#endif
+ABORT_VARIANT_VP(nullability_arg);
+
+struct ubsan_pointer_overflow_data
+{
+	struct ubsan_source_location location;
+};
+
+void __ubsan_handle_pointer_overflow(void* data_raw,
+                                     void* base_raw,
+                                     void* result_raw)
+{
+	struct ubsan_pointer_overflow_data* data =
+		(struct ubsan_pointer_overflow_data*) data_raw;
+	ubsan_value_handle_t base = (ubsan_value_handle_t) base_raw;
+	ubsan_value_handle_t result = (ubsan_value_handle_t) result_raw;
+	(void) base;
+	(void) result;
+	ubsan_abort(&data->location, "pointer overflow");
+}
+
+ABORT_VARIANT_VP_VP_VP(pointer_overflow);
 
 struct ubsan_cfi_bad_icall_data
 {
@@ -382,3 +575,40 @@ void __ubsan_handle_cfi_bad_icall(void* data_raw,
 }
 
 ABORT_VARIANT_VP_VP(cfi_bad_icall);
+
+struct ubsan_cfi_check_fail_data
+{
+	unsigned char check_kind;
+	struct ubsan_source_location location;
+	struct ubsan_type_descriptor* type;
+};
+
+void __ubsan_handle_cfi_check_fail(void* data_raw,
+                                   void* function_raw,
+                                   uintptr_t vtable_is_valid)
+{
+	struct ubsan_cfi_check_fail_data* data =
+		(struct ubsan_cfi_check_fail_data*) data_raw;
+	ubsan_value_handle_t function = (ubsan_value_handle_t) function_raw;
+	(void) function;
+	(void) vtable_is_valid;
+	ubsan_abort(&data->location, "control flow integrity check failure");
+}
+
+ABORT_VARIANT_VP_VP_UP(cfi_check_fail);
+
+void __ubsan_handle_cfi_bad_type(void* data_raw,
+                                 void* function_raw,
+                                 uintptr_t vtable_is_valid,
+                                 void* report_options_raw)
+{
+	struct ubsan_cfi_check_fail_data* data =
+		(struct ubsan_cfi_check_fail_data*) data_raw;
+	ubsan_value_handle_t function = (ubsan_value_handle_t) function_raw;
+	(void) function;
+	(void) vtable_is_valid;
+	(void) report_options_raw;
+	ubsan_abort(&data->location, "control flow integrity bad type");
+}
+
+ABORT_VARIANT_VP_VP_UP_VP(cfi_bad_type);

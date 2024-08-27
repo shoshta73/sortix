@@ -69,6 +69,42 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Update to gcc-14.2.0 and binutils-2.43.1
+The toolchain has been updated to gcc 14.2.0 and binutils 2.43.1 and must be
+rebuilt before building the operating system per
+.Xr development 7
+and
+.Xr cross-development 7 :
+.Bd -literal
+    cd /src &&
+    make clean-cross-toolchain &&
+    make PREFIX="$CROSS_PREFIX" TARGET=$SORTIX_PLATFORM install-cross-toolchain
+.Ed
+.Pp
+For native
+.Xr development 7 ,
+the
+.Sy TARGET
+variable can be omitted.
+Use a temporary non-empty
+.Sy PREFIX
+to avoid clobbering the system toolchain and add
+.Pa $PREFIX/bin
+to the
+.Sy PATH
+environment variable afterwards.
+.Pp
+The new toolchain is not able to build versions before this commit due to bugs
+in the base system and ports that are now compile-time errors. These issues
+are fixed as of this commit.
+.Pp
+The old toolchain with gcc 5.2.0 and binutils 2.24 remain supported to build the
+base system and selected ports, such that the new version of the operating
+system can be bootstrapped.
+However, ports may now require the new toolchain and it must be upgraded to
+build all ports.
+Backwards compatibility for the old toolchain will be dropped after releasing
+the next version of this operating system.
 .Ss Support combining CONFIGURE_USE_BUILD_DIRECTORY and SUBDIR
 .Xr tix-build 8
 now supports combining CONFIGURE_USE_BUILD_DIRECTORY and SUBDIR

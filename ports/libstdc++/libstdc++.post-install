@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+tix-eradicate-libtool-la
+# Get rid of fake C++ wrapper headers for libc headers that cause trouble.
+cd "$TIX_INSTALL_DIR"
+cd "./$PREFIX/include/c++"
+rm -f complex.h fenv.h math.h std*.h tgmath.h

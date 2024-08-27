@@ -1,19 +1,22 @@
 NAME=gcc
 BUILD_LIBRARIES='libstdc++ libiconv? libgmp libmpfr libmpc libz'
-VERSION=1.1-rc3
-DISTNAME=sortix-gcc-$VERSION
+VERSION=14.2.0
+DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=4d90fe38a67cddab81dc34265009cde508338072ec9b0083010d46647f9c6320
-UPSTREAM_SITE=https://pub.sortix.org/sortix/toolchain
+SHA256SUM=a7b39bc69cbf9e25826c5a60ab26477001f7c08d85cec04bc0e29cabed6f3cc9
+UPSTREAM_SITE=https://ftp.gnu.org/gnu/gcc/gcc-$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
+RELEASE_SEARCH_PAGE=https://ftp.gnu.org/gnu/gcc/
+RELEASE_SEARCH_REGEX='gcc-([0-9]+\.[0-9]+(\.[0-9]+)*)/'
 BUILD_SYSTEM=configure
 CONFIGURE_WITH_SYSROOT=true
 CONFIGURE_WITH_SYSROOT_LD_BUG=true
 CONFIGURE_WITH_BUILD_SYSROOT=true
 CONFIGURE_ARGS='--enable-languages=c,c++ --with-system-zlib'
 CONFIGURE_USE_BUILD_DIRECTORY=true
+# TODO: The configure subdirs use <sys/param.h> for this for some reason?
+MAKE_VARS=ac_cv_c_bigendian=no
 MAKE_BUILD_TARGET='all-gcc all-target-libgcc'
 MAKE_INSTALL_TARGET='install-gcc install-target-libgcc'
 POST_INSTALL=../gcc.post-install
-VERSION_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*(-rc[0-9]+)?)'

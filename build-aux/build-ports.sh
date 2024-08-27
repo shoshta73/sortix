@@ -74,8 +74,14 @@ if [ -z "${PORTS_CFLAGS+x}" ]; then PORTS_CFLAGS="$PORTS_OPTLEVEL"; fi
 if [ -z "${PORTS_CXXFLAGS+x}" ]; then PORTS_CXXFLAGS="$PORTS_OPTLEVEL"; fi
 if [ -z "${CFLAGS+x}" ]; then CFLAGS="$PORTS_CFLAGS"; fi
 if [ -z "${CXXFLAGS+x}" ]; then CXXFLAGS="$PORTS_CXXFLAGS"; fi
-CFLAGS="$CFLAGS -Werror=format -Wno-error=format-contains-nul -Werror=implicit-function-declaration"
-CXXFLAGS="$CXXFLAGS -Werror=format -Wno-error=format-contains-nul"
+WERRORFORMAT="-Werror=format -Wno-error=format-contains-nul"
+# TODO: After releasing Sortix 1.1, use these new options conditionally.
+if [ "$OPERATION" = build ] && \
+   ! "$HOST-gcc" --version | grep -Eq ' \(GCC\) 5\.2\.0$'; then
+  WERRORFORMAT="$WERRORFORMAT -Wno-error=format-overflow -Wno-error=format-truncation"
+fi
+CFLAGS="$CFLAGS $WERRORFORMAT -Werror=implicit-function-declaration"
+CXXFLAGS="$CXXFLAGS $WERRORFORMAT"
 export CFLAGS
 export CXXFLAGS
 

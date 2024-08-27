@@ -1,0 +1,671 @@
+diff -Paur --no-dereference -- gcc.upstream/fixincludes/mkfixinc.sh gcc/fixincludes/mkfixinc.sh
+--- gcc.upstream/fixincludes/mkfixinc.sh
++++ gcc/fixincludes/mkfixinc.sh
+@@ -11,6 +11,7 @@
+ 
+ # Check for special fix rules for particular targets
+ case $machine in
++    *-sortix* | \
+     i?86-*-cygwin* | \
+     i?86-*-mingw32* | \
+     x86_64-*-mingw32* | \
+diff -Paur --no-dereference -- gcc.upstream/gcc/Makefile.in gcc/gcc/Makefile.in
+--- gcc.upstream/gcc/Makefile.in
++++ gcc/gcc/Makefile.in
+@@ -845,8 +845,10 @@
+ # Native compiler for the build machine and its switches.
+ CC_FOR_BUILD = @CC_FOR_BUILD@
+ CXX_FOR_BUILD = @CXX_FOR_BUILD@
+-BUILD_CFLAGS= @BUILD_CFLAGS@ $(GENERATOR_CFLAGS) -DGENERATOR_FILE
+-BUILD_CXXFLAGS = @BUILD_CXXFLAGS@ $(GENERATOR_CFLAGS) -DGENERATOR_FILE
++# PATCH: genautomata can crash by https://gitlab.com/sortix/sortix/-/issues/740
++#        since it uses pthread_create and pulls in operator new via vec.h under
++#        some circumstances, so disable exceptions.
++BUILD_CXXFLAGS = @BUILD_CXXFLAGS@ $(GENERATOR_CFLAGS) -DGENERATOR_FILE -fno-exceptions
+ 
+ # Native compiler that we use.  This may be C++ some day.
+ COMPILER_FOR_BUILD = $(CXX_FOR_BUILD)
+diff -Paur --no-dereference -- gcc.upstream/gcc/c-family/c-common.cc gcc/gcc/c-family/c-common.cc
+--- gcc.upstream/gcc/c-family/c-common.cc
++++ gcc/gcc/c-family/c-common.cc
+@@ -4673,6 +4673,8 @@
+   uintmax_type_node =
+     TREE_TYPE (identifier_global_value (get_identifier (UINTMAX_TYPE)));
+ 
++  if (SSIZE_TYPE)
++    builtin_define_with_value ("__SSIZE_TYPE__", SSIZE_TYPE, 0);
+   if (SIG_ATOMIC_TYPE)
+     sig_atomic_type_node =
+       TREE_TYPE (identifier_global_value (c_get_ident (SIG_ATOMIC_TYPE)));
+diff -Paur --no-dereference -- gcc.upstream/gcc/collect2.cc gcc/gcc/collect2.cc
+--- gcc.upstream/gcc/collect2.cc
++++ gcc/gcc/collect2.cc
+@@ -895,7 +895,7 @@
+   no_demangle = !! getenv ("COLLECT_NO_DEMANGLE");
+ 
+   /* Suppress demangling by the real linker, which may be broken.  */
+-  putenv (xstrdup ("COLLECT_NO_DEMANGLE=1"));
++  setenv ("COLLECT_NO_DEMANGLE", "1", 1);
+ #endif
+ 
+ #if defined (COLLECT2_HOST_INITIALIZATION)
+diff -Paur --no-dereference -- gcc.upstream/gcc/config/i386/sortix32.h gcc/gcc/config/i386/sortix32.h
+--- gcc.upstream/gcc/config/i386/sortix32.h
++++ gcc/gcc/config/i386/sortix32.h
+@@ -0,0 +1,16 @@
++/* Copyright(C) Jonas 'Sortie' Termansen 2012, 2013, 2014, 2015. */
++/* Insert regular GCC licence information here with proper exceptions. */
++
++/* Use the stack frame linked list by default (-fno-omit-frame-pointer). */
++#undef USE_IX86_FRAME_POINTER
++#define USE_IX86_FRAME_POINTER 1
++
++/* HACK: This currently causes trouble on Sortix, so disable it by default.
++         (-fno-asynchronous-unwind-tables) */
++#define SUBTARGET_OVERRIDE_OPTIONS \
++	do { \
++		flag_asynchronous_unwind_tables = 0; \
++	} while (0);
++
++/* Additional linker options. */
++#define LINK_SPEC "%{m32:-m elf_i386_sortix} %{m64:-m elf_x86_64_sortix}"
+diff -Paur --no-dereference -- gcc.upstream/gcc/config/i386/sortix64.h gcc/gcc/config/i386/sortix64.h
+--- gcc.upstream/gcc/config/i386/sortix64.h
++++ gcc/gcc/config/i386/sortix64.h
+@@ -0,0 +1,16 @@
++/* Copyright(C) Jonas 'Sortie' Termansen 2012, 2013, 2014, 2015. */
++/* Insert regular GCC licence information here with proper exceptions. */
++
++/* Use the stack frame linked list by default (-fno-omit-frame-pointer). */
++#undef USE_X86_64_FRAME_POINTER
++#define USE_X86_64_FRAME_POINTER 1
++
++/* HACK: This currently causes trouble on Sortix, so disable it by default.
++         (-fno-asynchronous-unwind-tables) */
++#define SUBTARGET_OVERRIDE_OPTIONS \
++	do { \
++		flag_asynchronous_unwind_tables = 0; \
++	} while (0);
++
++/* Additional linker options. */
++#define LINK_SPEC "%{m32:-m elf_i386_sortix} %{m64:-m elf_x86_64_sortix}"
+diff -Paur --no-dereference -- gcc.upstream/gcc/config/sortix.h gcc/gcc/config/sortix.h
+--- gcc.upstream/gcc/config/sortix.h
++++ gcc/gcc/config/sortix.h
+@@ -0,0 +1,52 @@
++/* Copyright(C) Jonas 'Sortie' Termansen 2012, 2013, 2014, 2015. */
++/* Insert regular GCC licence information here with proper exceptions. */
++
++/* The Sortix standard library does what glibc does, so copied from gnu-user. */
++
++#undef TARGET_SORTIX
++#define TARGET_SORTIX 1
++
++/* Objects automatically prepended to the link command line. */
++#undef  STARTFILE_SPEC
++#define STARTFILE_SPEC "crt0.o%s crti.o%s crtbegin.o%s"
++
++/* Objects automatically appended to the link link command line. */
++#undef  ENDFILE_SPEC
++#define ENDFILE_SPEC "crtend.o%s crtn.o%s"
++
++/* Search for crt*.o files in this directory. */
++#undef STANDARD_STARTFILE_PREFIX
++#define STANDARD_STARTFILE_PREFIX "/lib/"
++
++/* Handle the mutual dependencies between libm and libc. */
++#undef LIB_SPEC
++#define LIB_SPEC "--start-group %{pthread:} -lm -lc --end-group"
++
++/* ubsan is provided by Sortix libc. */
++#undef LIBUBSAN_SPEC
++#define LIBUBSAN_SPEC ""
++
++/* Define relevant macros for Sortix. */
++#undef  TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()   \
++do {                               \
++  builtin_define("__sortix__");    \
++  builtin_define("__unix__");      \
++  builtin_assert("system=sortix"); \
++  builtin_assert("system=unix");   \
++  builtin_assert("system=posix");  \
++} while(0);
++
++/* ABI decisions. */
++#undef PID_TYPE
++#define PID_TYPE INTPTR_TYPE
++
++/* Provide __SIZE_TYPE__ and __SSIZE_TYPE__ declarations. */
++#undef SIZE_TYPE
++#undef SSIZE_TYPE
++#define SIZE_TYPE (TARGET_64BIT ? "long unsigned int" : "unsigned int")
++#define SSIZE_TYPE (TARGET_64BIT ? "long signed int" : "signed int")
++
++/* Fix PTRDIFF_TYPE being long int even if -m32 */
++#undef PTRDIFF_TYPE
++#define PTRDIFF_TYPE (TARGET_64BIT ? "long int" : "int")
+diff -Paur --no-dereference -- gcc.upstream/gcc/config.gcc gcc/gcc/config.gcc
+--- gcc.upstream/gcc/config.gcc
++++ gcc/gcc/config.gcc
+@@ -970,6 +970,13 @@
+       ;;
+   esac
+   ;;
++*-*-sortix*)
++  gas=yes
++  gnu_ld=yes
++  default_use_cxa_atexit=no
++  native_system_header_dir=/include
++  thread_file=posix
++  ;;
+ *-*-netbsd*)
+   tm_p_file="${tm_p_file} netbsd-protos.h"
+   tmake_file="t-netbsd t-slibgcc"
+@@ -2080,6 +2087,14 @@
+ 	done
+ 	TM_MULTILIB_CONFIG=`echo $TM_MULTILIB_CONFIG | sed 's/^,//'`
+ 	;;
++i[34567]86-*-sortix*)
++       tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/sortix32.h sortix.h"
++       tmake_file="t-sortix"
++       ;;
++x86_64-*-sortix*)
++       tm_file="${tm_file} i386/unix.h i386/att.h elfos.h glibc-stdint.h i386/i386elf.h i386/x86-64.h i386/sortix64.h sortix.h"
++       tmake_file="i386/t-x86_64-elf t-sortix"
++       ;;
+ i[34567]86-pc-msdosdjgpp*)
+ 	xm_file=i386/xm-djgpp.h
+ 	tm_file="${tm_file} i386/unix.h i386/bsd.h i386/gas.h i386/djgpp.h i386/djgpp-stdint.h"
+diff -Paur --no-dereference -- gcc.upstream/gcc/configure gcc/gcc/configure
+--- gcc.upstream/gcc/configure
++++ gcc/gcc/configure
+@@ -3677,7 +3677,10 @@
+ 
+ # Default local prefix if it is empty
+ if test x$local_prefix = x; then
+-	local_prefix=/usr/local
++  case "${target}" in
++    *-sortix) local_prefix=/local;;
++    *) local_prefix=/usr/local;;
++  esac
+ fi
+ 
+ 
+@@ -3782,6 +3785,13 @@
+ if test x${gcc_gxx_include_dir} = x; then
+   if test x${enable_version_specific_runtime_libs} = xyes; then
+     gcc_gxx_include_dir='${libsubdir}/include/c++'
++  elif echo "$target" | grep -- "-sortix" > /dev/null; then
++    # This is different from the libstdc++-v3 version. This declaration tell
++    # the compiler the location of the system native C++ directory. However, the
++    # libstdc++-v3 version tells where it should be installed. To decouple the
++    # projects, we manually insert the native system directory here.
++    gcc_gxx_include_dir="/include/c++"
++    gcc_gxx_include_dir_add_sysroot=1
+   else
+     libstdcxx_incdir='include/c++/$(version)'
+     if test x$host != x$target; then
+@@ -7856,7 +7866,7 @@
+     ma_msg_suffix=", disabled auto check (configured with --native-system-header-dir)"
+     enable_multiarch=no
+   fi
+-  if test x$host != x$target && test "x$with_sysroot" = x; then
++  if test x$host != x$target && test "x$with_sysroot" = x && test "x$with_build_sysroot" = x; then
+     ma_msg_suffix=", disabled auto check (cross build configured without --with-sysroot)"
+     enable_multiarch=no
+   fi
+@@ -15307,7 +15317,7 @@
+ # This prevents libgcc2 from containing any code which requires libc
+ # support.
+ : ${inhibit_libc=false}
+-if { { test x$host != x$target && test "x$with_sysroot" = x ; } ||
++if { { test x$host != x$target && test "x$with_sysroot" = x && test "x$with_build_sysroot" = x ; } ||
+        test x$with_newlib = xyes ; } &&
+      { test "x$with_headers" = xno || test ! -f "$target_header_dir/stdio.h"; } ; then
+        inhibit_libc=true
+@@ -32210,7 +32220,7 @@
+ fi
+ 
+ 
+-if test x$with_sysroot = x && test x$host = x$target \
++if test x$with_sysroot = x && test x$with_build_sysroot = x && test x$host = x$target \
+    && test "$prefix" != "/usr" && test "x$prefix" != "x$local_prefix" \
+    && test "$prefix" != "NONE"; then
+ 
+@@ -33443,6 +33453,8 @@
+ fi
+ 
+         ;;
++       *-*-sortix*)
++         gcc_cv_libc_provides_ssp=yes ;;
+        *) gcc_cv_libc_provides_ssp=no ;;
+     esac
+   fi
+diff -Paur --no-dereference -- gcc.upstream/gcc/cppdefault.cc gcc/gcc/cppdefault.cc
+--- gcc.upstream/gcc/cppdefault.cc
++++ gcc/gcc/cppdefault.cc
+@@ -64,6 +64,7 @@
+     /* This is the dir for gcc's private headers.  */
+     { GCC_INCLUDE_DIR, "GCC", 0, 0, 0, 0 },
+ #endif
++#ifndef TARGET_SORTIX
+ #ifdef LOCAL_INCLUDE_DIR
+     /* /usr/local/include comes before the fixincluded header files.  */
+     { LOCAL_INCLUDE_DIR, 0, 0, 1, 1, 2 },
+@@ -72,6 +73,7 @@
+ #ifdef PREFIX_INCLUDE_DIR
+     { PREFIX_INCLUDE_DIR, 0, 0, 1, 0, 0 },
+ #endif
++#endif
+ #ifdef FIXED_INCLUDE_DIR
+     /* This is the dir for fixincludes.  */
+ #ifndef SYSROOT_HEADERS_SUFFIX_SPEC
+@@ -100,6 +102,15 @@
+     { NATIVE_SYSTEM_HEADER_DIR, NATIVE_SYSTEM_HEADER_COMPONENT, 0, 0, 1, 2 },
+     { NATIVE_SYSTEM_HEADER_DIR, NATIVE_SYSTEM_HEADER_COMPONENT, 0, 0, 1, 0 },
+ #endif
++#ifdef TARGET_SORTIX
++#ifdef LOCAL_INCLUDE_DIR
++    { LOCAL_INCLUDE_DIR, 0, 0, 1, 1, 2 },
++    { LOCAL_INCLUDE_DIR, 0, 0, 1, 1, 0 },
++#endif
++#ifdef PREFIX_INCLUDE_DIR
++    { PREFIX_INCLUDE_DIR, 0, 0, 1, 0, 0 },
++#endif
++#endif
+     { 0, 0, 0, 0, 0, 0 }
+   };
+ #endif /* no INCLUDE_DEFAULTS */
+diff -Paur --no-dereference -- gcc.upstream/gcc/defaults.h gcc/gcc/defaults.h
+--- gcc.upstream/gcc/defaults.h
++++ gcc/gcc/defaults.h
+@@ -644,6 +644,10 @@
+ 
+ /* There are no default definitions of these <stdint.h> types.  */
+ 
++#ifndef SSIZE_TYPE
++#define SSIZE_TYPE ((const char *) NULL)
++#endif
++
+ #ifndef SIG_ATOMIC_TYPE
+ #define SIG_ATOMIC_TYPE ((const char *) NULL)
+ #endif
+diff -Paur --no-dereference -- gcc.upstream/gcc/gcc.cc gcc/gcc/gcc.cc
+--- gcc.upstream/gcc/gcc.cc
++++ gcc/gcc/gcc.cc
+@@ -139,7 +139,10 @@
+       m_keys.safe_push (kv);
+     }
+ 
+-  ::putenv (CONST_CAST (char *, string));
++  char *writable = CONST_CAST (char *, string);
++  char *equal = strchr(writable, '=');
++  *equal = '\0';
++  ::setenv (writable, equal + 1, 1);
+ }
+ 
+ /* Undo any xputenv changes made since last restore.
+diff -Paur --no-dereference -- gcc.upstream/gcc/genautomata.cc gcc/gcc/genautomata.cc
+--- gcc.upstream/gcc/genautomata.cc
++++ gcc/gcc/genautomata.cc
+@@ -9563,8 +9563,57 @@
+     remove (output_description_file_name);
+ }
+ 
++// PATCH: Ensure the main thread has 16 MiB of stack space on Sortix.
++#if defined(__sortix__)
++#include <sys/mman.h>
++
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++int real_main (void);
++
++void real_main_handler(int signum)
++{
++  (void) signum;
++  signal(SIGUSR1, SIG_DFL);
++  exit (real_main ());
++}
++
++static int argc;
++static const char** argv;
++
++int
++main (int main_argc, const char **main_argv)
++{
++  argc = main_argc;
++  argv = main_argv;
++  stack_t ss;
++  memset (&ss, 0, sizeof (ss));
++  ss.ss_size = 16 * 1048576;
++  int prot = PROT_READ | PROT_WRITE;
++  int flags = MAP_PRIVATE | MAP_ANONYMOUS;
++  if ((ss.ss_sp = mmap (NULL, ss.ss_size, prot, flags, -1, 0)) == MAP_FAILED)
++    {
++      fprintf (stderr, "mmap failed\n");
++      exit(1);
++    }
++  sigaltstack (&ss, NULL);
++  struct sigaction sa;
++  memset (&sa, 0, sizeof (sa));
++  sa.sa_handler = real_main_handler;
++  sa.sa_flags = SA_ONSTACK;
++  sigaction (SIGUSR1, &sa, NULL);
++  raise (SIGUSR1);
++}
++
++int
++real_main (void)
++#else
+ int
+ main (int argc, const char **argv)
++#endif
+ {
+   progname = "genautomata";
+ 
+diff -Paur --no-dereference -- gcc.upstream/gcc/json.cc gcc/gcc/json.cc
+--- gcc.upstream/gcc/json.cc
++++ gcc/gcc/json.cc
+@@ -435,10 +435,12 @@
+ static void
+ test_writing_float_numbers ()
+ {
++#if !defined(__sortix__) || defined(__SORTIX_HAS_FORMAT_FLOAT__)
+   ASSERT_PRINT_EQ (float_number (0), true, "0");
+   ASSERT_PRINT_EQ (float_number (42), true, "42");
+   ASSERT_PRINT_EQ (float_number (-100), true, "-100");
+   ASSERT_PRINT_EQ (float_number (123456789), true, "1.23457e+08");
++#endif
+ }
+ 
+ static void
+diff -Paur --no-dereference -- gcc.upstream/gcc/lto-wrapper.cc gcc/gcc/lto-wrapper.cc
+--- gcc.upstream/gcc/lto-wrapper.cc
++++ gcc/gcc/lto-wrapper.cc
+@@ -2066,8 +2066,8 @@
+ 	    {
+ 	      /* Avoid passing --jobserver-fd= and similar flags 
+ 		 unless jobserver mode is explicitly enabled.  */
+-	      putenv (xstrdup ("MAKEFLAGS="));
+-	      putenv (xstrdup ("MFLAGS="));
++	      setenv ("MAKEFLAGS", "", 1);
++	      setenv ("MFLAGS", "", 1);
+ 	    }
+ 
+ 	  char **make_argv = buildargv (getenv ("MAKE"));
+diff -Paur --no-dereference -- gcc.upstream/gcc/pretty-print.cc gcc/gcc/pretty-print.cc
+--- gcc.upstream/gcc/pretty-print.cc
++++ gcc/gcc/pretty-print.cc
+@@ -2835,7 +2835,9 @@
+   ASSERT_PP_FORMAT_2 ("17 12345678", "%to %x", (ptrdiff_t)15, 0x12345678);
+   ASSERT_PP_FORMAT_2 ("1afebabe 12345678", "%tx %x", (ptrdiff_t)0x1afebabe,
+ 		      0x12345678);
++#if !defined(__sortix__) || defined(__SORTIX_HAS_FORMAT_FLOAT__)
+   ASSERT_PP_FORMAT_2 ("1.000000 12345678", "%f %x", 1.0, 0x12345678);
++#endif
+   ASSERT_PP_FORMAT_2 ("A 12345678", "%c %x", 'A', 0x12345678);
+   ASSERT_PP_FORMAT_2 ("hello world 12345678", "%s %x", "hello world",
+ 		      0x12345678);
+diff -Paur --no-dereference -- gcc.upstream/gcc/text-art/style.cc gcc/gcc/text-art/style.cc
+--- gcc.upstream/gcc/text-art/style.cc
++++ gcc/gcc/text-art/style.cc
+@@ -148,7 +148,8 @@
+ 	  pp_string (pp, "38");
+ 	else
+ 	  pp_string (pp, "48");
+-	pp_printf (pp, ";5;%i", (int)u.m_8bit);
++	pp_string (pp, ";5;");
++	pp_printf (pp, "%i", (int)u.m_8bit);
+       }
+       break;
+     case kind::BITS_24:
+@@ -158,7 +159,8 @@
+ 	  pp_string (pp, "38");
+ 	else
+ 	  pp_string (pp, "48");
+-	pp_printf (pp, ";2;%i;%i;%i",
++	pp_string (pp, ";2;");
++	pp_printf (pp, "%i;%i;%i",
+ 		   (int)u.m_24bit.r,
+ 		   (int)u.m_24bit.g,
+ 		   (int)u.m_24bit.b);
+diff -Paur --no-dereference -- gcc.upstream/gcc/tree-ssa-strlen.cc gcc/gcc/tree-ssa-strlen.cc
+--- gcc.upstream/gcc/tree-ssa-strlen.cc
++++ gcc/gcc/tree-ssa-strlen.cc
+@@ -235,10 +235,11 @@
+ class strlen_pass : public dom_walker
+ {
+ public:
+-  strlen_pass (cdi_direction direction)
++  strlen_pass (cdi_direction direction, const char *function_name)
+     : dom_walker (direction),
+       ptr_qry (&m_ranger),
+-      m_cleanup_cfg (false)
++      m_cleanup_cfg (false),
++      function_name(function_name)
+   {
+   }
+ 
+@@ -310,6 +311,8 @@
+   /* Flag that will trigger TODO_cleanup_cfg to be returned in strlen
+      execute function.  */
+   bool m_cleanup_cfg;
++
++  const char* function_name;
+ };
+ 
+ /* Return:
+@@ -3873,6 +3876,7 @@
+   if (code1 == BUILT_IN_CALLOC)
+     /* Not touching alloc_stmt */ ;
+   else if (code1 == BUILT_IN_MALLOC
++	   && strcmp (function_name, "calloc") != 0
+ 	   && operand_equal_p (memset_size, alloc_size, 0))
+     {
+       /* Replace the malloc + memset calls with calloc.  */
+@@ -5914,7 +5918,9 @@
+ 
+   /* String length optimization is implemented as a walk of the dominator
+      tree and a forward walk of statements within each block.  */
+-  strlen_pass walker (CDI_DOMINATORS);
++  tree function_name_id = DECL_NAME (fun->decl);
++  const char *function_name = IDENTIFIER_POINTER (function_name_id);
++  strlen_pass walker (CDI_DOMINATORS, function_name);
+   walker.walk (ENTRY_BLOCK_PTR_FOR_FN (fun));
+ 
+   if (dump_file && (dump_flags & TDF_DETAILS))
+diff -Paur --no-dereference -- gcc.upstream/libbacktrace/mmap.c gcc/libbacktrace/mmap.c
+--- gcc.upstream/libbacktrace/mmap.c
++++ gcc/libbacktrace/mmap.c
+@@ -42,10 +42,6 @@
+ #include "backtrace.h"
+ #include "internal.h"
+ 
+-#ifndef HAVE_DECL_GETPAGESIZE
+-extern int getpagesize (void);
+-#endif
+-
+ /* Memory allocation on systems that provide anonymous mmap.  This
+    permits the backtrace functions to be invoked from a signal
+    handler, assuming that mmap is async-signal safe.  */
+diff -Paur --no-dereference -- gcc.upstream/libbacktrace/mmapio.c gcc/libbacktrace/mmapio.c
+--- gcc.upstream/libbacktrace/mmapio.c
++++ gcc/libbacktrace/mmapio.c
+@@ -40,10 +40,6 @@
+ #include "backtrace.h"
+ #include "internal.h"
+ 
+-#ifndef HAVE_DECL_GETPAGESIZE
+-extern int getpagesize (void);
+-#endif
+-
+ #ifndef MAP_FAILED
+ #define MAP_FAILED ((void *)-1)
+ #endif
+diff -Paur --no-dereference -- gcc.upstream/libcpp/expr.cc gcc/libcpp/expr.cc
+--- gcc.upstream/libcpp/expr.cc
++++ gcc/libcpp/expr.cc
+@@ -16,6 +16,9 @@
+ along with this program; see the file COPYING3.  If not see
+ <http://www.gnu.org/licenses/>.  */
+ 
++/* PATCH: -Werror=format causes issues on gcc 11 */
++#pragma GCC diagnostic warning "-Wformat-security"
++
+ #include "config.h"
+ #include "system.h"
+ #include "cpplib.h"
+diff -Paur --no-dereference -- gcc.upstream/libcpp/macro.cc gcc/libcpp/macro.cc
+--- gcc.upstream/libcpp/macro.cc
++++ gcc/libcpp/macro.cc
+@@ -22,6 +22,9 @@
+  You are forbidden to forbid anyone else to use, share and improve
+  what you give them.   Help stamp out software-hoarding!  */
+ 
++/* PATCH: -Werror=format causes issues on gcc 11 */
++#pragma GCC diagnostic warning "-Wformat-security"
++
+ #include "config.h"
+ #include "system.h"
+ #include "cpplib.h"
+diff -Paur --no-dereference -- gcc.upstream/libgcc/config.host gcc/libgcc/config.host
+--- gcc.upstream/libgcc/config.host
++++ gcc/libgcc/config.host
+@@ -814,6 +814,16 @@
+ 	tm_file="${tm_file} i386/elf-lib.h"
+ 	md_unwind_header=i386/gnu-unwind.h
+ 	;;
++i[34567]86-*-sortix*)
++       extra_parts="$extra_parts crtbegin.o crtend.o"
++       tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++       tm_file="${tm_file} i386/elf-lib.h"
++       ;;
++x86_64-*-sortix*)
++       extra_parts="$extra_parts crtbegin.o crtend.o"
++       tmake_file="$tmake_file i386/t-crtstuff t-crtstuff-pic t-libgcc-pic"
++       tm_file="${tm_file} i386/elf-lib.h"
++       ;;
+ i[34567]86-pc-msdosdjgpp*)
+ 	;;
+ i[34567]86-*-lynxos*)
+diff -Paur --no-dereference -- gcc.upstream/libgcc/gthr-posix.h gcc/libgcc/gthr-posix.h
+--- gcc.upstream/libgcc/gthr-posix.h
++++ gcc/libgcc/gthr-posix.h
+@@ -114,9 +114,12 @@
+ __gthrw(pthread_equal)
+ __gthrw(pthread_self)
+ __gthrw(pthread_detach)
++/* TODO: Remove this after Sortix has a release with pthread_cancel. */
++#if !defined(__sortix__)
+ #ifndef __BIONIC__
+ __gthrw(pthread_cancel)
+ #endif
++#endif
+ __gthrw(sched_yield)
+ 
+ __gthrw(pthread_mutex_lock)
+@@ -251,7 +254,7 @@
+ 	 __pthread_key_create,
+ 	 pthread_key_create)
+ # define GTHR_ACTIVE_PROXY	__gthrw_(__pthread_key_create)
+-#elif defined (__BIONIC__)
++#elif defined (__BIONIC__) || defined(__sortix__)
+ # define GTHR_ACTIVE_PROXY	__gthrw_(pthread_create)
+ #else
+ # define GTHR_ACTIVE_PROXY	__gthrw_(pthread_cancel)
+diff -Paur --no-dereference -- gcc.upstream/libgcc/libgcc2.c gcc/libgcc/libgcc2.c
+--- gcc.upstream/libgcc/libgcc2.c
++++ gcc/libgcc/libgcc2.c
+@@ -2971,6 +2971,7 @@
+ 
+ #endif
+ 
++#if !defined(__sortix__)
+ /* __eprintf used to be used by GCC's private version of <assert.h>.
+    We no longer provide that header, but this routine remains in libgcc.a
+    for binary backward compatibility.  Note that it is not included in
+@@ -2992,6 +2993,7 @@
+ 
+ #endif
+ #endif
++#endif
+ 
+ 
+ #ifdef L_clear_cache
+diff -Paur --no-dereference -- gcc.upstream/libgcc/libgcov-driver-system.c gcc/libgcc/libgcov-driver-system.c
+--- gcc.upstream/libgcc/libgcov-driver-system.c
++++ gcc/libgcc/libgcov-driver-system.c
+@@ -158,7 +158,7 @@
+ 	  switch (*p)
+ 	    {
+ 	    case 'p':
+-	      sprintf (buffer, "%d", getpid ());
++	      sprintf (buffer, "%jd", (intmax_t) getpid ());
+ 	      replacement = buffer;
+ 	      p++;
+ 	      break;
+diff -Paur --no-dereference -- gcc.upstream/libiberty/choose-temp.c gcc/libiberty/choose-temp.c
+--- gcc.upstream/libiberty/choose-temp.c
++++ gcc/libiberty/choose-temp.c
+@@ -68,7 +68,8 @@
+   strcpy (temp_filename, base);
+   strcpy (temp_filename + len, TEMP_FILE);
+ 
+-  if (mktemp (temp_filename) == 0)
++  if (mkdtemp (temp_filename) == 0)
+     abort ();
++  remove (temp_filename);
+   return temp_filename;
+ }
+diff -Paur --no-dereference -- gcc.upstream/libstdc++-v3/configure gcc/libstdc++-v3/configure
+--- gcc.upstream/libstdc++-v3/configure
++++ gcc/libstdc++-v3/configure
+@@ -38822,7 +38822,7 @@
+ 
+   fi
+     ;;
+-  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris*)
++  *-linux* | *-uclinux* | *-gnu* | *-kfreebsd*-gnu | *-cygwin* | *-solaris* | *-sortix*)
+ 
+   # All these tests are for C++; save the language and the compiler flags.
+   # The CXXFLAGS thing is suspicious, but based on similar bits previously
+@@ -55578,7 +55578,13 @@
+   with_toolexeclibdir=no
+ fi
+ 
+-
++  # Set the Sortix default C++ header installation directory. See the note in
++  # ../gcc/configure.ac - in that file we override where the compiler searches
++  # for the C++ headers and here we control where they are installed.
++  if test $version_specific_libs = no && test $gxx_include_dir = no &&
++     echo "$target" | grep -- "-sortix" > /dev/null; then
++    gxx_include_dir='${prefix}/include/c++'
++  fi
+ 
+   # Default case for install directory for include files.
+   if test $version_specific_libs = no && test $gxx_include_dir = no; then
+diff -Paur --no-dereference -- gcc.upstream/libstdc++-v3/src/c++20/tzdb.cc gcc/libstdc++-v3/src/c++20/tzdb.cc
+--- gcc.upstream/libstdc++-v3/src/c++20/tzdb.cc
++++ gcc/libstdc++-v3/src/c++20/tzdb.cc
+@@ -637,11 +637,17 @@
+ 	// The caller must have called lock() for exclusive access to infos.
+ 	void decrement() { }
+ 
++/* PATCH: The muxex class is somehow missing on Sortix. */
++#if defined(__sortix__)
++	void lock() { }
++	void unlock() { }
++#else
+ 	// Use a mutex to synchronize all access to the infos vector.
+ 	mutex infos_mutex;
+ 
+ 	void lock() { infos_mutex.lock(); }
+ 	void unlock() { infos_mutex.unlock(); }
++#endif
+       };
+ 
+ #if defined __GTHREADS && __cpp_lib_atomic_wait

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2022 Jonas 'Sortie' Termansen.
+# Copyright (c) 2022, 2023, 2024 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -173,7 +173,7 @@ $qemu \
   -name "$hostname" \
   -nodefaults \
   $display \
-  -m 256 \
+  -m 440 \
   -vga std \
   -boot d \
   -cdrom sortix.iso \

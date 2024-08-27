@@ -1,14 +1,9 @@
 NAME=libstdc++
 BUILD_LIBRARIES=libiconv
-VERSION=1.1-rc3
-DISTNAME=sortix-libstdc++-$VERSION
-COMPRESSION=tar.xz
-ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=2c27346afc474d17347dc572cf4fa0dbbc8e7ab03fd99bd63fdb21abf4959329
-UPSTREAM_SITE=https://pub.sortix.org/sortix/toolchain
-UPSTREAM_ARCHIVE=$ARCHIVE
+SOURCE_PORT=gcc
 LICENSE='GPL-3.0-or-later WITH GCC-exception-3.1'
 BUILD_SYSTEM=configure
+SUBDIR=libstdc++-v3
 CONFIGURE_USE_BUILD_DIRECTORY=true
-POST_INSTALL=tix-eradicate-libtool-la
 VERSION_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*(-rc[0-9]+)?)'
+POST_INSTALL=../../../libstdc++/libstdc++.post-install
