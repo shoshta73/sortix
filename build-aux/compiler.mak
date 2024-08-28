@@ -130,3 +130,7 @@ DEFAULT_OPTLEVEL:=$(DEFAULT_GENERIC_OPTLEVEL_BASE)
 ifeq ($(HOST_IS_SORTIX),1)
   DEFAULT_OPTLEVEL+=
 endif
+
+# TODO: After releasing Sortix 1.1, drop support for gcc 5.2.0 and use the
+#       -nostdlibc++ option unconditionally.
+NOSTDLIBCXX=$(shell if [ 13 -le `$(CC) -dumpversion | grep -Eo '^[0-9]+'` ]; then echo -nostdlib++; fi)

@@ -9,7 +9,7 @@ CFLAGS?=$(OPTLEVEL)
 CXXFLAGS?=$(OPTLEVEL)
 
 CFLAGS:=$(CFLAGS) -Wall -Wextra
-CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -fno-exceptions -fno-rtti -fcheck-new
+CXXFLAGS:=$(CXXFLAGS) -Wall -Wextra -fno-exceptions -fno-rtti -fcheck-new $(NOSTDLIBCXX)
 
 BINARIES:=\
 asteroids \
