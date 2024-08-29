@@ -728,7 +728,7 @@ void ForkCleanup(size_t i, size_t level)
 		return;
 	for ( size_t n = 0; n < i-1; n++ )
 	{
-		addr_t entry = destpml->entry[i];
+		addr_t entry = destpml->entry[n];
 		if ( !(entry & PML_FORK ) )
 			continue;
 		addr_t phys = entry & PML_ADDRESS;
