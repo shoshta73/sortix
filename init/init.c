@@ -1145,7 +1145,7 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 			if ( !(new_argv[i] = strdup(argv[n])) )
 			{
 				warning("malloc: %m");
-				for ( int j = 0; i < j; j++ )
+				for ( int j = 0; j < i; j++ )
 					free(new_argv[j]);
 				free(new_argv);
 				return false;
