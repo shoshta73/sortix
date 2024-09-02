@@ -348,6 +348,21 @@ diff -Paur --no-dereference -- gettext.upstream/gettext-tools/configure gettext/
            gt_use_preinstalled_gnugettext=yes
          else
                      LIBINTL=
+@@ -46675,10 +46797,10 @@
+   $as_echo_n "(cached) " >&6
+ else
+ 
+-        gl_cv_libxml=no
+-        gl_cv_LIBXML=
+-        gl_cv_LTLIBXML=
+-        gl_cv_INCXML=
++        gl_cv_libxml=yes
++        gl_cv_LIBXML=`${PKG_CONFIG:-pkg-config} --libs libxml-2.0`
++        gl_cv_LTLIBXML="$gl_cv_LIBXML"
++        gl_cv_INCXML=`${PKG_CONFIG:-pkg-config} --cflags libxml-2.0`
+         gl_save_LIBS="$LIBS"
+         LIBS="$LIBS $LIBICONV"
+ 
 @@ -46687,7 +46809,9 @@
  
  
@@ -500,6 +515,17 @@ diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/format.c gette
                pretty_msgstr = buf;
              }
  
+diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/locating-rule.c gettext/gettext-tools/src/locating-rule.c
+--- gettext.upstream/gettext-tools/src/locating-rule.c
++++ gettext/gettext-tools/src/locating-rule.c
+@@ -44,6 +44,7 @@
+ #include <fnmatch.h>
+ #include "gettext.h"
+ #include "mem-hash-map.h"
++#include <stdlib.h>
+ #include <libxml/parser.h>
+ #include <libxml/uri.h>
+ #include "xalloc.h"
 diff -Paur --no-dereference -- gettext.upstream/gettext-tools/src/read-mo.c gettext/gettext-tools/src/read-mo.c
 --- gettext.upstream/gettext-tools/src/read-mo.c
 +++ gettext/gettext-tools/src/read-mo.c
