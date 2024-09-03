@@ -3686,24 +3686,38 @@ int main(int argc, char* argv[])
 				fatal("chroot: %s: %m", chain_path);
 			if ( chdir("/") < 0 )
 				fatal("chdir: %s: %m", chain_path);
-			const char* program = next_argv[0];
 			char verbose_opt[] = {'-', "sqv"[verbosity], '\0'};
+			// TODO: Concat next_argv onto this argv_next, so the arguments
+			//       can be passed to the final init.
+			char* sysmerge_argv[] =
+			{
+				"/sysmerge/sbin/init",
+				"--static-prefix=/sysmerge",
+				"--target=sysmerge",
+				verbose_opt,
+				NULL,
+			};
+			char* chain_argv[] =
+			{
+				"init",
+				verbose_opt,
+				NULL,
+			};
 			// Chain boot the operating system upgrade if needed.
+			const char* program;
 			if ( !strcmp(first_requirement, "chain-sysmerge") )
 			{
-				program = "/sysmerge/sbin/init";
-				// TODO: Concat next_argv onto this argv_next, so the arguments
-				//       can be passed to the final init.
-				next_argv =
-					(char*[]) { (char*) program, "--static-prefix=/sysmerge",
-					            "--target=sysmerge", verbose_opt, NULL };
+				next_argv = sysmerge_argv;
+				program = next_argv[0];
 			}
 			else if ( next_argc < 1 )
 			{
+				next_argv = chain_argv;
 				program = "/sbin/init";
-				next_argv = (char*[]) { "init", verbose_opt, NULL };
 			}
-			execvp(program, (char* const*) next_argv);
+			else
+				program = next_argv[0];
+			execvp(program, next_argv);
 			fatal("Failed to chain load init: %s: %m", next_argv[0]);
 		}
 		forward_signal_pid = child_pid;
