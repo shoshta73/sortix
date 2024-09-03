@@ -23,7 +23,7 @@
 
 int sig2str(int signum, char* str)
 {
-	if ( SIGRTMIN < signum || signum < SIGRTMAX )
+	if ( SIGRTMIN < signum && signum < SIGRTMAX )
 	{
 		snprintf(str, SIG2STR_MAX, "RTMIN+%i", signum - SIGRTMIN);
 		return 0;
