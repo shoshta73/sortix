@@ -3,6 +3,7 @@ BUILD_LIBRARIES='libffi libiconv libintl libpcre libz libdbus? liblzma?'
 # NOTE: 2.58.0 and above do not ship with configure and instead require either
 #       creating it locally using autotools or meson, so for time being we are
 #       stuck at 2.56.4.
+UPGRADE_BLOCKED=meson
 VERSION_MAJOR=2
 VERSION_MINOR=56
 VERSION_PATCH=4

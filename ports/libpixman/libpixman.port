@@ -1,6 +1,7 @@
 NAME=libpixman
 BUILD_LIBRARIES='libpng?'
-VERSION=0.42.2 # Update blocked by meson adoption
+UPGRADE_BLOCKED=meson
+VERSION=0.42.2
 DISTNAME=pixman-$VERSION
 COMPRESSION=tar.gz
 ARCHIVE=$DISTNAME.$COMPRESSION

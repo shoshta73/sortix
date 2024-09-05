@@ -1,6 +1,7 @@
 NAME=libcairo
 BUILD_LIBRARIES='libz libbz2 libpng libfreetype libfontconfig? librsvg? libexpat? libpixman libglib?'
-VERSION=1.16.0 # Update blocked by meson adoption
+UPGRADE_BLOCKED=meson
+VERSION=1.16.0
 DISTNAME=cairo-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
