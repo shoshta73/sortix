@@ -1,3 +1,4 @@
 rm -rf -- 'doc/Makefile.gdoc'
 rm -rf -- 'doc/stamp-1'
+rm -rf -- 'doc/stamp-2'
 rm -rf -- 'doc/stamp-vti'
