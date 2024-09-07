@@ -16,7 +16,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
    --shlibdir=DIR           install shared libs in DIR [LIBDIR]
    --incdir=DIR             install includes in DIR [PREFIX/include]
    --mandir=DIR             install man page in DIR [PREFIX/share/man]
-@@ -780,7 +782,9 @@
+@@ -796,7 +798,9 @@
  
  set_default(){
      for opt; do
@@ -27,7 +27,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      done
  }
  
-@@ -2528,6 +2532,8 @@
+@@ -2648,6 +2652,8 @@
  "
  
  PATHS_LIST="
@@ -36,7 +36,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      bindir
      datadir
      docdir
-@@ -2546,6 +2552,7 @@
+@@ -2666,6 +2672,7 @@
      arch
      as
      assert_level
@@ -44,7 +44,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      build_suffix
      cc
      objcc
-@@ -2558,6 +2565,7 @@
+@@ -2678,6 +2685,7 @@
      env
      extra_version
      gas
@@ -52,7 +52,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      host_cc
      host_cflags
      host_extralibs
-@@ -2586,6 +2594,7 @@
+@@ -2708,6 +2716,7 @@
      sws_max_filter_size
      sysinclude
      sysroot
@@ -60,7 +60,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      target_exec
      target_os
      target_path
-@@ -3836,11 +3845,12 @@
+@@ -4024,11 +4033,12 @@
  
  # installation paths
  prefix_default="/usr/local"
@@ -75,7 +75,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  mandir_default='${prefix}/share/man'
  
  # toolchain
-@@ -4200,8 +4210,10 @@
+@@ -4394,8 +4404,10 @@
              optname="${opt%%=*}"
              optname="${optname#--}"
              optname=$(echo "$optname" | sed 's/-/_/g')
@@ -86,7 +86,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
              elif is_in $optname $CMDLINE_APPEND; then
                  append $optname "$optval"
              else
-@@ -4404,6 +4416,16 @@
+@@ -4598,6 +4610,16 @@
      ;;
  esac
  
@@ -103,7 +103,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  if test -n "$cross_prefix"; then
      test -n "$arch" && test -n "$target_os" ||
          die "Must specify target arch (--arch) and OS (--target-os) when cross-compiling"
-@@ -5702,6 +5724,9 @@
+@@ -5927,6 +5949,9 @@
          ;;
      minix)
          ;;
@@ -113,7 +113,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
      none)
          ;;
      *)
-@@ -7457,6 +7482,7 @@
+@@ -7829,6 +7854,7 @@
  if test "$quiet" != "yes"; then
  
  echo "install prefix            $prefix"
@@ -121,7 +121,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  echo "source path               $source_path"
  echo "C compiler                $cc"
  echo "C library                 $libc_type"
-@@ -7614,6 +7640,7 @@
+@@ -7991,6 +8017,7 @@
  FFMPEG_CONFIG_MAK=1
  FFMPEG_CONFIGURATION=$FFMPEG_CONFIGURATION
  prefix=$prefix
@@ -129,7 +129,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  LIBDIR=\$(DESTDIR)$libdir
  SHLIBDIR=\$(DESTDIR)$shlibdir
  INCDIR=\$(DESTDIR)$incdir
-@@ -7883,6 +7910,7 @@
+@@ -8275,6 +8302,7 @@
  shared=$shared
  build_suffix=$build_suffix
  prefix=$prefix
@@ -137,194 +137,6 @@ diff -Paur --no-dereference -- ffmpeg.upstream/configure ffmpeg/configure
  libdir=$libdir
  incdir=$incdir
  rpath=$(enabled rpath && echo "-Wl,-rpath,\${libdir}")
-diff -Paur --no-dereference -- ffmpeg.upstream/doc/t2h.pm ffmpeg/doc/t2h.pm
---- ffmpeg.upstream/doc/t2h.pm
-+++ ffmpeg/doc/t2h.pm
-@@ -20,8 +20,45 @@
- # License along with FFmpeg; if not, write to the Free Software
- # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- 
-+# Texinfo 7.0 changed the syntax of various functions.
-+# Provide a shim for older versions.
-+sub ff_set_from_init_file($$) {
-+    my $key = shift;
-+    my $value = shift;
-+    if (exists &{'texinfo_set_from_init_file'}) {
-+        texinfo_set_from_init_file($key, $value);
-+    } else {
-+        set_from_init_file($key, $value);
-+    }
-+}
-+
-+sub ff_get_conf($) {
-+    my $key = shift;
-+    if (exists &{'texinfo_get_conf'}) {
-+        texinfo_get_conf($key);
-+    } else {
-+        get_conf($key);
-+    }
-+}
-+
-+sub get_formatting_function($$) {
-+    my $obj = shift;
-+    my $func = shift;
-+
-+    my $sub = $obj->can('formatting_function');
-+    if ($sub) {
-+        return $obj->formatting_function($func);
-+    } else {
-+        return $obj->{$func};
-+    }
-+}
-+
-+# determine texinfo version
-+my $program_version_num = version->declare(ff_get_conf('PACKAGE_VERSION'))->numify;
-+my $program_version_6_8 = $program_version_num >= 6.008000;
-+
- # no navigation elements
--set_from_init_file('HEADERS', 0);
-+ff_set_from_init_file('HEADERS', 0);
- 
- sub ffmpeg_heading_command($$$$$)
- {
-@@ -55,7 +92,7 @@
-         $element = $command->{'parent'};
-     }
-     if ($element) {
--        $result .= &{$self->{'format_element_header'}}($self, $cmdname,
-+        $result .= &{get_formatting_function($self, 'format_element_header')}($self, $cmdname,
-                                                        $command, $element);
-     }
- 
-@@ -112,7 +149,11 @@
-                 $cmdname
-                     = $Texinfo::Common::level_to_structuring_command{$cmdname}->[$heading_level];
-             }
--            $result .= &{$self->{'format_heading_text'}}(
-+            # format_heading_text expects an array of headings for texinfo >= 7.0
-+            if ($program_version_num >= 7.000000) {
-+                $heading = [$heading];
-+            }
-+            $result .= &{get_formatting_function($self,'format_heading_text')}(
-                         $self, $cmdname, $heading,
-                         $heading_level +
-                         $self->get_conf('CHAPTER_HEADER_LEVEL') - 1, $command);
-@@ -126,23 +167,19 @@
-     texinfo_register_command_formatting($command, \&ffmpeg_heading_command);
- }
- 
--# determine if texinfo is at least version 6.8
--my $program_version_num = version->declare(get_conf('PACKAGE_VERSION'))->numify;
--my $program_version_6_8 = $program_version_num >= 6.008000;
--
- # print the TOC where @contents is used
- if ($program_version_6_8) {
--    set_from_init_file('CONTENTS_OUTPUT_LOCATION', 'inline');
-+    ff_set_from_init_file('CONTENTS_OUTPUT_LOCATION', 'inline');
- } else {
--    set_from_init_file('INLINE_CONTENTS', 1);
-+    ff_set_from_init_file('INLINE_CONTENTS', 1);
- }
- 
- # make chapters <h2>
--set_from_init_file('CHAPTER_HEADER_LEVEL', 2);
-+ff_set_from_init_file('CHAPTER_HEADER_LEVEL', 2);
- 
- # Do not add <hr>
--set_from_init_file('DEFAULT_RULE', '');
--set_from_init_file('BIG_RULE', '');
-+ff_set_from_init_file('DEFAULT_RULE', '');
-+ff_set_from_init_file('BIG_RULE', '');
- 
- # Customized file beginning
- sub ffmpeg_begin_file($$$)
-@@ -159,7 +196,18 @@
-     my ($title, $description, $encoding, $date, $css_lines,
-         $doctype, $bodytext, $copying_comment, $after_body_open,
-         $extra_head, $program_and_version, $program_homepage,
--        $program, $generator) = $self->_file_header_informations($command);
-+        $program, $generator);
-+    if ($program_version_num >= 7.000000) {
-+        ($title, $description, $encoding, $date, $css_lines,
-+         $doctype, $bodytext, $copying_comment, $after_body_open,
-+         $extra_head, $program_and_version, $program_homepage,
-+         $program, $generator) = $self->_file_header_information($command);
-+    } else {
-+        ($title, $description, $encoding, $date, $css_lines,
-+         $doctype, $bodytext, $copying_comment, $after_body_open,
-+         $extra_head, $program_and_version, $program_homepage,
-+         $program, $generator) = $self->_file_header_informations($command);
-+    }
- 
-     my $links = $self->_get_links ($filename, $element);
- 
-@@ -223,7 +271,7 @@
- sub ffmpeg_end_file($)
- {
-     my $self = shift;
--    my $program_string = &{$self->{'format_program_string'}}($self);
-+    my $program_string = &{get_formatting_function($self,'format_program_string')}($self);
-     my $program_text = <<EOT;
-       <p style="font-size: small;">
-         $program_string
-@@ -244,7 +292,7 @@
- 
- # Dummy title command
- # Ignore title. Title is handled through ffmpeg_begin_file().
--set_from_init_file('USE_TITLEPAGE_FOR_TITLE', 1);
-+ff_set_from_init_file('USE_TITLEPAGE_FOR_TITLE', 1);
- sub ffmpeg_title($$$$)
- {
-     return '';
-@@ -262,8 +310,14 @@
-     my $args = shift;
-     my $content = shift;
- 
--    my ($caption, $prepended) = Texinfo::Common::float_name_caption($self,
--                                                                $command);
-+    my ($caption, $prepended);
-+    if ($program_version_num >= 7.000000) {
-+        ($caption, $prepended) = Texinfo::Convert::Converter::float_name_caption($self,
-+                                                                                 $command);
-+    } else {
-+        ($caption, $prepended) = Texinfo::Common::float_name_caption($self,
-+                                                                     $command);
-+    }
-     my $caption_text = '';
-     my $prepended_text;
-     my $prepended_save = '';
-@@ -335,8 +389,13 @@
-             $caption->{'args'}->[0], 'float caption');
-     }
-     if ($prepended_text.$caption_text ne '') {
--        $prepended_text = $self->_attribute_class('div','float-caption'). '>'
--                . $prepended_text;
-+        if ($program_version_num >= 7.000000) {
-+            $prepended_text = $self->html_attribute_class('div',['float-caption']). '>'
-+                    . $prepended_text;
-+        } else {
-+            $prepended_text = $self->_attribute_class('div','float-caption'). '>'
-+                    . $prepended_text;
-+        }
-         $caption_text .= '</div>';
-     }
-     my $html_class = '';
-@@ -349,8 +408,13 @@
-         $prepended_text = '';
-         $caption_text   = '';
-     }
--    return $self->_attribute_class('div', $html_class). '>' . "\n" .
--        $prepended_text . $caption_text . $content . '</div>';
-+    if ($program_version_num >= 7.000000) {
-+        return $self->html_attribute_class('div', [$html_class]). '>' . "\n" .
-+            $prepended_text . $caption_text . $content . '</div>';
-+    } else {
-+        return $self->_attribute_class('div', $html_class). '>' . "\n" .
-+            $prepended_text . $caption_text . $content . '</div>';
-+    }
- }
- 
- texinfo_register_command_formatting('float',
 diff -Paur --no-dereference -- ffmpeg.upstream/ffbuild/pkgconfig_generate.sh ffmpeg/ffbuild/pkgconfig_generate.sh
 --- ffmpeg.upstream/ffbuild/pkgconfig_generate.sh
 +++ ffmpeg/ffbuild/pkgconfig_generate.sh
@@ -340,7 +152,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/ffbuild/pkgconfig_generate.sh ffm
 diff -Paur --no-dereference -- ffmpeg.upstream/fftools/Makefile ffmpeg/fftools/Makefile
 --- ffmpeg.upstream/fftools/Makefile
 +++ ffmpeg/fftools/Makefile
-@@ -25,6 +25,8 @@
+@@ -42,6 +42,8 @@
  
  all: $(AVPROGS)
  
@@ -353,7 +165,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/libavcodec/vp9_mc_template.c ffmp
 --- ffmpeg.upstream/libavcodec/vp9_mc_template.c
 +++ ffmpeg/libavcodec/vp9_mc_template.c
 @@ -27,6 +27,9 @@
-     (VP56mv) { .x = ROUNDED_DIV(a.x + b.x + c.x + d.x, 4), \
+     (VP9mv) { .x = ROUNDED_DIV(a.x + b.x + c.x + d.x, 4), \
                 .y = ROUNDED_DIV(a.y + b.y + c.y + d.y, 4) }
  
 +/* PATCH: Native i686-sortix-gcc 14.2.0 fails with
@@ -362,80 +174,10 @@ diff -Paur --no-dereference -- ffmpeg.upstream/libavcodec/vp9_mc_template.c ffmp
  static void FN(inter_pred)(VP9TileData *td)
  {
      static const uint8_t bwlog_tab[2][N_BS_SIZES] = {
-diff -Paur --no-dereference -- ffmpeg.upstream/libavcodec/x86/mathops.h ffmpeg/libavcodec/x86/mathops.h
---- ffmpeg.upstream/libavcodec/x86/mathops.h
-+++ ffmpeg/libavcodec/x86/mathops.h
-@@ -35,12 +35,20 @@
- static av_always_inline av_const int MULL(int a, int b, unsigned shift)
- {
-     int rt, dummy;
-+    if (__builtin_constant_p(shift))
-     __asm__ (
-         "imull %3               \n\t"
-         "shrdl %4, %%edx, %%eax \n\t"
-         :"=a"(rt), "=d"(dummy)
--        :"a"(a), "rm"(b), "ci"((uint8_t)shift)
-+        :"a"(a), "rm"(b), "i"(shift & 0x1F)
-     );
-+    else
-+        __asm__ (
-+            "imull %3               \n\t"
-+            "shrdl %4, %%edx, %%eax \n\t"
-+            :"=a"(rt), "=d"(dummy)
-+            :"a"(a), "rm"(b), "c"((uint8_t)shift)
-+        );
-     return rt;
- }
- 
-@@ -113,19 +121,31 @@
- // avoid +32 for shift optimization (gcc should do that ...)
- #define NEG_SSR32 NEG_SSR32
- static inline  int32_t NEG_SSR32( int32_t a, int8_t s){
-+    if (__builtin_constant_p(s))
-     __asm__ ("sarl %1, %0\n\t"
-          : "+r" (a)
--         : "ic" ((uint8_t)(-s))
-+         : "i" (-s & 0x1F)
-     );
-+    else
-+        __asm__ ("sarl %1, %0\n\t"
-+               : "+r" (a)
-+               : "c" ((uint8_t)(-s))
-+        );
-     return a;
- }
- 
- #define NEG_USR32 NEG_USR32
- static inline uint32_t NEG_USR32(uint32_t a, int8_t s){
-+    if (__builtin_constant_p(s))
-     __asm__ ("shrl %1, %0\n\t"
-          : "+r" (a)
--         : "ic" ((uint8_t)(-s))
-+         : "i" (-s & 0x1F)
-     );
-+    else
-+        __asm__ ("shrl %1, %0\n\t"
-+               : "+r" (a)
-+               : "c" ((uint8_t)(-s))
-+        );
-     return a;
- }
- 
-diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/codec2.c ffmpeg/libavformat/codec2.c
---- ffmpeg.upstream/libavformat/codec2.c
-+++ ffmpeg/libavformat/codec2.c
-@@ -19,7 +19,6 @@
-  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
-  */
- 
--#include <memory.h>
- #include "libavcodec/codec2utils.h"
- #include "libavutil/channel_layout.h"
- #include "libavutil/intreadwrite.h"
 diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/udp.c ffmpeg/libavformat/udp.c
 --- ffmpeg.upstream/libavformat/udp.c
 +++ ffmpeg/libavformat/udp.c
-@@ -252,7 +252,9 @@
+@@ -271,7 +271,9 @@
                                       struct sockaddr_storage *sources,
                                       int nb_sources, int include)
  {
@@ -445,7 +187,7 @@ diff -Paur --no-dereference -- ffmpeg.upstream/libavformat/udp.c ffmpeg/libavfor
      if (addr->sa_family != AF_INET) {
  #if HAVE_STRUCT_GROUP_SOURCE_REQ && defined(MCAST_BLOCK_SOURCE)
          /* For IPv4 prefer the old approach, as that alone works reliably on
-@@ -796,10 +798,12 @@
+@@ -828,10 +830,12 @@
  
      if (dscp >= 0) {
          dscp <<= 2;
