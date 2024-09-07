@@ -305,7 +305,7 @@ esac
 cat << EOF
   hook_kernel_pre
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot /$kernel \$no_random_seed \$enable_network_drivers "\$@"
+  multiboot /$kernel --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers "\$@"
   echo done
   hook_kernel_post
   if ! \$enable_dhclient; then

@@ -1,15 +1,15 @@
 diff -Paur --no-dereference -- grub.upstream/Makefile.in grub/Makefile.in
 --- grub.upstream/Makefile.in
 +++ grub/Makefile.in
-@@ -1212,6 +1212,7 @@
+@@ -1260,6 +1260,7 @@
  	util/grub.d/10_kfreebsd.in util/grub.d/10_illumos.in \
  	util/grub.d/10_netbsd.in util/grub.d/10_linux.in \
  	util/grub.d/10_xnu.in util/grub.d/20_linux_xen.in \
 +	util/grub.d/10_sortix.in \
- 	util/grub.d/30_os-prober.in util/grub.d/40_custom.in \
+ 	util/grub.d/25_bli.in util/grub.d/30_os-prober.in \
+ 	util/grub.d/30_uefi-firmware.in util/grub.d/40_custom.in \
  	util/grub.d/41_custom.in util/grub-mkconfig.in \
- 	util/grub-set-default.in util/grub-reboot.in \
-@@ -2372,7 +2373,7 @@
+@@ -2780,7 +2781,7 @@
  CCASFLAGS_LIBRARY = 
  
  # Other variables
@@ -17,32 +17,40 @@ diff -Paur --no-dereference -- grub.upstream/Makefile.in grub/Makefile.in
 +grubconfdir = $(sysconfdir)/default/grub.d
  platformdir = $(pkglibdir)/$(target_cpu)-$(platform)
  starfielddir = $(pkgdatadir)/themes/starfield
- CFLAGS_GNULIB = -Wno-undef -Wno-sign-compare -Wno-unused -Wno-unused-parameter -Wno-redundant-decls -Wno-unreachable-code -Wno-conversion
-@@ -2440,6 +2441,7 @@
- grubconf_SCRIPTS = 00_header $(am__append_57) $(am__append_61) \
- 	$(am__append_65) $(am__append_69) $(am__append_73) \
- 	$(am__append_77) $(am__append_81) $(am__append_85) \
-+	10_sortix \
- 	30_os-prober 40_custom 41_custom
- noinst_LIBRARIES = libgrubkern.a libgrubmods.a libgrubgcry.a
- dist_noinst_DATA = grub-core/kern/disk_common.c \
-@@ -2460,6 +2462,7 @@
- 	util/grub.d/00_header.in $(am__append_60) $(am__append_64) \
- 	$(am__append_68) $(am__append_72) $(am__append_76) \
- 	$(am__append_80) $(am__append_84) $(am__append_88) \
+ CFLAGS_GNULIB = -Wno-undef -Wno-sign-compare -Wno-unused -Wno-unused-parameter -Wno-redundant-decls -Wno-unreachable-code -Wno-conversion -Wno-error=attributes
+@@ -2866,6 +2867,7 @@
+ 	util/grub.d/00_header.in $(am__append_62) $(am__append_66) \
+ 	$(am__append_70) $(am__append_74) $(am__append_78) \
+ 	$(am__append_82) $(am__append_86) $(am__append_90) \
 +	util/grub.d/10_sortix.in \
- 	util/grub.d/30_os-prober.in util/grub.d/40_custom.in \
+ 	util/grub.d/25_bli.in util/grub.d/30_os-prober.in \
+ 	util/grub.d/30_uefi-firmware.in util/grub.d/40_custom.in \
  	util/grub.d/41_custom.in util/grub-mkconfig.in \
- 	util/grub-set-default.in util/grub-reboot.in \
-@@ -2640,6 +2643,7 @@
- 	$(am__append_62) $(am__append_66) $(am__append_70) \
- 	$(am__append_74) $(am__append_78) $(am__append_82) \
- 	$(am__append_86) 30_os-prober 40_custom 41_custom \
+@@ -2915,6 +2917,7 @@
+ grubconf_SCRIPTS = 00_header $(am__append_59) $(am__append_63) \
+ 	$(am__append_67) $(am__append_71) $(am__append_75) \
+ 	$(am__append_79) $(am__append_83) $(am__append_87) 25_bli \
 +	10_sortix \
- 	$(am__append_89) grub-mkconfig $(am__append_90) \
- 	grub-set-default $(am__append_91) grub-reboot \
- 	grub-mkconfig_lib $(am__append_92) grub-kbdcomp grub-shell \
-@@ -12086,6 +12090,10 @@
+ 	30_os-prober 30_uefi-firmware 40_custom 41_custom
+ man_MANS = $(am__append_7) $(am__append_14) $(am__append_19) \
+ 	$(am__append_22) $(am__append_28) $(am__append_33) \
+@@ -3069,6 +3072,7 @@
+ 	$(am__append_64) $(am__append_68) $(am__append_72) \
+ 	$(am__append_76) $(am__append_80) $(am__append_84) \
+ 	$(am__append_88) 25_bli 30_os-prober 30_uefi-firmware \
++	10_sortix \
+ 	40_custom 41_custom $(am__append_91) grub-mkconfig \
+ 	$(am__append_92) grub-set-default $(am__append_93) grub-reboot \
+ 	grub-mkconfig_lib $(am__append_94) grub-kbdcomp grub-shell \
+@@ -12885,6 +12889,7 @@
+ distclean: distclean-recursive
+ 	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
+ 	-rm -rf ./$(DEPDIR) grub-core/$(DEPDIR) grub-core/commands/$(DEPDIR) grub-core/disk/$(DEPDIR) grub-core/font/$(DEPDIR) grub-core/fs/$(DEPDIR) grub-core/fs/zfs/$(DEPDIR) grub-core/gfxmenu/$(DEPDIR) grub-core/io/$(DEPDIR) grub-core/kern/$(DEPDIR) grub-core/kern/arm/$(DEPDIR) grub-core/kern/arm64/$(DEPDIR) grub-core/kern/emu/$(DEPDIR) grub-core/kern/ia64/$(DEPDIR) grub-core/kern/loongarch64/$(DEPDIR) grub-core/lib/$(DEPDIR) grub-core/lib/i386/pc/$(DEPDIR) grub-core/lib/json/$(DEPDIR) grub-core/lib/libgcrypt-grub/cipher/$(DEPDIR) grub-core/lib/minilzo/$(DEPDIR) grub-core/lib/xzembed/$(DEPDIR) grub-core/lib/zstd/$(DEPDIR) grub-core/loader/$(DEPDIR) grub-core/loader/i386/$(DEPDIR) grub-core/normal/$(DEPDIR) grub-core/osdep/$(DEPDIR) grub-core/osdep/devmapper/$(DEPDIR) grub-core/osdep/unix/$(DEPDIR) grub-core/partmap/$(DEPDIR) grub-core/script/$(DEPDIR) grub-core/tests/lib/$(DEPDIR) grub-core/video/$(DEPDIR) grub-core/video/fb/$(DEPDIR) tests/$(DEPDIR) tests/lib/$(DEPDIR) util/$(DEPDIR) util/ieee1275/$(DEPDIR)
++	-rm -rf __pycache__
+ 	-rm -f Makefile
+ distclean-am: clean-am distclean-compile distclean-generic \
+ 	distclean-hdr distclean-tags
+@@ -13144,6 +13149,10 @@
  @COND_HOST_XNU_TRUE@	(for x in util/grub.d/10_xnu.in ; do cat $(srcdir)/"$$x"; done) | $(top_builddir)/config.status --file=$@:-
  @COND_HOST_XNU_TRUE@	chmod a+x 10_xnu
  
@@ -53,25 +61,29 @@ diff -Paur --no-dereference -- grub.upstream/Makefile.in grub/Makefile.in
  @COND_HOST_LINUX_TRUE@20_linux_xen: $(top_builddir)/config.status util/grub.d/20_linux_xen.in 
  @COND_HOST_LINUX_TRUE@	(for x in util/grub.d/20_linux_xen.in ; do cat $(srcdir)/"$$x"; done) | $(top_builddir)/config.status --file=$@:-
  @COND_HOST_LINUX_TRUE@	chmod a+x 20_linux_xen
-diff -Paur --no-dereference -- grub.upstream/build-aux/config.sub grub/build-aux/config.sub
---- grub.upstream/build-aux/config.sub
-+++ grub/build-aux/config.sub
-@@ -1354,7 +1354,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* | -plan9* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
+@@ -13618,6 +13627,15 @@
+ widthspec.h: $(FONT_SOURCE) build-grub-gen-widthspec$(BUILD_EXEEXT)
+ 	./build-grub-gen-widthspec$(BUILD_EXEEXT) $(FONT_SOURCE) $@ || (rm -f $@; exit 1)
+ 
++# PATCH: grub-core is standalone but requires top-level files for fonts.
++.PHONY: grub-core
++grub-core: $(pkgdata_DATA)
++	$(MAKE) -C grub-core
++
++.PHONY: install-grub-core
++install-grub-core: grub-core
++	$(MAKE) -C grub-core install
++
+ @COND_real_platform_TRUE@linux.init.x86_64: $(srcdir)/grub-core/tests/boot/linux.init-x86_64.S $(srcdir)/grub-core/tests/boot/qemu-shutdown-x86.S
+ @COND_real_platform_TRUE@	$(TARGET_CC) -o $@ $< -static -m64 -nostdlib -nostdinc -DSUCCESSFUL_BOOT_STRING=\"$(SUCCESSFUL_BOOT_STRING)\"
+ 
 diff -Paur --no-dereference -- grub.upstream/configure grub/configure
 --- grub.upstream/configure
 +++ grub/configure
 @@ -1,4 +1,126 @@
  #! /bin/sh
 +# CFLAGS containing -s produces a broken GRUB on boot.
-+if [ -n "$CFLAGS" ]; then
++if [ "$NO_CFLAGS_STRIP" = 1 -a -n "$CFLAGS" ]; then
 +  CFLAGS=$(printf '%s\n' "$CFLAGS" | sed 's/\(^\|[[:space:]]\+\)-s\([[:space:]]\+\|$\)/ /g')
 +fi
 +# Make gnulib assume the best about unknown operating systems when cross-compiling.
@@ -193,24 +205,21 @@ diff -Paur --no-dereference -- grub.upstream/configure grub/configure
 +export gl_cv_func_getcwd_null=yes # Only if the OS actually supports this, Sortix does.
 +export gl_cv_struct_dirent_d_ino=yes # Only if the OS actually supports this, Sortix does.
  # Guess values for system-dependent variables and create Makefiles.
- # Generated by GNU Autoconf 2.69 for GRUB 2.02~beta2.
+ # Generated by GNU Autoconf 2.69 for GRUB 2.12.
  #
-@@ -26950,6 +27072,11 @@
+@@ -39636,7 +39758,7 @@
+ if test x"$grub_build_mkfont_excuse" = x ; then
+   # Check for freetype libraries.
+   SAVED_PKG_CONFIG="$PKG_CONFIG"
+-  test -z "$BUILD_PKG_CONFIG" || PKG_CONFIG="$BUILD_PKG_CONFIG"
++  test -z "$PKG_CONFIG_FOR_BUILD" || PKG_CONFIG="$PKG_CONFIG_FOR_BUILD"
  
- fi
- fi
-+if ${PKG_CONFIG:-pkg-config} --exists freetype2; then
-+  ac_cv_prog_FREETYPE="${PKG_CONFIG:-pkg-config} freetype2"
-+else
-+  ac_cv_prog_FREETYPE=
-+fi
- FREETYPE=$ac_cv_prog_FREETYPE
- if test -n "$FREETYPE"; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: result: $FREETYPE" >&5
+ pkg_failed=no
+ { $as_echo "$as_me:${as_lineno-$LINENO}: checking for BUILD_FREETYPE" >&5
 diff -Paur --no-dereference -- grub.upstream/grub-core/Makefile.in grub/grub-core/Makefile.in
 --- grub.upstream/grub-core/Makefile.in
 +++ grub/grub-core/Makefile.in
-@@ -13658,7 +13658,7 @@
+@@ -16325,7 +16325,7 @@
  CCASFLAGS_LIBRARY = $(CCASFLAGS_PLATFORM)
  
  # Other variables
@@ -218,8 +227,20 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/Makefile.in grub/grub-cor
 +grubconfdir = $(sysconfdir)/default/grub.d
  platformdir = $(pkglibdir)/$(target_cpu)-$(platform)
  starfielddir = $(pkgdatadir)/themes/starfield
- CFLAGS_GNULIB = -Wno-undef -Wno-sign-compare -Wno-unused -Wno-unused-parameter -Wno-redundant-decls -Wno-unreachable-code -Wno-conversion
-@@ -42572,7 +42572,7 @@
+ CFLAGS_GNULIB = -Wno-undef -Wno-sign-compare -Wno-unused -Wno-unused-parameter -Wno-redundant-decls -Wno-unreachable-code -Wno-conversion -Wno-error=attributes
+@@ -49018,8 +49018,9 @@
+ crypto.lst: $(srcdir)/lib/libgcrypt-grub/cipher/crypto.lst
+ 	cp $^ $@
+ 
+-syminfo.lst: gensyminfo.sh kernel_syms.lst $(top_srcdir)/grub-core/extra_deps.lst $(MODULE_FILES)
+-	cat kernel_syms.lst $(top_srcdir)/grub-core/extra_deps.lst > $@.new
++# PATCH: extra_deps.lst does not seem to exist.
++syminfo.lst: gensyminfo.sh kernel_syms.lst $(MODULE_FILES)
++	cat kernel_syms.lst > $@.new
+ 	for m in $(MODULE_FILES); do \
+ 	  sh $< $$m >> $@.new || exit 1; \
+ 	done
+@@ -49035,7 +49036,7 @@
  @COND_ENABLE_EFIEMU_TRUE@efiemu32.o: efiemu/runtime/efiemu.c $(TARGET_OBJ2ELF)
  @COND_ENABLE_EFIEMU_TRUE@	-rm -f $@
  @COND_ENABLE_EFIEMU_TRUE@	-rm -f $@.bin
@@ -228,7 +249,7 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/Makefile.in grub/grub-cor
  @COND_ENABLE_EFIEMU_TRUE@	if test "x$(TARGET_APPLE_LINKER)" = x1; then \
  @COND_ENABLE_EFIEMU_TRUE@	  $(TARGET_OBJCONV) -felf32 -nu -nd $@.bin $@ || exit 1; \
  @COND_ENABLE_EFIEMU_TRUE@	  rm -f $@.bin ; \
-@@ -42585,10 +42585,10 @@
+@@ -49048,10 +49049,10 @@
  
  # Link format -arch,x86_64 means Apple linker
  @COND_ENABLE_EFIEMU_TRUE@efiemu64_c.o: efiemu/runtime/efiemu.c
@@ -244,29 +265,7 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/Makefile.in grub/grub-cor
 diff -Paur --no-dereference -- grub.upstream/grub-core/lib/libgcrypt-grub/cipher/rijndael.c grub/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
 --- grub.upstream/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
 +++ grub/grub-core/lib/libgcrypt-grub/cipher/rijndael.c
-@@ -180,8 +180,9 @@
-   static int initialized = 0;
-   static const char *selftest_failed=0;
-   int rounds;
--  int i,j, r, t, rconpointer = 0;
-+  int j, r, t, rconpointer = 0;
-   int KC;
-+  unsigned i;
-   union
-   {
-     PROPERLY_ALIGNED_TYPE dummy;
-@@ -226,7 +227,9 @@
-       KC = 4;
- 
-       if (0)
--        ;
-+        {
-+          ; /* [-Wempty-body] */
-+        }
- #ifdef USE_PADLOCK
-       else if ((_gcry_get_hw_features () & HWF_PADLOCK_AES))
-         {
-@@ -349,7 +352,7 @@
+@@ -352,7 +352,7 @@
    else
      {
  #define W (ctx->keyschenc)
@@ -275,6 +274,99 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/lib/libgcrypt-grub/cipher
          {
            k[i >> 2][i & 3] = key[i];
          }
+diff -Paur --no-dereference -- grub.upstream/grub-core/loader/multiboot.c grub/grub-core/loader/multiboot.c
+--- grub.upstream/grub-core/loader/multiboot.c
++++ grub/grub-core/loader/multiboot.c
+@@ -363,7 +363,7 @@
+ 		 int argc, char *argv[])
+ {
+   grub_file_t file = 0;
+-  grub_ssize_t size;
++  grub_ssize_t size, req_size;
+   void *module = NULL;
+   grub_addr_t target;
+   grub_err_t err;
+@@ -401,10 +401,12 @@
+   size = grub_file_size (file);
+   if (size)
+   {
++    /* PATCH: Avoid modules sharing pages. */
++    req_size = ALIGN_UP (size, MULTIBOOT_MOD_ALIGN);
+     grub_relocator_chunk_t ch;
+     err = grub_relocator_alloc_chunk_align (GRUB_MULTIBOOT (relocator), &ch,
+-					    lowest_addr, UP_TO_TOP32 (size),
+-					    size, MULTIBOOT_MOD_ALIGN,
++					    lowest_addr, UP_TO_TOP32 (req_size),
++					    req_size, MULTIBOOT_MOD_ALIGN,
+ 					    GRUB_RELOCATOR_PREFERENCE_NONE, 1);
+     if (err)
+       {
+diff -Paur --no-dereference -- grub.upstream/grub-core/normal/main.c grub/grub-core/normal/main.c
+--- grub.upstream/grub-core/normal/main.c
++++ grub/grub-core/normal/main.c
+@@ -203,17 +203,24 @@
+ {
+   grub_ssize_t msg_len;
+   int posx;
+-  char *msg_formatted;
++  const char *menu_title = NULL;
++  char *msg_formatted = NULL;
+   grub_uint32_t *unicode_msg;
+   grub_uint32_t *last_position;
+ 
+   grub_term_cls (term);
+ 
+-  msg_formatted = grub_xasprintf (_("GNU GRUB  version %s"), PACKAGE_VERSION);
+-  if (!msg_formatted)
+-    return;
++  menu_title = grub_env_get ("menu_title");
+ 
+-  msg_len = grub_utf8_to_ucs4_alloc (msg_formatted,
++  if (!menu_title)
++    {
++      msg_formatted = grub_xasprintf (_("GNU GRUB  version %s"), PACKAGE_VERSION);
++      if (!msg_formatted)
++	return;
++      menu_title = msg_formatted;
++    }
++
++  msg_len = grub_utf8_to_ucs4_alloc (menu_title,
+   				     &unicode_msg, &last_position);
+   grub_free (msg_formatted);
+ 
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/basic/platform.c grub/grub-core/osdep/basic/platform.c
+--- grub.upstream/grub-core/osdep/basic/platform.c
++++ grub/grub-core/osdep/basic/platform.c
+@@ -18,6 +18,12 @@
+ 
+ #include <grub/util/install.h>
+ 
++#ifdef __sortix__
++#include <sys/kernelinfo.h>
++
++#include <string.h>
++#endif
++
+ const char *
+ grub_install_get_default_arm_platform (void)
+ {
+@@ -27,6 +33,16 @@
+ const char *
+ grub_install_get_default_x86_platform (void)
+ {
++#ifdef __sortix__
++  char firmware[16];
++  if (!kernelinfo("firmware", firmware, sizeof(firmware)) &&
++      !strcmp(firmware, "efi"))
++#ifdef __i386__
++    return "i386-efi";
++#else
++    return "x86_64-efi";
++#endif
++#endif
+   return "i386-pc";
+ }
+ 
 diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/getroot.c grub/grub-core/osdep/getroot.c
 --- grub.upstream/grub-core/osdep/getroot.c
 +++ grub/grub-core/osdep/getroot.c
@@ -314,7 +406,7 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/random.c grub/grub-
 diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/sortix/getroot.c grub/grub-core/osdep/sortix/getroot.c
 --- grub.upstream/grub-core/osdep/sortix/getroot.c
 +++ grub/grub-core/osdep/sortix/getroot.c
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,163 @@
 +/*
 + *  GRUB  --  GRand Unified Bootloader
 + *  Copyright (C) 1999,2000,2001,2002,2003,2006,2007,2008,2009,2010,2011,2012,2013  Free Software Foundation, Inc.
@@ -339,6 +431,7 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/sortix/getroot.c gr
 +#include <sys/stat.h>
 +#include <sys/types.h>
 +#include <assert.h>
++#include <ctype.h>
 +#include <dirent.h>
 +#include <errno.h>
 +#include <error.h>
@@ -586,12 +679,47 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/sortix/random.c gru
 +  arc4random_buf(out, len);
 +  return 0;
 +}
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/config.c grub/grub-core/osdep/unix/config.c
+--- grub.upstream/grub-core/osdep/unix/config.c
++++ grub/grub-core/osdep/unix/config.c
+@@ -35,8 +35,7 @@
+ {
+   static char *value = NULL;
+   if (!value)
+-    value = grub_util_path_concat (3, GRUB_SYSCONFDIR,
+-				   "default", "grub");
++    value = grub_util_path_concat (2, GRUB_SYSCONFDIR, "grub");
+   return value;
+ }
+ 
+@@ -78,6 +77,10 @@
+   if (v && v[0] == 'y' && v[1] == '\0')
+     cfg->is_cryptodisk_enabled = 1;
+ 
++  v = getenv ("GRUB_REMOVABLE");
++  if (v && grub_strcmp (v, "true") == 0)
++    cfg->is_removable = 1;
++
+   v = getenv ("GRUB_DISTRIBUTOR");
+   if (v)
+     cfg->grub_distributor = xstrdup (v);
+@@ -105,8 +108,8 @@
+       *ptr++ = *iptr;
+     }
+ 
+-  strcpy (ptr, "'; printf \"GRUB_ENABLE_CRYPTODISK=%s\\nGRUB_DISTRIBUTOR=%s\\n\" "
+-	  "\"$GRUB_ENABLE_CRYPTODISK\" \"$GRUB_DISTRIBUTOR\"");
++  strcpy (ptr, "'; printf \"GRUB_ENABLE_CRYPTODISK=%s\\nGRUB_REMOVABLE=%s\\nGRUB_DISTRIBUTOR=%s\\n\" "
++	  "\"$GRUB_ENABLE_CRYPTODISK\" \"$GRUB_REMOVABLE\" \"$GRUB_DISTRIBUTOR\"");
+ 
+   argv[2] = script;
+   argv[3] = '\0';
 diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/getroot.c grub/grub-core/osdep/unix/getroot.c
 --- grub.upstream/grub-core/osdep/unix/getroot.c
 +++ grub/grub-core/osdep/unix/getroot.c
 @@ -111,7 +111,8 @@
- #include <sys/mount.h>
- #endif
+ 
+ #include "save-cwd.h"
  
 -#if !defined (__GNU__)
 +/* Sortix implements these in grub-core/osdep/sortix/getroot.c instead. */
@@ -599,19 +727,10 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/getroot.c grub
  static void
  strip_extra_slashes (char *dir)
  {
-@@ -441,7 +442,7 @@
- 
- 	  cwd = xgetcwd ();
- 	  res = xmalloc (strlen (cwd) + strlen (ent->d_name) + 3);
--	  sprintf (res, 
-+	  snprintf (res, strlen (cwd) + strlen (ent->d_name) + 3,
- #if defined(__NetBSD__) || defined(__OpenBSD__)
- 		   /* Convert this block device to its character (raw) device.  */
- 		   "%s/r%s",
 diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/hostdisk.c grub/grub-core/osdep/unix/hostdisk.c
 --- grub.upstream/grub-core/osdep/unix/hostdisk.c
 +++ grub/grub-core/osdep/unix/hostdisk.c
-@@ -200,16 +200,7 @@
+@@ -213,16 +213,7 @@
  char *
  grub_canonicalize_file_name (const char *path)
  {
@@ -647,7 +766,7 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/password.c gru
 diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/platform.c grub/grub-core/osdep/unix/platform.c
 --- grub.upstream/grub-core/osdep/unix/platform.c
 +++ grub/grub-core/osdep/unix/platform.c
-@@ -114,8 +114,14 @@
+@@ -115,8 +115,14 @@
  	  || line[sizeof ("Boot") - 1] < '0'
  	  || line[sizeof ("Boot") - 1] > '9')
  	continue;
@@ -662,6 +781,40 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/platform.c gru
        bootnum = line + sizeof ("Boot") - 1;
        bootnum[4] = '\0';
        if (!verbosity)
+diff -Paur --no-dereference -- grub.upstream/grub-core/video/bochs.c grub/grub-core/video/bochs.c
+--- grub.upstream/grub-core/video/bochs.c
++++ grub/grub-core/video/bochs.c
+@@ -210,7 +210,9 @@
+   addr = grub_pci_make_address (dev, GRUB_PCI_REG_CLASS);
+   class = grub_pci_read (addr);
+ 
+-  if (((class >> 16) & 0xffff) != 0x0300 || pciid != 0x11111234)
++  if (((class >> 16) & 0xffff) != 0x0300)
++    return 0;
++  if (pciid != 0x11111234 && pciid != 0xbeef80ee)
+     return 0;
+ 
+   addr = grub_pci_make_address (dev, GRUB_PCI_REG_ADDRESS_REG0);
+@@ -263,7 +265,7 @@
+   if (depth == 0
+       && !grub_video_check_mode_flag (mode_type, mode_mask,
+ 				      GRUB_VIDEO_MODE_TYPE_INDEX_COLOR, 0))
+-    depth = 24;
++    depth = 32;
+ 
+   if (depth == 0)
+     depth = 8;
+diff -Paur --no-dereference -- grub.upstream/include/grub/emu/config.h grub/include/grub/emu/config.h
+--- grub.upstream/include/grub/emu/config.h
++++ grub/include/grub/emu/config.h
+@@ -36,6 +36,7 @@
+ struct grub_util_config
+ {
+   int is_cryptodisk_enabled;
++  int is_removable;
+   char *grub_distributor;
+ };
+ 
 diff -Paur --no-dereference -- grub.upstream/include/grub/emu/getroot.h grub/include/grub/emu/getroot.h
 --- grub.upstream/include/grub/emu/getroot.h
 +++ grub/include/grub/emu/getroot.h
@@ -683,7 +836,7 @@ diff -Paur --no-dereference -- grub.upstream/update-grub grub/update-grub
 diff -Paur --no-dereference -- grub.upstream/util/bash-completion.d/Makefile.in grub/util/bash-completion.d/Makefile.in
 --- grub.upstream/util/bash-completion.d/Makefile.in
 +++ grub/util/bash-completion.d/Makefile.in
-@@ -1022,7 +1022,7 @@
+@@ -1403,7 +1403,7 @@
  bash_completion_script = grub
  EXTRA_DIST = $(bash_completion_source)
  CLEANFILES = $(bash_completion_script) config.log
@@ -692,6 +845,27 @@ diff -Paur --no-dereference -- grub.upstream/util/bash-completion.d/Makefile.in 
  bashcompletion_DATA = $(bash_completion_script)
  all: all-am
  
+diff -Paur --no-dereference -- grub.upstream/util/config.c grub/util/config.c
+--- grub.upstream/util/config.c
++++ grub/util/config.c
+@@ -42,6 +42,17 @@
+ 	    cfg->is_cryptodisk_enabled = 1;
+ 	  continue;
+ 	}
++      if (grub_strncmp (ptr, "GRUB_REMOVABLE=",
++			sizeof ("GRUB_REMOVABLE=") - 1) == 0)
++	{
++	  ptr += sizeof ("GRUB_REMOVABLE=") - 1;
++	  if (*ptr == '"' || *ptr == '\'')
++	    ptr++;
++	  if (grub_strncmp (ptr, "true", sizeof ("true") - 1) == 0)
++	    cfg->is_removable = 1;
++	  continue;
++	}
++
+       if (grub_strncmp (ptr, "GRUB_DISTRIBUTOR=",
+ 			sizeof ("GRUB_DISTRIBUTOR=") - 1) == 0)
+ 	{
 diff -Paur --no-dereference -- grub.upstream/util/getroot.c grub/util/getroot.c
 --- grub.upstream/util/getroot.c
 +++ grub/util/getroot.c
@@ -737,7 +911,7 @@ diff -Paur --no-dereference -- grub.upstream/util/getroot.c grub/util/getroot.c
 diff -Paur --no-dereference -- grub.upstream/util/grub-fstest.c grub/util/grub-fstest.c
 --- grub.upstream/util/grub-fstest.c
 +++ grub/util/grub-fstest.c
-@@ -753,7 +753,7 @@
+@@ -759,7 +759,7 @@
          {
            alloc_root = xmalloc (strlen (default_root) + strlen (root) + 2);
  
@@ -746,6 +920,76 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-fstest.c grub/util/grub-f
            root = alloc_root;
          }
      }
+diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-install.c
+--- grub.upstream/util/grub-install.c
++++ grub/util/grub-install.c
+@@ -876,6 +876,9 @@
+ 
+   grub_util_load_config (&config);
+ 
++  if (config.is_removable)
++    removable = 1;
++
+   if (!bootloader_id && config.grub_distributor)
+     {
+       char *ptr;
+@@ -888,7 +891,7 @@
+   if (!bootloader_id || bootloader_id[0] == '\0')
+     {
+       free (bootloader_id);
+-      bootloader_id = xstrdup ("grub");
++      bootloader_id = xstrdup ("sortix");
+     }
+ 
+   if (!grub_install_source_directory)
+@@ -956,12 +959,20 @@
+       break;
+     }
+ 
++  if (!bootdir)
++    bootdir = grub_util_path_concat (3, "/", rootdir, GRUB_BOOT_DIR_NAME);
++
+   switch (platform)
+     {
+     case GRUB_INSTALL_PLATFORM_I386_PC:
+     case GRUB_INSTALL_PLATFORM_SPARC64_IEEE1275:
+       if (!install_device)
+-	grub_util_error ("%s", _("install device isn't specified"));
++	{
++	  grub_devices = grub_guess_root_devices (bootdir);
++	  if (!grub_devices || !grub_devices[0] ||
++	      !(install_device = grub_util_get_os_disk (grub_devices[0])))
++	    grub_util_error ("%s", _("install device isn't specified"));
++	}
+       break;
+     case GRUB_INSTALL_PLATFORM_POWERPC_IEEE1275:
+       if (install_device)
+@@ -999,9 +1010,6 @@
+       break;
+     }
+ 
+-  if (!bootdir)
+-    bootdir = grub_util_path_concat (3, "/", rootdir, GRUB_BOOT_DIR_NAME);
+-
+   {
+     char * t = grub_util_path_concat (2, bootdir, GRUB_DIR_NAME);
+     grub_install_mkdir_p (t);
+@@ -1913,6 +1921,7 @@
+       break;
+ 
+     case GRUB_INSTALL_PLATFORM_I386_EFI:
++#ifndef __sortix__
+       if (!efidir_is_mac)
+ 	{
+ 	  char *dst = grub_util_path_concat (2, efidir, "grub.efi");
+@@ -1920,6 +1929,7 @@
+ 	  grub_install_copy_file (imgfile, dst, 1);
+ 	  free (dst);
+ 	}
++#endif
+       /* Fallthrough.  */
+     case GRUB_INSTALL_PLATFORM_X86_64_EFI:
+       if (efidir_is_mac)
 diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/grub-mkconfig.in
 --- grub.upstream/util/grub-mkconfig.in
 +++ grub/util/grub-mkconfig.in
@@ -785,8 +1029,8 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/gru
  set $grub_probe dummy
  if test -f "$1"; then
      :
-@@ -147,8 +127,8 @@
-     GRUB_FS="$(stat -f --printf=%T / || echo unknown)"
+@@ -157,8 +137,8 @@
+ 	GRUB_EARLY_INITRD_LINUX_STOCK="intel-uc.img intel-ucode.img amd-uc.img amd-ucode.img early_ucode.cpio microcode.cpio"
  fi
  
 -if test -f ${sysconfdir}/default/grub ; then
@@ -795,16 +1039,16 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/gru
 +  . ${sysconfdir}/grub
  fi
  
- # XXX: should this be deprecated at some point?
-@@ -211,6 +191,7 @@
+ if [ "x${GRUB_DISABLE_UUID}" = "xtrue" ]; then
+@@ -233,6 +213,7 @@
    GRUB_CMDLINE_NETBSD \
    GRUB_CMDLINE_NETBSD_DEFAULT \
    GRUB_CMDLINE_GNUMACH \
 +  GRUB_CMDLINE_SORTIX \
-   GRUB_TERMINAL_INPUT \
-   GRUB_TERMINAL_OUTPUT \
-   GRUB_SERIAL_COMMAND \
-@@ -243,12 +224,23 @@
+   GRUB_TOP_LEVEL \
+   GRUB_TOP_LEVEL_XEN \
+   GRUB_TOP_LEVEL_OS_PROBER \
+@@ -271,12 +252,23 @@
  # DO NOT EDIT THIS FILE
  #
  # It is automatically generated by $self using templates
@@ -831,7 +1075,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/gru
    case "$i" in
      # emacsen backup files. FIXME: support other editors
      *~) ;;
-@@ -269,7 +261,7 @@
+@@ -297,7 +289,7 @@
    if ! ${grub_script_check} ${grub_cfg}.new; then
      # TRANSLATORS: %s is replaced by filename
      gettext_printf "Syntax errors are detected in generated GRUB config file.
@@ -840,6 +1084,87 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/gru
  and /etc/grub.d/* files or please file a bug report with
  %s file attached." "${grub_cfg}.new" >&2
      echo >&2
+diff -Paur --no-dereference -- grub.upstream/util/grub-mkpasswd-pbkdf2.c grub/util/grub-mkpasswd-pbkdf2.c
+--- grub.upstream/util/grub-mkpasswd-pbkdf2.c
++++ grub/util/grub-mkpasswd-pbkdf2.c
+@@ -45,6 +45,7 @@
+ static struct argp_option options[] = {
+   {"iteration-count",  'c', N_("NUM"), 0, N_("Number of PBKDF2 iterations"), 0},
+   {"buflen",  'l', N_("NUM"), 0, N_("Length of generated hash"), 0},
++  {"password",  'p', N_("NAME"), 0, N_("Password"), 0},
+   {"salt",  's', N_("NUM"), 0, N_("Length of salt"), 0},
+   { 0, 0, 0, 0, 0, 0 }
+ };
+@@ -54,6 +55,7 @@
+   unsigned int count;
+   unsigned int buflen;
+   unsigned int saltlen;
++  char* password;
+ };
+ 
+ static error_t
+@@ -73,6 +75,10 @@
+       arguments->buflen = strtoul (arg, NULL, 0);
+       break;
+ 
++    case 'p':
++      arguments->password = xstrdup (arg);
++      break;
++
+     case 's':
+       arguments->saltlen = strtoul (arg, NULL, 0);
+       break;
+@@ -116,6 +122,7 @@
+   struct arguments arguments = {
+     .count = 10000,
+     .buflen = 64,
++    .password = NULL,
+     .saltlen = 64
+   };
+   char *result, *ptr;
+@@ -136,6 +143,9 @@
+   buf = xmalloc (arguments.buflen);
+   salt = xmalloc (arguments.saltlen);
+ 
++  if (!arguments.password)
++    {
++
+   printf ("%s", _("Enter password: "));
+   if (!grub_password_get (pass1, GRUB_AUTH_MAX_PASSLEN))
+     {
+@@ -161,6 +171,9 @@
+     }
+   memset (pass2, 0, sizeof (pass2));
+ 
++      arguments.password = pass1;
++    }
++
+   if (grub_get_random (salt, arguments.saltlen))
+     {
+       memset (pass1, 0, sizeof (pass1));
+@@ -170,10 +183,12 @@
+     }
+ 
+   gcry_err = grub_crypto_pbkdf2 (GRUB_MD_SHA512,
+-				 (grub_uint8_t *) pass1, strlen (pass1),
++				 (grub_uint8_t *) arguments.password,
++				 strlen (arguments.password),
+ 				 salt, arguments.saltlen,
+ 				 arguments.count, buf, arguments.buflen);
+   memset (pass1, 0, sizeof (pass1));
++  memset (arguments.password, 0, strlen (arguments.password));
+ 
+   if (gcry_err)
+     {
+@@ -200,7 +215,7 @@
+   ptr += arguments.buflen * 2;
+   *ptr = '\0';
+ 
+-  printf (_("PBKDF2 hash of your password is %s\n"), result);
++  printf ("%s\n", result);
+   memset (buf, 0, arguments.buflen);
+   free (buf);
+   memset (salt, 0, arguments.saltlen);
 diff -Paur --no-dereference -- grub.upstream/util/grub.d/00_header.in grub/util/grub.d/00_header.in
 --- grub.upstream/util/grub.d/00_header.in
 +++ grub/util/grub.d/00_header.in
@@ -946,7 +1271,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub.d/10_sortix.in grub/util/
 +  insmod part_$PARTMAP
 +  insmod $FS
 +  search --no-floppy --fs-uuid --set=root $HINTS_STRING $FS_UUID
-+  multiboot $BOOT_REL/sortix.bin $GRUB_CMDLINE_SORTIX
++  multiboot $BOOT_REL/sortix.bin --firmware=\$grub_platform $GRUB_CMDLINE_SORTIX
 +  module $OLD_BOOT_REL/random.seed --random-seed
 +  module $BOOT_REL/sortix.initrd
 +}
@@ -959,14 +1284,14 @@ diff -Paur --no-dereference -- grub.upstream/util/grub.d/README grub/util/grub.d
 @@ -1,11 +1,15 @@
 -
 -All executable files in this directory are processed in shell expansion order.
-+All executable files in /etc/grub.d and /etc/grub.d/default are processed in
++All executable files in /etc/grub.d and /etc/default/grub.d are processed in
 +shell expansion order.
  
    00_*: Reserved for 00_header.
    10_*: Native boot entries.
    20_*: Third party apps (e.g. memtest86+).
  
-+Files in /etc/grub.d override files in /etc/grub.d/default if they exist. It is
++Files in /etc/grub.d override files in /etc/default/grub.d if they exist. It is
 +unsupported to override the native bootloader file 10_sortix since the
 +configuration will be updated across releases
 +
@@ -994,7 +1319,15 @@ diff -Paur --no-dereference -- grub.upstream/util/misc.c grub/util/misc.c
 diff -Paur --no-dereference -- grub.upstream/util/probe.c grub/util/probe.c
 --- grub.upstream/util/probe.c
 +++ grub/util/probe.c
-@@ -81,6 +81,22 @@
+@@ -37,6 +37,7 @@
+ #include <grub/emu/misc.h>
+ #include <grub/util/ofpath.h>
+ 
++#include <ctype.h>
+ #include <string.h>
+ 
+ /* Since OF path names can have "," characters in them, and GRUB
+@@ -79,6 +80,22 @@
      ptr++;
    else
      ptr = canon;
@@ -1017,7 +1350,7 @@ diff -Paur --no-dereference -- grub.upstream/util/probe.c grub/util/probe.c
    if ((ptr[0] == 's' || ptr[0] == 'h') && ptr[1] == 'd')
      {
        int num = ptr[2] - 'a';
-@@ -110,6 +126,22 @@
+@@ -108,6 +125,22 @@
      ptr++;
    else
      ptr = canon;
@@ -1040,7 +1373,7 @@ diff -Paur --no-dereference -- grub.upstream/util/probe.c grub/util/probe.c
    if ((ptr[0] == 's' || ptr[0] == 'h') && ptr[1] == 'd')
      {
        int num = ptr[2] - 'a';
-@@ -139,6 +171,22 @@
+@@ -137,6 +170,22 @@
      ptr++;
    else
      ptr = canon;
@@ -1066,7 +1399,7 @@ diff -Paur --no-dereference -- grub.upstream/util/probe.c grub/util/probe.c
 diff -Paur --no-dereference -- grub.upstream/util/resolve.c grub/util/resolve.c
 --- grub.upstream/util/resolve.c
 +++ grub/util/resolve.c
-@@ -172,7 +172,7 @@
+@@ -175,7 +175,7 @@
    else
      {
        base = xmalloc (strlen (str) + 4 + 1);

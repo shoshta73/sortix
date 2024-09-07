@@ -1,13 +1,15 @@
 NAME=grub
+EDITION=2
+RENAMES="grub@1: grub@2"
 BUILD_LIBRARIES='libiconv? libintl? libfreetype? liblzma?'
-VERSION=1.0-rc1
-DISTNAME=sortix-grub-$VERSION
-COMPRESSION=tar.gz
+VERSION=2.12
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=82ac8faf257fb3476969a0b79a0b5fd53d4cdefb2e2aa5941381477e38c5f9c5
-UPSTREAM_SITE=https://pub.sortix.org/sortix/toolchain
+SHA256SUM=f3c97391f7c4eaa677a78e090c7e97e6dc47b16f655f04683ebd37bef7fe0faa
+UPSTREAM_SITE=https://ftp.gnu.org/gnu/grub
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
-CONFIGURE_ARGS='--disable-werror --program-prefix='
+CONFIGURE_ARGS='--disable-werror --program-prefix= --with-platform=none'
 POST_INSTALL=../grub.post-install
-VERSION_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*(-rc[0-9]+)?)'

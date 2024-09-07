@@ -98,6 +98,8 @@ Clean the component directories and the port source code.
 Clean the directories of all build tools.
 .It Sy clean-cross-compiler
 Clean the directories for the cross-compiler.
+.It Sy clean-cross-grub
+Clean the directories for the GRUB bootloader.
 .It Sy clean-cross-toolchain
 Clean the directories for the build tools and cross-compiler.
 .Sy ( clean-build-tools , clean-cross-compiler )
@@ -113,11 +115,20 @@ in
 .Pa /src/ports
 and apply the appropriate patches.
 .It Sy install-build-tools
-Install all build tools after making them.
+Install all build tools in
+.Ev PREFIX
+after making them.
 .It Sy install-cross-compiler
-Install the cross-compiler after making it.
+Install the cross-compiler in
+.Ev PREFIX
+after making it.
+.It Sy install-cross-grub
+Install the GRUB bootloader in
+.Ev PREFIX .
 .It Sy install-cross-toolchain
-Install the build tools and cross-compiler after making them.
+Install the build tools and cross-compiler in
+.Ev PREFIX
+after making them.
 .Sy ( install-build-tools , install-cross-compiler )
 .It Sy iso
 Create a release iso in the

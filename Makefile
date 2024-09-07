@@ -175,6 +175,42 @@ clean-cross-toolchain: clean-sysroot clean-build-tools clean-cross-compiler
 install-cross-toolchain: install-build-tools
 	$(MAKE) install-cross-compiler
 
+.PHONY: install-cross-grub
+install-cross-grub:
+	$(MAKE) extract-ports PACKAGES=grub
+	rm -rf ports/grub/grub.build
+	mkdir ports/grub/grub.build
+	cd ports/grub/grub.build && \
+	../grub/configure --prefix="$(PREFIX)" --disable-werror --program-prefix= --with-platform=none
+	$(MAKE) -C ports/grub/grub.build install
+	rm -rf ports/grub/grub.build
+	mkdir ports/grub/grub.build
+	cd ports/grub/grub.build && \
+	../grub/configure --prefix="$(PREFIX)" --disable-werror --program-prefix= --with-platform=pc --target=i686-sortix
+	$(MAKE) -C ports/grub/grub.build install-grub-core
+	rm -rf ports/grub/grub.build
+	mkdir ports/grub/grub.build
+	cd ports/grub/grub.build && \
+	../grub/configure --prefix="$(PREFIX)" --disable-werror --program-prefix= --with-platform=efi --target=i686-sortix
+	$(MAKE) -C ports/grub/grub.build install-grub-core
+	rm -rf ports/grub/grub.build
+	mkdir ports/grub/grub.build
+	cd ports/grub/grub.build && \
+	../grub/configure --prefix="$(PREFIX)" --disable-werror --program-prefix= --with-platform=efi --target=x86_64-sortix
+	$(MAKE) -C ports/grub/grub.build install-grub-core
+	rm -rf ports/grub/grub.build
+	if [ ! -e "$(PREFIX)/share/grub/unicode.pf2" ]; then \
+	  if [ -e /share/grub/unicode.pf2 ]; then \
+	    cp /share/grub/unicode.pf2 "$(PREFIX)/share/grub/unicode.pf2"; \
+	  elif [ -e /usr/share/grub/unicode.pf2 ]; then \
+	    cp /usr/share/grub/unicode.pf2 "$(PREFIX)/share/grub/unicode.pf2"; \
+	  fi; \
+	fi
+
+.PHONY: clean-cross-grub
+clean-cross-grub:
+	rm -rf ports/grub/grub.build
+
 .PHONY: sysroot-fsh
 sysroot-fsh:
 	mkdir -p "$(SYSROOT)"

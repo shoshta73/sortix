@@ -7,3 +7,6 @@ if [ ! -e "$TIX_INSTALL_DIR$PREFIX/share/grub/unicode.pf2" ]; then
   [ -e /usr/share/grub/unicode.pf2 ] &&
   cp /usr/share/grub/unicode.pf2 "$TIX_INSTALL_DIR$PREFIX/share/grub/unicode.pf2"
 fi
+rm -rf "$TIX_INSTALL_DIR$PREFIX/lib/grub/"*"-none"
+rmdir --ignore-fail-on-non-empty "$TIX_INSTALL_DIR$PREFIX/lib/grub"
+rmdir --ignore-fail-on-non-empty "$TIX_INSTALL_DIR$PREFIX/lib"

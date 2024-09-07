@@ -1,0 +1,11 @@
+NAME=grub-i386-pc
+EDITION=2
+RENAMES="grub@1: grub-i386-pc@2"
+BUILD_LIBRARIES='libiconv? libintl? libfreetype? liblzma?'
+SOURCE_PORT=grub
+LICENSE=GPL-3.0-or-later
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--disable-werror --program-prefix= --with-platform=pc'
+CONFIGURE_VARS='NO_CFLAGS_STRIP=1'
+MAKE_BUILD_TARGET=grub-core
+MAKE_INSTALL_TARGET=install-grub-core
