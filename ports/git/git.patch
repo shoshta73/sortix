@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
 --- git.upstream/Makefile
 +++ git/Makefile
-@@ -646,7 +646,9 @@
+@@ -649,7 +649,9 @@
  MSGCAT = msgcat
  MSGFMT = msgfmt
  MSGMERGE = msgmerge
@@ -12,7 +12,7 @@ diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
  GCOV = gcov
  STRIP = strip
  SPATCH = spatch
-@@ -2843,8 +2845,9 @@
+@@ -2878,8 +2880,9 @@
  doc: man-perl
  	$(MAKE) -C Documentation all
  
@@ -24,7 +24,7 @@ diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
  
  man-perl: perl/build/man/man3/Git.3pm
  
-@@ -3444,7 +3447,7 @@
+@@ -3479,7 +3482,7 @@
  
  INSTALL_STRIP =
  
@@ -33,7 +33,7 @@ diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
  	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(bindir_SQ)'
  	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
  	$(INSTALL) $(INSTALL_STRIP) $(PROGRAMS) '$(DESTDIR_SQ)$(gitexec_instdir_SQ)'
-@@ -3540,8 +3543,9 @@
+@@ -3575,8 +3578,9 @@
  install-doc: install-man-perl
  	$(MAKE) -C Documentation install
  
@@ -45,7 +45,7 @@ diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
  
  install-man-perl: man-perl
  	$(INSTALL) -d -m 755 '$(DESTDIR_SQ)$(mandir_SQ)/man3'
-@@ -3648,8 +3652,8 @@
+@@ -3683,8 +3687,8 @@
  
  ### Cleaning rules
  
@@ -58,7 +58,7 @@ diff -Paur --no-dereference -- git.upstream/Makefile git/Makefile
 diff -Paur --no-dereference -- git.upstream/builtin/gc.c git/builtin/gc.c
 --- git.upstream/builtin/gc.c
 +++ git/builtin/gc.c
-@@ -1771,7 +1771,7 @@
+@@ -1783,7 +1783,7 @@
  
  static char *launchctl_get_uid(void)
  {
@@ -70,7 +70,7 @@ diff -Paur --no-dereference -- git.upstream/builtin/gc.c git/builtin/gc.c
 diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
 --- git.upstream/builtin/log.c
 +++ git/builtin/log.c
-@@ -395,7 +395,12 @@
+@@ -404,7 +404,12 @@
  	fprintf(rev->diffopt.file, _("Final output: %d %s\n"), nr, stage);
  }
  
@@ -83,7 +83,7 @@ diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
  
  static void log_show_early(struct rev_info *revs, struct commit_list *list)
  {
-@@ -444,9 +449,18 @@
+@@ -453,9 +458,18 @@
  	 * trigger every second even if we're blocked on a
  	 * reader!
  	 */
@@ -102,7 +102,7 @@ diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
  }
  
  static void early_output(int signal UNUSED)
-@@ -456,6 +470,13 @@
+@@ -465,6 +479,13 @@
  
  static void setup_early_output(void)
  {
@@ -116,7 +116,7 @@ diff -Paur --no-dereference -- git.upstream/builtin/log.c git/builtin/log.c
  	struct sigaction sa;
  
  	/*
-@@ -478,13 +499,37 @@
+@@ -487,13 +508,37 @@
  	 *
  	 * This is a one-time-only trigger.
  	 */
@@ -200,7 +200,7 @@ diff -Paur --no-dereference -- git.upstream/config.mak.uname git/config.mak.unam
 +	#HAVE_PLATFORM_PROCINFO = YesPlease
 +	#COMPAT_OBJS += compat/linux/procinfo.o
  	# centos7/rhel7 provides gcc 4.8.5 and zlib 1.2.7.
- 	ifneq ($(findstring .el7.,$(uname_R)),)
+         ifneq ($(findstring .el7.,$(uname_R)),)
  		BASIC_CFLAGS += -std=c99
 diff -Paur --no-dereference -- git.upstream/configure git/configure
 --- git.upstream/configure
@@ -281,7 +281,7 @@ diff -Paur --no-dereference -- git.upstream/configure git/configure
 diff -Paur --no-dereference -- git.upstream/git-compat-util.h git/git-compat-util.h
 --- git.upstream/git-compat-util.h
 +++ git/git-compat-util.h
-@@ -429,7 +429,14 @@
+@@ -443,7 +443,14 @@
  typedef uintmax_t timestamp_t;
  #define PRItime PRIuMAX
  #define parse_timestamp strtoumax
@@ -329,7 +329,7 @@ diff -Paur --no-dereference -- git.upstream/lockfile.c git/lockfile.c
 diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
 --- git.upstream/progress.c
 +++ git/progress.c
-@@ -47,6 +47,10 @@
+@@ -49,6 +49,10 @@
  	int split;
  };
  
@@ -340,7 +340,7 @@ diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
  static volatile sig_atomic_t progress_update;
  
  /*
-@@ -68,8 +72,19 @@
+@@ -70,8 +74,19 @@
  
  static void set_progress_signal(void)
  {
@@ -360,7 +360,7 @@ diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
  
  	if (progress_testing)
  		return;
-@@ -82,20 +97,43 @@
+@@ -84,20 +99,43 @@
  	sa.sa_flags = SA_RESTART;
  	sigaction(SIGALRM, &sa, NULL);
  
@@ -407,7 +407,7 @@ diff -Paur --no-dereference -- git.upstream/progress.c git/progress.c
 diff -Paur --no-dereference -- git.upstream/run-command.c git/run-command.c
 --- git.upstream/run-command.c
 +++ git/run-command.c
-@@ -515,9 +515,12 @@
+@@ -522,9 +522,12 @@
  #else
  	CHECK_BUG(pthread_sigmask(SIG_SETMASK, &all, &as->old),
  		"blocking all signals");
@@ -420,7 +420,7 @@ diff -Paur --no-dereference -- git.upstream/run-command.c git/run-command.c
  }
  
  static void atfork_parent(struct atfork_state *as)
-@@ -526,8 +529,11 @@
+@@ -533,8 +536,11 @@
  	if (sigprocmask(SIG_SETMASK, &as->old, NULL))
  		die_errno("sigprocmask");
  #else

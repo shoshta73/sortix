@@ -1,0 +1,1 @@
+rm -rf -- 't/t4256/1/mailinfo.c.orig'
