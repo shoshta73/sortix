@@ -9,17 +9,8 @@ diff -Paur --no-dereference -- bochs.upstream/Makefile.in bochs/Makefile.in
 +DESTDIR ?=
  
  VERSION=@VERSION@
- VER_STRING=@VER_STRING@
-@@ -96,7 +96,7 @@
- X_LIBS = @X_LIBS@
- X_PRE_LIBS = @X_PRE_LIBS@
- GUI_LINK_OPTS_X = $(X_LIBS) $(X_PRE_LIBS)
--GUI_LINK_OPTS_SDL = `sdl-config --cflags --libs`
-+GUI_LINK_OPTS_SDL = `$${PKG_CONFIG:-pkg-config} sdl --cflags --libs`
- GUI_LINK_OPTS_SVGA =  -lvga -lvgagl
- GUI_LINK_OPTS_RFB = @RFB_LIBS@
- GUI_LINK_OPTS_AMIGAOS =
-@@ -623,6 +623,8 @@
+ REL_STRING=@REL_STRING@
+@@ -655,6 +655,8 @@
  	@CD_UP_THREE@
  	@RMCOMMAND@ Makefile
  
@@ -28,43 +19,19 @@ diff -Paur --no-dereference -- bochs.upstream/Makefile.in bochs/Makefile.in
  ###########################################
  # Build app on MacOS X
  ###########################################
-diff -Paur --no-dereference -- bochs.upstream/config.cc bochs/config.cc
---- bochs.upstream/config.cc
-+++ bochs/config.cc
-@@ -3258,7 +3258,7 @@
- 
-     fprintf(fp, ", biosdetect=%s", SIM->get_param_enum("biosdetect", base)->get_selected());
- 
--    if (SIM->get_param_string("model", base)->getptr()>0) {
-+    if (SIM->get_param_string("model", base)->getptr()) {
-         fprintf(fp, ", model=\"%s\"", SIM->get_param_string("model", base)->getptr());
-     }
- 
-diff -Paur --no-dereference -- bochs.upstream/config.sub bochs/config.sub
---- bochs.upstream/config.sub
-+++ bochs/config.sub
-@@ -1297,7 +1297,7 @@
- 	      | -hpux* | -unos* | -osf* | -luna* | -dgux* | -auroraux* | -solaris* \
- 	      | -sym* | -kopensolaris* \
- 	      | -amigaos* | -amigados* | -msdos* | -newsos* | -unicos* | -aof* \
--	      | -aos* | -aros* \
-+	      | -aos* | -aros* | -sortix* \
- 	      | -nindy* | -vxsim* | -vxworks* | -ebmon* | -hms* | -mvs* \
- 	      | -clix* | -riscos* | -uniplus* | -iris* | -rtu* | -xenix* \
- 	      | -hiux* | -386bsd* | -knetbsd* | -mirbsd* | -netbsd* \
 diff -Paur --no-dereference -- bochs.upstream/configure bochs/configure
 --- bochs.upstream/configure
 +++ bochs/configure
-@@ -23755,7 +23755,7 @@
+@@ -25275,7 +25275,7 @@
    if test "$with_sdl" = yes; then
      SOUNDLOW_OBJS="$SOUNDLOW_OBJS soundsdl.o"
      if test "$bx_plugins" = 1; then
--      SOUND_LINK_OPTS="$SOUND_LINK_OPTS `sdl-config --libs`"
-+      SOUND_LINK_OPTS="$SOUND_LINK_OPTS `${PKG_CONFIG:-pkg-config} sdl --libs`"
+-      SDL_SOUND_LINK_OPTS="$SDL_SOUND_LINK_OPTS `sdl-config --libs`"
++      SDL_SOUND_LINK_OPTS="$SDL_SOUND_LINK_OPTS `${PKG_CONFIG:-pkg-config} sdl --libs`"
      fi
-     { $as_echo "$as_me:${as_lineno-$LINENO}: result: sdl" >&5
- $as_echo "sdl" >&6; }
-@@ -24199,7 +24199,7 @@
+     soundlow_drivers="$soundlow_drivers sdl"
+     if test "$soundlow_default" = "dummy"; then
+@@ -25931,14 +25931,14 @@
    SPECIFIC_GUI_OBJS="$SPECIFIC_GUI_OBJS \$(GUI_OBJS_SDL)"
    # GUI_*FLAGS are added to the compilation of every bochs file, not just
    # the files in gui/*.cc.
@@ -72,98 +39,89 @@ diff -Paur --no-dereference -- bochs.upstream/configure bochs/configure
 +  SDL_CFLAGS=`${PKG_CONFIG:-pkg-config} sdl --cflags`
    GUI_CFLAGS="$GUI_CFLAGS $SDL_CFLAGS"
    GUI_CXXFLAGS="$GUI_CXXFLAGS $SDL_CFLAGS"
+-  GUI_LINK_OPTS_SDL="`sdl-config --libs`"
++  GUI_LINK_OPTS_SDL="`${PKG_CONFIG:-pkg-config} sdl --libs`"
    GUI_LINK_OPTS="$GUI_LINK_OPTS \$(GUI_LINK_OPTS_SDL)"
-diff -Paur --no-dereference -- bochs.upstream/configure.in bochs/configure.in
---- bochs.upstream/configure.in
-+++ bochs/configure.in
-@@ -1805,7 +1805,7 @@
-   if test "$with_sdl" = yes; then
-     SOUNDLOW_OBJS="$SOUNDLOW_OBJS soundsdl.o"
-     if test "$bx_plugins" = 1; then
--      SOUND_LINK_OPTS="$SOUND_LINK_OPTS `sdl-config --libs`"
-+      SOUND_LINK_OPTS="$SOUND_LINK_OPTS `${PKG_CONFIG:-pkg-config} sdl --libs`"
-     fi
-     AC_MSG_RESULT(sdl)
-   else
-@@ -2102,7 +2102,7 @@
-   SPECIFIC_GUI_OBJS="$SPECIFIC_GUI_OBJS \$(GUI_OBJS_SDL)"
-   # GUI_*FLAGS are added to the compilation of every bochs file, not just
-   # the files in gui/*.cc.
--  SDL_CFLAGS=`sdl-config --cflags`
-+  SDL_CFLAGS=`${PKG_CONFIG:-pkg-config} sdl --cflags`
-   GUI_CFLAGS="$GUI_CFLAGS $SDL_CFLAGS"
-   GUI_CXXFLAGS="$GUI_CXXFLAGS $SDL_CFLAGS"
-   GUI_LINK_OPTS="$GUI_LINK_OPTS \$(GUI_LINK_OPTS_SDL)"
-diff -Paur --no-dereference -- bochs.upstream/cpu/debugstuff.cc bochs/cpu/debugstuff.cc
---- bochs.upstream/cpu/debugstuff.cc
-+++ bochs/cpu/debugstuff.cc
-@@ -256,8 +256,8 @@
-       (unsigned) BX_CPU_THIS_PTR cr0.get32(),
-       (unsigned) BX_CPU_THIS_PTR cr2, (unsigned) BX_CPU_THIS_PTR cr3));
- #else
--    BX_INFO(("| CR0=0x%08x CR2=0x%08x",
--      BX_CPU_THIS_PTR cr0.get32(), BX_CPU_THIS_PTR cr2));
-+    BX_INFO(("| CR0=0x%08x CR2=0x%08jx",
-+      BX_CPU_THIS_PTR cr0.get32(), (uintmax_t)BX_CPU_THIS_PTR cr2));
-     BX_INFO(("| CR3=0x%08x CR4=0x%08x",
-       (unsigned) BX_CPU_THIS_PTR cr3, 
-       (unsigned) BX_CPU_THIS_PTR cr4.get32()));
-diff -Paur --no-dereference -- bochs.upstream/cpu/fetchdecode.cc bochs/cpu/fetchdecode.cc
---- bochs.upstream/cpu/fetchdecode.cc
-+++ bochs/cpu/fetchdecode.cc
-@@ -2010,8 +2010,8 @@
- #endif
-   }
-   else {
--    BX_DEBUG(("%s: instruction not supported - signalling #UD (features bitmask: 0x%08x)",
--      get_bx_opcode_name(ia_opcode), BX_CPU_THIS_PTR isa_extensions_bitmask));
-+    BX_DEBUG(("%s: instruction not supported - signalling #UD (features bitmask: 0x%08jx)",
-+      get_bx_opcode_name(ia_opcode), (uintmax_t)BX_CPU_THIS_PTR isa_extensions_bitmask));
-   }
- 
-   exception(BX_UD_EXCEPTION, 0);
+   # The plugin version uses multi-threading support in Bochs core
+   if test "$bx_plugins" = 1; then
+-    NONPLUGIN_GUI_LINK_OPTS="`sdl-config --libs`"
++    NONPLUGIN_GUI_LINK_OPTS="`${PKG_CONFIG:-pkg-config} sdl --libs`"
+   fi
+   # The enhanced X debugger depends on GTK2
+   if test "$gui_debugger" = 1 -a "$DEFAULT_GUI" != win32; then
+@@ -27196,8 +27196,8 @@
+ main (void)
+ {
+ pthread_t th; pthread_join(th, 0);
+-		     pthread_attr_init(0); pthread_cleanup_push(0, 0);
+-		     pthread_create(0,0,0,0); pthread_cleanup_pop(0);
++		     pthread_attr_init(0);
++		     pthread_create(0,0,0,0);
+   ;
+   return 0;
+ }
 diff -Paur --no-dereference -- bochs.upstream/doc/docbook/Makefile.in bochs/doc/docbook/Makefile.in
 --- bochs.upstream/doc/docbook/Makefile.in
 +++ bochs/doc/docbook/Makefile.in
-@@ -15,7 +15,7 @@
- TARGZ = bochsdoc.tar.gz
- RENDERED_DOC_URL = http://bochs.sf.net/doc/docbook/$(TARGZ)
+@@ -26,7 +26,7 @@
+ DOCBOOK2HTML = $(JADE) $(JADE_ARGS)
+ endif
  
 -DESTDIR=
 +DESTDIR?=
  
  # name of the major documentation sections
  SECTIONS=user documentation development
-diff -Paur --no-dereference -- bochs.upstream/fpu/fpu.cc bochs/fpu/fpu.cc
---- bochs.upstream/fpu/fpu.cc
-+++ bochs/fpu/fpu.cc
-@@ -582,7 +582,7 @@
-     f *= fp.fraction*scale_factor;
- #endif
-     float_class_t f_class = floatx80_class(fp);
--    fprintf(stderr, "%sFP%d ST%d(%c):        raw 0x%04x:%08lx%08lx (%.10f) (%s)\n",
-+    fprintf(stderr, "%sFP%d ST%d(%c):        raw 0x%04x:%08x%08x (%.10f) (%s)\n",
-           i==tos?"=>":"  ", i, (i-tos)&7,
-           "v0se"[tag],
-           fp.exp & 0xffff, GET32H(fp.fraction), GET32L(fp.fraction),
-diff -Paur --no-dereference -- bochs.upstream/gui/Makefile.in bochs/gui/Makefile.in
---- bochs.upstream/gui/Makefile.in
-+++ bochs/gui/Makefile.in
-@@ -69,7 +69,7 @@
- X_LIBS = @X_LIBS@
- X_PRE_LIBS = @X_PRE_LIBS@
- GUI_LINK_OPTS_X = $(X_LIBS) $(X_PRE_LIBS)
--GUI_LINK_OPTS_SDL = `sdl-config --cflags --libs`
-+GUI_LINK_OPTS_SDL = `$${PKG_CONFIG:-pkg-config} sdl --cflags --libs`
- GUI_LINK_OPTS_SVGA =  -lvga -lvgagl
- GUI_LINK_OPTS_RFB = @RFB_LIBS@
- GUI_LINK_OPTS_AMIGAOS =
+diff -Paur --no-dereference -- bochs.upstream/gui/textconfig.cc bochs/gui/textconfig.cc
+--- bochs.upstream/gui/textconfig.cc
++++ bochs/gui/textconfig.cc
+@@ -48,6 +48,7 @@
+ #include <ctype.h>
+ #include <string.h>
+ #include <assert.h>
++#include <inttypes.h>
+ 
+ #ifndef __QNXNTO__
+ }
+@@ -205,7 +206,7 @@
+       bx_printf("Your choice must be an integer between " FMT_LL "d and " FMT_LL "d.\n\n", min, max);
+       continue;
+     }
+-    illegal = (1 != sscanf(buffer, "%ld", &n));
++    illegal = (1 != sscanf(buffer, "%" PRId64, &n));
+     if (illegal || n<min || n>max) {
+       bx_printf("Your choice (%s) was not an integer between " FMT_LL "d and " FMT_LL "d.\n\n",
+              clean, min, max);
+diff -Paur --no-dereference -- bochs.upstream/iodev/hdimage/vbox.cc bochs/iodev/hdimage/vbox.cc
+--- bochs.upstream/iodev/hdimage/vbox.cc
++++ bochs/iodev/hdimage/vbox.cc
+@@ -138,7 +138,7 @@
+   // (10gig = 10240 1-meg blocks with each entry using 4 bytes) = 40k
+   mtlb = new Bit32s[(unsigned) header.blocks_in_hdd];
+   if (mtlb == 0) {
+-    BX_PANIC(("unable to allocate %lu bytes for vbox image's map table", header.blocks_in_hdd * sizeof(Bit32u)));
++    BX_PANIC(("unable to allocate %zu bytes for vbox image's map table", (size_t) header.blocks_in_hdd * sizeof(Bit32u)));
+   }
+ 
+   // read in the map table
+diff -Paur --no-dereference -- bochs.upstream/iodev/hpet.cc bochs/iodev/hpet.cc
+--- bochs.upstream/iodev/hpet.cc
++++ bochs/iodev/hpet.cc
+@@ -391,7 +391,7 @@
+   }
+   if (diff < HPET_MIN_ALLOWED_PERIOD) diff = HPET_MIN_ALLOWED_PERIOD;
+   if (diff > HPET_MAX_ALLOWED_PERIOD) diff = HPET_MAX_ALLOWED_PERIOD;
+-  BX_DEBUG(("Timer %d to fire in 0x%lX ticks", t->tn, diff));
++  BX_DEBUG(("Timer %d to fire in 0x%lX ticks", t->tn, (long) diff));
+   bx_pc_system.activate_timer_nsec(t->timer_id, ticks_to_ns(diff), 0);
+ }
+ 
 diff -Paur --no-dereference -- bochs.upstream/iodev/serial.cc bochs/iodev/serial.cc
 --- bochs.upstream/iodev/serial.cc
 +++ bochs/iodev/serial.cc
-@@ -39,6 +39,18 @@
- typedef int SOCKET;
- #endif
+@@ -30,6 +30,18 @@
+ // is used to know when we are exporting symbols and when we are importing.
+ #define BX_PLUGGABLE
  
 +#if defined(__sortix__)
 +struct hostent
@@ -178,9 +136,9 @@ diff -Paur --no-dereference -- bochs.upstream/iodev/serial.cc bochs/iodev/serial
 +#endif
 +
  #include "iodev.h"
- #include "serial.h"
  
-@@ -462,9 +474,9 @@
+ #if !defined(WIN32) || defined(__CYGWIN__)
+@@ -489,9 +501,9 @@
  
          memset ((char*) &sin, 0, sizeof (sin));
  #if BX_HAVE_SOCKADDR_IN_SIN_LEN
@@ -192,60 +150,3 @@ diff -Paur --no-dereference -- bochs.upstream/iodev/serial.cc bochs/iodev/serial
          sin.sin_family = hp->h_addrtype;
          sin.sin_port = htons (port);
  
-diff -Paur --no-dereference -- bochs.upstream/iodev/vgacore.cc bochs/iodev/vgacore.cc
---- bochs.upstream/iodev/vgacore.cc
-+++ bochs/iodev/vgacore.cc
-@@ -387,9 +387,9 @@
- 
- void bx_vgacore_c::determine_screen_dimensions(unsigned *piHeight, unsigned *piWidth)
- {
--  int ai[0x20];
-+  int ai[20];
-   int i,h,v;
--  for (i = 0 ; i < 0x20 ; i++)
-+  for (i = 0 ; i < 20 ; i++)
-    ai[i] = BX_VGA_THIS s.CRTC.reg[i];
- 
-   h = (ai[1] + 1) * 8;
-diff -Paur --no-dereference -- bochs.upstream/memory/misc_mem.cc bochs/memory/misc_mem.cc
---- bochs.upstream/memory/misc_mem.cc
-+++ bochs/memory/misc_mem.cc
-@@ -158,12 +158,12 @@
-   const Bit64u block_address = ((Bit64u)block)*BX_MEM_BLOCK_LEN;
- 
-   if (fseeko64(BX_MEM_THIS overflow_file, block_address, SEEK_SET))
--    BX_PANIC(("FATAL ERROR: Could not seek to 0x%lx in memory overflow file!", block_address));
-+    BX_PANIC(("FATAL ERROR: Could not seek to 0x%llx in memory overflow file!", (unsigned long long) block_address));
- 
-   // We could legitimately get an EOF condition if we are reading the last bit of memory.ram
-   if ((fread(BX_MEM_THIS blocks[block], BX_MEM_BLOCK_LEN, 1, BX_MEM_THIS overflow_file) != 1) && 
-       (!feof(BX_MEM_THIS overflow_file))) 
--    BX_PANIC(("FATAL ERROR: Could not read from 0x%lx in memory overflow file!", block_address)); 
-+    BX_PANIC(("FATAL ERROR: Could not read from 0x%llx in memory overflow file!", (unsigned long long) block_address)); 
- }
- #endif
- 
-@@ -208,9 +208,9 @@
-     }
-     // Write swapped out block
-     if (fseeko64(BX_MEM_THIS overflow_file, address, SEEK_SET))
--      BX_PANIC(("FATAL ERROR: Could not seek to 0x%llx in overflow file!", address)); 
-+      BX_PANIC(("FATAL ERROR: Could not seek to 0x%llx in overflow file!", (unsigned long long)address)); 
-     if (1 != fwrite (BX_MEM_THIS blocks[BX_MEM_THIS next_swapout_idx], BX_MEM_BLOCK_LEN, 1, BX_MEM_THIS overflow_file))
--      BX_PANIC(("FATAL ERROR: Could not write at 0x%llx in overflow file!", address));
-+      BX_PANIC(("FATAL ERROR: Could not write at 0x%llx in overflow file!", (unsigned long long)address));
-     // Mark swapped out block
-     BX_MEM_THIS blocks[BX_MEM_THIS next_swapout_idx] = BX_MEM_C::swapped_out;
-     BX_MEM_THIS blocks[block] = buffer;
-@@ -245,9 +245,9 @@
-     {
-       bx_phy_address address = ((bx_phy_address)idx)*BX_MEM_BLOCK_LEN;
-       if (fseeko64(fp, address, SEEK_SET))
--        BX_PANIC(("FATAL ERROR: Could not seek to 0x%llx in overflow file!", address)); 
-+        BX_PANIC(("FATAL ERROR: Could not seek to 0x%llx in overflow file!", (unsigned long long)address)); 
-       if (1 != fwrite (BX_MEM(0)->blocks[idx], BX_MEM_BLOCK_LEN, 1, fp))
--        BX_PANIC(("FATAL ERROR: Could not write at 0x%llx in overflow file!", address));
-+        BX_PANIC(("FATAL ERROR: Could not write at 0x%llx in overflow file!", (unsigned long long)address));
-     }
-   }
- }
