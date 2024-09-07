@@ -1,11 +1,11 @@
 NAME=e2fsprogs
 # Requires gettext (otherwise bundled copy is used)
 BUILD_LIBRARIES='libiconv libintl'
-VERSION=1.47.0
+VERSION=1.47.1
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=144af53f2bbd921cef6f8bea88bb9faddca865da3fbc657cc9b4d2001097d5db
+SHA256SUM=5a33dc047fd47284bca4bb10c13cfe7896377ae3d01cb81a05d406025d99e0d1
 UPSTREAM_SITE=https://kernel.org/pub/linux/kernel/people/tytso/e2fsprogs/v$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-2.0-only
