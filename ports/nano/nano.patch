@@ -1,19 +1,20 @@
 diff -Paur --no-dereference -- nano.upstream/configure nano/configure
 --- nano.upstream/configure
 +++ nano/configure
-@@ -41989,6 +41989,8 @@
-   # Extract the first word of "${ac_tool_prefix}ncursesw5-config", so it can be a program name with args.
- set dummy ${ac_tool_prefix}ncursesw5-config; ac_word=$2
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
-+# PATCH: pkg-config must be used instead of the cross unsafe ncursesw5-config.
-+ac_cv_prog_NCURSESW_CONFIG=false
- $as_echo_n "checking for $ac_word... " >&6; }
- if ${ac_cv_prog_NCURSESW_CONFIG+:} false; then :
-   $as_echo_n "(cached) " >&6
+@@ -52309,7 +52309,8 @@
+   esac
+     for ac_exec_ext in '' $ac_executable_extensions; do
+   if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
+-    ac_cv_prog_NCURSESW_CONFIG="${ac_tool_prefix}ncursesw5-config"
++    # PATCH: pkg-config must be used instead of the cross unsafe ncursesw5-config.
++    ac_cv_prog_NCURSESW_CONFIG=false
+     printf "%s\n" "$as_me:${as_lineno-$LINENO}: found $as_dir$ac_word$ac_exec_ext" >&5
+     break 2
+   fi
 diff -Paur --no-dereference -- nano.upstream/src/files.c nano/src/files.c
 --- nano.upstream/src/files.c
 +++ nano/src/files.c
-@@ -1455,8 +1455,10 @@
+@@ -1458,8 +1458,10 @@
  	if (env_dir != NULL)
  		tempdir = check_writable_directory(env_dir);
  
@@ -36,7 +37,7 @@ diff -Paur --no-dereference -- nano.upstream/src/nano.c nano/src/nano.c
  	} else
  		plainname = copy_of(filename);
  
-@@ -2105,8 +2105,7 @@
+@@ -2151,8 +2151,7 @@
  	}
  
  	/* Curses needs TERM; if it is unset, try falling back to a VT220. */
@@ -49,7 +50,7 @@ diff -Paur --no-dereference -- nano.upstream/src/nano.c nano/src/nano.c
 diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
 --- nano.upstream/src/rcfile.c
 +++ nano/src/rcfile.c
-@@ -575,6 +575,11 @@
+@@ -580,6 +580,11 @@
   * null-terminate it, and return a pointer to the succeeding text. */
  char *parse_next_regex(char *ptr)
  {
@@ -61,7 +62,7 @@ diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
  	char *starting_point = ptr;
  
  	if (*(ptr - 1) != '"') {
-@@ -582,11 +587,28 @@
+@@ -587,11 +592,28 @@
  		return NULL;
  	}
  
@@ -94,7 +95,7 @@ diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
  
  	if (*ptr == '\0') {
  		jot_error(N_("Regex strings must begin and end with a \" character"));
-@@ -599,7 +621,8 @@
+@@ -604,7 +626,8 @@
  	}
  
  	/* Null-terminate the regex and skip until the next non-blank. */
