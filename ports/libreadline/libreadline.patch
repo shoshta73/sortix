@@ -23,18 +23,6 @@ diff -Paur --no-dereference -- libreadline.upstream/configure libreadline/config
      esac
      if test -n "${cross_cache}" && test -r "${cross_cache}"; then
          echo "loading cross-build cache file ${cross_cache}"
-diff -Paur --no-dereference -- libreadline.upstream/input.c libreadline/input.c
---- libreadline.upstream/input.c
-+++ libreadline/input.c
-@@ -805,7 +805,7 @@
-   int result;
-   unsigned char c;
-   int fd;
--#if defined (HAVE_PSELECT)
-+#if defined (HAVE_PSELECT) || defined (HAVE_SELECT)
-   sigset_t empty_set;
-   fd_set readfds;
- #endif
 diff -Paur --no-dereference -- libreadline.upstream/terminal.c libreadline/terminal.c
 --- libreadline.upstream/terminal.c
 +++ libreadline/terminal.c
