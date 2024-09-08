@@ -39,4 +39,4 @@ diff -Paur --no-dereference -- libpng.upstream/contrib/tools/pngfix.c libpng/con
 +
  #define implies(x,y) assert(!(x) || (y))
  
- #ifdef __GNUC__
+ #define PROGRAM_NAME "pngfix"
