@@ -1,16 +1,16 @@
 diff -Paur --no-dereference -- libcurl.upstream/Makefile.in libcurl/Makefile.in
 --- libcurl.upstream/Makefile.in
 +++ libcurl/Makefile.in
-@@ -659,7 +659,7 @@
-  $(VC14_SRCVCXPROJ) $(VC14_10_LIBVCXPROJ) $(VC14_10_SRCVCXPROJ)              \
+@@ -621,7 +621,7 @@
+  $(VC14_20_LIBVCXPROJ) $(VC14_20_SRCVCXPROJ)       \
   $(VC14_30_LIBVCXPROJ) $(VC14_30_SRCVCXPROJ)
  
 -bin_SCRIPTS = curl-config
 +bin_SCRIPTS =
- SUBDIRS = lib src
+ SUBDIRS = lib docs src scripts
  DIST_SUBDIRS = $(SUBDIRS) tests packages scripts include docs
  pkgconfigdir = $(libdir)/pkgconfig
-@@ -1593,6 +1593,12 @@
+@@ -1570,6 +1570,17 @@
  distclean: distclean-recursive
  	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
  	-rm -f Makefile
@@ -20,13 +20,18 @@ diff -Paur --no-dereference -- libcurl.upstream/Makefile.in libcurl/Makefile.in
 +	-rm -f docs/libcurl/Makefile
 +	-rm -f docs/libcurl/opts/Makefile
 +	-rm -f docs/Makefile
++	-rm -f docs/cmdline-opts/curl.1
++	-rm -f docs/cmdline-opts/curl.txt
++	-rm -f docs/libcurl/*.3
++	-rm -f docs/libcurl/opts/*.3
++	-rm -f scripts/Makefile
  distclean-am: clean-am distclean-generic distclean-libtool \
  	distclean-tags
  
 diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 --- libcurl.upstream/configure
 +++ libcurl/configure
-@@ -23303,9 +23303,7 @@
+@@ -23081,9 +23081,7 @@
  
  fi
  
@@ -37,7 +42,7 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
  
  
  curl_includes_winsock2="\
-@@ -37520,11 +37518,8 @@
+@@ -37811,11 +37809,8 @@
  
  int main (void)
  {
@@ -45,7 +50,7 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 +  /* PATCH: h_errno has nothing to do with getaddrinfo */
    return 0;
 -#else
--  force compilation error
+-  #error force compilation error
 -#endif
  }
  
@@ -53,25 +58,21 @@ diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 diff -Paur --no-dereference -- libcurl.upstream/docs/Makefile.in libcurl/docs/Makefile.in
 --- libcurl.upstream/docs/Makefile.in
 +++ libcurl/docs/Makefile.in
-@@ -484,10 +484,10 @@
- # but distribute it (using the relative file name) in the next variable
- man_MANS = $(abs_builddir)/curl.1
- noinst_man_MANS = curl.1 mk-ca-bundle.1
--dist_man_MANS = curl-config.1
--GENHTMLPAGES = curl.html curl-config.html mk-ca-bundle.html
--PDFPAGES = curl.pdf curl-config.pdf mk-ca-bundle.pdf
--MANDISTPAGES = curl.1.dist curl-config.1.dist
-+dist_man_MANS =
-+GENHTMLPAGES = curl.html mk-ca-bundle.html
-+PDFPAGES = curl.pdf mk-ca-bundle.pdf
-+MANDISTPAGES = curl.1.dist
- HTMLPAGES = $(GENHTMLPAGES)
+@@ -487,8 +487,8 @@
  
- # Build targets in this file (.) before cmdline-opts to ensure that
+ # if we disable man page building, ignore these
+ @BUILD_DOCS_TRUE@MK_CA_DOCS = mk-ca-bundle.1
+-@BUILD_DOCS_TRUE@CURLCONF_DOCS = curl-config.1
+-@BUILD_DOCS_TRUE@man_MANS = curl-config.1
++@BUILD_DOCS_TRUE@CURLCONF_DOCS =
++@BUILD_DOCS_TRUE@man_MANS = 
+ CURLPAGES = curl-config.md mk-ca-bundle.md
+ SUBDIRS = . cmdline-opts libcurl
+ DIST_SUBDIRS = $(SUBDIRS) examples
 diff -Paur --no-dereference -- libcurl.upstream/include/curl/curl.h libcurl/include/curl/curl.h
 --- libcurl.upstream/include/curl/curl.h
 +++ libcurl/include/curl/curl.h
-@@ -75,18 +75,7 @@
+@@ -83,18 +83,7 @@
  #endif
  #endif
  
