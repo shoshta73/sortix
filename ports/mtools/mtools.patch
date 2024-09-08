@@ -1,20 +1,17 @@
 diff -Paur --no-dereference -- mtools.upstream/configure mtools/configure
 --- mtools.upstream/configure
 +++ mtools/configure
-@@ -3964,17 +3964,11 @@
+@@ -4550,14 +4550,11 @@
  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
  
 -/* Override any GCC internal prototype to avoid an error.
 -   Use char because int might match the return type of a GCC
 -   builtin and then its argument prototype would still apply.  */
--#ifdef __cplusplus
--extern "C"
--#endif
 -char iconv ();
 +#include <iconv.h>
  int
- main ()
+ main (void)
  {
 -return iconv ();
 +return (int) iconv;
