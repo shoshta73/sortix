@@ -47,7 +47,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
  case ".$NGX_PID_PATH" in
 @@ -114,39 +116,27 @@
  			'\$(DESTDIR)$NGX_SBIN_PATH.old'
- 	cp $NGX_OBJS/nginx '\$(DESTDIR)$NGX_SBIN_PATH'
+ 	cp $NGX_OBJS/nginx$ngx_binext '\$(DESTDIR)$NGX_SBIN_PATH'
  
 -	test -d '\$(DESTDIR)$NGX_CONF_PREFIX' \\
 -		|| mkdir -p '\$(DESTDIR)$NGX_CONF_PREFIX'
@@ -175,7 +175,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
  CC=${CC:-cc}
  CPP=
  NGX_OBJS=objs
-@@ -194,6 +200,8 @@
+@@ -195,6 +201,8 @@
  
          --prefix=)                       NGX_PREFIX="!"             ;;
          --prefix=*)                      NGX_PREFIX="$value"        ;;
@@ -184,7 +184,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
          --sbin-path=*)                   NGX_SBIN_PATH="$value"     ;;
          --modules-path=*)                NGX_MODULES_PATH="$value"  ;;
          --conf-path=*)                   NGX_CONF_PATH="$value"     ;;
-@@ -205,9 +213,13 @@
+@@ -206,9 +214,13 @@
  
          --crossbuild=*)                  NGX_PLATFORM="$value"      ;;
  
@@ -199,7 +199,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
          --with-select_module)            EVENT_SELECT=YES           ;;
          --without-select_module)         EVENT_SELECT=NONE          ;;
          --with-poll_module)              EVENT_POLL=YES             ;;
-@@ -608,6 +620,12 @@
+@@ -611,6 +623,12 @@
      exit 1
  fi
  
@@ -212,7 +212,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/options nginx/auto/options
  
  if [ ".$NGX_PLATFORM" = ".win32" ]; then
      NGX_WINE=$WINE
-@@ -618,6 +636,8 @@
+@@ -621,6 +639,8 @@
  NGX_MODULES_PATH=${NGX_MODULES_PATH:-modules}
  NGX_CONF_PATH=${NGX_CONF_PATH:-conf/nginx.conf}
  NGX_CONF_PREFIX=`dirname $NGX_CONF_PATH`
@@ -772,7 +772,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_channel.c nginx/sr
 diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/os/unix/ngx_files.c
 --- nginx.upstream/src/os/unix/ngx_files.c
 +++ nginx/src/os/unix/ngx_files.c
-@@ -600,14 +600,14 @@
+@@ -604,14 +604,14 @@
  ngx_int_t
  ngx_set_file_time(u_char *name, ngx_fd_t fd, time_t s)
  {
@@ -791,7 +791,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/
          return NGX_OK;
      }
  
-@@ -758,6 +758,9 @@
+@@ -762,6 +762,9 @@
  ngx_err_t
  ngx_trylock_fd(ngx_fd_t fd)
  {
@@ -801,7 +801,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/
      struct flock  fl;
  
      ngx_memzero(&fl, sizeof(struct flock));
-@@ -767,7 +770,7 @@
+@@ -771,7 +774,7 @@
      if (fcntl(fd, F_SETLK, &fl) == -1) {
          return ngx_errno;
      }
@@ -810,7 +810,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/
      return 0;
  }
  
-@@ -775,6 +778,9 @@
+@@ -779,6 +782,9 @@
  ngx_err_t
  ngx_lock_fd(ngx_fd_t fd)
  {
@@ -820,7 +820,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/
      struct flock  fl;
  
      ngx_memzero(&fl, sizeof(struct flock));
-@@ -784,7 +790,7 @@
+@@ -788,7 +794,7 @@
      if (fcntl(fd, F_SETLKW, &fl) == -1) {
          return ngx_errno;
      }
@@ -829,7 +829,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/
      return 0;
  }
  
-@@ -792,6 +798,9 @@
+@@ -796,6 +802,9 @@
  ngx_err_t
  ngx_unlock_fd(ngx_fd_t fd)
  {
@@ -839,7 +839,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_files.c nginx/src/
      struct flock  fl;
  
      ngx_memzero(&fl, sizeof(struct flock));
-@@ -801,7 +810,7 @@
+@@ -805,7 +814,7 @@
      if (fcntl(fd, F_SETLK, &fl) == -1) {
          return  ngx_errno;
      }
