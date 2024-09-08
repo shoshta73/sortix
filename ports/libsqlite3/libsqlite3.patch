@@ -12,7 +12,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/shell.c libsqlite3/shell.c
  #if HAVE_READLINE
  # include <readline/readline.h>
  # include <readline/history.h>
-@@ -4915,7 +4919,6 @@
+@@ -4919,7 +4923,6 @@
  */
  
  #include <stdio.h>
@@ -20,7 +20,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/shell.c libsqlite3/shell.c
  #include <string.h>
  #include <assert.h>
  #ifndef OMIT_BASE85_CHECKER
-@@ -7540,7 +7543,7 @@
+@@ -7602,7 +7605,7 @@
        return 1;
      }
  #endif
@@ -29,7 +29,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/shell.c libsqlite3/shell.c
      /* Recent unix */
      struct timespec times[2];
      times[0].tv_nsec = times[1].tv_nsec = 0;
-@@ -28955,8 +28958,8 @@
+@@ -30359,8 +30362,8 @@
  #if !defined(_WIN32_WCE)
    if( getenv("SQLITE_DEBUG_BREAK") ){
      if( isatty(0) && isatty(2) ){
@@ -43,7 +43,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/shell.c libsqlite3/shell.c
 diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.c
 --- libsqlite3.upstream/sqlite3.c
 +++ libsqlite3/sqlite3.c
-@@ -15518,6 +15518,9 @@
+@@ -15572,6 +15572,9 @@
  
  /* Maximum pathname length.  Note: FILENAME_MAX defined by stdio.h
  */
@@ -53,7 +53,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  #ifndef SQLITE_MAX_PATHLEN
  # define SQLITE_MAX_PATHLEN FILENAME_MAX
  #endif
-@@ -38135,6 +38138,45 @@
+@@ -38464,6 +38467,45 @@
  # include <sys/param.h>
  #endif /* SQLITE_ENABLE_LOCKING_STYLE */
  
@@ -99,7 +99,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  /*
  ** Try to determine if gethostuuid() is available based on standard
  ** macros.  This might sometimes compute the wrong value for some
-@@ -39598,6 +39640,7 @@
+@@ -39931,6 +39973,7 @@
  
    /* Otherwise see if some other process holds it.
    */
@@ -107,7 +107,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  #ifndef __DJGPP__
    if( !reserved && !pFile->pInode->bProcessLock ){
      struct flock lock;
-@@ -39613,6 +39656,7 @@
+@@ -39946,6 +39989,7 @@
      }
    }
  #endif
@@ -115,7 +115,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  
    sqlite3_mutex_leave(pFile->pInode->pLockMutex);
    OSTRACE(("TEST WR-LOCK %d %d %d (unix)\n", pFile->h, rc, reserved));
-@@ -40365,11 +40409,15 @@
+@@ -40698,11 +40742,15 @@
    if( pFile->eFileLock > NO_LOCK ){
      pFile->eFileLock = eFileLock;
      /* Always update the timestamp on the old file */
