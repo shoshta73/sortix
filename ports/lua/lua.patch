@@ -26,7 +26,7 @@ diff -Paur --no-dereference -- lua.upstream/Makefile lua/Makefile
  # How to install. If your install program does not support "-p", then
  # you may have to run ranlib on the installed liblua.a.
 @@ -49,26 +52,28 @@
- R= $V.6
+ R= $V.7
  
  # Targets start here.
 -all:	$(PLAT)
