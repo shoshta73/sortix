@@ -36,6 +36,18 @@ diff -Paur --no-dereference -- gawk.upstream/extension/filefuncs.c gawk/extensio
  	}
  
  #ifdef HAVE_STRUCT_STAT_ST_BLKSIZE
+diff -Paur --no-dereference -- gawk.upstream/extras/Makefile.in gawk/extras/Makefile.in
+--- gawk.upstream/extras/Makefile.in
++++ gawk/extras/Makefile.in
+@@ -316,7 +316,7 @@
+ top_build_prefix = @top_build_prefix@
+ top_builddir = @top_builddir@
+ top_srcdir = @top_srcdir@
+-profiledir = $(sysconfdir)/profile.d
++profiledir = $(sysconfdir)/default/profile.d
+ profile_DATA = gawk.sh gawk.csh
+ EXTRA_DIST = $(profile_DATA)
+ all: all-am
 diff -Paur --no-dereference -- gawk.upstream/io.c gawk/io.c
 --- gawk.upstream/io.c
 +++ gawk/io.c
