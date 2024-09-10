@@ -784,28 +784,6 @@ static void InitThread(void* /*user*/)
 	if ( !init )
 		PanicF("Could not open %s in early kernel RAM filesystem:\n%s",
 		       initpath, strerror(errno));
-	struct stat st;
-	if ( init->stat(&ctx, &st) )
-		PanicF("Could not stat '%s' in initrd.", initpath);
-	assert(0 <= st.st_size);
-	if ( (uintmax_t) SIZE_MAX < (uintmax_t) st.st_size )
-		PanicF("%s is bigger than SIZE_MAX.", initpath);
-	size_t programsize = st.st_size;
-	uint8_t* program = new uint8_t[programsize];
-	if ( !program )
-		PanicF("Unable to allocate 0x%zx bytes needed for %s.", programsize, initpath);
-	size_t sofar = 0;
-	while ( sofar < programsize )
-	{
-		ssize_t numbytes = init->read(&ctx, program+sofar, programsize-sofar);
-		if ( !numbytes )
-			PanicF("Premature EOF when reading %s.", initpath);
-		if ( numbytes < 0 )
-			PanicF("IO error when reading %s.", initpath);
-		sofar += numbytes;
-	}
-
-	init.Reset();
 
 	Log::PrintF("\r\e[m\e[J");
 
@@ -814,14 +792,15 @@ static void InitThread(void* /*user*/)
 	struct thread_registers regs;
 	assert((((uintptr_t) &regs) & (alignof(regs)-1)) == 0);
 
-	if ( process->Execute(initpath, program, programsize, argc, argv, envc,
+	if ( process->Execute(initpath, init, argc, argv, envc,
 	                       envp, &regs) )
-		PanicF("Unable to execute %s.", initpath);
+		PanicF("Unable to execute %s: %m", initpath);
 
-	delete[] program;
 	delete[] argv;
 
-	// Now become the init process and the operation system shall run.
+	init.Reset();
+
+	// Now become the init process and the operating system shall run.
 	LoadRegisters(&regs);
 }
 

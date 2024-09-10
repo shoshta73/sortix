@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,11 @@
 #include <stdint.h>
 
 namespace Sortix {
+template <class T> class Ref;
+class Descriptor;
+}
+
+namespace Sortix {
 namespace ELF {
 
 struct Auxiliary
@@ -38,7 +43,7 @@ struct Auxiliary
 
 // Reads the elf file into the current address space and returns the entry
 // address of the program, or 0 upon failure.
-uintptr_t Load(const void* file, size_t filelen, Auxiliary* aux);
+uintptr_t Load(Ref<Descriptor>, Auxiliary* aux);
 
 } // namespace ELF
 } // namespace Sortix

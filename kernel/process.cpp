@@ -879,8 +879,8 @@ bool Process::MapSegment(struct segment* result, void* hint, size_t size,
 	return true;
 }
 
-int Process::Execute(const char* programname, const uint8_t* program,
-                     size_t programsize, int argc, const char* const* argv,
+int Process::Execute(const char* program_name, Ref<Descriptor> program,
+                     int argc, const char* const* argv,
                      int envc, const char* const* envp,
                      struct thread_registers* regs)
 {
@@ -891,17 +891,18 @@ int Process::Execute(const char* programname, const uint8_t* program,
 	if ( argc == 0 )
 		return errno = EINVAL, -1;
 
-	char* programname_clone = String::Clone(programname);
-	if ( !programname_clone )
+	char* program_name_clone = String::Clone(program_name);
+	if ( !program_name_clone )
 		return -1;
 
 	ELF::Auxiliary aux;
 
-	addr_t entry = ELF::Load(program, programsize, &aux);
-	if ( !entry ) { delete[] programname_clone; return -1; }
+	addr_t entry = ELF::Load(program, &aux);
+	if ( !entry ) { delete[] program_name_clone; return -1; }
 
 	delete[] program_image_path;
-	program_image_path = programname_clone; programname_clone = NULL;
+	program_image_path = program_name_clone;
+	program_name_clone = NULL;
 
 	uintptr_t userspace_addr;
 	size_t userspace_size;
@@ -926,7 +927,7 @@ int Process::Execute(const char* programname, const uint8_t* program,
 	size_t raw_tls_size_aligned = -(-raw_tls_size & ~(aux.tls_mem_align-1));
 	if ( raw_tls_size && raw_tls_size_aligned == 0 /* overflow */ )
 		return errno = EINVAL, -1;
-	int raw_tls_kprot = PROT_KWRITE | PROT_FORK;
+	int raw_tls_kprot = PROT_WRITE | PROT_KWRITE | PROT_FORK;
 	int raw_tls_prot = PROT_READ | PROT_KREAD | PROT_FORK;
 	void* raw_tls_hint = stack_hint;
 
@@ -1014,16 +1015,32 @@ int Process::Execute(const char* programname, const uint8_t* program,
 	}
 	target_envp[envc] = (char*) NULL;
 
-	const uint8_t* file_raw_tls = program + aux.tls_file_offset;
-
+	static const uintmax_t off_max = OFF_MAX; // Silence false -Wtype-limits
+	if ( (uintmax_t) off_max < aux.tls_file_offset ||
+	     OFF_MAX - aux.tls_file_offset < aux.tls_file_size )
+		return errno = EINVAL, -1;
 	uint8_t* target_raw_tls = (uint8_t*) raw_tls_segment.addr;
-	memcpy(target_raw_tls, file_raw_tls, aux.tls_file_size);
+	ioctx_t user_ctx; SetupUserIOCtx(&user_ctx);
+	kthread_mutex_unlock(&segment_lock);
+	for ( size_t done = 0; done < aux.tls_file_size; )
+	{
+		ssize_t amount =
+			program->pread(&user_ctx, target_raw_tls + done,
+			               aux.tls_file_size - done,
+			               (off_t) aux.tls_file_offset + done);
+		if ( amount < 0 )
+			return -1;
+		if ( !amount )
+			return errno = EINVAL, -1;
+		done += amount;
+	}
+	kthread_mutex_lock(&segment_lock);
 	memset(target_raw_tls + aux.tls_file_size, 0, aux.tls_mem_size - aux.tls_file_size);
 	Memory::ProtectMemory(this, raw_tls_segment.addr, raw_tls_segment.size, raw_tls_prot);
 
 	uint8_t* target_tls = (uint8_t*) (tls_segment.addr + tls_offset_tls);
 	assert((((uintptr_t) target_tls) & (aux.tls_mem_align-1)) == 0);
-	memcpy(target_tls, file_raw_tls, aux.tls_file_size);
+	memcpy(target_tls, target_raw_tls, aux.tls_file_size);
 	memset(target_tls + aux.tls_file_size, 0, aux.tls_mem_size - aux.tls_file_size);
 
 	struct uthread* uthread = (struct uthread*) (tls_segment.addr + tls_offset_uthread);
@@ -1239,6 +1256,12 @@ int sys_execve_kernel(const char* filename,
 		return -1;
 	if ( !(st.st_mode & 0111) )
 		return errno = EACCES, -1;
+
+	if ( !process->Execute(filename, desc, argc, argv, envc, envp, regs) )
+		return 0;
+	else if ( errno != ENOEXEC )
+		return -1;
+
 	if ( st.st_size < 0 )
 		return errno = EINVAL, -1;
 	if ( (uintmax_t) SIZE_MAX < (uintmax_t) st.st_size )
@@ -1263,11 +1286,8 @@ int sys_execve_kernel(const char* filename,
 
 	desc.Reset();
 
-	int result = process->Execute(filename, buffer, filesize, argc, argv, envc, envp, regs);
-
-	if ( result == 0 || errno != ENOEXEC ||
-	     filesize < 2 || buffer[0] != '#' || buffer[1] != '!' )
-		return sys_execve_free(&buffer_alloc), result;
+	if ( filesize < 2 || buffer[0] != '#' || buffer[1] != '!' )
+		return sys_execve_free(&buffer_alloc), -1;
 
 	size_t line_length = 0;
 	while ( 2 + line_length < filesize && buffer[2 + line_length] != '\n' )
@@ -1318,7 +1338,7 @@ int sys_execve_kernel(const char* filename,
 		new_argv[sb_argc + i] = argv[i];
 	new_argv[new_argc] = (char*) NULL;
 
-	result = -1;
+	int result = -1;
 
 	// (See the above comment block before editing this searching logic)
 	const char* path = shebang_lookup_environment("PATH", envp);

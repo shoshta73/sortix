@@ -165,8 +165,8 @@ public:
 	Clock child_system_clock;
 
 public:
-	int Execute(const char* programname, const uint8_t* program,
-	            size_t programsize, int argc, const char* const* argv,
+	int Execute(const char* programname, Ref<Descriptor> program,
+	            int argc, const char* const* argv,
 	            int envc, const char* const* envp,
 	            struct thread_registers* regs);
 	void ResetAddressSpace();
