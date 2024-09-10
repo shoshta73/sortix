@@ -1,5 +1,6 @@
 NAME=xz
 BUILD_LIBRARIES='liblzma libiconv? libintl?'
+UPGRADE_BLOCKED='backdoor concerns'
 VERSION=5.4.5
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
