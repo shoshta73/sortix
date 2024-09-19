@@ -13,14 +13,14 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * sys/select/pselect.c
- * Waiting on multiple file descriptors.
+ * sys/param.h
+ * MIN and MAX.
  */
 
- #include <sys/select.h>
+#ifndef _INCLUDE_SYS_PARAM_H
+#define _INCLUDE_SYS_PARAM_H
 
-int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
-           fd_set* restrict exceptfds, struct timeval* restrict timeout)
-{
-	return pselect(nfds, readfds, writefds, exceptfds, timeout, NULL);
-}
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#define MAX(a, b) ((a) < (b) ? (b) : (a))
+
+#endif

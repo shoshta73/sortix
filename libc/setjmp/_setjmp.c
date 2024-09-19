@@ -13,14 +13,13 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * sys/select/pselect.c
- * Waiting on multiple file descriptors.
+ * setjmp/_setjmp.c
+ * POSIX _setjmp
  */
 
- #include <sys/select.h>
+ #include <setjmp.h>
 
-int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
-           fd_set* restrict exceptfds, struct timeval* restrict timeout)
+int _setjmp(jmp_buf jb)
 {
-	return pselect(nfds, readfds, writefds, exceptfds, timeout, NULL);
+	return sigsetjmp(jb, 0);
 }

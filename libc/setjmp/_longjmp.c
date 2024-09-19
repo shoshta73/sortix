@@ -13,14 +13,16 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * sys/select/pselect.c
- * Waiting on multiple file descriptors.
+ * setjmp/_longjmp.c
+ * POSIX _longjmp
  */
 
- #include <sys/select.h>
+ #include <setjmp.h>
 
-int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
-           fd_set* restrict exceptfds, struct timeval* restrict timeout)
+void _longjmp(jmp_buf jb, int val)
 {
-	return pselect(nfds, readfds, writefds, exceptfds, timeout, NULL);
+	// jb was saved by _setjmp, so the signal mask won't get overridden.
+	// If the user messes up, and jb wasn't saved by _setjmp, the behaviour
+	// is undefined.  POSIX's words, not mine.
+	siglongjmp(jb, val);
 }

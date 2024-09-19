@@ -64,6 +64,8 @@ regex/regcomp.o \
 regex/regerror.o \
 regex/regexec.o \
 regex/regfree.o \
+setjmp/_longjmp.o \
+setjmp/_setjmp.o \
 sha2/sha224hl.o \
 sha2/sha224.o \
 sha2/sha256hl.o \
@@ -601,6 +603,7 @@ sys/resource/getrusage.o \
 sys/resource/prlimit.o \
 sys/resource/setpriority.o \
 sys/resource/setrlimit.o \
+sys/select/pselect.o \
 sys/select/select.o \
 sys/socket/accept4.o \
 sys/socket/accept.o \
