@@ -133,8 +133,8 @@ void UnmapMemory(Process* process, uintptr_t addr, size_t size)
 			continue;
 		}
 
-		// Delete the middle of the segment if covered there by our request.
-		if ( conflict->addr < addr && addr + size - conflict->addr <= conflict->size )
+		// Delete the middle of the segment if our request splits it in two.
+		if ( conflict->addr < addr && addr + size < conflict->size + conflict->addr )
 		{
 			Memory::UnmapRange(addr, size, PAGE_USAGE_USER_SPACE);
 			Memory::Flush();
