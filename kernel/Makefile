@@ -30,6 +30,7 @@ ifeq ($(CPU),x86)
     X86FAMILY:=1
     CPUDIR:=$(CPU)
     CPUOBJS:=$(CPUDIR)/boot.o
+    LDADD:=-Wl,-Ttext -Wl,100000
 endif
 
 ifeq ($(CPU),x64)
@@ -37,6 +38,7 @@ ifeq ($(CPU),x64)
     CPUDIR:=$(CPU)
     CXXFLAGS:=$(CXXFLAGS) -mno-red-zone -mno-mmx -mno-sse -mno-sse2
     CPUOBJS:=$(CPUDIR)/boot.o
+    LDADD:=-Wl,-Ttext -Wl,100000 -Wl,-z -Wl,max-page-size=0x1000
 endif
 
 ifndef CPUDIR
@@ -196,24 +198,8 @@ kernel: sortix.bin
 
 headers:
 
-# x64 compilation
-ifeq ($(CPU),x64)
-
-sortix-x86_64.bin: $(ALLOBJS)
-	$(CXX) $(CXXFLAGS) -Wl,-Ttext -Wl,100000 -Wl,-z -Wl,max-page-size=0x1000 $(LINK_OBJECTS) -o $@
-
-sortix.bin: sortix-x86_64.bin
-	$(OBJCOPY) $< -O elf32-i386-sortix $@
-
-endif
-
-# x86 compilation
-ifeq ($(CPU),x86)
-
 sortix.bin: $(ALLOBJS)
-	$(CXX) $(CXXFLAGS) -Wl,-Ttext -Wl,100000 $(LINK_OBJECTS) -o $@
-
-endif
+	$(CXX) $(CXXFLAGS) $(LDADD) $(LINK_OBJECTS) -o $@
 
 %: %.kblayout
 	kblayout-compiler --format=sortix-kblayout-1 --compression=none $< -o $@
