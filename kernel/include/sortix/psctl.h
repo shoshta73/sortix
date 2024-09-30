@@ -101,7 +101,7 @@ struct psctl_program_path
 	size_t size;
 };
 
-#define PSCTL_TTYNAME __PSCTL(psctl_program_path, 5)
+#define PSCTL_TTYNAME __PSCTL(psctl_ttyname, 5)
 struct psctl_ttyname
 {
 	char* buffer;
