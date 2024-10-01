@@ -148,7 +148,8 @@ install-cross-compiler:
 	  --target="$(TARGET)" \
 	  --prefix="$(PREFIX)" \
 	  $(CROSS_COMPILER_WITH_SYSROOT) \
-	  --disable-werror
+	  --disable-werror \
+	  --enable-default-execstack=no
 	V=1 $(MAKE) -C ports/binutils/binutils.build
 	V=1 $(MAKE) -C ports/binutils/binutils.build install
 	rm -rf ports/gcc/gcc.build
