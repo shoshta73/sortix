@@ -2194,9 +2194,12 @@ static void daemon_start(struct daemon* daemon)
 	log_status("starting", "Starting %s...\n", daemon->name);
 	uid_t uid = getuid();
 	pid_t ppid = getpid();
+	errno = 0;
 	struct passwd* pwd = getpwuid(uid);
-	if ( !pwd )
+	if ( !pwd && errno )
 		fatal("looking up user by uid %" PRIuUID ": %m", uid);
+	else if ( !pwd )
+		fatal("no such user with uid: %" PRIuUID, uid);
 	const char* home = pwd->pw_dir[0] ? pwd->pw_dir : "/";
 	const char* shell = pwd->pw_shell[0] ? pwd->pw_shell : "sh";
 	const char* cd = daemon->cd ? daemon->cd : "/";
