@@ -20,8 +20,10 @@
 #include <sys/display.h>
 #include <sys/ioctl.h>
 #include <sys/mount.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/un.h>
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -130,6 +132,19 @@ enum daemon_state
 };
 
 #define NUM_DAEMON_STATES (DAEMON_STATE_FINISHED + 1)
+
+const char* daemon_state_names[] =
+{
+	"terminated",
+	"scheduled",
+	"waiting",
+	"satisfied",
+	"starting",
+	"running",
+	"terminating",
+	"finishing",
+	"finished",
+};
 
 struct daemon;
 
@@ -273,10 +288,32 @@ struct daemon_config
 	enum type type;
 };
 
+struct server
+{
+	size_t index;
+	const char* path;
+	int fd;
+};
+
+struct connection
+{
+	size_t index;
+	char* input;
+	size_t input_used;
+	size_t input_size;
+	char* output;
+	size_t output_used;
+	size_t output_size;
+	int fd;
+	size_t state;
+};
+
 enum communication_type
 {
 	COMMUNICATION_TYPE_OUTPUT,
 	COMMUNICATION_TYPE_READY,
+	COMMUNICATION_TYPE_SERVER,
+	COMMUNICATION_TYPE_CONNECTION,
 };
 
 struct communication
@@ -303,6 +340,7 @@ static char* share_init_path;
 static char* tmp_path;
 static char* var_path;
 static char* random_seed_path;
+static char* server_path;
 static char* chain_path;
 static bool chain_path_made;
 static char* chain_dev_path;
@@ -1594,6 +1632,32 @@ static bool daemon_config_load_from_path(struct daemon_config* daemon_config,
 	return true;
 }
 
+static bool daemon_has_config(const char* name)
+{
+	const char* search_paths[] =
+	{
+		etc_init_path,
+		share_init_path,
+	};
+	size_t search_paths_count = sizeof(search_paths) / sizeof(search_paths[0]);
+	for ( size_t i = 0; i < search_paths_count; i++ )
+	{
+		const char* search_path = search_paths[i];
+		char* path = join_paths(search_path, name);
+		if ( !path )
+			return false;
+		if ( access(path, F_OK) < 0 && errno == ENOENT )
+		{
+			free(path);
+			continue;
+		}
+		free(path);
+		return true;
+	}
+	errno = ENOENT;
+	return false;
+}
+
 static bool daemon_config_load_search(struct daemon_config* daemon_config,
                                       size_t next_search_path_index)
 {
@@ -1832,6 +1896,27 @@ static struct daemon* daemon_create_unconfigured(const char* name)
 	daemon->log.fd = -1;
 	daemon_insert_state_list(daemon);
 	return daemon;
+}
+
+static struct daemon* daemon_find_or_create(const char* name)
+{
+	struct daemon* daemon = daemon_find_by_name(name);
+	if ( !daemon && !daemon_has_config(name) && errno == ENOENT )
+		return NULL;
+	if ( !daemon )
+		daemon = daemon_create_unconfigured(name);
+	return daemon;
+}
+
+static struct dependency* daemon_find_dependency(struct daemon* daemon,
+                                                 const char* target)
+{
+	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
+	{
+		if ( !strcmp(daemon->dependencies[i]->target->name, target) )
+			return daemon->dependencies[i];
+	}
+	return NULL;
 }
 
 static struct dependency* daemon_add_dependency(struct daemon* daemon,
@@ -2094,6 +2179,20 @@ static void daemon_reload(struct daemon* daemon)
 	}
 }
 
+static void daemon_signal(struct daemon* daemon, const char* signame, int sig)
+{
+	if ( daemon->state != DAEMON_STATE_STARTING &&
+	     daemon->state != DAEMON_STATE_RUNNING &&
+	     daemon->state != DAEMON_STATE_TERMINATING )
+		return;
+
+	if ( 0 < daemon->pid )
+	{
+		log_status("signal", "Sending %s to %s.\n", signame, daemon->name);
+		kill(daemon->pid, sig);
+	}
+}
+
 static void daemon_on_not_referenced(struct daemon* daemon)
 {
 	assert(daemon->reference_count == 0);
@@ -2308,6 +2407,52 @@ static void daemon_reconfigure(struct daemon* daemon)
 	daemon_load_and_configure(daemon);
 }
 
+static void daemon_request_reconfigure(struct daemon* daemon)
+{
+	// TODO: Support reconfiguring instantiated daemons.
+	if ( daemon->netif )
+		return;
+	if ( !daemon->want_reconfigure )
+	{
+		log_status("reconfigure", "Reconfigure requested of %s.\n", daemon->name);
+		bool should_run =
+			daemon->state == DAEMON_STATE_WAITING ||
+			daemon->state == DAEMON_STATE_SATISFIED ||
+			daemon->state == DAEMON_STATE_STARTING ||
+			daemon->state == DAEMON_STATE_RUNNING;
+		if ( daemon->state == DAEMON_STATE_STARTING ||
+		     daemon->state == DAEMON_STATE_RUNNING )
+			daemon_terminate(daemon);
+		daemon->want_reconfigure = true;
+		daemon->want_restart = should_run;
+	}
+	if ( daemon->state == DAEMON_STATE_TERMINATED ||
+	     daemon->state == DAEMON_STATE_FINISHED )
+		daemon_reconfigure(daemon);
+}
+
+static void daemon_kill(struct daemon* daemon)
+{
+	if ( daemon->state != DAEMON_STATE_SCHEDULED &&
+	     daemon->state != DAEMON_STATE_SATISFIED &&
+	     daemon->state != DAEMON_STATE_STARTING &&
+	     daemon->state != DAEMON_STATE_RUNNING &&
+	     daemon->state != DAEMON_STATE_TERMINATING )
+		return;
+	daemon->was_terminated = true;
+	daemon->want_restart = false;
+	daemon->want_reload = false;
+	daemon_change_state_list(daemon, DAEMON_STATE_TERMINATING);
+	if ( 0 < daemon->pid )
+	{
+		log_status("killing", "Killing %s.\n", daemon->name);
+		kill(daemon->pid, SIGKILL);
+		daemon->timeout_set = false;
+	}
+	else
+		daemon_on_finished(daemon);
+}
+
 static void daemon_on_referenced(struct daemon* daemon)
 {
 	switch ( daemon->state )
@@ -2374,6 +2519,67 @@ static void daemon_wait_dependency(struct dependency* dependency)
 	case DAEMON_STATE_FINISHED:
 		daemon_on_dependency_ready(dependency);
 		daemon_on_dependency_finished(dependency);
+		break;
+	}
+}
+
+static bool daemon_depend(struct daemon* source,
+                          struct daemon* target,
+                          int flags)
+{
+	if ( !source->configured )
+		return false;
+	struct dependency* dependency =
+		daemon_find_dependency(source, target->name);
+	// TODO: Updating the flags is tricky.
+	if ( dependency )
+		return true;
+	else if ( !(dependency = daemon_add_dependency(source, target, flags)) )
+		return false;
+	// No need to start the target if the source isn't supposed to be running,
+	// and no need if the source is scheduled (it will be done later).
+	if ( source->state == DAEMON_STATE_TERMINATED ||
+	     source->state == DAEMON_STATE_SCHEDULED ||
+	     source->state == DAEMON_STATE_TERMINATING ||
+	     source->state == DAEMON_STATE_FINISHING ||
+	     source->state == DAEMON_STATE_FINISHED )
+		return true;
+	// Return source to WAITING if the target isn't ready.
+	if ( source->state == DAEMON_STATE_SATISFIED &&
+	     (target->state == DAEMON_STATE_TERMINATED ||
+	      target->state == DAEMON_STATE_SCHEDULED ||
+	      target->state == DAEMON_STATE_SATISFIED ||
+	      target->state == DAEMON_STATE_STARTING) )
+		daemon_change_state_list(target, DAEMON_STATE_WAITING);
+	// Wait on the new dependency.
+	daemon_wait_dependency(dependency);
+	return true;
+}
+
+static void daemon_undepend(struct daemon* source, struct daemon* target)
+{
+	for ( size_t i = 0; i < source->dependencies_used; i++ )
+	{
+		if ( source->dependencies[i]->target != target )
+			continue;
+		struct dependency* dependency = source->dependencies[i];
+		size_t last = --source->dependencies_used;
+		if ( i != last  )
+			source->dependencies[i] = source->dependencies[last];
+		for ( size_t n = 0; n < target->dependents_used; n++ )
+		{
+			if ( target->dependents[n] != dependency )
+				continue;
+			last = --target->dependents_used;
+			if ( n != last  )
+				target->dependents[n] = target->dependents[last];
+			break;
+		}
+		daemon_dereference_dependency(dependency);
+		if ( dependency->flags & DEPENDENCY_FLAG_EXIT_CODE )
+			dependency->source->exit_code_from = NULL;
+		free(dependency);
+		daemon_consider_satisfied(source);
 		break;
 	}
 }
@@ -2715,6 +2921,532 @@ static void daemon_on_exit(struct daemon* daemon, int exit_code)
 	daemon_on_finished(daemon);
 }
 
+static void daemon_get_exit_string(struct daemon* daemon, char* buf, size_t len)
+{
+	if ( daemon->state != DAEMON_STATE_FINISHED )
+		snprintf(buf, len, "n/a");
+	else if ( WIFEXITED(daemon->exit_code) )
+		snprintf(buf, len, "%i", WEXITSTATUS(daemon->exit_code));
+	else if ( WIFSIGNALED(daemon->exit_code) )
+	{
+		assert(3 + SIG2STR_MAX <= len);
+		snprintf(buf, len, "SIG");
+		sig2str(WTERMSIG(daemon->exit_code), buf + 3);
+	}
+	else
+		snprintf(buf, len, "%#x", WEXITSTATUS(daemon->exit_code));
+}
+
+static const char* daemon_get_state_string(struct daemon* daemon)
+{
+	if ( daemon->state == DAEMON_STATE_TERMINATED && daemon_is_failed(daemon) )
+		return "failed";
+	return daemon_state_names[daemon->state];
+}
+
+static void connection_close(struct connection* conn)
+{
+	communication_unregister(conn->index);
+	close(conn->fd);
+	conn->fd = -1;
+}
+
+static void connection_free(struct connection* conn)
+{
+	if ( 0 <= conn->fd )
+		connection_close(conn);
+	free(conn->input);
+	free(conn->output);
+	free(conn);
+}
+
+static struct connection* connection_new(int fd)
+{
+	size_t buffer_size = 4096;
+	struct connection* conn = calloc(1, sizeof(struct connection));
+	char* input = malloc(buffer_size);
+	char* output = malloc(buffer_size);
+	if ( !conn || !input || !output )
+		return free(conn), free(input), free(output), NULL;
+	conn->input = input;
+	conn->input_used = 0;
+	conn->input_size = buffer_size;
+	conn->output = output;
+	conn->output_used = 0;
+	conn->output_size = buffer_size;
+	conn->fd = fd;
+	if ( !communication_reserve(1) )
+		return connection_free(conn), NULL;
+	struct communication comm;
+	comm.type = COMMUNICATION_TYPE_CONNECTION;
+	comm.index_ptr = &conn->index;
+	comm.connection = conn;
+	communication_register(&comm, fd, POLLIN);
+	return conn;
+}
+
+static void connection_reply(struct connection* conn, const char* string)
+{
+	if ( conn->fd < 0 )
+		return;
+	size_t length = strlen(string);
+	size_t available = conn->output_size - conn->output_used;
+	if ( available < length )
+		return connection_close(conn);
+	memcpy(conn->output + conn->output_used, string, length);
+	conn->output_used += length;
+}
+
+static void connection_replyf(struct connection* conn,
+                              const char* restrict format,
+                              ...)
+{
+	if ( conn->fd < 0 )
+		return;
+	char* buffer = conn->output + conn->output_used;
+	size_t available = conn->output_size - conn->output_used;
+	va_list list;
+	va_start(list, format);
+	size_t length = vsnprintf(buffer, available, format, list);
+	va_end(list);
+	if ( available <= length )
+		return connection_close(conn);
+	conn->output_used += length;
+}
+
+static void connection_ok(struct connection* conn)
+{
+	connection_reply(conn, "ok\n");
+}
+
+static void connection_error(struct connection* conn, const char* code)
+{
+	connection_reply(conn, "error ");
+	connection_reply(conn, code);
+	connection_reply(conn, "\n");
+}
+
+static void reply_status(struct connection* conn, struct daemon* daemon)
+{
+	connection_replyf(conn, " daemon=%s state=%s",
+	                  daemon->name, daemon_get_state_string(daemon));
+	if ( 0 < daemon->pid )
+		connection_replyf(conn, " pid=%ji", (intmax_t) daemon->pid);
+	if ( daemon->state == DAEMON_STATE_FINISHED )
+	{
+		char exit_str[64];
+		daemon_get_exit_string(daemon, exit_str, sizeof(exit_str));
+		connection_replyf(conn, " exit=%s", exit_str);
+	}
+}
+
+static void reply_dependency(struct connection* conn,
+                             struct dependency* dependency)
+{
+	char flags[sizeof(" optional no-await exit-code")];
+	snprintf(flags, sizeof(flags), "%s%s%s",
+	         !(dependency->flags & DEPENDENCY_FLAG_REQUIRE) ? " optional" : "",
+	         !(dependency->flags & DEPENDENCY_FLAG_AWAIT) ? " no-await" : "",
+	         dependency->flags & DEPENDENCY_FLAG_EXIT_CODE ? " exit-code" : "");
+	connection_replyf(conn, "require %s %s %s", dependency->source->name,
+	                  dependency->target->name, flags);
+}
+
+static void request_require(struct connection* conn, int argc, char** argv)
+{
+	if ( argc < 3 )
+		return connection_error(conn, "missing_operand");
+	const char* source_name = argv[1];
+	const char* target_name = argv[2];
+	int flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
+	for ( int i = 3; i < argc; i++ )
+	{
+		if ( !strcmp(argv[i], "optional") )
+			flags &= ~DEPENDENCY_FLAG_REQUIRE;
+		else if ( !strcmp(argv[i], "no-await") )
+			flags &= ~DEPENDENCY_FLAG_AWAIT;
+		else if ( !strcmp(argv[i], "exit-code") )
+			flags |= DEPENDENCY_FLAG_EXIT_CODE;
+		else
+			return connection_error(conn, "unknown_flag");
+	}
+	struct daemon* source = daemon_find_by_name(source_name);
+	if ( !source )
+		return connection_error(conn, "no_such_source_daemon");
+	struct daemon* target = daemon_find_or_create(target_name);
+	if ( !target )
+		return connection_error(conn, errno == ENOENT ? "no_such_daemon" :
+		                              "creating_daemon_failed");
+	if ( !daemon_depend(source, target, flags) )
+		return connection_error(conn, "adding_connection_failed");
+	connection_ok(conn);
+}
+
+static void request_unrequire(struct connection* conn, int argc, char** argv)
+{
+	if ( argc < 3 )
+		return connection_error(conn, "missing_operand");
+	const char* source_name = argv[1];
+	const char* target_name = argv[2];
+	struct daemon* source = daemon_find_by_name(source_name);
+	if ( !source )
+		return connection_error(conn, "no_such_source_daemon");
+	struct daemon* target = daemon_find_by_name(target_name);
+	if ( !target )
+		return connection_error(conn, "no_such_daemon");
+	daemon_undepend(source, target);
+	connection_ok(conn);
+}
+
+static void request_reconfigure(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 2 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_or_create(name);
+	if ( !daemon )
+		return connection_error(conn, errno == ENOENT ? "no_such_daemon" :
+		                              "creating_daemon_failed");
+	daemon_request_reconfigure(daemon);
+	connection_ok(conn);
+}
+
+static void request_reload(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 2 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_or_create(name);
+	if ( !daemon )
+		return connection_error(conn, errno == ENOENT ? "no_such_daemon" :
+		                              "creating_daemon_failed");
+	daemon_reload(daemon);
+	connection_ok(conn);
+}
+
+static void request_restart(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 2 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_or_create(name);
+	if ( !daemon )
+		return connection_error(conn, errno == ENOENT ? "no_such_daemon" :
+		                              "creating_daemon_failed");
+	daemon_request_restart(daemon);
+	connection_ok(conn);
+}
+
+static void request_terminate(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 2 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_by_name(name);
+	if ( !daemon )
+		return connection_error(conn, "no_such_daemon");
+	daemon_terminate(daemon);
+	connection_ok(conn);
+}
+
+static void request_kill(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 2 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_by_name(name);
+	if ( !daemon )
+		return connection_error(conn, "no_such_daemon");
+	daemon_kill(daemon);
+	connection_ok(conn);
+}
+
+static void request_signal(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 3 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_by_name(name);
+	if ( !daemon )
+		return connection_error(conn, "no_such_daemon");
+	const char* signame = argv[2];
+	int sig;
+	if ( strncmp(signame, "SIG", 3) != 0 ||
+	     str2sig(signame + 3, &sig) < 0 )
+		return connection_error(conn, "no_such_signal");
+	daemon_signal(daemon, signame, sig);
+	connection_ok(conn);
+}
+
+static void request_status(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 2 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_by_name(name);
+	if ( !daemon )
+		return connection_error(conn, "no_such_daemon");
+	connection_reply(conn, "ok");
+	reply_status(conn, daemon);
+	connection_reply(conn, "\n");
+}
+
+static void request_list(struct connection* conn, int argc, char** argv)
+{
+	(void) argv;
+	if ( argc != 1 )
+		return connection_error(conn, "unexpected_operand");
+	if ( !conn->state )
+	{
+		connection_reply(conn, "ok");
+		conn->state = 1;
+		return;
+	}
+	while ( conn->state - 1 < daemons_used )
+	{
+		size_t i = conn->state - 1;
+		if ( i )
+			connection_reply(conn, " , ");
+		reply_status(conn, daemons[i]);
+		conn->state++;
+		return;
+	}
+	connection_reply(conn, "\n");
+	conn->state = 0;
+}
+
+static void request_requirements(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 2 )
+		return connection_error(conn, "missing_operand");
+	const char* name = argv[1];
+	struct daemon* daemon = daemon_find_by_name(name);
+	if ( !daemon )
+		return connection_error(conn, "no_such_daemon");
+	if ( !conn->state )
+	{
+		connection_reply(conn, "ok");
+		conn->state = 1;
+		return;
+	}
+	bool in = !strcmp(argv[0], "edges") || !strcmp(argv[0], "dependents");
+	bool out = !strcmp(argv[0], "edges") || !strcmp(argv[0], "requirements");
+	size_t dependents_used = in ? daemon->dependents_used : 0;
+	size_t dependencies_used = out ? daemon->dependencies_used : 0;
+	while ( conn->state - 1 < dependents_used )
+	{
+		size_t i = conn->state - 1;
+		connection_reply(conn, conn->state == 1 ? " " : " , ");
+		reply_dependency(conn, daemon->dependents[i]);
+		conn->state++;
+		return;
+	}
+	while ( conn->state - 1 < dependents_used + dependencies_used )
+	{
+		size_t i = conn->state - (1 + dependents_used);
+		connection_reply(conn, conn->state == 1 ? " " : " , ");
+		reply_dependency(conn, daemon->dependencies[i]);
+		conn->state++;
+		return;
+	}
+	connection_reply(conn, "\n");
+	conn->state = 0;
+}
+
+static void request_poweroff(struct connection* conn, int argc, char** argv)
+{
+	if ( argc != 1 )
+		return connection_error(conn, "unexpected_operand");
+	if ( !strcmp(argv[0], "poweroff") )
+		caught_exit_signal = 0;
+	else if ( !strcmp(argv[0], "reboot") )
+		caught_exit_signal = 1;
+	else if ( !strcmp(argv[0], "halt") )
+		caught_exit_signal = 2;
+	else if ( !strcmp(argv[0], "reinit") )
+		caught_exit_signal = 3;
+	connection_ok(conn);
+}
+
+static void connection_on_message(struct connection* conn, const char* message)
+{
+	size_t argc = 0;
+	char** argv = tokenize(&argc, message);
+	if ( !argv )
+	{
+		connection_error(conn, !errno ? "syntax_error" : "out_of_memory");
+		return;
+	}
+
+	if ( argc == 0 ) {}
+	else if ( !strcmp(argv[0], "require") )
+		request_require(conn, argc, argv);
+	else if ( !strcmp(argv[0], "unrequire") )
+		request_unrequire(conn, argc, argv);
+	else if ( !strcmp(argv[0], "reconfigure") )
+		request_reconfigure(conn, argc, argv);
+	else if ( !strcmp(argv[0], "reload") )
+		request_reload(conn, argc, argv);
+	else if ( !strcmp(argv[0], "restart") )
+		request_restart(conn, argc, argv);
+	else if ( !strcmp(argv[0], "terminate") )
+		request_terminate(conn, argc, argv);
+	else if ( !strcmp(argv[0], "kill") )
+		request_kill(conn, argc, argv);
+	else if ( !strcmp(argv[0], "signal") )
+		request_signal(conn, argc, argv);
+	else if ( !strcmp(argv[0], "status") )
+		request_status(conn, argc, argv);
+	else if ( !strcmp(argv[0], "list") )
+		request_list(conn, argc, argv);
+	else if ( !strcmp(argv[0], "edges") ||
+	          !strcmp(argv[0], "dependents") ||
+	          !strcmp(argv[0], "requirements") )
+		request_requirements(conn, argc, argv);
+	else if ( !strcmp(argv[0], "poweroff") ||
+	          !strcmp(argv[0], "reboot") ||
+	          !strcmp(argv[0], "halt") ||
+	          !strcmp(argv[0], "reinit") )
+		request_poweroff(conn, argc, argv);
+	else
+		connection_error(conn, "unknown_command");
+
+	for ( size_t i = 0; i < argc; i++ )
+		free(argv[i]);
+	free(argv);
+}
+
+static bool connection_on_event(struct connection* conn, int revents)
+{
+	if ( !(revents & (POLLIN | POLLOUT | POLLHUP | POLLERR | POLLNVAL)) )
+		return true;
+	size_t from = 0;
+	if ( (revents & POLLIN) && conn->input_used < conn->input_size )
+	{
+
+		ssize_t amount = recv(conn->fd, conn->input + conn->input_used,
+		                      conn->input_size - conn->input_used, 0);
+		if ( 0 < amount )
+		{
+			from = conn->input_used;
+			conn->input_used += amount;
+		}
+		else if ( amount == 0 ||
+		          (amount < 0 && errno != EWOULDBLOCK && errno != EAGAIN ) )
+			return connection_free(conn), false;
+	}
+	if ( !conn->output_used )
+	{
+		size_t i = from;
+		while ( i < conn->input_used )
+		{
+			if ( conn->input[i] == '\n' )
+			{
+				size_t n = i + 1;
+				conn->input[i] = '\0';
+				connection_on_message(conn, conn->input);
+				conn->input[i] = '\n';
+				if ( conn->fd < 0 )
+					return connection_free(conn), false;
+				if ( conn->state )
+					break;
+				memmove(conn->input, conn->input + n, conn->input_used - n);
+				conn->input_used -= n;
+				i = 0;
+			}
+			else
+				i++;
+		}
+		// Disconnect if the input line is too long.
+		if ( i == conn->input_size )
+			return connection_free(conn), false;
+	}
+	if ( (revents & POLLOUT) && conn->output_used )
+	{
+		ssize_t amount = send(conn->fd, conn->output, conn->output_used,
+		                      MSG_NOSIGNAL);
+		if ( 0 < amount )
+		{
+			if ( (size_t) amount < conn->output_used )
+				memmove(conn->output, conn->output + amount,
+				        conn->output_used - amount);
+			conn->output_used -= amount;
+		}
+		else if ( errno != EWOULDBLOCK && errno != EAGAIN )
+			return connection_free(conn), false;
+	}
+	if ( (revents & (POLLHUP | POLLERR | POLLNVAL)) )
+		return connection_free(conn), false;
+	pfds[conn->index].events =
+		(conn->input_used < conn->input_size ? POLLIN : 0) |
+		(conn->output_used || conn->state ? POLLOUT : 0);
+	return true;
+}
+
+static int open_local_server_socket(const char* path, int flags)
+{
+	size_t path_length = strlen(path);
+	size_t addr_size = offsetof(struct sockaddr_un, sun_path) + path_length + 1;
+	struct sockaddr_un* sockaddr = malloc(addr_size);
+	if ( !sockaddr )
+		return -1;
+	sockaddr->sun_family = AF_LOCAL;
+	strcpy(sockaddr->sun_path, path);
+	int fd = socket(AF_LOCAL, SOCK_STREAM | flags, 0);
+	if ( fd < 0 )
+		return free(sockaddr), -1;
+	if ( fchmod(fd, 0600) < 0 )
+		return close(fd), free(sockaddr), -1;
+	if ( bind(fd, (const struct sockaddr*) sockaddr, addr_size) < 0 )
+		return close(fd), free(sockaddr), -1;
+	if ( listen(fd, SOMAXCONN) < 0 )
+		return close(fd), free(sockaddr), -1;
+	free(sockaddr);
+	return fd;
+}
+
+static struct server* server_start(const char* path)
+{
+	if ( !communication_reserve(1) )
+		return NULL;
+	struct server* server = calloc(1, sizeof(struct server));
+	if ( !server )
+		return NULL;
+	server->fd = open_local_server_socket(path, SOCK_NONBLOCK | SOCK_CLOEXEC);
+	server->path = path;
+	if ( server->fd < 0 )
+	{
+		free(server);
+		return NULL;
+	}
+	struct communication comm;
+	comm.type = COMMUNICATION_TYPE_SERVER;
+	comm.index_ptr = &server->index;
+	comm.server = server;
+	communication_register(&comm, server->fd, POLLIN);
+	return server;
+}
+
+static bool server_on_event(struct server* server, int revents)
+{
+	if ( revents & POLLIN )
+	{
+		int fd = accept4(server->fd, NULL, NULL, SOCK_NONBLOCK | SOCK_CLOEXEC);
+		if ( 0 <= fd )
+		{
+			struct connection* conn = connection_new(fd);
+			if ( !conn )
+			{
+				warning("Failed to allocate connection: %s: %m", server->path);
+				close(fd);
+			}
+		}
+		else if ( errno != EAGAIN && errno != EWOULDBLOCK )
+			warning("accept: %s: %m", server->path);
+	}
+	return true;
+}
+
 static void init(void)
 {
 	int default_daemon_exit_code = -1;
@@ -2839,6 +3571,12 @@ static void init(void)
 				break;
 			case COMMUNICATION_TYPE_READY:
 				closed = daemon_on_ready_event(comm->daemon, pfd->revents);
+				break;
+			case COMMUNICATION_TYPE_SERVER:
+				closed = server_on_event(comm->server, pfd->revents);
+				break;
+			case COMMUNICATION_TYPE_CONNECTION:
+				closed = connection_on_event(comm->connection, pfd->revents);
 				break;
 			}
 			if ( closed )
@@ -3820,6 +4558,7 @@ int main(int argc, char* argv[])
 	     !(etc_init_path = join_paths(etc_path, "init")) ||
 	     !(share_init_path = join_paths(static_prefix, "share/init")) ||
 	     !(random_seed_path = join_paths(prefix, "boot/random.seed")) ||
+	     !(server_path = join_paths(run_path, "init")) ||
 	     !(chain_path = join_paths(tmp_path, "fs.XXXXXX")) ||
 	     !(chain_dev_path = join_paths(chain_path, "dev")) )
 		fatal("malloc: %m");
@@ -4078,6 +4817,9 @@ int main(int argc, char* argv[])
 	set_hostname();
 	set_kblayout();
 	set_videomode();
+
+	if ( !server_start(server_path) )
+		fatal("Failed to start init server: %s: %m", server_path);
 
 	// TODO: Use the arguments to specify additional things the default daemon
 	//       should depend on, as well as a denylist of things not to start

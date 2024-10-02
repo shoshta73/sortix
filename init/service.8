@@ -1,0 +1,392 @@
+.Dd May 24, 2024
+.Dt SERVICE 8
+.Os
+.Sh NAME
+.Nm service
+.Nd daemon maintenance
+.Sh SYNOPSIS
+.Nm service
+.Op Fl lr
+.Op Fl s Ar source-daemon
+.Op Fl \-exit-code
+.Op Fl \-list
+.Op Fl \-no-await
+.Op Fl \-no-optional
+.Op Fl \-raw
+.Op Fl \-source Ns "=" Ns Ar source-daemon
+.Ar daemon
+.Oo
+.Sy dependents
+|
+.Sy disable
+|
+.Sy edges
+|
+.Sy enable
+|
+.Sy exit-code
+|
+.Sy kill
+|
+.Sy pid
+|
+.Sy reconfigure
+|
+.Sy reload
+|
+.Sy requirements
+|
+.Sy restart
+|
+.Sy signal
+|
+.Sy start
+|
+.Sy state
+|
+.Sy status
+|
+.Sy stop
+|
+.Sy terminate
+.Oc
+.Sh DESCRIPTION
+.Nm
+performs maintenance of daemons run by
+.Xr init 8
+as configured in
+.Xr init 5 .
+The daemons are serviced by connecting to the
+.Nm init
+process and writing the requested command to the
+.Pa /var/run/init
+filesytem socket.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl s , Fl \-source-daemon Ns "=" Ns Ar source-daemon
+When modifying a dependency using the
+.Sy enable , disable , start
+and
+.Sy stop
+commands, use the
+.Ar source-daemon
+as the source daemon in the dependency on the target
+.Ar daemon .
+The default the
+.Sy local
+daemon which is the parent of the locally configured daemons.
+.It Fl \-exit-code
+Set the
+.Sy exit-code
+flag on the dependency created in the
+.Sy enable
+and
+.Sy start
+commands.
+.It Fl \-no-await
+Set the
+.Sy no-await
+flag on the dependency created in the
+.Sy enable
+and
+.Sy start
+commands.
+.It Fl \-no-optional
+Unset the
+.Sy optional
+flag on the dependency created in the
+.Sy enable
+and
+.Sy start
+commands.
+The default is to set the
+.Sy optional
+flag, which is the opposite of the
+.Xr init 5
+.Sy require
+declaration where dependencies are mandatory by default.
+.It Fl l , \-list
+Write a table containing the status of every loaded daemon in the format of the
+.Sy status
+command.
+.It Fl r , \-raw
+Write the command and additional operands as a raw message without verification
+on the
+.Nm init
+socket
+and output the raw reply sent from
+.Nm init.
+.El
+.Pp
+The commands are as follows:
+.Bl -tag -width "requirements"
+.It Sy dependents
+Write the incoming dependencies on the
+.Ar daemon
+in the format of the
+.Sy edges
+command, which explains why a daemon is running.
+.It Sy disable
+Permanently disable the
+.Ar daemon
+by removing the dependency on it from the configuration of the
+.Ar source-daemon
+(the
+.Sy local
+daemon by default, see
+.Xr init 5 )
+and then stopping it using the
+.Sy stop
+command.
+The daemon will continue to run if any other daemon depends on it, which can
+be diagnosed using the
+.Sy dependents
+command.
+.It Sy edges
+Write the incoming dependencies on the
+.Ar daemon
+and its outgoing dependencies in the format of the
+.Sy require
+declaration in
+.Xr init 5
+with an extra
+.Ar source
+operand:
+.Pp
+.Sy require
+.Ar source
+.Ar target
+[exit-code]
+[no-await]
+[optional]
+.It Sy enable
+Permanently enable the
+.Ar daemon
+by adding it to the configuration of the
+.Ar source-daemon
+(the
+.Sy local
+daemon by default, see
+.Xr init 5 )
+with the dependency flags per
+.Fl \-exit-code ,
+.Fl \-no-await ,
+and
+.Fl \-no-optional
+and starting it by sending the
+.Sy start
+command.
+The daemon only starts if the
+.Ar source-daemon
+is running.
+.It Sy exit-code
+Write the exit code of the
+.Ar daemon ,
+or the empty string if it has not exited.
+.It Sy kill
+Kill the
+.Ar daemon
+by sending the
+.Sy SIGKILL
+signal as a last resort that may cause data loss.
+.It Sy pid
+Write the process id of the
+.Ar daemon
+if it is running, or the empty output if it
+does not have a process.
+Process ids can be recycled and are subject to inherent race conditions.
+Prefer to use the other commands in
+.Nm
+that addresses the daemon by its symbolic name as
+.Xr init 8
+will ensure the command operates on the correct process.
+.It Sy reconfigure
+Reread the
+.Xr init 5
+configuration for the
+.Ar daemon
+and apply it after restarting the daemon.
+.It Sy reload
+Request the
+.Ar daemon
+gracefully reload its own configuration sending
+the reload signal (usually
+.Sy SIGHUP )
+without restarting the daemon and without reloading the
+.Xr init 5
+configuration.
+.It Sy requirements
+Write the outgoing dependencies from the
+.Ar daemon
+in the format of the
+.Sy edges
+command, which explains what daemons the daemon needs.
+.It Sy restart
+Restart the
+.Ar daemon
+by terminating it and starting it up again afterwards.
+.It Sy signal Ar signal
+Send the
+.Ar signal
+in the symbolic signal name format (e.g.
+.Sy SIGUSR1 )
+to the
+.Ar daemon .
+.It Sy start
+Start the
+.Ar daemon
+by asking
+.Xr init 8
+to add a runtime dependency from the
+.Ar source-daemon
+(the
+.Sy local
+daemon by default, see
+.Xr init 5 )
+to the daemon with the dependency flags per
+.Fl \-exit-code ,
+.Fl \-no-await ,
+and
+.Fl \-no-optional
+and starting it by sending the
+.Sy start
+command.
+The daemon only starts if the
+.Ar source-daemon
+is running.
+.It Sy state
+Write which the state the
+.Ar daemon
+is in.
+.It Sy status
+Write the status of the
+.Ar daemon
+as a single table row in the format:
+.Pp
+.Ar name
+.Ar state
+.Li pid Ns "=" Ns Ar pid
+.Li exit Ns "=" Ns Ar exit-code
+.Pp
+The
+.Ar state
+is one of
+.Sy terminated ,
+.Sy scheduled ,
+.Sy waiting ,
+.Sy satisfied ,
+.Sy starting ,
+.Sy running ,
+.Sy terminating ,
+.Sy finishing ,
+.Sy finished ,
+or
+.Sy failed .
+The
+.Ar pid
+is the process id if any, or
+.Li 0
+otherwise.
+The
+.Ar exit-code
+is the exit code of the daemon if it has exited, or the name of a signal that
+killed it, or
+.Li n/a
+if the daemon has not exited.
+.It Sy stop
+Stop the
+.Ar daemon
+by asking
+.Xr init 8
+to remove the dependency from the
+.Ar source-daemon
+(the
+.Sy local
+daemon by default, see
+.Xr init 5 )
+on the daemon.
+The daemon will continue to run as long if other daemon depends on it, which can
+be diagnosed using the
+.Sy dependents
+command.
+.It Sy terminate
+Terminate the
+.Ar daemon
+gracefully by sending the
+.Sy SIGTERM
+signal and
+.Sy SIGKILL
+after a timeout.
+Prefer the
+.Sy stop
+command if possible as the
+.Sy terminate
+command bypasses the reference count and may cause data loss if other daemons
+malfunction when the daemon is unexpectedly terminated.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width "INIT_SOCKET"
+.It Ev INIT_SOCKET
+.Xr init 8 Ns 's
+filesystem socket for communication,
+.Pa /var/run/init
+by default.
+.El
+.Sh FILES
+.Bl -tag -width "/etc/init/local" -compact
+.It Pa /etc/init/
+Daemon configuration for the local system (first in search path) (see
+.Xr init 5 )
+.It Pa /etc/init/local
+Configuration for the
+.Sy local
+daemon (see
+.Xr init 5 )
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+Permanently enable the sshd daemon:
+.Bd -literal
+$ service sshd enable
+.Ed
+.Pp
+Permanently disable the ntpd daemon:
+.Bd -literal
+$ service ntpd disable
+.Ed
+.Pp
+Temporarily start the nginx daemon without changing
+.Pa /etc/init/local :
+.Bd -literal
+$ service nginx start
+.Ed
+.Pp
+Temporarily disable the sshd daemon without changing
+.Pa /etc/init/local :
+.Bd -literal
+$ service sshd stop
+.Ed
+.Pp
+Temporarily stop the ntpd daemon and diagnose why it kept running due to the
+.Sy time
+daemon depending on it:
+.Bd -literal
+$ service ntpd stop
+$ service ntpd state
+running
+$ service ntpd dependents
+require time ntpd exit-code
+$ service --source-daemon=time ntpd stop
+$ service ntpd state
+finished
+.Ed
+.Sh SEE ALSO
+.Xr kill 1 ,
+.Xr init 5 ,
+.Xr halt 8 ,
+.Xr init 8 ,
+.Xr poweroff 8 ,
+.Xr reboot 8

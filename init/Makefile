@@ -8,26 +8,26 @@ CFLAGS?=$(OPTLEVEL)
 
 CFLAGS:=$(CFLAGS) -Wall -Wextra
 
-BINARY=init
+BINARIES=\
+init \
+service \
 
-OBJS=\
-init.o \
+MANPAGES8=\
+init.8 \
+service.8 \
 
-all: $(BINARY)
+all: $(BINARIES)
 
 .PHONY: all install clean
 
-$(BINARY): $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o $(BINARY) -lmount $(LIBS)
-
-%.o: %.c
-	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) -c $< -o $@
+%: %.c
+	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@ -lmount $(LIBS)
 
 install: all
 	mkdir -p $(DESTDIR)$(SBINDIR)
-	install $(BINARY) $(DESTDIR)$(SBINDIR)
+	install $(BINARIES) $(DESTDIR)$(SBINDIR)
 	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp init.8 $(DESTDIR)$(MANDIR)/man8/init.8
+	install $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
 clean:
-	rm -f $(BINARY) $(OBJS) *.o
+	rm -f $(BINARIES) $(OBJS) *.o
