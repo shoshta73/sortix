@@ -282,8 +282,10 @@ int sys_ppoll(struct pollfd* user_fds, size_t nfds,
 		Ref<Descriptor> desc = process->GetDescriptor(fds[reqs].fd);
 		if ( !desc )
 		{
-			self_woken = unexpected_error = true;
-			break;
+			node->revents = POLLNVAL;
+			reqs++;
+			self_woken = true;
+			continue;
 		}
 		node->events = fds[reqs].events | POLL__ONLY_REVENTS;
 		node->revents = 0;
