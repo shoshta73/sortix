@@ -138,11 +138,17 @@ struct dependency
 	struct daemon* source;
 	struct daemon* target;
 	int flags;
+	int status;
 };
 
 #define DEPENDENCY_FLAG_REQUIRE (1 << 0)
 #define DEPENDENCY_FLAG_AWAIT (1 << 1)
 #define DEPENDENCY_FLAG_EXIT_CODE (1 << 2)
+
+#define DEPENDENCY_STATUS_REFERENCED (1 << 0)
+#define DEPENDENCY_STATUS_READY (1 << 1)
+#define DEPENDENCY_STATUS_FINISHED (1 << 2)
+#define DEPENDENCY_STATUS_FAILED (1 << 3)
 
 enum log_method
 {
@@ -231,7 +237,9 @@ struct daemon
 	bool need_tty;
 	bool was_ready;
 	bool was_terminated;
-	bool was_dereferenced;
+	bool want_reconfigure;
+	bool want_reload;
+	bool want_restart;
 	bool timeout_set;
 };
 
@@ -612,6 +620,16 @@ static bool log_initialize(struct log* log,
 	return true;
 }
 
+static void log_deinitialize(struct log* log)
+{
+	free(log->name);
+	free(log->path);
+	free(log->path_src);
+	free(log->path_dst);
+	memset(log, 0, sizeof(*log));
+	log->fd = -1;
+}
+
 static bool log_begin_buffer(struct log* log)
 {
 	log->buffer_used = 0;
@@ -875,10 +893,22 @@ static void log_status(const char* status, const char* format, ...)
 		fprintf(stderr, "[\e[91mFAILED\e[m] ");
 	else if ( !strcmp(status, "stopping") )
 		fprintf(stderr, "[      ] ");
+	else if ( !strcmp(status, "killing") )
+		fprintf(stderr, "[      ] ");
+	else if ( !strcmp(status, "reconfigure") )
+		fprintf(stderr, "[      ] ");
+	else if ( !strcmp(status, "reconfiguring") )
+		fprintf(stderr, "[      ] ");
+	else if ( !strcmp(status, "restart") )
+		fprintf(stderr, "[      ] ");
+	else if ( !strcmp(status, "restarting") )
+		fprintf(stderr, "[      ] ");
 	else if ( !strcmp(status, "stopped") )
 		fprintf(stderr, "[  \e[92mOK\e[m  ] ");
 	else if ( !strcmp(status, "timeout") )
 		fprintf(stderr, "[\e[93m TIME \e[m] ");
+	else if ( !strcmp(status, "signal") )
+		fprintf(stderr, "[SIGNAL] ");
 	else
 		fprintf(stderr, "[  ??  ] ");
 	vfprintf(stderr, format, ap);
@@ -1804,9 +1834,9 @@ static struct daemon* daemon_create_unconfigured(const char* name)
 	return daemon;
 }
 
-static bool daemon_add_dependency(struct daemon* daemon,
-                                  struct daemon* target,
-                                  int flags)
+static struct dependency* daemon_add_dependency(struct daemon* daemon,
+                                                struct daemon* target,
+                                                int flags)
 {
 	struct dependency* dependency = calloc(1, sizeof(struct dependency));
 	if ( !dependency )
@@ -1833,8 +1863,49 @@ static bool daemon_add_dependency(struct daemon* daemon,
 	}
 	if ( flags & DEPENDENCY_FLAG_EXIT_CODE )
 		daemon->exit_code_from = dependency;
-	target->reference_count++;
-	return true;
+	return dependency;
+}
+
+static void daemon_unconfigure(struct daemon* daemon)
+{
+	assert(daemon->state == DAEMON_STATE_TERMINATED ||
+	       daemon->state == DAEMON_STATE_FINISHED);
+	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
+	{
+		struct dependency* dependency = daemon->dependencies[i];
+		assert(dependency->status == 0);
+		struct daemon* target = dependency->target;
+		for ( size_t n = 0; n < target->dependents_used; n++ )
+		{
+			if ( target->dependents[n] != dependency )
+				continue;
+			size_t last = --target->dependents_used;
+			if ( n != last  )
+				target->dependents[n] = target->dependents[last];
+			break;
+		}
+		free(dependency);
+	}
+	free(daemon->dependencies);
+	daemon->dependencies = NULL;
+	daemon->dependencies_used = 0;
+	daemon->dependencies_length = 0;
+	daemon->dependencies_ready = 0;
+	daemon->dependencies_finished = 0;
+	daemon->dependencies_failed = 0;
+	daemon->exit_code_from = NULL;
+	free(daemon->cd);
+	daemon->cd = NULL;
+	for ( int i = 0; i < daemon->argc; i++ )
+		free(daemon->argv[i]);
+	free(daemon->argv);
+	log_deinitialize(&daemon->log);
+	daemon->exit_code_meaning = EXIT_CODE_MEANING_DEFAULT;
+	daemon->type = TYPE_DAEMON;
+	daemon->echo = false;
+	daemon->need_tty = false;
+	daemon->configured = false;
+	daemon->want_reconfigure = false;
 }
 
 static void daemon_configure_sub(struct daemon* daemon,
@@ -1916,17 +1987,19 @@ static void daemon_configure(struct daemon* daemon,
 			              daemon_config->name, netif) < 0 )
 				fatal("malloc: %m");
 			struct daemon* parameterized =
-				daemon_create_unconfigured(parameterized_name);
+				daemon_find_by_name(parameterized_name);
+			if ( !parameterized )
+				parameterized = daemon_create_unconfigured(parameterized_name);
 			free(parameterized_name);
-			if ( !(parameterized->netif = strdup(netif)) )
-				fatal("malloc: %m");
-			char* name_clone = strdup(parameterized->name);
-			if ( !name_clone )
-				fatal("malloc: %m");
+			if ( !parameterized->configured )
+			{
+				if ( !(parameterized->netif = strdup(netif)) )
+					fatal("malloc: %m");
+				daemon_configure_sub(parameterized, daemon_config, netif);
+			}
 			int flags = DEPENDENCY_FLAG_REQUIRE | DEPENDENCY_FLAG_AWAIT;
 			if ( !daemon_add_dependency(daemon, parameterized, flags) )
 				fatal("malloc: %m");
-			daemon_configure_sub(parameterized, daemon_config, netif);
 		}
 		if_freenameindex(ifs);
 		daemon->configured = true;
@@ -1942,10 +2015,29 @@ static struct daemon* daemon_create(struct daemon_config* daemon_config)
 	return daemon;
 }
 
-static void schedule_daemon(struct daemon* daemon)
+static void daemon_schedule(struct daemon* daemon)
 {
 	assert(daemon->state == DAEMON_STATE_TERMINATED);
 	daemon_change_state_list(daemon, DAEMON_STATE_SCHEDULED);
+}
+
+static void daemon_reset_dependency(struct dependency* dependency)
+{
+	if ( dependency->status & DEPENDENCY_STATUS_READY )
+	{
+		dependency->source->dependencies_ready--;
+		dependency->status &= ~(DEPENDENCY_STATUS_READY);
+	}
+	if ( dependency->status & DEPENDENCY_STATUS_FINISHED )
+	{
+		dependency->source->dependencies_finished--;
+		dependency->status &= ~(DEPENDENCY_STATUS_FINISHED);
+	}
+	if ( dependency->status & DEPENDENCY_STATUS_FAILED )
+	{
+		dependency->source->dependencies_failed--;
+		dependency->status &= ~(DEPENDENCY_STATUS_FAILED);
+	}
 }
 
 static void daemon_on_finished(struct daemon* daemon)
@@ -1963,12 +2055,20 @@ static void daemon_on_finished(struct daemon* daemon)
 
 static void daemon_terminate(struct daemon* daemon)
 {
-	assert(!daemon->was_terminated);
+	if ( daemon->state != DAEMON_STATE_SCHEDULED &&
+	     daemon->state != DAEMON_STATE_SATISFIED &&
+	     daemon->state != DAEMON_STATE_STARTING &&
+	     daemon->state != DAEMON_STATE_RUNNING )
+		return;
+	if ( daemon->was_terminated )
+		return;
 	daemon->was_terminated = true;
+	daemon->want_restart = false;
+	daemon->want_reload = false;
 	daemon_change_state_list(daemon, DAEMON_STATE_TERMINATING);
 	if ( 0 < daemon->pid )
 	{
-		log_status("stopping", "Stopping %s.\n", daemon->name);
+		log_status("stopping", "Stopping %s...\n", daemon->name);
 		kill(daemon->pid, SIGTERM);
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
@@ -1979,12 +2079,30 @@ static void daemon_terminate(struct daemon* daemon)
 		daemon_on_finished(daemon);
 }
 
+static void daemon_reload(struct daemon* daemon)
+{
+	if ( daemon->state == DAEMON_STATE_STARTING )
+		daemon->want_reload = true;
+	else if ( daemon->state == DAEMON_STATE_RUNNING )
+	{
+		if ( 0 < daemon->pid )
+		{
+			log_status("reload", "Reloading %s.\n", daemon->name);
+			kill(daemon->pid, SIGHUP); // TODO: Configuration.
+		}
+		daemon->want_reload = false;
+	}
+}
+
 static void daemon_on_not_referenced(struct daemon* daemon)
 {
 	assert(daemon->reference_count == 0);
+	daemon->want_restart = false;
+	daemon->want_reload = false;
 	switch ( daemon->state )
 	{
 	case DAEMON_STATE_TERMINATED:
+		break;
 	case DAEMON_STATE_SCHEDULED:
 	case DAEMON_STATE_WAITING:
 	case DAEMON_STATE_SATISFIED:
@@ -2011,26 +2129,44 @@ static void daemon_dereference(struct daemon* daemon)
 		daemon_on_not_referenced(daemon);
 }
 
-static void daemon_dereference_dependencies(struct daemon* daemon)
+static void daemon_dereference_dependency(struct dependency* dependency)
 {
-	assert(!daemon->was_dereferenced);
-	daemon->was_dereferenced = true;
-	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
-		daemon_dereference(daemon->dependencies[i]->target);
+	if ( dependency->status & DEPENDENCY_STATUS_REFERENCED )
+	{
+		daemon_reset_dependency(dependency);
+		daemon_dereference(dependency->target);
+		dependency->status &= ~(DEPENDENCY_STATUS_REFERENCED);
+	}
+	else
+		assert(dependency->status == 0);
 }
 
-static void daemon_on_dependency_ready(struct dependency* dependency)
+static void daemon_dereference_dependencies(struct daemon* daemon)
 {
-	struct daemon* daemon = dependency->source;
-	daemon->dependencies_ready++;
+	for ( size_t i = 0; i < daemon->dependencies_used; i++ )
+		daemon_dereference_dependency(daemon->dependencies[i]);
+}
+
+static void daemon_consider_satisfied(struct daemon* daemon)
+{
 	if ( daemon->state == DAEMON_STATE_WAITING &&
 	     daemon->dependencies_ready == daemon->dependencies_used )
 		daemon_change_state_list(daemon, DAEMON_STATE_SATISFIED);
 }
 
+static void daemon_on_dependency_ready(struct dependency* dependency)
+{
+	struct daemon* daemon = dependency->source;
+	if ( !(dependency->status & DEPENDENCY_STATUS_READY) )
+	{
+		daemon->dependencies_ready++;
+		dependency->status |= DEPENDENCY_STATUS_READY;
+	}
+	daemon_consider_satisfied(daemon);
+}
+
 static void daemon_mark_ready(struct daemon* daemon)
 {
-	daemon_change_state_list(daemon, DAEMON_STATE_RUNNING);
 	daemon->was_ready = true;
 	for ( size_t i = 0; i < daemon->dependents_used; i++ )
 	{
@@ -2042,6 +2178,9 @@ static void daemon_mark_ready(struct daemon* daemon)
 static void daemon_on_ready(struct daemon* daemon)
 {
 	log_status("started", "Started %s.\n", daemon->name);
+	daemon_change_state_list(daemon, DAEMON_STATE_RUNNING);
+	if ( daemon->want_reload )
+		daemon_reload(daemon);
 	daemon_mark_ready(daemon);
 }
 
@@ -2049,14 +2188,23 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 {
 	struct daemon* daemon = dependency->source;
 	struct daemon* target = dependency->target;
-	daemon->dependencies_finished++;
-	if ( daemon->state == DAEMON_STATE_FINISHING ||
-	     daemon->state == DAEMON_STATE_FINISHED )
+	if ( target->state != DAEMON_STATE_FINISHED )
 		return;
 	bool failed = (dependency->flags & DEPENDENCY_FLAG_REQUIRE) &&
 	              daemon_is_failed(target);
-	if ( failed )
+	if ( !(dependency->status & DEPENDENCY_STATUS_FINISHED) )
+	{
+		daemon->dependencies_finished++;
+		dependency->status |= DEPENDENCY_STATUS_FINISHED;
+	}
+	if ( failed && !(dependency->status & DEPENDENCY_STATUS_FAILED) )
+	{
 		daemon->dependencies_failed++;
+		dependency->status |= DEPENDENCY_STATUS_FAILED;
+	}
+	if ( daemon->state == DAEMON_STATE_FINISHING ||
+	     daemon->state == DAEMON_STATE_FINISHED )
+		return;
 	// Don't stop a running non-virtual daemon if dependencies failed.
 	if ( daemon->argv &&
 	    (daemon->state == DAEMON_STATE_STARTING ||
@@ -2079,15 +2227,48 @@ static void daemon_on_dependency_finished(struct dependency* dependency)
 		daemon_on_finished(daemon);
 }
 
-static void daemon_finish(struct daemon* daemon)
+static void daemon_reset(struct daemon* daemon, enum daemon_state new_state)
 {
-	assert(daemon->state != DAEMON_STATE_FINISHED);
-	if ( !daemon->was_ready )
-		daemon_mark_ready(daemon);
-	daemon_change_state_list(daemon, DAEMON_STATE_FINISHED);
+	assert(new_state == DAEMON_STATE_TERMINATED ||
+	       new_state == DAEMON_STATE_FINISHED);
+	daemon_change_state_list(daemon, new_state);
 	for ( size_t i = 0; i < daemon->dependents_used; i++ )
-		daemon_on_dependency_finished(daemon->dependents[i]);
-	daemon_dereference_dependencies(daemon);
+	{
+		if ( new_state == DAEMON_STATE_TERMINATED )
+			daemon_reset_dependency(daemon->dependents[i]);
+		else if ( new_state == DAEMON_STATE_FINISHED )
+			daemon_on_dependency_finished(daemon->dependents[i]);
+	}
+	daemon->was_ready = false;
+	daemon->was_terminated = false;
+	daemon->timeout_set = false;
+}
+
+static void daemon_request_restart(struct daemon* daemon)
+{
+	if ( !daemon->reference_count )
+		return;
+	if ( daemon->state == DAEMON_STATE_SCHEDULED ||
+	     daemon->state == DAEMON_STATE_WAITING ||
+	     daemon->state == DAEMON_STATE_SATISFIED )
+		return;
+	if ( !daemon->want_restart )
+	{
+		log_status("restart", "Restart requested of %s.\n", daemon->name);
+		if ( daemon->state == DAEMON_STATE_STARTING ||
+		     daemon->state == DAEMON_STATE_RUNNING )
+			daemon_terminate(daemon);
+		daemon->want_restart = true;
+	}
+	if ( daemon->state == DAEMON_STATE_TERMINATED ||
+	     daemon->state == DAEMON_STATE_FINISHED )
+	{
+		log_status("restarting", "Restarting %s.\n", daemon->name);
+		daemon_reset(daemon, DAEMON_STATE_TERMINATED);
+		daemon->want_restart = false;
+	}
+	if ( daemon->state == DAEMON_STATE_TERMINATED )
+		daemon_schedule(daemon);
 }
 
 static void daemon_on_startup_error(struct daemon* daemon)
@@ -2095,25 +2276,141 @@ static void daemon_on_startup_error(struct daemon* daemon)
 	assert(daemon->state != DAEMON_STATE_FINISHING);
 	assert(daemon->state != DAEMON_STATE_FINISHED);
 	daemon_change_state_list(daemon, DAEMON_STATE_FINISHING);
+	if ( daemon->want_restart )
+		daemon_request_restart(daemon);
+}
+
+static bool daemon_load_and_configure(struct daemon* daemon)
+{
+	assert(!daemon->configured);
+	struct daemon_config* daemon_config = daemon_config_load(daemon->name);
+	if ( !daemon_config )
+	{
+		log_status("failed", "Failed to load configuration for %s.\n",
+		           daemon->name);
+		daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
+		daemon->want_restart = false;
+		daemon_on_startup_error(daemon);
+		return false;
+	}
+	daemon_configure(daemon, daemon_config);
+	daemon_config_free(daemon_config);
+	return true;
+}
+
+static void daemon_reconfigure(struct daemon* daemon)
+{
+	assert(!daemon->netif);
+	assert(daemon->state == DAEMON_STATE_TERMINATED ||
+	       daemon->state == DAEMON_STATE_FINISHED);
+	log_status("reconfiguring", "Reconfiguring %s.\n", daemon->name);
+	daemon_unconfigure(daemon);
+	daemon_load_and_configure(daemon);
+}
+
+static void daemon_on_referenced(struct daemon* daemon)
+{
+	switch ( daemon->state )
+	{
+	case DAEMON_STATE_TERMINATED:
+		daemon_schedule(daemon);
+		break;
+	case DAEMON_STATE_SCHEDULED:
+	case DAEMON_STATE_WAITING:
+	case DAEMON_STATE_SATISFIED:
+	case DAEMON_STATE_STARTING:
+	case DAEMON_STATE_RUNNING:
+		break;
+	case DAEMON_STATE_TERMINATING:
+	case DAEMON_STATE_FINISHING:
+		if ( daemon->type == TYPE_DAEMON )
+			daemon_request_restart(daemon);
+		break;
+	case DAEMON_STATE_FINISHED:
+		break;
+	}
+}
+
+static void daemon_reference(struct daemon* daemon)
+{
+	daemon->reference_count++;
+	if ( daemon->reference_count == 1 )
+		daemon_on_referenced(daemon);
+}
+
+static void daemon_reference_dependency(struct dependency* dependency)
+{
+	if ( !(dependency->status & DEPENDENCY_STATUS_REFERENCED) )
+	{
+		assert(dependency->status == 0);
+		daemon_reference(dependency->target);
+		dependency->status |= DEPENDENCY_STATUS_REFERENCED;
+	}
+}
+
+static void daemon_wait_dependency(struct dependency* dependency)
+{
+	daemon_reference_dependency(dependency);
+	switch ( dependency->target->state )
+	{
+	case DAEMON_STATE_TERMINATED:
+	case DAEMON_STATE_SCHEDULED:
+	case DAEMON_STATE_WAITING:
+	case DAEMON_STATE_SATISFIED:
+	case DAEMON_STATE_STARTING:
+		if ( !(dependency->flags & DEPENDENCY_FLAG_AWAIT) )
+			daemon_on_dependency_ready(dependency);
+		break;
+	case DAEMON_STATE_RUNNING:
+		daemon_on_dependency_ready(dependency);
+		break;
+	case DAEMON_STATE_TERMINATING:
+	case DAEMON_STATE_FINISHING:
+		if ( dependency->target->type == TYPE_ONESHOT )
+			daemon_on_dependency_ready(dependency);
+		else if ( !(dependency->flags & DEPENDENCY_FLAG_AWAIT) )
+			daemon_on_dependency_ready(dependency);
+		break;
+	case DAEMON_STATE_FINISHED:
+		daemon_on_dependency_ready(dependency);
+		daemon_on_dependency_finished(dependency);
+		break;
+	}
+}
+
+static void daemon_finish(struct daemon* daemon)
+{
+	assert(daemon->state == DAEMON_STATE_FINISHING);
+	if ( !daemon->was_ready )
+		daemon_mark_ready(daemon);
+	enum daemon_state new_state =
+		daemon->type == TYPE_ONESHOT ||
+		daemon->exit_code_meaning == EXIT_CODE_MEANING_POWEROFF_REBOOT ||
+		(daemon->type == TYPE_DAEMON && !daemon->was_terminated &&
+		 daemon->exit_code_meaning == EXIT_CODE_MEANING_DEFAULT &&
+		 WIFEXITED(daemon->exit_code) && WEXITSTATUS(daemon->exit_code) == 0) ||
+		daemon_is_failed(daemon) ||
+		daemon->exit_code_from ?
+		DAEMON_STATE_FINISHED : DAEMON_STATE_TERMINATED;
+	daemon_reset(daemon, new_state);
+	if ( daemon->want_reconfigure )
+	{
+		daemon_dereference_dependencies(daemon);
+		daemon_reconfigure(daemon);
+	}
+	if ( daemon->want_restart )
+	{
+		daemon_request_restart(daemon);
+		return;
+	}
+	daemon_dereference_dependencies(daemon);
 }
 
 static void daemon_wait(struct daemon* daemon)
 {
 	assert(daemon->state == DAEMON_STATE_SCHEDULED);
-	if ( !daemon->configured )
-	{
-		struct daemon_config* daemon_config = daemon_config_load(daemon->name);
-		if ( !daemon_config )
-		{
-			log_status("failed", "Failed to load configuration for %s.\n",
-			           daemon->name);
-			daemon->exit_code = WCONSTRUCT(WNATURE_EXITED, 3, 0);
-			daemon_on_startup_error(daemon);
-			return;
-		}
-		daemon_configure(daemon, daemon_config);
-		daemon_config_free(daemon_config);
-	}
+	if ( !daemon->configured && !daemon_load_and_configure(daemon) )
+		return;
 	if ( daemon->dependencies_ready == daemon->dependencies_used )
 		daemon_change_state_list(daemon, DAEMON_STATE_SATISFIED);
 	else
@@ -2124,31 +2421,7 @@ static void daemon_wait(struct daemon* daemon)
 		struct dependency* dependency = daemon->dependencies[i];
 		assert(dependency->source == daemon);
 		assert(dependency->target);
-
-		switch ( dependency->target->state )
-		{
-		case DAEMON_STATE_TERMINATED:
-			schedule_daemon(dependency->target);
-			if ( !(dependency->flags & DEPENDENCY_FLAG_AWAIT) )
-				daemon_on_dependency_ready(dependency);
-			break;
-		case DAEMON_STATE_SCHEDULED:
-		case DAEMON_STATE_WAITING:
-		case DAEMON_STATE_SATISFIED:
-		case DAEMON_STATE_STARTING:
-			if ( !(dependency->flags & DEPENDENCY_FLAG_AWAIT) )
-				daemon_on_dependency_ready(dependency);
-			break;
-		case DAEMON_STATE_RUNNING:
-		case DAEMON_STATE_TERMINATING:
-		case DAEMON_STATE_FINISHING:
-			daemon_on_dependency_ready(dependency);
-			break;
-		case DAEMON_STATE_FINISHED:
-			daemon_on_dependency_ready(dependency);
-			daemon_on_dependency_finished(dependency);
-			break;
-		}
+		daemon_wait_dependency(dependency);
 		if ( daemon->state != DAEMON_STATE_WAITING )
 			break;
 	}
@@ -2405,6 +2678,7 @@ static void daemon_on_exit(struct daemon* daemon, int exit_code)
 {
 	assert(daemon->state != DAEMON_STATE_FINISHING);
 	assert(daemon->state != DAEMON_STATE_FINISHED);
+	daemon->pid = 0;
 	daemon->exit_code = exit_code;
 	if ( 0 <= daemon->readyfd )
 	{
@@ -2466,6 +2740,9 @@ static void init(void)
 				                         DAEMON_STATE_FINISHING);
 			default_daemon_exit_code =
 				WCONSTRUCT(WNATURE_EXITED, caught_exit_signal, 0);
+			default_daemon->exit_code = default_daemon_exit_code;
+			default_daemon->exit_code_meaning =
+				EXIT_CODE_MEANING_POWEROFF_REBOOT;
 		}
 		caught_exit_signal = -1;
 
@@ -3808,7 +4085,7 @@ int main(int argc, char* argv[])
 	//       be able to inject require and unset require lines into default.
 
 	// Request the default daemon be run.
-	schedule_daemon(default_daemon);
+	daemon_schedule(default_daemon);
 
 	// Initialize the operating system.
 	init();
