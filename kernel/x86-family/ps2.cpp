@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -311,7 +312,7 @@ void Init(PS2Device* keyboard, PS2Device* mouse)
 		return;
 	config &= ~REG_CONFIG_FIRST_INTERRUPT;
 	config &= ~REG_CONFIG_SECOND_INTERRUPT;
-	//config &= ~REG_CONFIG_FIRST_TRANSLATION; // TODO: Not ready for this yet.
+	config &= ~REG_CONFIG_FIRST_TRANSLATION;
 	if ( !TryWriteCommand(REG_COMMAND_WRITE_RAM) ||
 	     !TryWriteByte(config) )
 		return;

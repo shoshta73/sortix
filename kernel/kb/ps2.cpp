@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,18 +31,18 @@
 
 #include "ps2.h"
 
-// TODO: This driver doesn't deal with keyboard scancode sets yet.
-
 namespace Sortix {
 
 static const uint8_t DEVICE_RESET_OK = 0xAA;
 static const uint8_t DEVICE_SCANCODE_ESCAPE = 0xE0;
+static const uint8_t DEVICE_SCANCODE_RELEASE = 0xF0;
 static const uint8_t DEVICE_ECHO = 0xEE;
 static const uint8_t DEVICE_ACK = 0xFA;
 static const uint8_t DEVICE_RESEND = 0xFE;
 static const uint8_t DEVICE_ERROR = 0xFF;
 
 static const uint8_t DEVICE_CMD_SET_LED = 0xED;
+static const uint8_t DEVICE_CMD_SCANCODE_SET = 0xF0;
 static const uint8_t DEVICE_CMD_SET_TYPEMATIC = 0xF3;
 static const uint8_t DEVICE_CMD_ENABLE_SCAN = 0xF4;
 static const uint8_t DEVICE_CMD_DISABLE_SCAN = 0xF5;
@@ -53,6 +54,181 @@ static const uint8_t DEVICE_LED_NUMLCK = 1 << 1;
 static const uint8_t DEVICE_LED_CAPSLCK = 1 << 2;
 
 static const size_t DEVICE_RETRIES = 5;
+
+static const unsigned char unescaped_translation[256] =
+{
+	// 0x00
+	0,
+	KBKEY_F9,
+	0,
+	KBKEY_F5,
+	KBKEY_F3,
+	KBKEY_F1,
+	KBKEY_F2,
+	KBKEY_F12,
+	0,
+	KBKEY_F10,
+	KBKEY_F8,
+	KBKEY_F6,
+	KBKEY_F4,
+	KBKEY_TAB,
+	KBKEY_SYM7,
+	0,
+	// 0x10
+	0,
+	KBKEY_LALT,
+	KBKEY_LSHIFT,
+	0,
+	KBKEY_LCTRL,
+	KBKEY_Q,
+	KBKEY_NUM1,
+	0, 0, 0,
+	KBKEY_Z,
+	KBKEY_S,
+	KBKEY_A,
+	KBKEY_W,
+	KBKEY_NUM2,
+	0,
+	// 0x20
+	0,
+	KBKEY_C,
+	KBKEY_X,
+	KBKEY_D,
+	KBKEY_E,
+	KBKEY_NUM4,
+	KBKEY_NUM3,
+	0, 0,
+	KBKEY_SPACE,
+	KBKEY_V,
+	KBKEY_F,
+	KBKEY_T,
+	KBKEY_R,
+	KBKEY_NUM5,
+	0,
+	// 0x30
+	0,
+	KBKEY_N,
+	KBKEY_B,
+	KBKEY_H,
+	KBKEY_G,
+	KBKEY_Y,
+	KBKEY_NUM6,
+	0, 0, 0,
+	KBKEY_M,
+	KBKEY_J,
+	KBKEY_U,
+	KBKEY_NUM7,
+	KBKEY_NUM8,
+	0,
+	// 0x40
+	0,
+	KBKEY_SYM9,
+	KBKEY_K,
+	KBKEY_I,
+	KBKEY_O,
+	KBKEY_NUM0,
+	KBKEY_NUM9,
+	0, 0,
+	KBKEY_SYM10,
+	KBKEY_SYM11,
+	KBKEY_L,
+	KBKEY_SYM5,
+	KBKEY_P,
+	KBKEY_SYM1,
+	0,
+	// 0x50
+	0, 0,
+	KBKEY_SYM6,
+	0,
+	KBKEY_SYM3,
+	KBKEY_SYM2,
+	0, 0,
+	KBKEY_CAPSLOCK,
+	KBKEY_RSHIFT,
+	KBKEY_ENTER,
+	KBKEY_SYM4,
+	0,
+	KBKEY_SYM8,
+	0,
+	0,
+	// 0x60
+	0,
+	KBKEY_NO_STANDARD_MEANING_2,
+	0, 0, 0, 0,
+	KBKEY_BKSPC,
+	0, 0,
+	KBKEY_KPAD1,
+	0,
+	KBKEY_KPAD4,
+	KBKEY_KPAD7,
+	0, 0, 0,
+	// 0x70
+	KBKEY_KPAD0,
+	KBKEY_SYM15,
+	KBKEY_KPAD2,
+	KBKEY_KPAD5,
+	KBKEY_KPAD6,
+	KBKEY_KPAD8,
+	KBKEY_ESC,
+	KBKEY_NUMLOCK,
+	KBKEY_F11,
+	KBKEY_SYM14,
+	KBKEY_KPAD3,
+	KBKEY_SYM13,
+	KBKEY_SYM12,
+	KBKEY_KPAD9,
+	KBKEY_SCROLLLOCK,
+	0,
+	// 0x80
+	0, 0, 0,
+	KBKEY_F7,
+};
+
+static const unsigned char escaped_translation[256] =
+{
+	// 0xE0 0x00
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	// 0xE0 0x10
+	0,
+	KBKEY_RALT,
+	0, 0,
+	KBKEY_RCTRL,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	KBKEY_LSUPER,
+	// 0xE0 0x20
+	0, 0, 0, 0, 0, 0, 0,
+	KBKEY_RSUPER,
+	0, 0, 0, 0, 0, 0, 0,
+	KBKEY_MENU,
+	// 0xE0 0x30
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	// 0xE0 0x40
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	KBKEY_SYM16,
+	0, 0, 0, 0, 0,
+	// 0xE0 0x50
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	KBKEY_KPADENTER,
+	0, 0, 0, 0, 0,
+	// 0xE0 0x60
+	0, 0, 0, 0, 0, 0, 0, 0, 0,
+	KBKEY_END,
+	0,
+	KBKEY_LEFT,
+	KBKEY_HOME,
+	0, 0, 0,
+	// 0xE0 0x70
+	KBKEY_INSERT,
+	KBKEY_DELETE,
+	KBKEY_DOWN,
+	0,
+	KBKEY_RIGHT,
+	KBKEY_UP,
+	0, 0, 0, 0,
+	KBKEY_PGDOWN,
+	0, 0,
+	KBKEY_PGUP,
+};
 
 PS2Keyboard::PS2Keyboard()
 {
@@ -123,6 +299,19 @@ void PS2Keyboard::PS2DeviceOnByte(uint8_t byte)
 			     send(send_ctx, typematic) )
 				return;
 		}
+		state = STATE_SET_SCANCODE_SET;
+		tries = DEVICE_RETRIES;
+		byte = DEVICE_RESEND;
+	}
+
+	if ( state == STATE_SET_SCANCODE_SET )
+	{
+		if ( byte == DEVICE_RESEND && tries-- )
+		{
+			if ( send(send_ctx, DEVICE_CMD_SCANCODE_SET) &&
+			     send(send_ctx, 2) )
+				return;
+		}
 		state = STATE_ENABLE_SCAN;
 		tries = DEVICE_RETRIES;
 		byte = DEVICE_RESEND;
@@ -143,26 +332,43 @@ void PS2Keyboard::PS2DeviceOnByte(uint8_t byte)
 	if ( byte == DEVICE_RESEND || byte == DEVICE_ACK )
 		return;
 
-	if ( byte == DEVICE_SCANCODE_ESCAPE )
+	if ( state == STATE_NORMAL && byte == DEVICE_SCANCODE_ESCAPE )
 	{
 		state = STATE_NORMAL_ESCAPED;
 		return;
 	}
-
-	if ( state == STATE_NORMAL )
+	else if ( state == STATE_NORMAL && byte == DEVICE_SCANCODE_RELEASE)
 	{
-		int kbkey = byte & 0x7F;
-		OnKeyboardKey(byte & 0x80 ? -kbkey : kbkey);
-		lock.Reset();
-		NotifyOwner();
+		state = STATE_NORMAL_RELEASED;
+		return;
+	}
+	else if ( state == STATE_NORMAL_ESCAPED && byte == DEVICE_SCANCODE_RELEASE )
+	{
+		state = STATE_NORMAL_ESCAPED_RELEASED;
 		return;
 	}
 
-	if ( state == STATE_NORMAL_ESCAPED )
+	if ( state == STATE_NORMAL ||
+	     state == STATE_NORMAL_RELEASED ||
+	     state == STATE_NORMAL_ESCAPED ||
+	     state == STATE_NORMAL_ESCAPED_RELEASED )
 	{
+		switch ( state )
+		{
+		case STATE_NORMAL:
+			OnKeyboardKey(unescaped_translation[byte]);
+			break;
+		case STATE_NORMAL_RELEASED:
+			OnKeyboardKey(-unescaped_translation[byte]);
+			break;
+		case STATE_NORMAL_ESCAPED:
+			OnKeyboardKey(escaped_translation[byte]);
+			break;
+		case STATE_NORMAL_ESCAPED_RELEASED:
+			OnKeyboardKey(-escaped_translation[byte]);
+			break;
+		}
 		state = STATE_NORMAL;
-		int kbkey = (byte & 0x7F) + 0x80;
-		OnKeyboardKey(byte & 0x80 ? -kbkey : kbkey);
 		lock.Reset();
 		NotifyOwner();
 		return;
