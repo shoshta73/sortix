@@ -68,7 +68,7 @@ static int get_init_exit_plan(void)
 void display_exit(struct display* display, int exit_code)
 {
 	display->running = false;
-	display->exit_code = exit_code;
+	display->exit_code = exit_code == -1 ? 0 : exit_code;
 	int plan = exit_code == -1 ? get_init_exit_plan() : exit_code;
 	display->announcement = "Exiting...";
 	if ( plan == 0 )
