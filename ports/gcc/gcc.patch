@@ -148,11 +148,12 @@ diff -Paur --no-dereference -- gcc.upstream/gcc/config/sortix.h gcc/gcc/config/s
 diff -Paur --no-dereference -- gcc.upstream/gcc/config.gcc gcc/gcc/config.gcc
 --- gcc.upstream/gcc/config.gcc
 +++ gcc/gcc/config.gcc
-@@ -970,6 +970,13 @@
+@@ -970,6 +970,14 @@
        ;;
    esac
    ;;
 +*-*-sortix*)
++  extra_options="$extra_options gnu-user.opt"
 +  gas=yes
 +  gnu_ld=yes
 +  default_use_cxa_atexit=no
@@ -162,7 +163,7 @@ diff -Paur --no-dereference -- gcc.upstream/gcc/config.gcc gcc/gcc/config.gcc
  *-*-netbsd*)
    tm_p_file="${tm_p_file} netbsd-protos.h"
    tmake_file="t-netbsd t-slibgcc"
-@@ -2080,6 +2087,14 @@
+@@ -2080,6 +2088,14 @@
  	done
  	TM_MULTILIB_CONFIG=`echo $TM_MULTILIB_CONFIG | sed 's/^,//'`
  	;;
