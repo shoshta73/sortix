@@ -560,6 +560,7 @@ void TCPSocket::Close() // tcp_lock taken
 	state = TCP_STATE_CLOSED;
 	kthread_cond_broadcast(&transmit_cond);
 	kthread_cond_broadcast(&receive_cond);
+	poll_channel.Signal(PollEventStatus());
 	deadline = timespec_make(-1, 0);
 	SetTimer();
 }
