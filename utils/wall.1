@@ -1,0 +1,34 @@
+.Dd October 15, 2024
+.Dt WALL 1
+.Os
+.Sh NAME
+.Nm wall
+.Nd write message to all users
+.Sh SYNOPSIS
+.Nm
+.Op Fl m Ar message
+.Op Ar file
+.Sh DESCRIPTION
+.Nm
+broadcasts a
+.Ar message
+to the terminals of all users logged into the system.
+If no
+.Ar message
+is specified, the message is read from the
+.Ar file
+if specified, or the standard input otherwise.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl m Ar message
+Broadcast this
+.Ar message
+rather than reading from the standard input or the specified file
+.Ar file .
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr shutdown 8

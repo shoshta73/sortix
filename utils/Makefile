@@ -67,6 +67,7 @@ type \
 uname \
 uniq \
 uptime \
+wall \
 wc \
 which \
 yes \
@@ -85,6 +86,7 @@ passwd.1 \
 readlink.1 \
 sort.1 \
 uname.1 \
+wall.1 \
 
 SBINS=\
 chroot \
