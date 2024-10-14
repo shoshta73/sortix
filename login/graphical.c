@@ -374,12 +374,26 @@ static void render_form(struct framebuffer fb)
 
 	if ( state.warning )
 	{
-		struct framebuffer warnfb = fb;
-		int y = (fb.yres - 50 - window_height) / 2 - 2 * FONT_HEIGHT;
-		warnfb = framebuffer_cut_top_y(warnfb, y);
-		int w = strlen(state.warning) * (FONT_WIDTH+1);
-		warnfb = framebuffer_center_x(warnfb, fb.xres / 2, w);
-		render_text(warnfb, state.warning, make_color(255, 0, 0));
+		size_t lines = 1;
+		for ( size_t i = 0; state.warning[i]; i++ )
+			if ( state.warning[i] == '\n' )
+				lines++;
+		size_t line = 0;
+		for ( size_t i = 0; state.warning[i]; )
+		{
+			size_t len = strcspn(state.warning + i, "\n");
+			struct framebuffer warnfb = fb;
+			int y = (fb.yres - 50 - window_height) / 2 -
+			        (line + 2 )* FONT_HEIGHT;
+			warnfb = framebuffer_cut_top_y(warnfb, y);
+			int w = len * (FONT_WIDTH+1);
+			warnfb = framebuffer_center_x(warnfb, fb.xres / 2, w);
+			render_chars(warnfb, state.warning + i, len, make_color(255, 0, 0));
+			line++;
+			i += len;
+			if ( state.warning[i] == '\n' )
+				i++;
+		}
 	}
 
 	fb = framebuffer_center_x(fb, fb.xres / 2, window_width);
@@ -769,6 +783,8 @@ static void think(struct glogin* state)
 			textbox_reset(&textbox_username);
 			if ( errno == EACCES )
 				state->warning = "Invalid username/password";
+			else if ( errno == EEXIST && (state->warning = read_nologin()) )
+				;
 			else
 				state->warning = strerror(errno);
 		}

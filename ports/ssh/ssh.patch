@@ -476,6 +476,19 @@ diff -Paur --no-dereference -- ssh.upstream/defines.h ssh/defines.h
  #endif
  
  #ifndef HAVE_INTXX_T
+@@ -464,8 +471,12 @@
+ #endif
+ 
+ #ifndef _PATH_NOLOGIN
++#ifdef __sortix__
++# define _PATH_NOLOGIN "/var/run/nologin"
++#else
+ # define _PATH_NOLOGIN "/etc/nologin"
+ #endif
++#endif
+ 
+ /* Define this to be the path of the xauth program. */
+ #ifdef XAUTH_PATH
 diff -Paur --no-dereference -- ssh.upstream/dh.c ssh/dh.c
 --- ssh.upstream/dh.c
 +++ ssh/dh.c

@@ -18,6 +18,7 @@
  * Authenticates users.
  */
 
+#include <sys/stat.h>
 #include <sys/termmode.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -65,6 +66,20 @@ void on_interrupt_signal(int signum)
 	}
 }
 
+char* read_nologin(void)
+{
+	static char buffer[4096];
+	FILE* fp = fopen("/var/run/nologin", "r");
+	if ( !fp )
+		return NULL;
+	size_t length = fread(buffer, 1, sizeof(buffer) - 1, fp);
+	buffer[length] = '\0';
+	if ( length && buffer[length - 1] == '\n' )
+		buffer[length - 1] = '\0';
+	fclose(fp);
+	return buffer;
+}
+
 bool check_real(const char* username, const char* password)
 {
 	char fakehashbuf[128];
@@ -73,6 +88,8 @@ bool check_real(const char* username, const char* password)
 	size_t goodmatch = 0;
 	const char* fakehash = NULL;
 	const char* goodhash = NULL;
+	bool fakeisroot = false;
+	bool goodisroot = false;
 	setpwent();
 	struct passwd* pwd;
 	while ( (errno = 0, pwd = getpwent()) )
@@ -82,22 +99,27 @@ bool check_real(const char* username, const char* password)
 			strlcpy(goodhashbuf, pwd->pw_passwd, sizeof(goodhashbuf));
 			goodhash = goodhashbuf;
 			goodmatch++;
+			goodisroot = pwd->pw_uid == 0;
 		}
 		else
 		{
 			strlcpy(fakehashbuf, pwd->pw_passwd, sizeof(fakehashbuf));
 			fakehash = fakehashbuf;
 			fakematch++;
+			fakeisroot = pwd->pw_uid == 0;
 		}
 	}
 	int errnum = errno;
 	endpwent();
 	if ( errnum != 0 )
 		return errno = errnum, false;
+	if ( !goodisroot && !access("/var/run/nologin", F_OK) )
+		return errno = EEXIST, false;
 	if ( 1 < goodmatch )
 		return errno = EACCES, false;
 	errno = 0;
 	(void) fakehash;
+	(void) fakeisroot;
 	return crypt_checkpass(password, goodhash) == 0;
 }
 
@@ -511,7 +533,9 @@ int textual(void)
 		if ( !result )
 		{
 			const char* msg = "Invalid username/password";
-			if ( errno != EACCES )
+			if ( errno == EEXIST )
+				msg = read_nologin();
+			else if ( errno != EACCES )
 				msg = sortix_strerror(errno);
 			printf("%s\n", msg);
 			printf("\n");

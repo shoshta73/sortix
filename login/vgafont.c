@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -62,6 +62,14 @@ void render_char(struct framebuffer fb, char c, uint32_t color)
 	character_fb.buffer = buffer;
 
 	framebuffer_copy_to_framebuffer_blend(fb, character_fb);
+}
+
+void render_chars(struct framebuffer fb, const char* str, size_t len,
+                  uint32_t color)
+{
+	for ( size_t i = 0; i < len; i++ )
+		render_char(framebuffer_crop(fb, (FONT_WIDTH+1) * i, 0, fb.xres, fb.yres),
+		            str[i], color);
 }
 
 void render_text(struct framebuffer fb, const char* str, uint32_t color)

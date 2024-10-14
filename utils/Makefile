@@ -93,6 +93,7 @@ chroot \
 halt \
 poweroff \
 reboot \
+shutdown \
 unmount \
 
 MANPAGES8=\
@@ -100,6 +101,7 @@ chroot.8 \
 halt.8 \
 poweroff.8 \
 reboot.8 \
+shutdown.8 \
 unmount.8 \
 
 all: $(BINARIES) $(SBINS)

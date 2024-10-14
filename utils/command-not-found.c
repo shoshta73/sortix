@@ -43,7 +43,6 @@ enum category
 	LOGOUT,
 	MOUNT,
 	PAGER,
-	POWEROFF,
 	RW,
 	SHELL,
 	UNMOUNT,
@@ -85,9 +84,6 @@ struct command commands[] =
 	{PAGER, "less", NULL, NULL},
 	{PAGER, "more", NULL, NULL},
 	{PAGER, "pager", "system", NULL},
-
-	{POWEROFF, "poweroff", "system", NULL},
-	{POWEROFF, "shutdown", NULL, NULL},
 
 	{RW, "dd", NULL, NULL},
 	{RW, "rw", "system", NULL},

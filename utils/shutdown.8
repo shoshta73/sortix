@@ -1,0 +1,112 @@
+.Dd October 14, 2024
+.Dt SUHTDOWN 8
+.Os
+.Sh NAME
+.Nm shutdown
+.Nd shut down the computer
+.Sh SYNOPSIS
+.Nm
+.Op Fl Dhikpr
+.Op Ar time
+.Op Ar messages ...
+.Sh DESCRIPTION
+.Nm
+gracefully powers off the computer at the specified
+.Ar time
+by waiting in the background and sending a request to the appropriate
+.Xr init 8
+process.
+.Pp
+The system is shut down immediately unless another
+.Ar time
+is specified:
+.Pp
+.Bl -tag -width "YYYY-mm-dd HH:MM:SS" -compact
+.It Sy now
+Shutdown immediately.
+.It Sy + Ns Ar minutes Ns Op Ar unit
+Shutdown after this many
+.Ar minutes .
+Optionally another unit can be specified with a
+.Sy s ,
+.Sy sec ,
+.Sy m ,
+.Sy min ,
+.Sy h ,
+or
+.Sy hour
+suffix.
+.It Sy HH:MM
+Shutdown at this time today, or tomorrow if in the past.
+.It Sy HH:MM:SS
+Shutdown at this time today, or tomorrow if in the past.
+.It Sy YYYY-mm-dd HH:MM:SS
+Shutdown at this time.
+.El
+.Pp
+Countdown messages are broadcast using
+.Xr wall 1
+with increasing frequency to warn users of the impending shutdown.
+Additional
+.Ar messages
+are included if specified, joined by spaces.
+.Pp
+Further logins by non-privileged users are prohibited when 5 minutes or less
+remain by creating the
+.Pa /var/run/nologin
+file with the broadcast messages and an explanation.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl D
+Run in the foreground rather than detaching a child process.
+.It Fl h
+Halt the operating system.
+.It Fl i
+Reinitialize the operating system.
+.It Fl k
+Broadcast the warning messages and create
+.Pa nologin
+but don't actually shut down.
+.It Fl p
+Power off the system.
+This is the default behavior.
+.It Fl r
+Reboot the system.
+.El
+.Sh FILES
+.Bl -tag -width "/var/run/nologin"
+.It Pa /var/run/nologin
+Further non-privileged logins are prohibited if this file exists and users
+attempting to log in are shown the contents of this file.
+.El
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "12345678"
+.It Dv SIGINT
+Cancels the pending shutdown and deletes the
+.Pa nologin
+file.
+.It Dv SIGTERM
+Cancels the pending shutdown and deletes the
+.Pa nologin
+file.
+.It Dv SIGQUIT
+Cancels the pending shutdown and deletes the
+.Pa nologin
+file.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+A child process continues running in the background as it waits for
+the scheduled shutdown.
+.Pp
+The system will always shut down when the time comes if the parent process has
+exited successfully even if further errors occur while warning users.
+.Sh SEE ALSO
+.Xr wall 1 ,
+.Xr halt 8 ,
+.Xr init 8 ,
+.Xr login 8 ,
+.Xr poweroff 8 ,
+.Xr reboot 8

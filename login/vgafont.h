@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,8 @@ extern uint8_t font[FONT_CHARSIZE * FONT_NUMCHARS];
 
 bool load_font();
 void render_char(struct framebuffer fb, char c, uint32_t color);
+void render_chars(struct framebuffer fb, const char* str, size_t len,
+                  uint32_t color);
 void render_text(struct framebuffer fb, const char* str, uint32_t color);
 
 #endif

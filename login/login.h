@@ -47,6 +47,7 @@ enum special_action
 };
 
 void on_interrupt_signal(int signum);
+char* read_nologin(void);
 bool login(const char* username, const char* session);
 bool check_real(const char* username, const char* password);
 bool check_begin(struct check* chk,

@@ -46,6 +46,7 @@ realpath
 reboot
 rm
 rmdir
+shutdown
 sleep
 sort
 stat

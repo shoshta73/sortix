@@ -85,6 +85,10 @@ user database (see
 .It Pa /etc/session
 fallback session script run upon login (see
 .Xr session 5 )
+.It Pa /var/run/nologin
+Further non-privileged logins are prohibited if this file exists and users
+attempting to log in are shown the contents of this file (see
+.Xr shutdown 8 )
 .El
 .Sh EXIT STATUS
 .Nm login
@@ -97,7 +101,7 @@ system should reinitialize.
 .Xr passwd 5 ,
 .Xr session 5 ,
 .Xr init 8 ,
-.Xr login 8
+.Xr shutdown 8
 .Sh BUGS
 .Nm login
 only supports a single monitor.
