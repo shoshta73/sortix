@@ -29,7 +29,6 @@ env \
 expr \
 false \
 find \
-halt \
 head \
 help \
 id \
@@ -71,8 +70,6 @@ uptime \
 wc \
 which \
 yes \
-poweroff \
-reboot \
 
 BINARIES=\
 $(BINARIES_EXCEPT_INSTALL) \
@@ -91,6 +88,9 @@ uname.1 \
 
 SBINS=\
 chroot \
+halt \
+poweroff \
+reboot \
 unmount \
 
 MANPAGES8=\
