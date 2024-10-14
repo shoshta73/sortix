@@ -104,10 +104,10 @@ int main(int argc, char* argv[])
 		err(1, "stdup");
 
 	const char* username;
-	if ( argc - optind <= 1 )
+	if ( argc - optind < 1 )
 		username = my_username;
-	else if ( argc - optind <= 2 )
-		username = argv[1];
+	else if ( argc - optind <= 1 )
+		username = argv[optind];
 	else
 		errx(1, "Unexpected extra operand");
 
