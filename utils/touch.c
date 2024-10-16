@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 Alexandros Alexandrou.
+ * Copyright (c) 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -54,6 +55,7 @@ static void help(FILE* fp, const char* argv0)
 	fprintf(fp, "Usage: %s [OPTION]... [FILE]\n", argv0);
 	fprintf(fp, "Update access and/or modification time of FILE(s).\n");
 	fprintf(fp, "  -a           Change only access time.\n");
+	fprintf(fp, "  -d datetime  Set time to this date and time.\n");
 	fprintf(fp, "  -c           Don't create a specified file if it doesn't exist.\n");
 	fprintf(fp, "  -m           Change only modification time.\n");
 	fprintf(fp, "  -r ref_file  Refer to access and modifiaction times of ref_file.\n");
@@ -61,9 +63,11 @@ static void help(FILE* fp, const char* argv0)
 
 int main(int argc, char* argv[])
 {
+	tzset();
 	setlocale(LC_ALL, "");
 
 	bool opt_a = false;
+	const char* opt_d = NULL;
 	bool opt_c = false;
 	bool opt_m = false;
 	const char* opt_r = NULL;
@@ -84,7 +88,20 @@ int main(int argc, char* argv[])
 			{
 			case 'a': opt_a = true; break;
 			case 'c': opt_c = true; break;
-			// TODO: -d
+			case 'd':
+				if ( !*(opt_d = arg + 1) )
+				{
+					if ( i + 1 == argc )
+					{
+						fprintf(stderr, "option requires an argument -- 'd'\n");
+						fprintf(stderr, "Try '%s --help' for more information.\n", argv0);
+						exit(125);
+					}
+					opt_d = argv[i+1];
+					argv[++i] = NULL;
+				}
+				arg = "d";
+				break;
 			case 'm': opt_m = true; break;
 			case 'r':
 				if ( !*(opt_r = arg + 1) )
@@ -124,6 +141,9 @@ int main(int argc, char* argv[])
 	if ( argc == 1 )
 		errx(1, "missing file operand");
 
+	if ( opt_d && opt_r )
+		errx(1, "options -d and -r are mutually exclusive");
+
 	if ( !opt_a && !opt_m )
 	{
 		opt_a = true;
@@ -136,7 +156,23 @@ int main(int argc, char* argv[])
 		timespec_make(0, UTIME_NOW),
 	};
 
-	if ( opt_r )
+	if ( opt_d )
+	{
+		struct tm tm = {0};
+		char* e;
+		if ( !((e = strptime(opt_d, "%a %b %e %H:%M:%S %Z %Y", &tm)) && !*e) &&
+		     !((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%SZ", &tm)) && !*e) &&
+		     !((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%S%z", &tm)) && !*e) &&
+		     !((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%S%Z", &tm)) && !*e) &&
+		     !((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S", &tm)) && !*e) &&
+		     !((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S %z", &tm)) && !*e) &&
+		     !((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S %Z", &tm)) && !*e) )
+			errx(1, "invalid datetime: %s", opt_d);
+		time_t time = mktime(&tm);
+		times[0] = timespec_make(time, 0);
+		times[1] = timespec_make(time, 0);
+	}
+	else if ( opt_r )
 	{
 		struct stat st;
 		if ( stat(opt_r, &st) < 0 )
