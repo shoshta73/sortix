@@ -94,9 +94,17 @@ sysmerge: sysroot
 sysmerge-full: sysroot
 	sysmerge --full "$(SYSROOT)"
 
+.PHONY: sysmerge-full-now
+sysmerge-full-now: sysroot
+	sysmerge --full --now "$(SYSROOT)"
+
 .PHONY: sysmerge-full-wait
 sysmerge-full-wait: sysroot
 	sysmerge --full --wait "$(SYSROOT)"
+
+.PHONY: sysmerge-now
+sysmerge-now: sysroot
+	sysmerge --now "$(SYSROOT)"
 
 .PHONY: sysmerge-wait
 sysmerge-wait: sysroot

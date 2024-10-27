@@ -1103,7 +1103,7 @@ int main(void)
 			execute((const char*[]) { "chroot", "-d", ".", "update-grub", NULL },
 			        "_eqQ");
 		}
-		else if ( access_or_die("/etc/default/grub.d/10_sortix", F_OK) == 0 )
+		else if ( access_or_die("etc/default/grub.d/10_sortix", F_OK) == 0 )
 		{
 			// Help dual booters by making /etc/default/grub.d/10_sortix.cache.
 			printf(" - Creating bootloader fragment...\n");

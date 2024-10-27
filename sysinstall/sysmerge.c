@@ -125,7 +125,8 @@ int main(int argc, char* argv[])
 	bool ports = false;
 	bool system = false;
 	const char* target = "/";
-	bool wait = false;
+	bool wait = true;
+	bool wait_default = true;
 
 	enum longopt
 	{
@@ -142,13 +143,14 @@ int main(int argc, char* argv[])
 		{"hook-finalize", no_argument, NULL, OPT_HOOK_FINALIZE},
 		{"hook-prepare", no_argument, NULL, OPT_HOOK_PREPARE},
 		{"is-reboot-needed", no_argument, NULL, OPT_IS_REBOOT_NEEDED},
+		{"now", no_argument, NULL, 'n'},
 		{"ports", no_argument, NULL, 'p'},
 		{"system", no_argument, NULL, 's'},
 		{"target", required_argument, NULL, 't'},
 		{"wait", no_argument, NULL, 'w'},
 		{0, 0, 0, 0}
 	};
-	const char* opts = "cfpst:w";
+	const char* opts = "cfnpst:w";
 	int opt;
 	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
 	{
@@ -160,14 +162,15 @@ int main(int argc, char* argv[])
 		case OPT_HOOK_FINALIZE: hook_finalize = true; break;
 		case OPT_HOOK_PREPARE: hook_prepare = true; break;
 		case OPT_IS_REBOOT_NEEDED: is_reboot_needed = true; break;
+		case 'n': wait = false; wait_default = false; break;
 		case 'p': ports = true; break;
 		case 's': system = true; break;
 		case 't': target = optarg; break;
-		case 'w': wait = true; break;
+		case 'w': wait = true; wait_default = false; break;
 		default: return 2;
 		}
 	}
-	if ( 1 < booting + cancel + hook_finalize + hook_prepare + wait +
+	if ( 1 < booting + cancel + hook_finalize + hook_prepare + !wait +
 	         is_reboot_needed )
 		errx(2, "Mutually incompatible options were passed");
 
@@ -213,6 +216,9 @@ int main(int argc, char* argv[])
 		full = false;
 
 	bool has_system = !access_join_or_die(target, "tix/manifest/system", F_OK);
+
+	if ( wait_default )
+		wait = has_system && !access_join_or_die(target, "etc/fstab", F_OK);
 
 	if ( !has_system )
 		system = false;
@@ -322,6 +328,7 @@ int main(int argc, char* argv[])
 		my_prepare = true;
 		run_finalize = true;
 		my_finalize = true;
+		wait = false;
 	}
 	else if ( hook_prepare )
 	{
@@ -331,6 +338,7 @@ int main(int argc, char* argv[])
 		my_prepare = true;
 		run_finalize = false;
 		my_finalize = false;
+		wait = false;
 	}
 	else if ( hook_finalize )
 	{
@@ -340,6 +348,7 @@ int main(int argc, char* argv[])
 		my_prepare = false;
 		run_finalize = true;
 		my_finalize = true;
+		wait = false;
 	}
 	else
 	{
@@ -573,10 +582,11 @@ int main(int argc, char* argv[])
 		free(boot_sysmerge);
 	}
 
+	const char* done = wait ? "Successfully upgraded" : "Scheduled upgrade";
 	if ( new_release.pretty_name )
-		printf("Successfully upgraded to %s.\n", new_release.pretty_name);
+		printf("%s to %s.\n", done, new_release.pretty_name);
 	else
-		printf("Successfully upgraded %s.\n", target);
+		printf("%s.\n", done);
 
 	// Reinitialize the operating system if upgrading on boot.
 	return booting ? 3 : 0;
