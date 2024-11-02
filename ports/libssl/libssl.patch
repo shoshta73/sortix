@@ -175,18 +175,6 @@ diff -Paur --no-dereference -- libssl.upstream/apps/openssl/certhash.c libssl/ap
  static struct {
  	int dryrun;
  	int verbose;
-@@ -494,6 +499,11 @@
- 		fprintf(stderr, "symbolic link is too long %s\n", dep->d_name);
- 		return (-1);
- 	}
-+	/* PATCH: Handle symbolic links that are too long. */
-+	if (n == sizeof(target) - 1) {
-+		fprintf(stderr, "symbolic link is too long %s\n", dep->d_name);
-+		return (-1);
-+	}
- 	target[n] = '\0';
- 
- 	hi = hashinfo_from_linkname(dep->d_name, target);
 diff -Paur --no-dereference -- libssl.upstream/apps/openssl/s_socket.c libssl/apps/openssl/s_socket.c
 --- libssl.upstream/apps/openssl/s_socket.c
 +++ libssl/apps/openssl/s_socket.c
@@ -281,42 +269,6 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/bio/bss_bio.c libssl/crypt
  #include <assert.h>
  #include <limits.h>
  #include <stdlib.h>
-diff -Paur --no-dereference -- libssl.upstream/include/compat/stdlib.h libssl/include/compat/stdlib.h
---- libssl.upstream/include/compat/stdlib.h
-+++ libssl/include/compat/stdlib.h
-@@ -16,7 +16,7 @@
- #ifndef LIBCRYPTOCOMPAT_STDLIB_H
- #define LIBCRYPTOCOMPAT_STDLIB_H
- 
--#include <sys/types.h>
-+/* PATCH: <sys/types.h> doesn't need to be included. */
- #include <stdint.h>
- 
- #ifndef HAVE_ARC4RANDOM_BUF
-diff -Paur --no-dereference -- libssl.upstream/include/compat/string.h libssl/include/compat/string.h
---- libssl.upstream/include/compat/string.h
-+++ libssl/include/compat/string.h
-@@ -16,7 +16,7 @@
- #include_next <string.h>
- #endif
- 
--#include <sys/types.h>
-+/* PATCH: <sys/types.h> doesn't need to be included. */
- 
- #if defined(__sun) || defined(_AIX) || defined(__hpux)
- /* Some functions historically defined in string.h were placed in strings.h by
-diff -Paur --no-dereference -- libssl.upstream/include/compat/sys/types.h libssl/include/compat/sys/types.h
---- libssl.upstream/include/compat/sys/types.h
-+++ libssl/include/compat/sys/types.h
-@@ -16,7 +16,7 @@
- #ifndef LIBCRYPTOCOMPAT_SYS_TYPES_H
- #define LIBCRYPTOCOMPAT_SYS_TYPES_H
- 
--#include <stdint.h>
-+/* PATCH: <stdint.h> doesn't need to be included. */
- 
- #ifdef __MINGW32__
- #include <_bsd_types.h>
 diff -Paur --no-dereference -- libssl.upstream/include/compat/unistd.h libssl/include/compat/unistd.h
 --- libssl.upstream/include/compat/unistd.h
 +++ libssl/include/compat/unistd.h
