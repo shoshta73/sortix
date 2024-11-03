@@ -87,9 +87,7 @@ struct tcphdr
 
 /* Options at the IPPROTO_TCP socket level. */
 #define TCP_NODELAY 1
-#if __USE_SORTIX
 #define TCP_MAXSEG 2
 #define TCP_NOPUSH 3
-#endif
 
 #endif
