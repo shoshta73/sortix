@@ -925,7 +925,7 @@ int main(void)
 			// Help dual booters by making /etc/default/grub.d/10_sortix.cache.
 			printf(" - Creating bootloader fragment...\n");
 			execute((const char*[]) { "chroot", "-d", ".",
-			                          "/etc/grub.d/default/10_sortix", NULL },
+			                          "/etc/default/grub.d/10_sortix", NULL },
 			                          "_eq");
 		}
 		printf(" - Finishing upgrade...\n");

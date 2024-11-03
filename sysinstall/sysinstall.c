@@ -1105,10 +1105,10 @@ int main(void)
 		}
 		else if ( access_or_die("/etc/default/grub.d/10_sortix", F_OK) == 0 )
 		{
-			// Help dual booters by making /etc/grub.d/default/10_sortix.cache.
+			// Help dual booters by making /etc/default/grub.d/10_sortix.cache.
 			printf(" - Creating bootloader fragment...\n");
 			execute((const char*[]) { "chroot", "-d", ".",
-			                          "/etc/grub.d/default/10_sortix",
+			                          "/etc/default/grub.d/10_sortix",
 			                          NULL }, "_eq");
 		}
 		printf(" - Finishing installation...\n");
