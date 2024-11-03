@@ -113,6 +113,8 @@ typedef __float_t float_t;
 /* XOPEN/SVID macros */
 #if __USE_SORTIX || __USE_XOPEN
 #define M_E             2.7182818284590452354   /* e */
+#endif
+#if __USE_SORTIX || 1999 <= __USE_C || __USE_XOPEN
 #define M_LOG2E         1.4426950408889634074   /* log 2e */
 #define M_LOG10E        0.43429448190325182765  /* log 10e */
 #define M_LN2           0.69314718055994530942  /* log e2 */
@@ -125,7 +127,9 @@ typedef __float_t float_t;
 #define M_2_SQRTPI      1.12837916709551257390  /* 2/sqrt(pi) */
 #define M_SQRT2         1.41421356237309504880  /* sqrt(2) */
 #define M_SQRT1_2       0.70710678118654752440  /* 1/sqrt(2) */
+#endif
 
+#if __USE_SORTIX || __USE_XOPEN
 /* TODO: MAXFLOAT is obsoleted by FLT_MAX of float.h. */
 #define MAXFLOAT        ((float)3.40282346638528860e+38)
 
@@ -382,6 +386,12 @@ long double fminl(long double, long double);
 /* 7.12.3.4 int isnan(real-floating x) */
 #define isnan(__x)      __fpmacro_unary_floating(isnan, __x)
 
+/*
+ * Functions callable from C, intended to support IEEE arithmetic.
+ */
+double copysign(double, double);
+double scalbn(double, int);
+
 #endif /* __USE_SORTIX || 1999 <= __USE_C */
 
 #if __USE_SORTIX
@@ -393,12 +403,6 @@ int matherr(struct exception*);
  * IEEE Test Vector
  */
 double significand(double);
-
-/*
- * Functions callable from C, intended to support IEEE arithmetic.
- */
-double copysign(double, double);
-double scalbn(double, int);
 
 /*
  * BSD math library entry points
