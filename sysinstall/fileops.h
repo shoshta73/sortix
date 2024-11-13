@@ -23,6 +23,7 @@
 char* join_paths(const char* a, const char* b);
 int mkdir_p(const char* path, mode_t mode);
 int access_or_die(const char* path, int mode);
+int access_join_or_die(const char* a, const char* b, int mode);
 void mkdir_or_chmod_or_die(const char* path, mode_t mode);
 void write_random_seed(const char* path);
 char* read_string_file(const char* path);

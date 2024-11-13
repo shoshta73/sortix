@@ -85,6 +85,19 @@ int access_or_die(const char* path, int mode)
 	return 0;
 }
 
+int access_join_or_die(const char* a, const char* b, int mode)
+{
+	char* path = join_paths(a, b);
+	if ( !path )
+	{
+		warn("malloc");
+		_exit(2);
+	}
+	int result = access_or_die(path, mode);
+	free(path);
+	return result;
+}
+
 void mkdir_or_chmod_or_die(const char* path, mode_t mode)
 {
 	if ( mkdir(path, mode) == 0 )

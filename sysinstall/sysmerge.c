@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, 2020, 2021, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2018, 2020-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -86,15 +86,8 @@ static bool is_partition_name(const char* path)
 
 static bool has_pending_upgrade(const char* target)
 {
-	char* sysmerge = join_paths(target, "sysmerge");
-	char* boot_sysmerge = join_paths(target, "boot/sysmerge");
-	if ( !sysmerge || !boot_sysmerge )
-		err(2, "malloc");
-	bool result = access_or_die(sysmerge, F_OK) == 0 ||
-	              access_or_die(boot_sysmerge, F_OK) == 0;
-	free(sysmerge);
-	free(boot_sysmerge);
-	return result;
+	return !access_join_or_die(target, "sysmerge", F_OK) ||
+	       !access_join_or_die(target, "boot/sysmerge", F_OK);
 }
 
 static void update_grub(struct conf* conf, const char* target)
@@ -104,7 +97,9 @@ static void update_grub(struct conf* conf, const char* target)
 		printf(" - Configuring bootloader...\n");
 		execute((const char*[]) { "update-grub", NULL }, "ceqQ", target);
 	}
-	else if ( access_or_die("/etc/default/grub.d/10_sortix", F_OK) == 0 )
+	else if ( !access_join_or_die(target,
+	                             "etc/default/grub.d/10_sortix", F_OK) &&
+	          !access_join_or_die(target, "etc/fstab", F_OK) )
 	{
 		printf(" - Creating bootloader fragment...\n");
 		execute((const char*[]) { "/etc/default/grub.d/10_sortix", NULL },
@@ -184,17 +179,11 @@ int main(int argc, char* argv[])
 			err(2, "malloc");
 		if ( optind < argc )
 			errx(2, "Unexpected extra operand: %s", argv[optind]);
-		char* system_path = join_paths(target, "sysmerge/tix/sysmerge.system");
-		char* ports_path = join_paths(target, "sysmerge/tix/sysmerge.ports");
-		char* full_path = join_paths(target, "sysmerge/tix/sysmerge.full");
-		if ( !system_path || !ports_path || !full_path )
-			err(2, "malloc");
-		system = access_or_die(system_path, F_OK) == 0;
-		ports = access_or_die(ports_path, F_OK) == 0;
-		full = access_or_die(full_path, F_OK) == 0;
-		free(system_path);
-		free(ports_path);
-		free(full_path);
+		system =
+			!access_join_or_die(target, "sysmerge/tix/sysmerge.system", F_OK);
+		ports =
+			!access_join_or_die(target, "sysmerge/tix/sysmerge.ports", F_OK);
+		full = !access_join_or_die(target, "sysmerge/tix/sysmerge.full", F_OK);
 	}
 	else
 	{
@@ -210,11 +199,7 @@ int main(int argc, char* argv[])
 	if ( !ports )
 		full = false;
 
-	char* system_manifest = join_paths(target, "tix/manifest/system");
-	if ( !system_manifest )
-		err(2, "malloc");
-	bool has_system = !access_or_die(system_manifest, F_OK);
-	free(system_manifest);
+	bool has_system = !access_join_or_die(target, "tix/manifest/system", F_OK);
 
 	if ( !has_system )
 		system = false;
@@ -521,7 +506,7 @@ int main(int argc, char* argv[])
 
 	// Update the initrd and bootloader. The new bootloader config won't refer
 	// to the upgrade as it's complete and the marker is gone.
-	if ( has_system && access_or_die("/etc/fstab", F_OK) == 0 )
+	if ( has_system && !access_join_or_die(target, "/etc/fstab", F_OK) )
 	{
 		printf(" - Creating initrd...\n");
 		execute((const char*[]) { "update-initrd", NULL }, "ce", target);
