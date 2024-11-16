@@ -250,9 +250,11 @@ int main(int argc, char* argv[])
 	}
 
 	const char* when = "now";
+	char* message = NULL;
 	if ( 0 < argc - optind )
 		when = argv[optind + 0];
-	char* message = argv[optind + 1];
+	if ( 1 < argc - optind )
+		message = argv[optind + 1];
 	if ( 2 < argc - optind )
 	{
 		size_t message_size;
