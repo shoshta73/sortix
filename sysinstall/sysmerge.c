@@ -90,6 +90,11 @@ static bool has_pending_upgrade(const char* target)
 	       !access_join_or_die(target, "boot/sysmerge", F_OK);
 }
 
+static bool has_ready_upgrade(const char* target)
+{
+	return !access_join_or_die(target, "sysmerge/tix/sysmerge.ready", F_OK);
+}
+
 static void update_grub(struct conf* conf, const char* target)
 {
 	if ( conf->grub )
@@ -116,6 +121,7 @@ int main(int argc, char* argv[])
 	bool full = false;
 	bool hook_finalize = false;
 	bool hook_prepare = false;
+	bool is_reboot_needed = false;
 	bool ports = false;
 	bool system = false;
 	const char* target = "/";
@@ -126,6 +132,7 @@ int main(int argc, char* argv[])
 		OPT_BOOTING = 128,
 		OPT_HOOK_FINALIZE,
 		OPT_HOOK_PREPARE,
+		OPT_IS_REBOOT_NEEDED,
 	};
 	const struct option longopts[] =
 	{
@@ -134,6 +141,7 @@ int main(int argc, char* argv[])
 		{"full", no_argument, NULL, 'f'},
 		{"hook-finalize", no_argument, NULL, OPT_HOOK_FINALIZE},
 		{"hook-prepare", no_argument, NULL, OPT_HOOK_PREPARE},
+		{"is-reboot-needed", no_argument, NULL, OPT_IS_REBOOT_NEEDED},
 		{"ports", no_argument, NULL, 'p'},
 		{"system", no_argument, NULL, 's'},
 		{"target", required_argument, NULL, 't'},
@@ -151,6 +159,7 @@ int main(int argc, char* argv[])
 		case 'f': full = true; break;
 		case OPT_HOOK_FINALIZE: hook_finalize = true; break;
 		case OPT_HOOK_PREPARE: hook_prepare = true; break;
+		case OPT_IS_REBOOT_NEEDED: is_reboot_needed = true; break;
 		case 'p': ports = true; break;
 		case 's': system = true; break;
 		case 't': target = optarg; break;
@@ -158,8 +167,12 @@ int main(int argc, char* argv[])
 		default: return 2;
 		}
 	}
-	if ( 1 < booting + cancel + hook_finalize + hook_prepare + wait )
+	if ( 1 < booting + cancel + hook_finalize + hook_prepare + wait +
+	         is_reboot_needed )
 		errx(2, "Mutually incompatible options were passed");
+
+	if ( is_reboot_needed )
+		exit(has_ready_upgrade(target) ? 0 : 1);
 
 	bool hook_only = hook_prepare || hook_finalize;
 	bool no_source = cancel;
