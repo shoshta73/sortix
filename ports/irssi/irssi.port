@@ -13,3 +13,4 @@ BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--enable-true-color --with-perl=no'
 MAKE_VARS=V=1
 LICENSE=GPL-2.0-or-later
+RUNTIME_DEPS=libcurses

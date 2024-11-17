@@ -12,3 +12,4 @@ LICENSE=ISC
 CONFIGURE_ARGS='--with-openssl --with-ca-bundle=/etc/ssl/cert.pem --with-ca-path=/etc/ssl/certs'
 MAKE_VARS='V=1'
 POST_INSTALL=tix-eradicate-libtool-la
+RUNTIME_DEPS=libssl

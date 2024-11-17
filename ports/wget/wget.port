@@ -11,3 +11,4 @@ LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--with-ssl=openssl'
 MAKE_VARS='V=1'
+RUNTIME_DEPS=libssl

@@ -20,3 +20,4 @@ MAKE_VARS=ac_cv_c_bigendian=no
 MAKE_BUILD_TARGET='all-gcc all-target-libgcc'
 MAKE_INSTALL_TARGET='install-gcc install-target-libgcc'
 POST_INSTALL=../gcc.post-install
+RUNTIME_DEPS=binutils

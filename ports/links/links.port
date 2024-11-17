@@ -9,3 +9,4 @@ UPSTREAM_SITE=http://links.twibright.com/download
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
 LOCATION_INDEPENDENT=true
+RUNTIME_DEPS=libssl
