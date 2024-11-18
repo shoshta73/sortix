@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2018, 2022, 2023 Jonas 'Sortie' Termansen.
+# Copyright (c) 2018, 2022, 2023, 2024 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -106,9 +106,31 @@ isinset() {
    exit 0)
 }
 
-. "$thisdir/ports.conf"
+escape_extended_regex() {
+  printf "%s\n" "$1" | sed -E -e 's/[[$()*?\+.^{|}]/\\\0/g'
+}
+
+list_set_recurse() {
+  if [ "$1" = '*' ]; then
+    grep -Ev '^all' repository/packages.list
+  elif [ ! -e "repository/$1.visited" ]; then
+    echo "$1"
+    touch "repository/$1.visited"
+    for dep in $(tix-vars -d '' "repository/$1.info" RUNTIME_DEPS); do
+      list_set_recurse "$dep"
+    done
+  fi
+}
+
+list_set() {
+  rm -f repository/*.visited
+  list_set_recurse "$1" | LC_ALL=C sort -u
+  rm -f repository/*.visited
+}
 
 cd "$directory"
+
+sets=$(grep -Ev '^all$' repository/sets.list || true)
 
 kernel=$(maybe_compressed boot/sortix.bin)
 live_initrd=$(maybe_compressed boot/live.tar)
@@ -247,7 +269,7 @@ printf "  hook_port_set_no\n"
 echo "}"
 for set in $sets; do
   echo
-  set_content=$(eval echo \$set_$set)
+  set_content=$(list_set "$set")
   echo "function select_ports_set_$set {"
   for port in $ports; do
     printf "  port_%s=%s\n" "$(portvar "$port")" "$(isinset "$port" "$set_content")"
@@ -272,7 +294,7 @@ printf "  hook_tix_set_no\n"
 echo "}"
 for set in $sets; do
   echo
-  set_content=$(eval echo \$set_$set)
+  set_content=$(list_set "$set")
   echo "function select_tix_set_$set {"
   for port in $ports; do
     printf "  tix_%s=%s\n" "$(portvar "$port")" "$(isinset "$port" "$set_content")"
@@ -550,7 +572,6 @@ EOF
 
 for set in $sets; do
   echo
-  set_content=$(eval echo \$set_$set)
   printf 'menuentry "Load only '"$set"' ports" {\n'
   printf "  select_ports_set_%s\n" "$set"
   printf '  configfile /boot/grub/ports.cfg\n'
@@ -610,7 +631,6 @@ EOF
 
 for set in $sets; do
   echo
-  set_content=$(eval echo \$set_$set)
   printf 'menuentry "Load only '"$set"' binary packages" {\n'
   printf "  select_tix_set_%s\n" "$set"
   printf '  configfile /boot/grub/tix.cfg\n'

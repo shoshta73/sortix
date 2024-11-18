@@ -5,8 +5,7 @@ if [ -z "$SORTIX_PORTS_DIR" ]; then
   SORTIX_PORTS_DIR="$(dirname -- "$0")/../ports"
 fi
 
-# Load the ports sets.
-. "$(dirname -- "$0")/ports.conf"
+RUNTIME_DEPS=RUNTIME_DEPS
 
 get_all_packages() {(
   for package in $(ls "$SORTIX_PORTS_DIR"); do
@@ -18,15 +17,7 @@ get_all_packages() {(
 
 get_package_dependencies_raw() {(
   if [ -f "$SORTIX_PORTS_DIR/$1/$1.port" ]; then
-    tix-vars -d ''  "$SORTIX_PORTS_DIR/$1/$1.port" BUILD_LIBRARIES
-  elif [ "$1" = "all" ]; then
-    get_all_packages
-  else
-    for set in $sets; do
-      if [ $set = $1 ]; then
-        echo $(eval echo \$set_$set)
-      fi
-    done
+    tix-vars -d ''  "$SORTIX_PORTS_DIR/$1/$1.port" BUILD_LIBRARIES $RUNTIME_DEPS
   fi
 )}
 
@@ -34,6 +25,10 @@ get_package_dependencies_raw() {(
 get_package_dependencies_recursive() {(
   for dependency in $(get_package_dependencies_raw $1); do
     want=false
+    if [ "$dependency" = '*' ]; then
+       get_all_packages | grep -Ev '^all$'
+       continue
+    fi
     if [ "$2" = "!!" ]; then
       want=true
     else
@@ -79,10 +74,7 @@ list_package() {(
   fi
   recursion=$(echo "$package" | grep -Eo '!*$')
   package=$(echo "$package" | grep -Eo '^[^!]*')
-  # TODO: Better way of detecting if a port is a set.
-  if [ -f "$SORTIX_PORTS_DIR/$package/$package.port" ]; then
-    echo "$package"
-  fi
+  echo "$package"
   if [ -n "$recursion" ]; then
     get_package_dependencies_recursive "$package" "$recursion"
   fi
@@ -90,6 +82,7 @@ list_package() {(
 
 if [ "$1" = "--dependencies" ]; then
   shift
+  RUNTIME_DEPS=
   PACKAGES=$("$0" PACKAGES)
   for package; do
     list_dependencies "$package"

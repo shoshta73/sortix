@@ -94,6 +94,9 @@ command line options and standard environment variables.
 A
 .Pa Makefile
 using the below set of conventional environment variables.
+.It Sy none
+The port is not built and contains no files.
+Useful for port sets depending on other ports.
 .El
 .It Sy CONFIGURE
 The path to the configure script relative to the source directory.
@@ -190,6 +193,10 @@ variable can be used in combination with
 .Sy EDITION
 to rename and split packages.
 The default edition is 1.
+.It Sy IS_SET Ns = Ns Oo Sy false "|" true Oc
+Whether the bootloader should offer this port as a reasonable subset of ports
+expressed recursively in
+.Sy RUNTIME_DEPS .
 .It Sy LICENSE
 Primary license identifier for the installed files from the
 .Lk https://spdx.org/licenses/ "SPDX License List" .

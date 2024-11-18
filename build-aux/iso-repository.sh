@@ -26,3 +26,5 @@ for PACKAGE in $PACKAGES; do
   cp "$SORTIX_REPOSITORY_DIR/$PACKAGE.tix.tar.xz" "$1"
   cp "$SORTIX_REPOSITORY_DIR/$PACKAGE.version" "$1"
 done
+
+tix-repository --generation=3 metadata "$1"

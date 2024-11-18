@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, 2020, 2022-2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2016, 2020, 2022-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -793,6 +793,8 @@ static void TixInfo(struct metainfo* minfo)
 	bool location_independent =
 		parse_boolean(metainfo_get_def(minfo,
 			"LOCATION_INDEPENDENT", "pkg.location-independent", "false"));
+	bool is_set =
+		parse_boolean(metainfo_get_def(minfo, "IS_SET", "pkg.is-set", "false"));
 
 	FILE* tixinfo_fp = fopen(tixinfo_rel, "w");
 	if ( !tixinfo_fp )
@@ -827,6 +829,8 @@ static void TixInfo(struct metainfo* minfo)
 		const char* renames = metainfo_get(minfo, "RENAMES", "pkg.renames");
 		if ( renames )
 			fwrite_variable(tixinfo_fp, "RENAMES", renames);
+		if ( is_set )
+			fwrite_variable(tixinfo_fp, "IS_SET", "true");
 	}
 	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
 	else
@@ -951,6 +955,9 @@ static void Compile(struct metainfo* minfo)
 		metainfo_get(minfo, "BUILD_SYSTEM", "pkg.build-system");
 	if ( !build_system )
 		errx(1, "%s: pkg.build-system was not found", minfo->package_info_path);
+
+	if ( !strcmp(build_system, "none") )
+		return;
 
 	// Determine whether need to do an out-of-directory build.
 	const char* subdir = metainfo_get(minfo, "SUBDIR", "pkg.subdir");

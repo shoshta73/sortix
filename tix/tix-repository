@@ -92,6 +92,7 @@ metadata)
   true > dependencies.list
   true > renames.list
   true > manifest.list
+  true > sets.list
 
   for package in $(cat packages.list); do
     tar -xOf "$package.tix.tar.xz" "tix/tixinfo/$package" > "$package.info"
@@ -100,6 +101,9 @@ metadata)
     tix-vars -d '' "$package.info" RENAMES | tr , '\n' | sed -E '/^$/d' >> renames.list
     (printf "%s: " "$package" && tix-vars -d '' "$package.info" RUNTIME_DEPS | sed -E 's/ +$//') >> dependencies.list
     sed -E "s/$/:$package/" "$package.manifest" >> manifest.list
+    if [ "$(tix-vars -d false "$package.info" IS_SET)" = true ]; then
+      echo "$package" >> sets.list
+    fi
   done
 
   LC_ALL=C sort -t: -k1,1 manifest.list -o manifest.list
