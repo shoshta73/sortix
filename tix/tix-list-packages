@@ -1,0 +1,179 @@
+#!/bin/sh
+# Copyright (c) 2022, 2024 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-list-packages
+# List packages per their port(5) dependencies.
+
+set -e
+
+unset all_packages
+build_order=false
+dependencies=false
+ports_directory=
+
+operand=1
+dashdash=
+previous_option=
+for argument do
+  if [ -n "$previous_option" ]; then
+    eval $previous_option=\$argument
+    previous_option=
+    shift
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  --all-packages=*) all_packages=$parameter ;;
+  --all-packages) all_packages=ports_directory ;;
+  --build-order) build_order=true ;;
+  --dependencies) dependencies=true ;;
+  --ports=*) ports_directory=$parameter ;;
+  --ports) previous_option=ports_directory ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *) break ;;
+  esac
+
+  shift
+done
+
+if [ -z "$ports_directory" ]; then
+  echo "$0: error: No --ports option was specified" >&2
+  exit 1
+fi
+
+RUNTIME_DEPS=RUNTIME_DEPS
+
+tmpdir=$(mktemp -dt tix-list-packages.XXXXXX)
+trap 'rm -rf -- "$tmpdir"' EXIT HUP INT QUIT TERM
+
+get_all_packages() {(
+  for package in $(ls "$ports_directory"); do
+    if [ -f "$ports_directory/$package/$package.port" ]; then
+      echo $package
+    fi
+  done
+)}
+
+get_package_dependencies_raw() {(
+  if [ -f "$ports_directory/$1/$1.port" ]; then
+    tix-vars -d ''  "$ports_directory/$1/$1.port" BUILD_LIBRARIES $RUNTIME_DEPS
+  fi
+)}
+
+list_dependencies() {(
+  package="$1"
+  for dependency in $(get_package_dependencies_raw "$package"); do
+    if [ "$dependency" != "${dependency%\?}" ]; then
+      dependency="${dependency%\?}"
+      for candidate in $all_packages; do
+        if [ "$candidate" = "$dependency" ]; then
+          echo "$dependency"
+          break
+        fi
+      done
+    else
+      echo "$dependency"
+    fi
+  done
+)}
+
+get_package_dependencies_recursive() {(
+  if [ -e "$tmpdir/$1.visited" ]; then exit; fi
+  touch "$tmpdir/$1.visited"
+  for dependency in $(get_package_dependencies_raw $1); do
+    want=false
+    if [ "$dependency" = '*' ]; then
+       get_all_packages | grep -Ev '^all$'
+       continue
+    fi
+    if [ "$2" = "!!" ]; then
+      want=true
+    else
+      case "$dependency" in
+      *"?") ;;
+      *) want=true ;;
+      esac
+    fi
+    if $want; then
+      dependency=$(echo "$dependency" | tr -d '?')
+      # Optional dependencies might not exist yet.
+      if [ -f "$ports_directory/$dependency/$dependency.port" ]; then
+        echo "$dependency"
+        get_package_dependencies_recursive "$dependency" "$2"
+      fi
+    fi
+  done
+)}
+
+list_package() {(
+  package="$1"
+  # Fast path for listing all packages.
+  if [ "$package" = "all!" -o "$package" = "all!!" ]; then
+    get_all_packages
+    exit
+  fi
+  recursion=$(echo "$package" | grep -Eo '!*$')
+  package=$(echo "$package" | grep -Eo '^[^!]*')
+  echo "$package"
+  if [ -n "$recursion" ]; then
+    get_package_dependencies_recursive "$package" "$recursion"
+  fi
+)}
+
+if $dependencies; then
+  all_packages=${all_packages-all!!}
+  all_packages=$(for package in $all_packages; do
+                   list_package "$package"
+                 done | LC_ALL=C sort -u)
+  RUNTIME_DEPS=
+  for package; do
+    list_dependencies "$package"
+  done | sort -u
+  exit
+fi
+
+packages=$(for package; do
+             list_package "$package"
+           done | LC_ALL=C sort -u)
+
+if $build_order; then
+  all_packages=$packages
+  RUNTIME_DEPS=
+  (for package in $packages; do
+     echo "$package: $(list_dependencies "$package" | tr '\n' ' ')"
+     echo "	@echo $package"
+   done;
+   printf ".PHONY:"
+   for package in $packages; do
+     printf " $package"
+   done;
+   echo) > "$tmpdir/Makefile"
+  packages=$(unset MAKE;
+             unset MFLAGS;
+             unset MAKEFLAGS;
+             make -Bs -f "$tmpdir/Makefile" $packages)
+fi
+
+for package in $packages; do
+  echo "$package"
+done

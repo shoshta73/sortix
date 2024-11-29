@@ -8,6 +8,9 @@ if [ -z "$HOST" ]; then
 elif [ -z "$SORTIX_REPOSITORY_DIR" ]; then
   echo "$0: error: You need to set \$SORTIX_REPOSITORY_DIR" >&2
   exit 1
+elif [ -z "$SORTIX_PORTS_DIR" ]; then
+  echo "$0: error: You need to set \$SORTIX_PORTS_DIR" >&2
+  exit 1
 fi
 
 if ! [ -d "$SORTIX_REPOSITORY_DIR" ]; then
@@ -18,7 +21,7 @@ if ! [ -d "$SORTIX_REPOSITORY_DIR" ]; then
   exit 0
 fi
 
-PACKAGES="$("$(dirname -- "$0")"/list-packages.sh PACKAGES)"
+PACKAGES=$(tix-list-packages --ports="$SORTIX_PORTS_DIR" ${PACKAGES-all!!})
 
 mkdir -p "$1"
 

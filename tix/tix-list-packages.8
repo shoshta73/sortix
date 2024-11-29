@@ -1,0 +1,67 @@
+.Dd November 30, 2024
+.Dt TIX-LIST-PACKAGES 8
+.Os
+.Sh NAME
+.Nm tix-list-packages
+.Nd list packages per their port(5) dependencies
+.Sh SYNOPSIS
+.Nm
+.Fl \-ports Ns = Ns Ar directory
+.Op Fl \-all-packages Ns = Ns Ar package-list
+.Op Fl \-build-order
+.Op Fl \-dependencies
+.Ar packages ...
+.Sh DESCRIPTION
+.Nm
+lists the named
+.Ar packages
+in sorted order using the
+.Xr port 5
+files in the
+.Fl \-ports
+directory.
+The
+.Sq "!"
+package suffix includes its recursive mandatory build time and runtime
+dependencies.
+The
+.Sq !!
+package suffix includes all its recursive mandatory and optional build time and
+runtime dependencies.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-all-packages Ns = Ns Ar package-list
+The full set of ports for the purpose of
+.Fl \-dependencies
+is the space separated
+.Ar package-list
+expanded normally.
+Dependencies are only used if they exist in this list, defaulting to
+.Sy all!! .
+.It Fl \-build-order
+Order the packages in their build order respecting the
+.Sy BUILD_LIBRARIES
+variable in
+.Xr port 5 ,
+such that the packages can be built correctly in this order.
+.It Fl \-dependencies
+Output the direct dependencies of the
+.Ar packages .
+.It Fl \-ports Ns = Ns Ar directory
+Locate the ports in this
+.Ar directory
+where every port has a subdirectory named after it containing its
+.Xr port 5
+file.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr port 5 ,
+.Xr porting 7 ,
+.Xr tix-port 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

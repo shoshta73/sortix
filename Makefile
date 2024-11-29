@@ -340,13 +340,13 @@ endif
 
 .PHONY: available-ports
 available-ports:
-	@for port in $$(build-aux/list-packages.sh PACKAGES); do \
+	@for port in $$(tix-list-packages --ports="$(SORTIX_PORTS_DIR)" $${PACKAGES-all!!}); do \
 	  build-aux/upgrade-port.sh ports/$$port/$$port.port available; \
 	done
 
 .PHONY: upgrade-ports
 upgrade-ports:
-	@for port in $$(build-aux/list-packages.sh PACKAGES); do \
+	@for port in $$(tix-list-packages --ports="$(SORTIX_PORTS_DIR)" $${PACKAGES-all!!}); do \
 	  build-aux/upgrade-port.sh ports/$$port/$$port.port upgrade; \
 	done
 

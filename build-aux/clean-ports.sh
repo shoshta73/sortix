@@ -24,7 +24,7 @@ fi
 SORTIX_PORTS_DIR=$(make_dir_path_absolute "$SORTIX_PORTS_DIR")
 
 # Clean all the packages.
-for PACKAGE in $("$(dirname -- "$0")"/list-packages.sh 'all!'); do
+for PACKAGE in $(tix-list-packages --ports="$SORTIX_PORTS_DIR" 'all!!'); do
   if [ "$1" = distclean ]; then
     DEVELOPMENT=$(tix-vars -d false $SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.port \
                            DEVELOPMENT)

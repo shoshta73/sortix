@@ -92,7 +92,7 @@ if [ "$OPERATION" = build ]; then
   fi
 fi
 
-PACKAGES="$("$(dirname -- "$0")"/list-packages.sh PACKAGES)"
+PACKAGES=$(tix-list-packages --ports="$SORTIX_PORTS_DIR" ${PACKAGES-all!!})
 
 # Simply stop if there is no packages available.
 if [ -z "$PACKAGES" ]; then
@@ -102,26 +102,8 @@ fi
 # Decide the order the packages are built in according to their dependencies.
 if [ "$OPERATION" = build ]; then
   PACKAGES="$(echo "$PACKAGES" | tr ' ' '\n' | sort -R)"
-  DEPENDENCY_MAKEFILE=$(mktemp)
-  (for PACKAGE in $PACKAGES; do
-     DEPENDENCIES="$(PACKAGES="$PACKAGES" \
-                     "$(dirname -- "$0")"/list-packages.sh \
-                     --dependencies $PACKAGE)"
-     echo "$PACKAGE: $(echo "$DEPENDENCIES" | tr '\n' ' ')"
-     echo "	@echo $PACKAGE"
-   done;
-   printf ".PHONY:"
-   for PACKAGE in $PACKAGES; do
-     printf " $PACKAGE"
-   done;
-   echo) > "$DEPENDENCY_MAKEFILE"
-
-  BUILD_LIST=$(unset MAKE;
-               unset MFLAGS;
-               unset MAKEFLAGS;
-               make -Bs -f "$DEPENDENCY_MAKEFILE" $PACKAGES)
-  rm -f "$DEPENDENCY_MAKEFILE"
-  PACKAGES="$BUILD_LIST"
+  PACKAGES=$(tix-list-packages --ports="$SORTIX_PORTS_DIR" \
+                               --build-order $PACKAGES)
 fi
 
 unset CACHE_PACKAGE

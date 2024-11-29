@@ -30,6 +30,7 @@ tix-eradicate-libtool-la \
 tix-iso-add \
 tix-iso-bootconfig \
 tix-iso-liveconfig \
+tix-list-packages \
 tix-port \
 tix-repository \
 
@@ -41,6 +42,7 @@ tix-execpatch.8 \
 tix-iso-add.8 \
 tix-iso-bootconfig.8 \
 tix-iso-liveconfig.8 \
+tix-list-packages.8 \
 tix-port.8 \
 tix-repository.8 \
 tix-rmdiff.8 \
