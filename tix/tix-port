@@ -28,6 +28,8 @@ unset generation
 unset host
 unset make
 unset makeflags
+unset mirror
+unset mirror_directory
 unset prefix
 unset source_port
 unset start
@@ -35,8 +37,6 @@ unset sysroot
 unset tar
 unset target
 unset tmp
-unset mirror
-unset mirror_directory
 
 unset port
 

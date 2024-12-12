@@ -16,6 +16,8 @@
 .Op Fl \-host Ns = Ns Ar triplet
 .Op Fl \-make Ns = Ns Ar path
 .Op Fl \-makeflags Ns = Ns Ar makeflags
+.Op Fl \-mirror Ns = Ns Ar url
+.Op Fl \-mirror-directory Ns = Ns Ar directory
 .Op Fl \-prefix Ns = Ns Ar prefix
 .Op Fl \-source-port Ns = Ns Ar source-port
 .Op Fl \-start Ns = Ns Ar step
@@ -23,8 +25,6 @@
 .Op Fl \-tar Ns = Ns Ar path
 .Op Fl \-target Ns = Ns Ar triplet
 .Op Fl \-tmp Ns = Ns Ar directory
-.Op Fl \-mirror Ns = Ns Ar url
-.Op Fl \-mirror-directory Ns = Ns Ar directory
 .Ar port
 .Sh DESCRIPTION
 .Nm
@@ -152,6 +152,22 @@ if set and otherwise
 Override the
 .Ev MAKEFLAGS
 variable inherited by make.
+.It Fl \-mirror Ns = Ns Ar url
+First attempt to download the upstream releases from the port's source code
+mirror at
+.Ar url
+before attempting the upstream site.
+The files are copied from the filesystem if the
+.Ar url
+has no schema.
+.It Fl \-mirror-directory Ns = Ns Ar directory
+Place the downloaded upstream releases in this
+.Ar directory
+in the layout that can be used as a mirror for the
+.Fl \-mirror
+option.
+(Default:
+.Ar port Ns Pa .mirror )
 .It Fl \-prefix Ns = Ns Ar prefix
 Build the port into this
 .Ar prefix .
@@ -194,22 +210,6 @@ Place temporary files in this
 .Ev TMPDIR
 if set otherwise
 .Pa /tmp )
-.It Fl \-mirror Ns = Ns Ar url
-First attempt to download the upstream releases from the port's source code
-mirror at
-.Ar url
-before attempting the upstream site.
-The files are copied from the filesystem if the
-.Ar url
-has no schema.
-.It Fl \-mirror-directory Ns = Ns Ar directory
-Place the downloaded upstream releases in this
-.Ar directory
-in the layout that can be used as a mirror for the
-.Fl \-mirror
-option.
-(Default:
-.Ar port Ns Pa .mirror )
 .El
 .Sh EXIT STATUS
 .Nm
