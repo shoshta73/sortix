@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2017, 2020, 2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -203,6 +203,18 @@ static cc_t parse_mintime(const char* string)
 	return (cc_t) value;
 }
 
+static size_t parse_winsize(const char* string)
+{
+	if ( !isdigit((unsigned char) string[0]) )
+		errx(1, "invalid window size: %s", string);
+	errno = 0;
+	char* endptr;
+	uintmax_t value = strtoumax(string, &endptr, 10);
+	if ( errno || *endptr || value != (size_t) value )
+		errx(1, "invalid window size: %s", string);
+	return (size_t) value;
+}
+
 static bool is_gfmt1_name(const char* str, const char* name)
 {
 	size_t name_length = strlen(name);
@@ -289,8 +301,9 @@ int main(int argc, char* argv[])
 	char tty_name[TTY_NAME_MAX+1] = "<stdin>";
 	ttyname_r(tty, tty_name, sizeof(tty_name));
 
-	struct winsize ws;
+	struct winsize ws = {0};
 	bool got_ws = tcgetwinsize(tty, &ws) == 0;
+	bool set_ws = false;
 
 	struct termios tio;
 	if ( tcgetattr(tty, &tio) < 0 )
@@ -454,6 +467,22 @@ int main(int argc, char* argv[])
 		}
 		else if ( !strcmp(arg, "size") )
 			printf("%zu %zu\n", ws.ws_row, ws.ws_col);
+		else if ( !strcmp(arg, "columns") || !strcmp(arg, "cols") )
+		{
+			if ( i + 1 == argc )
+				errx(1, "missing argument to %s", arg);
+			const char* parameter = argv[++i];
+			ws.ws_col = parse_winsize(parameter);
+			set_ws = true;
+		}
+		else if ( !strcmp(arg, "rows") )
+		{
+			if ( i + 1 == argc )
+				errx(1, "missing argument to %s", arg);
+			const char* parameter = argv[++i];
+			ws.ws_row = parse_winsize(parameter);
+			set_ws = true;
+		}
 		else if ( !strcmp(arg, "min") )
 		{
 			if ( i + 1 == argc )
@@ -600,6 +629,9 @@ int main(int argc, char* argv[])
 
 	if ( tcsetattr(tty, TCSANOW, &tio) < 0 )
 		err(1, "tcsetattr: %s", tty_name);
+
+	if ( set_ws && tcsetwinsize(tty, &ws) < 0 )
+		err(1, "tcsetwinsize: %s", tty_name);
 
 	return 0;
 }
