@@ -27,12 +27,17 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <poll.h>
 #include <signal.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#if defined(__sortix__) && !defined(TTY_NAME_MAX)
+#include <sortix/limits.h>
+#endif
 
 #include <display-protocol.h>
 
@@ -85,7 +90,13 @@ void server_initialize(struct server* server, struct display* display,
 		server->tty_fd = open(tty, O_RDONLY);
 		if ( server->tty_fd < 0 )
 			err(1, tty);
+		if ( !isatty(server->tty_fd) )
+			err(1, tty);
 	}
+
+	char tty_name[TTY_NAME_MAX + 1];
+	ttyname_r(server->tty_fd, tty_name, sizeof(tty_name));
+	tty = tty_name;
 
 	// TODO: Support for multiple displays.
 	struct tiocgdisplays gdisplays = {0};
