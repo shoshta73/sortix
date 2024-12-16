@@ -17,6 +17,7 @@
  * A named collection of threads.
  */
 
+#include <sys/ioctl.h>
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -463,8 +464,14 @@ void Process::SessionRemoveMember(Process* child) // process_family_lock taken
 	if ( !session_first )
 	{
 		// Remove reference to tty when session is empty.
-		ScopedLock lock(&ptr_lock);
-		tty.Reset();
+		kthread_mutex_lock(&ptr_lock);
+		Ref<Descriptor> session_tty = tty;
+		kthread_mutex_unlock(&ptr_lock);
+		kthread_mutex_unlock(&process_family_lock);
+		ioctx_t ctx; SetupKernelIOCtx(&ctx);
+		if ( session_tty )
+			session_tty->ioctl(&ctx, TIOCUCTTY, 1);
+		kthread_mutex_lock(&process_family_lock);
 	}
 	if ( IsLimboDone() )
 		delete this;
