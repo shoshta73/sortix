@@ -29,8 +29,6 @@
 #include <sortix/kernel/thread.h>
 #include <sortix/kernel/worker.h>
 
-#include "uart.h"
-
 namespace Sortix {
 
 static kthread_mutex_t kutex_lock = KTHREAD_MUTEX_INITIALIZER;

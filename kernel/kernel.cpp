@@ -92,7 +92,6 @@
 #include "net/udp.h"
 #include "poll.h"
 #include "pty.h"
-#include "uart.h"
 #include "vga.h"
 
 #if defined(__i386__) || defined(__x86_64__)
