@@ -1,2 +1,1 @@
-rm -rf -- 'Makefile'
 rm -rf -- 'src/tool_hugehelp.c'

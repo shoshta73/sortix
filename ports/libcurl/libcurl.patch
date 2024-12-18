@@ -1,16 +1,16 @@
 diff -Paur --no-dereference -- libcurl.upstream/Makefile.in libcurl/Makefile.in
 --- libcurl.upstream/Makefile.in
 +++ libcurl/Makefile.in
-@@ -621,7 +621,7 @@
-  $(VC14_20_LIBVCXPROJ) $(VC14_20_SRCVCXPROJ)       \
+@@ -635,7 +635,7 @@
   $(VC14_30_LIBVCXPROJ) $(VC14_30_SRCVCXPROJ)
  
+ DISTCLEANFILES = buildinfo.txt
 -bin_SCRIPTS = curl-config
 +bin_SCRIPTS =
  SUBDIRS = lib docs src scripts
- DIST_SUBDIRS = $(SUBDIRS) tests packages scripts include docs
+ DIST_SUBDIRS = $(SUBDIRS) tests packages include docs
  pkgconfigdir = $(libdir)/pkgconfig
-@@ -1570,6 +1570,17 @@
+@@ -1585,6 +1585,39 @@
  distclean: distclean-recursive
  	-rm -f $(am__CONFIG_DISTCLEAN_FILES)
  	-rm -f Makefile
@@ -25,40 +25,49 @@ diff -Paur --no-dereference -- libcurl.upstream/Makefile.in libcurl/Makefile.in
 +	-rm -f docs/libcurl/*.3
 +	-rm -f docs/libcurl/opts/*.3
 +	-rm -f scripts/Makefile
++	-rm -rf lib/.deps
++	-rm -rf lib/vauth/.deps
++	-rm -rf lib/vquic/.deps
++	-rm -rf lib/vssh/.deps
++	-rm -rf lib/vtls/.deps
++	-rm -rf src/.deps
++	-rm -rf tests/certs/Makefile
++	-rm -rf tests/certs/scripts/Makefile
++	-rm -rf tests/config
++	-rm -rf tests/configurehelp.pm
++	-rm -rf tests/data/Makefile
++	-rm -rf tests/http/clients/.deps
++	-rm -rf tests/http/clients/Makefile
++	-rm -rf tests/http/config.ini
++	-rm -rf tests/http/Makefile
++	-rm -rf tests/libtest/.deps
++	-rm -rf tests/libtest/Makefile
++	-rm -rf tests/Makefile
++	-rm -rf tests/server/.deps
++	-rm -rf tests/server/Makefile
++	-rm -rf tests/unit/.deps
++	-rm -rf tests/unit/Makefile
  distclean-am: clean-am distclean-generic distclean-libtool \
  	distclean-tags
  
 diff -Paur --no-dereference -- libcurl.upstream/configure libcurl/configure
 --- libcurl.upstream/configure
 +++ libcurl/configure
-@@ -23081,9 +23081,7 @@
- 
+@@ -29439,9 +29439,7 @@
  fi
  
--if test "$HAVE_GETHOSTBYNAME" != "1"; then
--  as_fn_error $? "couldn't find libraries for gethostbyname()" "$LINENO" 5
--fi
-+# PATCH: gethostbyname is not actually needed.
  
- 
- curl_includes_winsock2="\
-@@ -37811,11 +37809,8 @@
- 
- int main (void)
- {
--#ifdef h_errno
-+  /* PATCH: h_errno has nothing to do with getaddrinfo */
-   return 0;
--#else
--  #error force compilation error
--#endif
- }
- 
- 
+-  if test "$LIBPSL_ENABLED" != "1"; then
+-    as_fn_error $? "libpsl libs and/or directories were not found where specified!" "$LINENO" 5
+-  fi
++  # TODO: libpsl should be detected rather than fail if not explicitly disabled
+ fi
+  if test "$curl_psl_msg" = "enabled"; then
+   USE_LIBPSL_TRUE=
 diff -Paur --no-dereference -- libcurl.upstream/docs/Makefile.in libcurl/docs/Makefile.in
 --- libcurl.upstream/docs/Makefile.in
 +++ libcurl/docs/Makefile.in
-@@ -487,8 +487,8 @@
+@@ -493,8 +493,8 @@
  
  # if we disable man page building, ignore these
  @BUILD_DOCS_TRUE@MK_CA_DOCS = mk-ca-bundle.1
@@ -72,7 +81,7 @@ diff -Paur --no-dereference -- libcurl.upstream/docs/Makefile.in libcurl/docs/Ma
 diff -Paur --no-dereference -- libcurl.upstream/include/curl/curl.h libcurl/include/curl/curl.h
 --- libcurl.upstream/include/curl/curl.h
 +++ libcurl/include/curl/curl.h
-@@ -83,18 +83,7 @@
+@@ -84,18 +84,7 @@
  #endif
  #endif
  
@@ -94,8 +103,8 @@ diff -Paur --no-dereference -- libcurl.upstream/include/curl/curl.h libcurl/incl
 diff -Paur --no-dereference -- libcurl.upstream/lib/curl_addrinfo.h libcurl/lib/curl_addrinfo.h
 --- libcurl.upstream/lib/curl_addrinfo.h
 +++ libcurl/lib/curl_addrinfo.h
-@@ -71,6 +71,16 @@
-                     struct Curl_addrinfo **result);
+@@ -76,6 +76,16 @@
+ Curl_he2ai(const struct hostent *he, int port);
  #endif
  
 +#if defined(__sortix__)
@@ -109,5 +118,5 @@ diff -Paur --no-dereference -- libcurl.upstream/lib/curl_addrinfo.h libcurl/lib/
 +};
 +#endif
  struct Curl_addrinfo *
- Curl_he2ai(const struct hostent *he, int port);
+ Curl_ip2addr(int af, const void *inaddr, const char *hostname, int port);
  
