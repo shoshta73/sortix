@@ -323,7 +323,7 @@ diff -Paur --no-dereference -- ssh.upstream/auth.c ssh/auth.c
 diff -Paur --no-dereference -- ssh.upstream/channels.c ssh/channels.c
 --- ssh.upstream/channels.c
 +++ ssh/channels.c
-@@ -1442,7 +1442,6 @@
+@@ -1444,7 +1444,6 @@
  channel_decode_socks4(Channel *c, struct sshbuf *input, struct sshbuf *output)
  {
  	const u_char *p;
@@ -331,7 +331,7 @@ diff -Paur --no-dereference -- ssh.upstream/channels.c ssh/channels.c
  	u_int len, have, i, found, need;
  	char username[256];
  	struct {
-@@ -1506,7 +1505,9 @@
+@@ -1508,7 +1507,9 @@
  	free(c->path);
  	c->path = NULL;
  	if (need == 1) {			/* SOCKS4: one string */
@@ -342,7 +342,7 @@ diff -Paur --no-dereference -- ssh.upstream/channels.c ssh/channels.c
  		c->path = xstrdup(host);
  	} else {				/* SOCKS4A: two strings */
  		have = sshbuf_len(input);
-@@ -2511,8 +2512,8 @@
+@@ -2513,8 +2514,8 @@
  		return;
  	}
  	if ((euid != 0) && (getuid() != euid)) {
@@ -374,9 +374,9 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  #define testmacro foo
  #define testmacro bar
  int
-@@ -13317,6 +13321,10 @@
- printf "%s\n" "#define BROKEN_SETVBUF 1" >>confdefs.h
- 
+@@ -13320,6 +13324,10 @@
+ *-*-gnu*)
+ 					CPPFLAGS="$CPPFLAGS -D_XOPEN_SOURCE=600 -D_BSD_SOURCE -D_DEFAULT_SOURCE -D_GNU_SOURCE"
  	;;
 +*-*-sortix*)
 +	default_user_path="/bin:/sbin"
@@ -385,7 +385,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  esac
  
  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking compiler and flags for sanity" >&5
-@@ -22205,7 +22213,12 @@
+@@ -22232,7 +22240,12 @@
  	long long num = 0x7fffffffffffffffll;
  #endif
  	strcpy(expected_out, "9223372036854775807");
@@ -399,7 +399,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  	if(strcmp(buf, expected_out) != 0)
  		exit(1);
  	exit(0);
-@@ -25139,7 +25152,8 @@
+@@ -25166,7 +25179,8 @@
  	elif ${NROFF} -man ${srcdir}/ssh.1 >/dev/null 2>&1; then
  		MANTYPE=man
  	else
@@ -409,7 +409,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  	fi
  fi
  
-@@ -25328,7 +25342,7 @@
+@@ -25355,7 +25369,7 @@
  		fi
  		if test "$cross_compiling" = yes
  then :
@@ -418,7 +418,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  
  else $as_nop
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -25344,7 +25358,7 @@
+@@ -25371,7 +25385,7 @@
  # ifdef _PATH_USERPATH	/* Irix */
  #  define _PATH_STDPATH _PATH_USERPATH
  # else
@@ -427,7 +427,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  # endif
  #endif
  #include <sys/types.h>
-@@ -25376,7 +25390,7 @@
+@@ -25403,7 +25417,7 @@
  then :
     user_path=`cat conftest.stdpath`
  else $as_nop
@@ -565,7 +565,7 @@ diff -Paur --no-dereference -- ssh.upstream/kex.h ssh/kex.h
 diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
 --- ssh.upstream/loginrec.c
 +++ ssh/loginrec.c
-@@ -147,6 +147,7 @@
+@@ -126,6 +126,7 @@
  
  #include "includes.h"
  
@@ -573,7 +573,7 @@ diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
  #include <sys/types.h>
  #include <sys/stat.h>
  #include <sys/socket.h>
-@@ -187,6 +188,20 @@
+@@ -166,6 +167,20 @@
  # include <util.h>
  #endif
  
@@ -594,7 +594,7 @@ diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
  /**
   ** prototypes for helper functions in this file
   **/
-@@ -439,6 +454,10 @@
+@@ -418,6 +433,10 @@
  int
  login_write(struct logininfo *li)
  {
@@ -605,7 +605,7 @@ diff -Paur --no-dereference -- ssh.upstream/loginrec.c ssh/loginrec.c
  #ifndef HAVE_CYGWIN
  	if (geteuid() != 0) {
  		logit("Attempt to write login records by non-root user (aborting)");
-@@ -1033,7 +1052,7 @@
+@@ -1015,7 +1034,7 @@
  		return (0);
  	}
  # else
@@ -1089,7 +1089,7 @@ diff -Paur --no-dereference -- ssh.upstream/servconf.c ssh/servconf.c
  #ifdef HAVE_NET_ROUTE_H
  #include <net/route.h>
  #endif
-@@ -325,7 +326,10 @@
+@@ -327,7 +328,10 @@
  	if (options->pid_file == NULL)
  		options->pid_file = xstrdup(_PATH_SSH_DAEMON_PID_FILE);
  	if (options->moduli_file == NULL)
@@ -1337,7 +1337,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.1 ssh/ssh-keygen.1
 diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
 --- ssh.upstream/ssh-keygen.c
 +++ ssh/ssh-keygen.c
-@@ -843,7 +843,7 @@
+@@ -871,7 +871,7 @@
  	}
  	sshkey_free(prv);
  	free(comment);
@@ -1346,7 +1346,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  }
  
  static void
-@@ -1001,7 +1001,7 @@
+@@ -1029,7 +1029,7 @@
  			free(line);
  			fclose(f);
  			fingerprint_private(path);
@@ -1355,7 +1355,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  		}
  
  		/*
-@@ -1050,7 +1050,7 @@
+@@ -1078,7 +1078,7 @@
  
  	if (invalid)
  		fatal("%s is not a public key file.", path);
@@ -1364,7 +1364,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  }
  
  static void
-@@ -1090,14 +1090,32 @@
+@@ -1118,14 +1118,32 @@
  
  		/* Check whether private key exists and is not zero-length */
  		if (stat(prv_file, &st) == 0) {
@@ -1398,7 +1398,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  		/*
  		 * Private key doesn't exist or is invalid; proceed with
  		 * key generation.
-@@ -3381,7 +3399,7 @@
+@@ -3414,7 +3432,7 @@
  	/* we need this for the home * directory.  */
  	pw = getpwuid(getuid());
  	if (!pw)
@@ -1407,7 +1407,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-keygen.c ssh/ssh-keygen.c
  	pw = pwcopy(pw);
  	if (gethostname(hostname, sizeof(hostname)) == -1)
  		fatal("gethostname: %s", strerror(errno));
-@@ -3737,8 +3755,10 @@
+@@ -3770,8 +3788,10 @@
  		}
  		return do_download_sk(sk_provider, sk_device);
  	}
@@ -1572,7 +1572,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd-session.c ssh/sshd-session.c
  /* Re-exec fds */
  #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
  #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
-@@ -309,8 +318,8 @@
+@@ -311,8 +320,8 @@
  			fatal("chdir(\"/\"): %s", strerror(errno));
  
  		/* Drop our privileges */
@@ -1583,7 +1583,59 @@ diff -Paur --no-dereference -- ssh.upstream/sshd-session.c ssh/sshd-session.c
  		gidset[0] = privsep_pw->pw_gid;
  		if (setgroups(1, gidset) == -1)
  			fatal("setgroups: %.100s", strerror(errno));
-@@ -1480,10 +1489,10 @@
+@@ -882,7 +891,7 @@
+ 	struct connection_info *connection_info = NULL;
+ 	sigset_t sigmask;
+ 	uint64_t timing_secret = 0;
+-	struct itimerval itv;
++	timer_t timer = 0;
+ 
+ 	sigemptyset(&sigmask);
+ 	sigprocmask(SIG_SETMASK, &sigmask, NULL);
+@@ -1279,14 +1288,21 @@
+ 	ssh_signal(SIGALRM, grace_alarm_handler);
+ 	if (!debug_flag && options.login_grace_time > 0) {
+ 		int ujitter = arc4random_uniform(4 * 1000000);
++		struct sigevent sev;
++		struct itimerspec its;
+ 
+-		timerclear(&itv.it_interval);
+-		itv.it_value.tv_sec = options.login_grace_time;
+-		itv.it_value.tv_sec += ujitter / 1000000;
+-		itv.it_value.tv_usec = ujitter % 1000000; 
+-
+-		if (setitimer(ITIMER_REAL, &itv, NULL) == -1)
+-			fatal("login grace time setitimer failed");
++		memset(&sev, 0, sizeof(sev));
++		sev.sigev_notify = SIGEV_SIGNAL;
++		sev.sigev_signo = SIGALRM;
++
++		if (timer_create(CLOCK_REALTIME, &sev, &timer) == -1)
++			fatal("login grace time timer_create failed");
++		memset(&its, 0, sizeof(its));
++		its.it_value.tv_sec = options.login_grace_time;
++		its.it_value.tv_sec += ujitter / 1000000;
++		its.it_value.tv_nsec = (ujitter % 1000000) * 1000;
++		if (timer_settime(timer, 0, &its, NULL) == -1)
++			fatal("login grace time timer_settime failed");
+ 	}
+ 
+ 	if ((r = kex_exchange_identification(ssh, -1,
+@@ -1331,10 +1347,9 @@
+ 	 * Cancel the alarm we set to limit the time taken for
+ 	 * authentication.
+ 	 */
+-	timerclear(&itv.it_interval);
+-	timerclear(&itv.it_value);
+-	if (setitimer(ITIMER_REAL, &itv, NULL) == -1)
+-		fatal("login grace time clear failed");
++	if (!debug_flag && options.login_grace_time > 0) {
++		timer_delete(timer);
++	}
+ 	ssh_signal(SIGALRM, SIG_DFL);
+ 	authctxt->authenticated = 1;
+ 	if (startup_pipe != -1) {
+@@ -1495,10 +1510,10 @@
  		do_cleanup(the_active_state, the_authctxt);
  		if (privsep_is_preauth &&
  		    pmonitor != NULL && pmonitor->m_pid > 1) {
@@ -1619,7 +1671,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.8 ssh/sshd.8
  .Pp
  The options are as follows:
  .Bl -tag -width Ds
-@@ -1005,14 +1005,6 @@
+@@ -1009,14 +1009,6 @@
  during privilege separation in the pre-authentication phase.
  The directory should not contain any files and must be owned by root
  and not group or world-writable.
@@ -1653,7 +1705,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  /* Re-exec fds */
  #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
  #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
-@@ -1227,6 +1236,10 @@
+@@ -1234,6 +1243,10 @@
  	/* Initialize configuration options to their default values. */
  	initialize_server_options(&options);
  
@@ -1664,8 +1716,8 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  	/* Parse command-line arguments. */
  	while ((opt = getopt(ac, av,
  	    "C:E:b:c:f:g:h:k:o:p:u:46DGQRTdeiqrtV")) != -1) {
-@@ -1344,7 +1357,26 @@
- 	if (!test_flag && !do_dump_cfg && !path_absolute(av[0]))
+@@ -1351,7 +1364,26 @@
+ 	if (!test_flag && !inetd_flag && !do_dump_cfg && !path_absolute(av[0]))
  		fatal("sshd requires execution with an absolute path");
  
 -	closefrom(STDERR_FILENO + 1);
@@ -1692,7 +1744,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  
  	/* Reserve fds we'll need later for reexec things */
  	if ((devnull = open(_PATH_DEVNULL, O_RDWR)) == -1)
-@@ -1722,7 +1754,8 @@
+@@ -1729,7 +1761,8 @@
  		 * Write out the pid file after the sigterm handler
  		 * is setup and the listen sockets are bound
  		 */
@@ -1702,7 +1754,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  			FILE *f = fopen(options.pid_file, "w");
  
  			if (f == NULL) {
-@@ -1734,6 +1767,15 @@
+@@ -1741,6 +1774,15 @@
  			}
  		}
  
@@ -1747,7 +1799,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd_config ssh/sshd_config
 diff -Paur --no-dereference -- ssh.upstream/sshkey.c ssh/sshkey.c
 --- ssh.upstream/sshkey.c
 +++ ssh/sshkey.c
-@@ -43,7 +43,6 @@
+@@ -44,7 +44,6 @@
  #include <stdio.h>
  #include <stdlib.h>
  #include <string.h>
