@@ -15,52 +15,71 @@ if [ $# = 0 ]; then
   exit 1
 fi
 OPERATION="$1"
+CLEAN=false
+unset CACHE_PACKAGE
+unset DISTCLEAN
+unset END
+unset RANDOMIZE
+unset START
 case "$OPERATION" in
-download|extract|build) ;;
+distclean) CLEAN=true; DISTCLEAN=--distclean ;;
+clean) CLEAN=true; START=clean; END=clean ;;
+download) END=download ;;
+extract) END=extract ;;
+build) CACHE_PACKAGE=--cache-package; RANDOMIZE=--randomize ;;
 *) echo "$0: error: Invalid operation: $OPERATION" >&2
    exit 1
 esac
 
 # Detect if the environment isn't set up properly.
-if [ -z "$HOST" ]; then
+if ! $clean && [ -z "$HOST" ]; then
   echo "$0: error: You need to set \$HOST" >&2
   exit 1
-elif [ -z "$SYSROOT" ]; then
+elif ! $clean && [ -z "$SYSROOT" ]; then
   echo "$0: error: You need to set \$SYSROOT" >&2
   exit 1
 elif [ -z "$SORTIX_PORTS_DIR" ]; then
   echo "$0: error: You need to set \$SORTIX_PORTS_DIR" >&2
   exit 1
-elif [ -z "$SORTIX_MIRROR_DIR" ]; then
+elif ! $clean && [ -z "$SORTIX_MIRROR_DIR" ]; then
   echo "$0: error: You need to set \$SORTIX_MIRROR_DIR" >&2
   exit 1
-elif [ -z "$SORTIX_REPOSITORY_DIR" ]; then
+elif ! $clean && [ -z "$SORTIX_REPOSITORY_DIR" ]; then
   echo "$0: error: You need to set \$SORTIX_REPOSITORY_DIR" >&2
   exit 1
 elif ! [ -d "$SORTIX_PORTS_DIR" ]; then
   echo "Warning: No ports directory found, third party software will not be built"
   exit 0
-elif ! has_command tix-rmdiff; then
-  echo "$0: error: You need to have installed Tix locally to compile ports." >&2
-  exit 1
+elif ! has_command tix-metabuild; then
+  if $clean; then
+    echo "$0: warning: You need to have Tix installed Tix to clean ports." >&2
+    exit 0
+  else
+    echo "$0: error: You need to have Tix installed Tix to compile ports." >&2
+    exit 1
+  fi
 fi
 
-# Create the mirror directory for downloaded archives.
-mkdir -p "$SORTIX_MIRROR_DIR"
+if ! $CLEAN; then
+  # Create the mirror directory for downloaded archives.
+  mkdir -p "$SORTIX_MIRROR_DIR"
 
-# Add the platform triplet to the binary repository path.
-if [ "$OPERATION" = build ]; then
-  SORTIX_REPOSITORY_DIR="$SORTIX_REPOSITORY_DIR/$HOST"
-  mkdir -p "$SORTIX_REPOSITORY_DIR"
-fi
+  # Add the platform triplet to the binary repository path.
+  if [ "$OPERATION" = build ]; then
+    SORTIX_REPOSITORY_DIR="$SORTIX_REPOSITORY_DIR/$HOST"
+    mkdir -p "$SORTIX_REPOSITORY_DIR"
+  fi
 
-# Create the system root if absent.
-if [ "$OPERATION" = build ]; then
-  mkdir -p "$SYSROOT"
+  # Create the system root if absent.
+  if [ "$OPERATION" = build ]; then
+    mkdir -p "$SYSROOT"
+  fi
 fi
 
 # Make paths absolute for later use.
-SORTIX_MIRROR_DIR=$(make_dir_path_absolute "$SORTIX_MIRROR_DIR")
+if ! $CLEAN; then
+  SORTIX_MIRROR_DIR=$(make_dir_path_absolute "$SORTIX_MIRROR_DIR")
+fi
 SORTIX_PORTS_DIR=$(make_dir_path_absolute "$SORTIX_PORTS_DIR")
 if [ "$OPERATION" = build ]; then
   SYSROOT=$(make_dir_path_absolute "$SYSROOT")
@@ -85,53 +104,21 @@ CXXFLAGS="$CXXFLAGS $WERRORFORMAT"
 export CFLAGS
 export CXXFLAGS
 
-# Initialize Tix package management in the system root if absent.
-if [ "$OPERATION" = build ]; then
-  if [ ! -e "$SYSROOT/tix/collection.conf" ]; then
-    tix-collection "$SYSROOT" create --platform=$HOST --prefix= --generation=3
-  fi
-fi
-
-PACKAGES=$(tix-list-packages --ports="$SORTIX_PORTS_DIR" ${PACKAGES-all!!})
-
-# Simply stop if there is no packages available.
-if [ -z "$PACKAGES" ]; then
-  exit 0
-fi
-
-# Decide the order the packages are built in according to their dependencies.
-if [ "$OPERATION" = build ]; then
-  PACKAGES="$(echo "$PACKAGES" | tr ' ' '\n' | sort -R)"
-  PACKAGES=$(tix-list-packages --ports="$SORTIX_PORTS_DIR" \
-                               --build-order $PACKAGES)
-fi
-
-unset CACHE_PACKAGE
-unset END
-if [ "$OPERATION" = download ]; then
-  END=download
-elif [ "$OPERATION" = extract ]; then
-  END=extract
-else
-  CACHE_PACKAGE=--cache-package
-fi
-
 # Build and install all the packages.
-for PACKAGE in $PACKAGES; do
-  SOURCE_PORT=$(tix-vars -d '' $SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE.port \
-                         SOURCE_PORT)
-  tix-port \
-    ${BUILD:+--build="$BUILD"} \
-    $CACHE_PACKAGE \
-    --collection="$SYSROOT" \
-    --destination="$SORTIX_REPOSITORY_DIR" \
-    ${END:+--end="$END"} \
-    --generation=3 \
-    --host=$HOST \
-    ${SORTIX_PORTS_MIRROR:+--mirror="$SORTIX_PORTS_MIRROR"} \
-    --mirror-directory="$SORTIX_MIRROR_DIR" \
-    --prefix= \
-    ${SOURCE_PORT:+--source-port="$SORTIX_PORTS_DIR/$SOURCE_PORT/$SOURCE_PORT"} \
-    --sysroot="$SYSROOT" \
-    "$SORTIX_PORTS_DIR/$PACKAGE/$PACKAGE"
-done
+tix-metabuild \
+  ${BUILD:+--build="$BUILD"} \
+  $CACHE_PACKAGE \
+  --collection="$SYSROOT" \
+  --destination="$SORTIX_REPOSITORY_DIR" \
+  $DISTCLEAN \
+  ${END:+--end="$END"} \
+  --generation=3 \
+  --host=$HOST \
+  ${SORTIX_PORTS_MIRROR:+--mirror="$SORTIX_PORTS_MIRROR"} \
+  --mirror-directory="$SORTIX_MIRROR_DIR" \
+  --packages="${PACKAGES-all!!}" \
+  --prefix= \
+  $RANDOMIZE \
+  ${START:+--start="$START"} \
+  --sysroot="$SYSROOT" \
+  "$SORTIX_PORTS_DIR"

@@ -411,7 +411,7 @@ clean-ports:
 	@SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
 	 MAKE="$(MAKE)" \
 	 MAKEFLAGS="$(MAKEFLAGS)" \
-	 build-aux/clean-ports.sh
+	 build-aux/build-ports.sh clean
 
 .PHONY: clean-builds
 clean-builds:
@@ -439,7 +439,7 @@ distclean-ports:
 	@SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
 	 MAKE="$(MAKE)" \
 	 MAKEFLAGS="$(MAKEFLAGS)" \
-	 build-aux/clean-ports.sh distclean
+	 build-aux/build-ports.sh distclean
 
 .PHONY: mostlyclean
 mostlyclean: clean-core distclean-ports clean-builds clean-release clean-sysroot clean-cross-compiler

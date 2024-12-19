@@ -1,0 +1,226 @@
+#!/bin/sh
+# Copyright (c) 2014, 2015, 2016, 2022, 2023, 2024 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-metabuild
+# Build packages from ports.
+
+set -e
+
+unset build
+cache_package=
+unset collection
+unset destination
+unset distclean
+unset end
+unset exec_prefix
+unset generation
+unset host
+unset hosts
+unset make
+unset makeflags
+metadata=false
+unset mirror
+unset mirror_directory
+unset packages
+unset prefix
+unset release_directory
+unset repository
+sort=
+unset source_port
+unset start
+unset sysroot
+unset sysroots
+unset tar
+unset target
+unset tmp
+
+operand=1
+dashdash=
+previous_option=
+for argument do
+  if [ -n "$previous_option" ]; then
+    eval $previous_option=\$argument
+    previous_option=
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  --build=*) build=$parameter ;;
+  --build) previous_option=build ;;
+  --cache-package) cache_package=--cache-package ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --destination=*) destination=$parameter ;;
+  --destination) previous_option=destination ;;
+  --distclean) distclean=true ;;
+  --end=*) end=$parameter ;;
+  --end) previous_option=end ;;
+  --exec-prefix=*) exec_prefix=$parameter ;;
+  --exec-prefix) previous_option=exec_prefix ;;
+  --generation=*) generation=$parameter ;;
+  --generation) previous_option=generation ;;
+  --host=*) host=$parameter ;;
+  --host) previous_option=host ;;
+  --hosts=*) hosts=$parameter ;;
+  --hosts) previous_option=hosts ;;
+  --make=*) make=$parameter ;;
+  --make) previous_option=make ;;
+  --makeflags=*) makeflags=$parameter ;;
+  --makeflags) previous_option=makeflags ;;
+  --metadata) metadata=true ;;
+  --mirror=*) mirror=$parameter ;;
+  --mirror) previous_option=mirror ;;
+  --mirror-directory=*) mirror_directory=$parameter ;;
+  --mirror-directory) previous_option=mirror_directory ;;
+  --packages=*) packages=$parameter ;;
+  --packages) previous_option=packages ;;
+  --prefix=*) prefix=$parameter ;;
+  --prefix) previous_option=prefix ;;
+  --randomize) sort="-R" ;;
+  --release-directory=*) release_directory=$parameter ;;
+  --release-directory) previous_option=release_directory ;;
+  --repository=*) repository=$parameter ;;
+  --repository) previous_option=repository ;;
+  --start=*) start=$parameter ;;
+  --start) previous_option=start ;;
+  --sysroot=*) sysroot=$parameter ;;
+  --sysroot) previous_option=sysroot ;;
+  --sysroots=*) sysroots=$parameter ;;
+  --sysroots) previous_option=sysroots ;;
+  --tar=*) tar=$parameter ;;
+  --tar) previous_option=tar ;;
+  --target=*) target=$parameter ;;
+  --target) previous_option=target ;;
+  --tmp=*) tmp=$parameter ;;
+  --tmp) previous_option=tmp ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *)
+    if [ $operand = 1 ]; then
+      ports="$argument"
+      operand=2
+    else
+      echo "$0: unexpected extra operand $argument" >&2
+      exit 1
+    fi
+    ;;
+  esac
+done
+
+if [ -n "$previous_option" ]; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+if [ -z "$ports" ]; then
+  echo "$0: error: No ports directory was specified" >&2
+  exit 1
+fi
+
+packages=$(tix-list-packages --ports="$ports" ${packages-all!!})
+
+# Build and install all the packages.
+for host in ${hosts-${host-build}}; do
+  # Determine per-host parameters.
+  if [ "$host" = build ]; then
+    unset host
+  fi
+  if [ -n "${sysroots+x}" ]; then
+     if [ "$host" != build ]; then
+       sysroot="$sysroots/$host"
+     else
+       unset sysroot
+     fi
+  fi
+  if $metadata; then
+    if [ -n "${hosts+x}" -o -z "${destination+x}" ]; then
+      if [ -z "${repository+x}" -a -n "${release_directory+x}" ]; then
+        repository="$release_directory/repository"
+      fi
+      if [ -n "${repository+x}" ]; then
+        destination="$repository/${host-`tix-build ${build+--build="$build"} \
+                                                   ${host+--host="$host"} \
+                                                   --print-host`}"
+      else
+        destination=.
+      fi
+    fi
+  fi
+
+  if [ "$end" != extract -a "$end" != download -a "$end" != tix-build-start -a \
+       "$end" != clean -a "$end" != pre-clean -a -z "$distclean" ]; then
+    # Initialize Tix package management if absent.
+    if [ -n "${collection+x}" ]; then
+      collection_dir="$collection"
+    else
+      collection_dir="$sysroot$prefix"
+    fi
+    if [ ! -e "$collection_dir/tix/collection.conf" ]; then
+      tix-collection \
+        ${generation+--generation="$generation"} \
+        ${host+--platform="$host"} \
+        ${prefix+--prefix="$prefix"} \
+        "$collection_dir" \
+        create
+    fi
+    # Decide the order the packages are built in per their dependencies.
+    packages="$(echo "$packages" | tr ' ' '\n' | sort $sort)"
+    packages=$(tix-list-packages --ports="$ports" \
+                                 --build-order -- $packages)
+  fi
+
+  # Build each package in order.
+  for package in $packages; do
+    source_port=$(tix-vars -d '' "$ports/$package/$package.port" SOURCE_PORT)
+    tix-port \
+      ${build+--build="$build"} \
+      $cache_package \
+      ${collection+--collection="$collection"} \
+      ${destination+--destination="$destination"} \
+      ${distclean+--distclean} \
+      ${end+--end="$end"} \
+      ${exec_prefix+--exec-prefix="$exec_prefix"} \
+      ${generation+--generation="$generation"} \
+      ${host+--host="$host"} \
+      ${make+--make="$make"} \
+      ${makeflags+--makeflags="$makeflags"} \
+      ${mirror+--mirror="$mirror"} \
+      ${mirror_directory+--mirror-directory="$mirror_directory"} \
+      ${prefix+--prefix="$prefix"} \
+      ${release_directory+--release-directory="$release_directory"} \
+      ${repository+--repository="$repository"} \
+      ${source_port:+--source-port="$ports/$source_port/$source_port"} \
+      ${start+--start="$start"} \
+      ${sysroot+--sysroot="$sysroot"} \
+      ${tar+--tar="$tar"} \
+      ${target+--target="$target"} \
+      ${tmp+--tmp="$tmp"} \
+      "$ports/$package/$package"
+  done
+
+  # Generate metadata for the per-host repository.
+  if $metadata; then
+    tix-repository \
+      ${generation+--generation="$generation"} \
+      metadata "$destination"
+  fi
+done

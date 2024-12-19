@@ -1,0 +1,266 @@
+.Dd December 27, 2024
+.Dt TIX-METABUILD 8
+.Os
+.Sh NAME
+.Nm tix-metabuild
+.Nd build packages from ports
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-build Ns = Ns Ar triplet
+.Op Fl \-cache-package
+.Op Fl \-collection Ns = Ns Ar collection
+.Op Fl \-destination Ns = Ns Ar directory
+.Op Fl \-distclean
+.Op Fl \-end Ns = Ns Ar step
+.Op Fl \-exec-prefix Ns = Ns Ar prefix
+.Op Fl \-generation Ns = Ns Ar level
+.Op Fl \-host Ns = Ns Ar triplet
+.Op Fl \-hosts Ns = Ns Ar triplets
+.Op Fl \-make Ns = Ns Ar path
+.Op Fl \-makeflags Ns = Ns Ar makeflags
+.Op Fl \-metadata
+.Op Fl \-mirror Ns = Ns Ar url
+.Op Fl \-mirror-directory Ns = Ns Ar directory
+.Op Fl \-packages Ns = Ns Ar packages
+.Op Fl \-prefix Ns = Ns Ar prefix
+.Op Fl \-randomize
+.Op Fl \-release-directory Ns = Ns Ar directory
+.Op Fl \-repository Ns = Ns Ar directory
+.Op Fl \-start Ns = Ns Ar step
+.Op Fl \-sysroot Ns = Ns Ar directory
+.Op Fl \-sysroots Ns = Ns Ar directory
+.Op Fl \-tar Ns = Ns Ar path
+.Op Fl \-target Ns = Ns Ar triplet
+.Op Fl \-tmp Ns = Ns Ar directory
+.Ar ports
+.Sh DESCRIPTION
+.Nm
+builds each port in the
+.Ar ports
+directory and creates a repository with the binary packages.
+Each port is in its own subdirectory named after it, containing the
+.Xr port 5
+The
+.Fl \-packages
+option can be used to select which packages to build.
+.Nm
+determines the build order using
+.Xr tix-list-packages 8 ,
+and then builds and installs the packages in order using
+.Xr tix-port 8 ,
+forwarding all the appropriate options.
+.Nm
+is usually invoked through
+.Xr development 7
+for the official ports.
+.Pp
+If the end of the build is beyond the
+.Sy clean
+phase, then the tix collection is automatically created if needed using
+.Xr tix-collection 8
+before the builds begin.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-build Ns = Ns Ar triplet
+The platform
+.Ar triplet
+for the machine the port is built on.
+(Default: Automatically detected.)
+.It Fl \-cache-package
+Skip the build if the binary package already exists and is the right version.
+.It Fl \-collection Ns = Ns Ar collection
+Install the binary package into this
+.Ar collection
+created with
+.Xr tix-collection 8 .
+(Default:
+.Fl \-sysroot
+plus
+.Fl \-prefix )
+.It Fl \-destination Ns = Ns Ar directory
+The binary package is placed inside this
+.Ar directory .
+.It Fl \-distclean
+Clean the port for distribution.
+Remove the extraction and all the metadata files.
+If
+.Sy DEVELOPMENT
+is
+.Sy true
+in the
+.Xr port 5 ,
+then emit a warning, and do nothing to avoid deleting any in-progress work.
+.It Fl \-end Ns = Ns Ar step
+Stop the build after this
+.Ar step :
+.Pp
+.Bl -tag -width "clean, pre-clean" -compact
+.It start
+The start step before anything has happened.
+.It download
+Download the source code.
+.It extract
+Extract the source code and apply patches.
+.It tix-build-start
+The start step in
+.Xr tix-build 8 .
+.It clean, pre-clean
+Clean the source directory before the build.
+.It configure
+Configure the port.
+.It build
+Build the port.
+.It install
+Install the port into the
+.Ev DESTDIR .
+.It post-install
+Run the post-installation script.
+.It post-clean
+Clean the source code after the port.
+.It package
+Create the binary package.
+.It tix-build-end
+The end step in
+.Xr tix-build 8 .
+.It strip
+Strip the executables in the binary package.
+.It diff
+Regenerate the patches if in development.
+.It tix-install
+Install the binary package.
+.It end
+The end step after everything has happened.
+(Default)
+.El
+.It Fl \-exec-prefix Ns = Ns Ar prefix
+The
+.Ar prefix
+where architecture dependent files are installed.
+(Default:
+.Fl \-prefix )
+.It Fl \-generation Ns = Ns Ar generation
+Create a binary package in the format of this tix generation
+.Ar level .
+(Default: 3)
+.It Fl \-host Ns = Ns Ar triplet
+The platform
+.Ar triplet
+for the machine the port will run on.
+(Default:
+.Fl \-build )
+.It Fl \-hosts Ns = Ns Ar triplets
+Build binary packages for each
+.Fl \-host
+triplet in the space-separated
+.Ar triplets list.
+The
+.Fl \-sysroots
+option is useful for cross-compilation.
+.It Fl \-make Ns = Ns Ar path
+Which
+.Xr make 1
+to use.
+(Default:
+.Ev MAKE
+if set and otherwise
+.Xr make 1 )
+.It Fl \-makeflags Ns = Ns Ar makeflags
+Override the
+.Ev MAKEFLAGS
+variable inherited by make.
+.It Fl \-metadata
+After building the packages, run the
+.Xr tix-repository 8
+metadata command to generate the tix repository metadata from the binary
+packages.
+.It Fl \-mirror Ns = Ns Ar url
+First attempt to download the upstream releases from the port's source code
+mirror at
+.Ar url
+before attempting the upstream site.
+The files are copied from the filesystem if the
+.Ar url
+has no schema.
+.It Fl \-mirror-directory Ns = Ns Ar directory
+Place the downloaded upstream releases in this
+.Ar directory
+in the layout that can be used as a mirror for the
+.Fl \-mirror
+option.
+(Default:
+.Ar port Ns Pa .mirror )
+.It Fl \-packages Ns = Ns Ar packages
+Build these
+.Ar packages
+as evaluated by
+.Xr tix-list-packages 8 .
+The defaullt is
+.Sq all!! .
+.It Fl \-prefix Ns = Ns Ar prefix
+Build the port into this
+.Ar prefix .
+(Default: The empty prefix designating the root directory)
+.It Fl \-randomize
+Build the ports in a random order while still respecting the build dependencies.
+.It Fl \-release-directory Ns = Ns Ar release
+Place the binary package inside the
+.Pa $release/repository/$host
+directory, if the
+.Fl \-destination
+and
+.Fl \-repository
+options are not set.
+.It Fl \-repository Ns = Ns Ar repository
+Place the binary package inside the
+.Pa $repository/$host
+directory, if the
+.Fl \-destination
+option is not set.
+.It Fl \-start Ns = Ns Ar step
+Start the build at this step (see
+.Fl \-end ) .
+(Default:
+.Sy start )
+.It Fl \-sysroot Ns = Ns Ar directory
+The system root to use while building and installing the port.
+The toolchain is wrapped to transparently use this sysroot during the build.
+.It Fl \-sysroots Ns = Ns Ar directory
+In combination with
+.Fl \-hosts,
+use system roots named after the triplets in the
+.Ar directory
+for cross-compilation.
+.It Fl \-tar Ns = Ns Ar path
+Which
+.Xr tar 1
+to use during the build.
+(Default:
+.Xr tar 1 )
+.It Fl \-target Ns = Ns Ar triplet
+The port's outputs targets this platform
+.Ar triplet .
+(Default:
+.Fl \-host )
+.It Fl \-tmp Ns = Ns Ar directory
+Place temporary files in this
+.Ar directory .
+(Default:
+.Ev TMPDIR
+if set otherwise
+.Pa /tmp )
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr port 5 ,
+.Xr development 7 ,
+.Xr porting 7 ,
+.Xr tix-collection 8 ,
+.Xr tix-install 8 ,
+.Xr tix-list-packages 8 ,
+.Xr tix-port 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

@@ -31,6 +31,7 @@ tix-iso-add \
 tix-iso-bootconfig \
 tix-iso-liveconfig \
 tix-list-packages \
+tix-metabuild \
 tix-port \
 tix-repository \
 
@@ -43,6 +44,7 @@ tix-iso-add.8 \
 tix-iso-bootconfig.8 \
 tix-iso-liveconfig.8 \
 tix-list-packages.8 \
+tix-metabuild.8 \
 tix-port.8 \
 tix-repository.8 \
 tix-rmdiff.8 \

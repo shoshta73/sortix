@@ -175,6 +175,9 @@ libraries and a clean sysroot, and then trying to build the port and adding the
 dependencies whose absense is causing the build to fail.
 .Pp
 The higher level
+.Xr tix-metabuild 8
+program builds multiple ports in the right order.
+The middle level
 .Xr tix-port 8
 program manages the build by downloading the source code, patching it,
 building the port, and installing the binary package.

@@ -383,8 +383,9 @@ Each
 .Xr port 5
 in the
 .Pa /src/ports
-directory will get built automatically when and installed into the sysroot when
-building the whole operating system.
+directory will get built automatically using
+.Xr tix-metabuild 8
+and installed into the sysroot when building the whole operating system.
 Installable binary packages are created in the
 .Pa /src/repository/$HOST
 directory using
