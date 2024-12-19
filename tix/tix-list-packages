@@ -156,7 +156,7 @@ packages=$(for package; do
              list_package "$package"
            done | LC_ALL=C sort -u)
 
-if $build_order; then
+if $build_order && [ -n "$packages" ]; then
   all_packages=$packages
   RUNTIME_DEPS=
   (for package in $packages; do
