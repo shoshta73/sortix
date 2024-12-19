@@ -10,6 +10,7 @@
 .Op Fl \-build Ns = Ns Ar triplet
 .Op Fl \-cache-package
 .Op Fl \-destination Ns = Ns Ar directory
+.Op Fl \-download-package
 .Op Fl \-distclean
 .Op Fl \-end Ns = Ns Ar step
 .Op Fl \-exec-prefix Ns = Ns Ar prefix
@@ -95,6 +96,11 @@ is
 in the
 .Xr port 5 ,
 then emit a warning, and do nothing to avoid deleting any in-progress work.
+.It Fl \-download-package
+Download an existing binary package from the collection using
+.Xr tix-fetch 8
+and use it if it is the right version as per
+.Fl \-cache-package .
 .It Fl \-end Ns = Ns Ar step
 Stop the build after this
 .Ar step :

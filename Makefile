@@ -411,6 +411,7 @@ sysroot-ports: sysroot-fsh sysroot-base-headers sysroot-system sysroot-source
 	 SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
 	 SORTIX_PORTS_MIRROR="$(SORTIX_PORTS_MIRROR)" \
 	 SIGNING_PUBLIC_KEY="$(SIGNING_PUBLIC_KEY)" \
+	 DOWNLOAD_PACKAGES="$(DOWNLOAD_PACKAGES)" \
 	 RELEASE_URL="$(RELEASE_URL)" \
 	 BUILD_ID="$(BUILD_ID)" \
 	 SYSROOT="$(SYSROOT)" \

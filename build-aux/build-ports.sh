@@ -30,6 +30,11 @@ build) CACHE_PACKAGE=--cache-package; RANDOMIZE=--randomize ;;
 *) echo "$0: error: Invalid operation: $OPERATION" >&2
    exit 1
 esac
+if [ "$DOWNLOAD_PACKAGES" = "yes" -a "$OPERATION" = build ]; then
+  DOWNLOAD_PACKAGES=--download-package
+else
+  unset DOWNLOAD_PACKAGES
+fi
 
 # TODO: After releasing Sortix 1.1, remove support for building with Sortix 1.0
 #       that doesn't have sort -R.
@@ -120,6 +125,7 @@ tix-metabuild \
   ${SYSROOT:+--collection="$SYSROOT"} \
   ${SORTIX_REPOSITORY_DIR:+--destination="$SORTIX_REPOSITORY_DIR"} \
   $DISTCLEAN \
+  $DOWNLOAD_PACKAGES \
   ${END:+--end="$END"} \
   --generation=3 \
   ${HOST:+--host="$HOST"} \

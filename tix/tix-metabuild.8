@@ -12,6 +12,7 @@
 .Op Fl \-cache-package
 .Op Fl \-destination Ns = Ns Ar directory
 .Op Fl \-distclean
+.Op Fl \-download-package
 .Op Fl \-end Ns = Ns Ar step
 .Op Fl \-exec-prefix Ns = Ns Ar prefix
 .Op Fl \-generation Ns = Ns Ar level
@@ -110,6 +111,11 @@ plus
 .It Fl \-destination Ns = Ns Ar directory
 The binary package is placed inside this
 .Ar directory .
+.It Fl \-download-package
+Download an existing binary package from the collection using
+.Xr tix-fetch 8
+and use it if it is the right version as per
+.Fl \-cache-package .
 .It Fl \-distclean
 Clean the port for distribution.
 Remove the extraction and all the metadata files.

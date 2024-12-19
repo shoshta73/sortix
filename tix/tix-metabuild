@@ -24,6 +24,7 @@ cache_package=
 unset collection
 unset destination
 unset distclean
+download_package=
 unset end
 unset exec_prefix
 unset generation
@@ -87,6 +88,7 @@ for argument do
   --destination=*) destination=$parameter ;;
   --destination) previous_option=destination ;;
   --distclean) distclean=true ;;
+  --download-package) download_package=--download-package ;;
   --end=*) end=$parameter ;;
   --end) previous_option=end ;;
   --exec-prefix=*) exec_prefix=$parameter ;;
@@ -241,6 +243,7 @@ for host in ${hosts-${host-build}}; do
       ${collection+--collection="$collection"} \
       ${destination+--destination="$destination"} \
       ${distclean+--distclean} \
+      $download_package \
       ${end+--end="$end"} \
       ${exec_prefix+--exec-prefix="$exec_prefix"} \
       ${generation+--generation="$generation"} \

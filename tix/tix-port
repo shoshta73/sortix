@@ -23,6 +23,7 @@ cache_package=false
 unset collection
 unset destination
 distclean=false
+download_package=false
 unset end
 unset exec_prefix
 unset generation
@@ -70,6 +71,7 @@ for argument do
   --destination=*) destination=$parameter ;;
   --destination) previous_option=destination ;;
   --distclean) distclean=true ;;
+  --download-package) download_package=true ;;
   --end=*) end=$parameter ;;
   --end) previous_option=end ;;
   --exec-prefix=*) exec_prefix=$parameter ;;
@@ -495,11 +497,21 @@ if [ -z "${destination+x}" ]; then
   fi
 fi
 
-if $cache_package &&
+if { $cache_package || $download_package; } &&
    [ -f "$destination/$NAME.tix.tar.xz" -a \
      -f "$destination/$NAME.version" ] &&
    [ "$(cat $destination/$NAME.version)" = "$(desired_version $port)" ]; then
   start=tix-install
+elif $download_package; then
+  # TODO: Cache the release information and sha256sum.
+  # TODO: Just build from source if the download failed.
+  announce "Downloading $NAME package"
+  tix-fetch --collection="$collection" \
+            -O "$destination" -- \
+            "$NAME.tix.tar.xz" "$NAME.version"
+  if [ "$(cat $destination/$NAME.version)" = "$(desired_version $port)" ]; then
+    start=tix-install
+  fi
 fi
 
 if should_run_step download; then
