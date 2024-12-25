@@ -582,7 +582,7 @@ int main(int argc, char* argv[])
 		free(boot_sysmerge);
 	}
 
-	const char* done = wait ? "Successfully upgraded" : "Scheduled upgrade";
+	const char* done = wait ? "Scheduled upgrade" : "Successfully upgraded";
 	if ( new_release.pretty_name )
 		printf("%s to %s.\n", done, new_release.pretty_name);
 	else
