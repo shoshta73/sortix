@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2022, 2023 Jonas 'Sortie' Termansen.
+# Copyright (c) 2022, 2023, 2024 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@ unset build
 cache_package=false
 unset collection
 unset destination
+distclean=false
 unset end
 unset exec_prefix
 unset generation
@@ -67,6 +68,7 @@ for argument do
   --collection) previous_option=collection ;;
   --destination=*) destination=$parameter ;;
   --destination) previous_option=destination ;;
+  --distclean) distclean=true ;;
   --end=*) end=$parameter ;;
   --end) previous_option=end ;;
   --exec-prefix=*) exec_prefix=$parameter ;;
@@ -155,6 +157,26 @@ if [ -n "$SOURCE_PORT" ]; then
          "$source_port.port" >&2
     exit 1
   fi
+fi
+
+if $distclean; then
+  if [ "$DEVELOPMENT" = true ]; then
+    case "`cat "$port.version"`" in
+    *.development)
+      echo "Port is in development: $port"
+      exit 0
+      ;;
+    esac
+  fi
+  if [ -e "$port" ]; then
+    echo "Removing '$port'"
+  fi
+  rm -rf "$port"
+  rm -rf "$port.upstream"
+  rm -f "$port.version"
+  rm -f "$port.version.new"
+  rm -f "$port.mirror"
+  exit 0
 fi
 
 step_number() {
@@ -490,7 +512,12 @@ fi
 update_version=false
 if [ $(step_number "${start-start}") -lt $(step_number tix-build-end) ] &&
    [ $(step_number "${end-end}") -gt $(step_number tix-build-start) ]; then
-  announce "Building $NAME"
+  if [ "$start" = clean -a "$end" = clean ]; then
+    if [ ! -d "$port" ]; then exit; fi
+    announce "Cleaning $NAME"
+  else
+    announce "Building $NAME"
+  fi
   unset tix_build_start
   unset tix_build_end
   if [ -n "$start" ]; then
@@ -542,7 +569,7 @@ if should_run_step diff; then
   update_version=true
 fi
 
-if $update_version && [ "${destination-.}" != "." ]; then
+if $update_version && [ "${destination:-.}" != "." ]; then
   cp "$port.version" "$destination/$NAME.version"
 fi
 

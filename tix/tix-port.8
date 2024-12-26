@@ -10,6 +10,7 @@
 .Op Fl \-cache-package
 .Op Fl \-collection Ns = Ns Ar collection
 .Op Fl \-destination Ns = Ns Ar directory
+.Op Fl \-distclean
 .Op Fl \-end Ns = Ns Ar step
 .Op Fl \-exec-prefix Ns = Ns Ar prefix
 .Op Fl \-generation Ns = Ns Ar level
@@ -39,8 +40,8 @@ Many of the options are forwarded to the low-level
 which performs the build once the source code has been prepared.
 .Nm
 is usually invoked through
-.Xr development 7
-for the official ports.
+.Xr tix-metabuild 8 ,
+which builds multiple ports in the right order.
 .Pp
 The mandatory
 .Ar port
@@ -84,6 +85,16 @@ plus
 .It Fl \-destination Ns = Ns Ar directory
 The binary package is placed inside this
 .Ar directory .
+.It Fl \-distclean
+Clean the port for distribution.
+Remove the extraction and all the metadata files.
+If
+.Sy DEVELOPMENT
+is
+.Sy true
+in the
+.Xr port 5 ,
+then emit a warning, and do nothing to avoid deleting any in-progress work.
 .It Fl \-end Ns = Ns Ar step
 Stop the build after this
 .Ar step :
@@ -135,7 +146,7 @@ where architecture dependent files are installed.
 .It Fl \-generation Ns = Ns Ar generation
 Create a binary package in the format of this tix generation
 .Ar level .
-(Default: 2)
+(Default: 3)
 .It Fl \-host Ns = Ns Ar triplet
 The platform
 .Ar triplet
@@ -269,7 +280,8 @@ by stopping after the binary package has been stripped.
 .Xr porting 7 ,
 .Xr tix-build 8 ,
 .Xr tix-collection 8 ,
-.Xr tix-install 8
+.Xr tix-install 8 ,
+.Xr tix-metabuild 8
 .Sh HISTORY
 .Nm
 originally appeared in Sortix 1.1 as a networked higher level interface around
