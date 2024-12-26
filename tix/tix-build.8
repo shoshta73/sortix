@@ -15,6 +15,9 @@
 .Op Fl \-make Ns = Ns Ar path
 .Op Fl \-makeflags Ns = Ns Ar makeflags
 .Op Fl \-prefix Ns = Ns Ar prefix
+.Op Fl \-print-build
+.Op Fl \-print-host
+.Op Fl \-print-target
 .Op Fl \-source-package Ns = Ns Ar source-package
 .Op Fl \-source-port Ns = Ns Ar source-port
 .Op Fl \-start Ns = Ns Ar step
@@ -112,6 +115,18 @@ Build the port into this
 .Ar prefix .
 (Default: The empty prefix designating the root directory)
 .\" After releasing Sortix 1.1, remove this option.
+.It Fl \-print-build
+Output the effective
+.Fl \-build
+triplet and exit.
+.It Fl \-print-host
+Output the effective
+.Fl \-host
+triplet and exit.
+.It Fl \-print-target
+Output the effective
+.Fl \-target
+triplet and exit.
 .It Fl \-source-package Ns = Ns Ar source-port
 Deprecated alias for
 .Fl \-source-port

@@ -1217,6 +1217,10 @@ int main(int argc, char* argv[])
 {
 	PurifyMakeflags();
 
+	bool print_build = false;
+	bool print_host = false;
+	bool print_target = false;
+
 	struct metainfo minfo;
 	memset(&minfo, 0, sizeof(minfo));
 	minfo.build = NULL;
@@ -1253,6 +1257,12 @@ int main(int argc, char* argv[])
 				errx(1, "unknown option -- '%c'", c);
 			}
 		}
+		else if ( !strcmp("--print-build", arg) )
+			print_build = true;
+		else if ( !strcmp("--print-host", arg) )
+			print_host = true;
+		else if ( !strcmp("--print-target", arg) )
+			print_target = true;
 		else if ( GET_OPTION_VARIABLE("--build", &minfo.build) ) { }
 		else if ( GET_OPTION_VARIABLE("--destination", &minfo.destination) ) { }
 		else if ( GET_OPTION_VARIABLE("--end", &end_step_string) ) { }
@@ -1274,6 +1284,8 @@ int main(int argc, char* argv[])
 			errx(1, "unknown option: %s", arg);
 	}
 
+	compact_arguments(&argc, &argv);
+
 	minfo.generation = atoi(generation_string);
 	free(generation_string);
 	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
@@ -1292,10 +1304,40 @@ int main(int argc, char* argv[])
 		exit(1);
 	}
 
-	compact_arguments(&argc, &argv);
+	if ( minfo.build && !minfo.build[0] )
+		free(minfo.build), minfo.build = NULL;
+	if ( minfo.host && !minfo.host[0] )
+		free(minfo.host), minfo.host = NULL;
+	if ( minfo.target && !minfo.target[0] )
+		free(minfo.target), minfo.target = NULL;
+
+	if ( !minfo.build && !(minfo.build = GetBuildTriplet()) )
+		err(1, "unable to determine build, use --build");
+	if ( !minfo.host )
+		minfo.host = strdup(minfo.build);
+	if ( !minfo.target )
+		minfo.target = strdup(minfo.host);
+
+	minfo.cross = strcmp(minfo.build, minfo.host) != 0 || minfo.sysroot;
+
+	if ( print_build || print_host || print_target )
+	{
+		if ( print_build )
+			printf("%s\n", minfo.build);
+		if ( print_host )
+			printf("%s\n", minfo.host);
+		if ( print_target )
+			printf("%s\n", minfo.target);
+		if ( ferror(stdout) || fflush(stdout) == EOF )
+			err(1, "stdout");
+		return 0;
+	}
 
 	if ( minfo.prefix && !strcmp(minfo.prefix, "/") )
 		minfo.prefix[0] = '\0';
+
+	if ( minfo.prefix && !minfo.exec_prefix )
+		minfo.exec_prefix = strdup(minfo.prefix);
 
 	if ( argc < 2 )
 	{
@@ -1315,25 +1357,6 @@ int main(int argc, char* argv[])
 	minfo.package_dir = realpath(srctix, NULL);
 	if ( !minfo.package_dir )
 		err(1, "%s", srctix);
-
-	if ( minfo.build && !minfo.build[0] )
-		free(minfo.build), minfo.build = NULL;
-	if ( minfo.host && !minfo.host[0] )
-		free(minfo.host), minfo.host = NULL;
-	if ( minfo.target && !minfo.target[0] )
-		free(minfo.target), minfo.target = NULL;
-
-	if ( !minfo.build && !(minfo.build = GetBuildTriplet()) )
-		err(1, "unable to determine build, use --build");
-	if ( !minfo.host )
-		minfo.host = strdup(minfo.build);
-	if ( !minfo.target )
-		minfo.target = strdup(minfo.host);
-
-	minfo.cross = strcmp(minfo.build, minfo.host) != 0 || minfo.sysroot;
-
-	if ( minfo.prefix && !minfo.exec_prefix )
-		minfo.exec_prefix = strdup(minfo.prefix);
 
 	if ( !IsDirectory(minfo.package_dir) )
 		err(1, "`%s'", minfo.package_dir);
