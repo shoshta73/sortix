@@ -442,9 +442,8 @@ strip_tix() {(
   $strip -d "$data_dir/libexec"* 2>/dev/null || true
   $strip -d "$data_dir/libexec/git-core/"* 2>/dev/null || true
   $strip -d "$data_dir/sbin/"* 2>/dev/null || true
-  (cd "$dir" &&
-   LC_ALL=C ls -A | grep -Ev '^tix$' |
-   tar --numeric-owner --owner=0 --group=0 -cJf "$1" tix -T -)
+  LC_ALL=C ls -A "$dir" | grep -Ev '^tix$' |
+  tar --numeric-owner --owner=0 --group=0 -C "$dir" -cJf "$1" tix -T -
   rm -rf "$dir"
 )}
 

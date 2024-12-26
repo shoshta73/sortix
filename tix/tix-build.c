@@ -905,8 +905,13 @@ static void Package(struct metainfo* minfo)
 	char* prefixdir_rel = print_string("%s%s", tardir_rel, prefix);
 	if ( !prefixdir_rel )
 		err(1, "malloc");
+	if ( mkdir_p(minfo->destination, 0755) < 0 )
+		err(1, "mkdir: %s", minfo->destination);
+	char* destination = realpath(minfo->destination, NULL);
+	if ( !destination )
+		err(1, "realpath: %s", minfo->destination);
 	char* package_tix = print_string("%s/%s.tix.tar.xz",
-		minfo->destination, minfo->package_name);
+		destination, minfo->package_name);
 	if ( !package_tix )
 		err(1, "malloc");
 	printf("Creating `%s'...\n", package_tix);
@@ -1357,6 +1362,15 @@ int main(int argc, char* argv[])
 	minfo.package_dir = realpath(srctix, NULL);
 	if ( !minfo.package_dir )
 		err(1, "%s", srctix);
+
+	if ( minfo.sysroot && minfo.sysroot[0] != '/'  )
+	{
+		char* sysroot = realpath(minfo.sysroot, NULL);
+		if ( !sysroot )
+			err(1, "realpath: %s", minfo.sysroot);
+		free(minfo.sysroot);
+		minfo.sysroot = sysroot;
+	}
 
 	if ( !IsDirectory(minfo.package_dir) )
 		err(1, "`%s'", minfo.package_dir);
