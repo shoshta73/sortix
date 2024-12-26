@@ -21,7 +21,7 @@ set -e
 unset build
 cache_package=false
 unset collection
-destination=.
+unset destination
 unset end
 unset exec_prefix
 unset generation
@@ -31,6 +31,8 @@ unset makeflags
 unset mirror
 unset mirror_directory
 unset prefix
+unset release_directory
+unset repository
 unset source_port
 unset start
 unset sysroot
@@ -79,6 +81,10 @@ for argument do
   --makeflags) previous_option=makeflags ;;
   --prefix=*) prefix=$parameter ;;
   --prefix) previous_option=prefix ;;
+  --release-directory=*) release_directory=$parameter ;;
+  --release-directory) previous_option=release_directory ;;
+  --repository=*) repository=$parameter ;;
+  --repository) previous_option=repository ;;
   --source-port=*) source_port=$parameter ;;
   --source-port) previous_option=source_port ;;
   --start=*) start=$parameter ;;
@@ -446,6 +452,19 @@ strip_tix() {(
   tar --numeric-owner --owner=0 --group=0 -C "$dir" -cJf "$1" tix -T -
   rm -rf "$dir"
 )}
+
+if [ -z "${destination+x}" ]; then
+  if [ -z "${repository+x}" -a -n "${release_directory+x}" ]; then
+    repository="$release_directory/repository"
+  fi
+  if [ -n "${repository+x}" ]; then
+    destination="$repository/${host-`tix-build ${build+--build="$build"} \
+                                               ${host+--host="$host"} \
+                                               --print-host`}"
+  else
+    destination=.
+  fi
+fi
 
 if $cache_package &&
    [ -f "$destination/$NAME.tix.tar.xz" -a \

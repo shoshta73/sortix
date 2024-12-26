@@ -19,6 +19,8 @@
 .Op Fl \-mirror Ns = Ns Ar url
 .Op Fl \-mirror-directory Ns = Ns Ar directory
 .Op Fl \-prefix Ns = Ns Ar prefix
+.Op Fl \-release-directory Ns = Ns Ar directory
+.Op Fl \-repository Ns = Ns Ar directory
 .Op Fl \-source-port Ns = Ns Ar source-port
 .Op Fl \-start Ns = Ns Ar step
 .Op Fl \-sysroot Ns = Ns Ar directory
@@ -172,6 +174,20 @@ option.
 Build the port into this
 .Ar prefix .
 (Default: The empty prefix designating the root directory)
+.It Fl \-release-directory Ns = Ns Ar release
+Place the binary package inside the
+.Pa $release/repository/$host
+directory, if the
+.Fl \-destination
+and
+.Fl \-repository
+options are not set.
+.It Fl \-repository Ns = Ns Ar repository
+Place the binary package inside the
+.Pa $repository/$host
+directory, if the
+.Fl \-destination
+option is not set.
 .It Fl \-source-port Ns = Ns Ar source-port
 The source code for the
 .Sy SOURCE_PORT
