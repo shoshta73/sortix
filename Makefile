@@ -269,9 +269,6 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /sbin >> "$(SYSROOT)/tix/manifest/system"
 	echo /share >> "$(SYSROOT)/tix/manifest/system"
 	echo /src >> "$(SYSROOT)/tix/manifest/system"
-	echo /tix >> "$(SYSROOT)/tix/manifest/system"
-	echo /tix/tixinfo >> "$(SYSROOT)/tix/manifest/system"
-	echo /tix/manifest >> "$(SYSROOT)/tix/manifest/system"
 	echo /tmp >> "$(SYSROOT)/tix/manifest/system"
 	echo /usr >> "$(SYSROOT)/tix/manifest/system"
 	echo /var >> "$(SYSROOT)/tix/manifest/system"
@@ -538,12 +535,12 @@ $(OVERLAY_INITRD): sysroot
 $(SRC_INITRD): sysroot
 	mkdir -p `dirname $(SRC_INITRD)`
 	sed -E 's,^/,,' "$(SYSROOT)/tix/manifest/src" | \
-	tar -cf $(SRC_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/src
+	tar -cf $(SRC_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix tix/manifest tix/manifest/src
 
 $(SYSTEM_INITRD): sysroot
 	mkdir -p `dirname $(SYSTEM_INITRD)`
 	sed -E 's,^/,,' "$(SYSROOT)/tix/manifest/system" | \
-	tar -cf $(SYSTEM_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix/manifest/system tix/tixinfo/system
+	tar -cf $(SYSTEM_INITRD) -C "$(SYSROOT)" --numeric-owner --owner=0 --group=0 --no-recursion -T - tix tix/manifest tix/manifest/system tix/tixinfo tix/tixinfo/system
 
 # Packaging
 
