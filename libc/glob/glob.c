@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -84,6 +84,12 @@ int glob(const char* restrict pattern,
 		return GLOB_NOSPACE;
 	gl->gl_pathv = new_pathv;
 	size_t paths_length = gl->gl_pathc + 1;
+	// Initialize the leading NULL pointers per GLOB_DOOFFS.
+	if ( !(flags & GLOB_APPEND) )
+	{
+		for ( size_t i = 0; i < gl->gl_offs; i++ )
+			gl->gl_pathv[i] = NULL;
+	}
 	// Parse the pattern into segments where trivial segments are fixed path
 	// components that can be directly opened and non-trivial segments require
 	// searching a directory for entries that match the pattern.
