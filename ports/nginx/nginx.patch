@@ -45,7 +45,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
  
  
  case ".$NGX_PID_PATH" in
-@@ -114,39 +116,27 @@
+@@ -114,39 +116,31 @@
  			'\$(DESTDIR)$NGX_SBIN_PATH.old'
  	cp $NGX_OBJS/nginx$ngx_binext '\$(DESTDIR)$NGX_SBIN_PATH'
  
@@ -101,11 +101,15 @@ diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
 +
 +	cp conf/scgi_params '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/scgi_params'
 +
++	cp conf/ssl-config-mozilla-intermediate '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/ssl-config-mozilla-intermediate'
++
++	cp conf/ssl-config-mozilla-modern '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/ssl-config-mozilla-modern'
++
 +	cp conf/nginx.conf '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/nginx.conf'
  
  	test -d '\$(DESTDIR)`dirname "$NGX_PID_PATH"`' \\
  		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_PID_PATH"`'
-@@ -156,6 +146,28 @@
+@@ -156,6 +150,34 @@
  
  	test -d '\$(DESTDIR)$NGX_PREFIX/html' \\
  		|| cp -R $NGX_HTML '\$(DESTDIR)$NGX_PREFIX'
@@ -122,8 +126,14 @@ diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
 +
 +	cp sites-available/default \\
 +		'\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-available'
-+	ln -s ../sites-available/default \\
++	ln -sf ../sites-available/default \\
 +		'\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-enabled'
++
++	cp sites-available/acme \\
++		'\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-available'
++
++	cp sites-available/https \\
++		'\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/sites-available'
 +
 +	mkdir -p '\$(DESTDIR)$NGX_SYSCONFDIR/default/passwd.d'
 +	mkdir -p '\$(DESTDIR)$NGX_SYSCONFDIR/default/group.d'
@@ -285,6 +295,18 @@ diff -Paur --no-dereference -- nginx.upstream/auto/unix nginx/auto/unix
                    if (p == MAP_FAILED) return 1;"
  . auto/feature
  
+diff -Paur --no-dereference -- nginx.upstream/conf/ffdhe2048.pem nginx/conf/ffdhe2048.pem
+--- nginx.upstream/conf/ffdhe2048.pem
++++ nginx/conf/ffdhe2048.pem
+@@ -0,0 +1,8 @@
++-----BEGIN DH PARAMETERS-----
++MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
+++8yTnc4kmz75fS/jY2MMddj2gbICrsRhetPfHtXV/WVhJDP1H18GbtCFY2VVPe0a
++87VXE15/V8k1mE8McODmi3fipona8+/och3xWKE2rec1MKzKT0g6eXq8CrGCsyT7
++YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi
++7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD
++ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
++-----END DH PARAMETERS-----
 diff -Paur --no-dereference -- nginx.upstream/conf/nginx.conf nginx/conf/nginx.conf
 --- nginx.upstream/conf/nginx.conf
 +++ nginx/conf/nginx.conf
@@ -395,6 +417,57 @@ diff -Paur --no-dereference -- nginx.upstream/conf/nginx.conf nginx/conf/nginx.c
 +    include conf.d/*.conf;
 +    include sites-enabled/*;
  }
+diff -Paur --no-dereference -- nginx.upstream/conf/ssl-config-mozilla-intermediate nginx/conf/ssl-config-mozilla-intermediate
+--- nginx.upstream/conf/ssl-config-mozilla-intermediate
++++ nginx/conf/ssl-config-mozilla-intermediate
+@@ -0,0 +1,23 @@
++# generated 2025-01-12, Mozilla Guideline v5.7, nginx 1.27.3, OpenSSL 3.4.0, intermediate config
++# https://ssl-config.mozilla.org/#server=nginx&version=1.27.3&config=intermediate&openssl=3.4.0&guideline=5.7
++# Supports Firefox 27, Android 4.4.2, Chrome 31, Edge, IE 11 on Windows 7, Java 8u31, OpenSSL 1.0.1, Opera 20, Safari 9
++
++# intermediate configuration
++ssl_protocols TLSv1.2 TLSv1.3;
++ssl_ecdh_curve X25519:prime256v1:secp384r1;
++ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305;
++ssl_prefer_server_ciphers off;
++
++# see also ssl_session_ticket_key alternative to stateful session cache
++ssl_session_timeout 1d;
++ssl_session_cache shared:MozSSL:10m;  # about 40000 sessions
++
++# curl https://ssl-config.mozilla.org/ffdhe2048.txt > /path/to/dhparam
++ssl_dhparam ffdhe2048.pem;
++
++# OCSP stapling
++ssl_stapling on;
++ssl_stapling_verify on;
++
++# If certificates are marked OCSP Must-Staple, consider managing the
++# OCSP stapling cache with an external script, e.g. certbot-ocsp-fetcher
+diff -Paur --no-dereference -- nginx.upstream/conf/ssl-config-mozilla-modern nginx/conf/ssl-config-mozilla-modern
+--- nginx.upstream/conf/ssl-config-mozilla-modern
++++ nginx/conf/ssl-config-mozilla-modern
+@@ -0,0 +1,20 @@
++# generated 2025-01-12, Mozilla Guideline v5.7, nginx 1.27.3, OpenSSL 3.4.0, modern config
++# https://ssl-config.mozilla.org/#server=nginx&version=1.27.3&config=modern&openssl=3.4.0&guideline=5.7
++# Supports Firefox 63, Android 10.0, Chrome 70, Edge 75, Java 11, OpenSSL 1.1.1, Opera 57, Safari 12.1
++
++# modern configuration
++ssl_protocols TLSv1.3;
++ssl_ecdh_curve X25519:prime256v1:secp384r1;
++ssl_prefer_server_ciphers off;
++
++# uncomment to enable if ssl_protocols includes TLSv1.2 or earlier;
++# see also ssl_session_ticket_key alternative to stateful session cache
++#ssl_session_timeout 1d;
++#ssl_session_cache shared:MozSSL:10m;  # about 40000 sessions
++
++# OCSP stapling
++ssl_stapling on;
++ssl_stapling_verify on;
++
++# If certificates are marked OCSP Must-Staple, consider managing the
++# OCSP stapling cache with an external script, e.g. certbot-ocsp-fetche
 diff -Paur --no-dereference -- nginx.upstream/configure nginx/configure
 --- nginx.upstream/configure
 +++ nginx/configure
@@ -432,15 +505,28 @@ diff -Paur --no-dereference -- nginx.upstream/init/nginx nginx/init/nginx
 @@ -0,0 +1,2 @@
 +require network
 +exec nginx
+diff -Paur --no-dereference -- nginx.upstream/sites-available/acme nginx/sites-available/acme
+--- nginx.upstream/sites-available/acme
++++ nginx/sites-available/acme
+@@ -0,0 +1,11 @@
++server {
++	listen 80;
++
++	location /.well-known/acme-challenge/ {
++		root   acme;
++	}
++
++	location / {
++		return 301 https://$host$request_uri;
++	}
++}
 diff -Paur --no-dereference -- nginx.upstream/sites-available/default nginx/sites-available/default
 --- nginx.upstream/sites-available/default
 +++ nginx/sites-available/default
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,73 @@
 +server {
 +    listen       80;
 +    server_name  localhost;
-+
-+    #charset koi8-r;
 +
 +    #access_log  logs/host.access.log  main;
 +
@@ -458,19 +544,13 @@ diff -Paur --no-dereference -- nginx.upstream/sites-available/default nginx/site
 +        root   html;
 +    }
 +
-+    # proxy the PHP scripts to Apache listening on 127.0.0.1:80
-+    #
-+    #location ~ \.php$ {
-+    #    proxy_pass   http://127.0.0.1;
-+    #}
-+
-+    # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
++    # pass the PHP scripts to FastCGI server listening on /var/run/php-fpm
 +    #
 +    #location ~ \.php$ {
 +    #    root           html;
-+    #    fastcgi_pass   127.0.0.1:9000;
++    #    fastcgi_pass   unix:/var/run/php-fpm;
 +    #    fastcgi_index  index.php;
-+    #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
++    #    fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
 +    #    include        fastcgi_params;
 +    #}
 +
@@ -517,6 +597,51 @@ diff -Paur --no-dereference -- nginx.upstream/sites-available/default nginx/site
 +#        index  index.html index.htm;
 +#    }
 +#}
+diff -Paur --no-dereference -- nginx.upstream/sites-available/https nginx/sites-available/https
+--- nginx.upstream/sites-available/https
++++ nginx/sites-available/https
+@@ -0,0 +1,41 @@
++server {
++    server_name example.com www.example.com;
++
++    #access_log  logs/host.access.log  main;
++
++    listen 443 ssl;
++    http2 on;
++    gzip off;
++
++    ssl_certificate /etc/letsencrypt/live/example.com/fullchain.pem;
++    ssl_certificate_key /etc/letsencrypt/live/example.com/privkey.pem;
++    ssl_trusted_certificate /etc/letsencrypt/live/example.com/chain.pem;
++
++    include ssl-config-mozilla-intermediate;
++    #include ssl-config-mozilla-modern;
++
++    charset UTF-8;
++    #add_header Strict-Transport-Security "max-age=63072000";
++    #add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload";
++
++    root /var/www/example.com;
++
++    location / {
++        index  index.html index.htm;
++    }
++
++    #error_page  404              /404.html;
++
++    # redirect server error pages to the static page /50x.html
++    #
++    error_page   500 502 503 504  /50x.html;
++
++    # pass the PHP scripts to FastCGI server listening on /var/run/php-fpm
++    #
++    #location ~ \.php$ {
++    #    fastcgi_pass   unix:/var/run/php-fpm;
++    #    fastcgi_index  index.php;
++    #    fastcgi_param  SCRIPT_FILENAME  $document_root$fastcgi_script_name;
++    #    include        fastcgi_params;
++    #}
++}
 diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/nginx.c
 --- nginx.upstream/src/core/nginx.c
 +++ nginx/src/core/nginx.c
