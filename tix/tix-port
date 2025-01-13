@@ -173,9 +173,9 @@ if $distclean; then
   fi
   rm -rf "$port"
   rm -rf "$port.upstream"
-  rm -f "$port.version"
-  rm -f "$port.version.new"
-  rm -f "$port.mirror"
+  rm -rf "$port.version"
+  rm -rf "$port.version.new"
+  rm -rf "$port.mirror"
   exit 0
 fi
 
@@ -235,7 +235,9 @@ download_archive_from_url() {(
   fi
   mirror_directory="$mirror_directory/$name"
   mkdir -p -- "$mirror_directory"
-  if [ ! -e "$mirror_directory/$archive.sha256sum" ]; then
+  if [ ! -e "$mirror_directory/$archive.sha256sum" ] ||
+     [ "`cat "$mirror_directory/$archive.sha256sum"`" != \
+       "$sha256sum  $archive" ]; then
     announce "Downloading $1: $archive"
     (if echo "$url" | grep -Eq '^[a-z][a-z0-9.+-]*://'; then
        if ! wget -O "$mirror_directory/$archive.untrusted" -- "$url"; then
@@ -256,7 +258,7 @@ download_archive_from_url() {(
      fi
      mv "$mirror_directory/$archive.untrusted" "$mirror_directory/$archive"
      echo "$url" > "$mirror_directory/$archive.url"
-     echo "$SHA256SUM  $archive" > "$mirror_directory/$archive.sha256sum.new"
+     echo "$sha256sum  $archive" > "$mirror_directory/$archive.sha256sum.new"
      mv "$mirror_directory/$archive.sha256sum.new" \
         "$mirror_directory/$archive.sha256sum"
     ) || (
