@@ -9,7 +9,7 @@ UPSTREAM_SITE=https://curl.se/download
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
 LICENSE=ISC
-CONFIGURE_ARGS='--with-openssl --with-ca-bundle=/etc/ssl/cert.pem --with-ca-path=/etc/ssl/certs'
+CONFIGURE_ARGS='--with-openssl --without-ca-bundle --without-ca-path --with-ca-fallback'
 MAKE_VARS='V=1'
 POST_INSTALL=tix-eradicate-libtool-la
 RUNTIME_DEPS=libssl
