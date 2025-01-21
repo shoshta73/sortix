@@ -31,6 +31,14 @@ build) CACHE_PACKAGE=--cache-package; RANDOMIZE=--randomize ;;
    exit 1
 esac
 
+# TODO: After releasing Sortix 1.1, remove support for building with Sortix 1.0
+#       that doesn't have sort -R.
+if [ -n "$RANDOMIZE" ]; then
+  if ! true | sort -R > /dev/null 2>&1; then
+    RANDOMIZE=
+  fi
+fi
+
 # Detect if the environment isn't set up properly.
 if ! $clean && [ -z "$HOST" ]; then
   echo "$0: error: You need to set \$HOST" >&2
