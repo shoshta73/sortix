@@ -1185,7 +1185,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub.d/00_header.in grub/util/
 diff -Paur --no-dereference -- grub.upstream/util/grub.d/10_sortix.in grub/util/grub.d/10_sortix.in
 --- grub.upstream/util/grub.d/10_sortix.in
 +++ grub/util/grub.d/10_sortix.in
-@@ -0,0 +1,92 @@
+@@ -0,0 +1,95 @@
 +#!/bin/sh
 +
 +set -e
@@ -1215,10 +1215,13 @@ diff -Paur --no-dereference -- grub.upstream/util/grub.d/10_sortix.in grub/util/
 +  . /etc/grub
 +fi
 +
-+if [ ! -e "$PREFIX/etc/sortix-release" ]; then
++if [ -e "$PREFIX/etc/sortix-release" ]; then
++  . "$PREFIX/etc/sortix-release"
++elif [ -e "$PREFIX/lib/sortix-release" ]; then
++  . "$PREFIX/lib/sortix-release"
++else
 +  exit 0
 +fi
-+. "$PREFIX/etc/sortix-release"
 +
 +if $UPGRADE; then
 +  PRETTY_NAME="Upgrade to $PRETTY_NAME"

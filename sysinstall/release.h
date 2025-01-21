@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 
 struct release
 {
+	char* architecture;
 	char* pretty_name;
 	unsigned long version_major;
 	unsigned long version_minor;
@@ -42,5 +43,6 @@ int release_compare_version(const struct release* a, const struct release* b);
 bool os_release_load(struct release* release,
                      const char* path,
                      const char* errpath);
+char* read_platform(const char* prefix);
 
 #endif

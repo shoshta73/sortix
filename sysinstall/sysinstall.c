@@ -115,32 +115,36 @@ static bool missing_bios_boot_partition(struct filesystem* root_fs)
 static bool should_install_bootloader_path(const char* mnt,
                                            struct blockdevice* bdev)
 {
-	char* release_errpath;
-	if ( asprintf(&release_errpath, "%s: /etc/sortix-release",
-	              path_of_blockdevice(bdev)) < 0 )
+	char* etc_release = join_paths(mnt, "etc/sortix-release");
+	char* lib_release = join_paths(mnt, "lib/sortix-release");
+	if ( !etc_release || !lib_release )
 	{
 		warn("malloc");
+		free(etc_release);
+		free(lib_release);
 		return false;
 	}
-	char* release_path;
-	if ( asprintf(&release_path, "%s/etc/sortix-release", mnt) < 0 )
+	const char* release_path = !access(etc_release, F_OK) ?
+	                           etc_release : lib_release;
+	char* release_errpath;
+	if ( asprintf(&release_errpath, "%s: %s",
+	              path_of_blockdevice(bdev), release_path) < 0 )
 	{
 		warn("malloc");
-		free(release_errpath);
+		free(etc_release);
+		free(lib_release);
 		return false;
 	}
 	struct release release;
-	if ( !os_release_load(&release, release_path, release_errpath) )
-	{
-		free(release_path);
-		free(release_errpath);
-		return false;
-	}
-	free(release_path);
+	bool status = os_release_load(&release, release_path, release_errpath);
 	free(release_errpath);
+	free(etc_release);
+	free(lib_release);
+	if ( !status )
+		return false;
 	release_free(&release);
-	char* conf_path;
-	if ( asprintf(&conf_path, "%s/etc/upgrade.conf", mnt) < 0 )
+	char* conf_path = join_paths(mnt, "etc/upgrade.conf");
+	if ( !conf_path )
 	{
 		warn("malloc");
 		return false;

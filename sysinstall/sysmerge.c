@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2018, 2020-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2018, 2020-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -252,9 +252,12 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	char* old_release_path = join_paths(target, "etc/sortix-release");
-	if ( !old_release_path )
+	char* old_etc_release = join_paths(target, "etc/sortix-release");
+	char* old_lib_release = join_paths(target, "lib/sortix-release");
+	if ( !old_etc_release || !old_lib_release )
 		err(2, "malloc");
+	const char* old_release_path = !access(old_etc_release, F_OK) ?
+	                               old_etc_release : old_lib_release;
 	struct release old_release;
 	if ( !os_release_load(&old_release, old_release_path, old_release_path) )
 	{
@@ -265,11 +268,15 @@ int main(int argc, char* argv[])
 			exit(2);
 		}
 	}
-	free(old_release_path);
+	free(old_etc_release);
+	free(old_lib_release);
 
-	char* new_release_path = join_paths(source, "etc/sortix-release");
-	if ( !new_release_path )
+	char* new_etc_release = join_paths(source, "etc/sortix-release");
+	char* new_lib_release = join_paths(source, "lib/sortix-release");
+	if ( !new_etc_release || !new_lib_release )
 		err(2, "malloc");
+	const char* new_release_path = !access(new_etc_release, F_OK) ?
+	                               new_etc_release : new_lib_release;
 	struct release new_release;
 	if ( !os_release_load(&new_release, new_release_path, new_release_path) )
 	{
@@ -282,30 +289,22 @@ int main(int argc, char* argv[])
 			exit(2);
 		}
 	}
-	free(new_release_path);
+	free(new_etc_release);
+	free(new_lib_release);
 
 	if ( has_system )
 	{
-		char* old_machine_path = join_paths(target, "etc/machine");
-		if ( !old_machine_path )
-			err(2, "malloc");
-		char* old_machine = read_string_file(old_machine_path);
-		if ( !old_machine )
-			err(2, "%s", old_machine_path);
-		char* new_machine_path = join_paths(source, "etc/machine");
-		if ( !new_machine_path )
-			err(2, "malloc");
-		char* new_machine = !system ? strdup(old_machine) :
-			                read_string_file(new_machine_path);
-		if ( !new_machine )
-			err(2, "%s", new_machine_path);
-		if ( strcmp(old_machine, new_machine) != 0 )
-			errx(2, "%s (%s) does not match %s (%s)", new_machine_path,
-				 new_machine, old_machine_path, old_machine);
-		free(old_machine);
-		free(old_machine_path);
-		free(new_machine);
-		free(new_machine_path);
+		char* old_platform = read_platform(target);
+		if ( !old_platform )
+			err(2, "%s/tix/collection.conf: Failed to find PLATFORM", target);
+		char* new_platform = read_platform(source);
+		if ( !new_platform )
+			err(2, "%s/tix/collection.conf: Failed to find PLATFORM", source);
+		if ( strcmp(old_platform, new_platform) != 0 )
+			errx(2, "cannot change PLATFORM from %s to %s",
+		         old_platform, new_platform);
+		free(old_platform);
+		free(new_platform);
 	}
 
 	// TODO: Check for version (skipping, downgrading).

@@ -88,7 +88,7 @@ string_array.o: string_array.h
 hooks.o: fileops.h manifest.h release.h string_array.h
 interactive.o: interactive.h autoconf.h execute.h
 manifest.o: manifest.h fileops.h string_array.h
-release.o: release.h
+release.o: execute.h fileops.h release.h
 
 clean:
 	rm -f sysinstall sysmerge sysupgrade $(OBJS)

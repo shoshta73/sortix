@@ -157,13 +157,11 @@ Old system
 New system kernel and initrd files.
 .It Pa /etc/default/grub.d/10_sortix.cache
 GRUB configuration fragment that boots the new system.
-.It Pa /etc/machine
-Processor platform of this installation.
-.It Pa /etc/sortix-release
-The current system release.
 .It Pa /etc/upgrade.conf
 Controls the bootloader upgrade behavior (see
 .Xr upgrade.conf 5 ) .
+.It Pa /lib/sortix-release
+The current system release.
 .It Pa /share/sysinstall/hooks/
 A file per upgrade hook indicating that it doesn't need to be run.
 .It Pa /sysmerge/

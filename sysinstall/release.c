@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2021, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,8 @@
  * Utility functions to handle release information.
  */
 
+#include <sys/types.h>
+
 #include <err.h>
 #include <errno.h>
 #include <stdbool.h>
@@ -25,6 +27,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "execute.h"
+#include "fileops.h"
 #include "release.h"
 
 int abi_compare(unsigned long a_major, unsigned long a_minor,
@@ -67,6 +71,7 @@ int version_compare(unsigned long a_major, unsigned long a_minor, bool a_dev,
 
 void release_free(struct release* release)
 {
+	free(release->architecture);
 	free(release->pretty_name);
 }
 
@@ -220,6 +225,15 @@ bool os_release_load(struct release* release,
 				failure = true;
 			}
 		}
+		else if ( !strncmp(line, "ARCHITECTURE=", strlen("ARCHITECTURE=")) )
+		{
+			const char* param = line + strlen("ARCHITECTURE=");
+			if ( !(release->architecture = os_release_eval(param)) )
+			{
+				warn("malloc");
+				failure = true;
+			}
+		}
 	}
 	if ( ferror(fp) )
 		warn("%s", errpath);
@@ -243,4 +257,31 @@ bool os_release_load(struct release* release,
 		return false;
 	}
 	return true;
+}
+
+char* read_platform(const char* prefix)
+{
+	char* collection_conf_path = join_paths(prefix, "tix/collection.conf");
+	if ( !collection_conf_path )
+		return NULL;
+	char* result = NULL;
+	errno = 0;
+	// Try the new PLATFORM and fall back on the Sortix 1.0 collection.platform.
+	if ( execute((const char*[]) { "tix-vars", "-d", "", collection_conf_path,
+	                               "PLATFORM", "collection.platform", NULL },
+	             "o", &result) == 0 )
+	{
+		if ( result[0] == '\n' )
+			memmove(result, result + 1, strlen(result + 1) + 1);
+		result[strcspn(result, "\n")] = '\0';
+	}
+	else
+	{
+		if ( !errno )
+			errno = EINVAL;
+		free(result);
+		result = NULL;
+	}
+	free(collection_conf_path);
+	return result;
 }

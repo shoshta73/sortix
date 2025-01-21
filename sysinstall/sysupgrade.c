@@ -62,7 +62,7 @@ struct installation
 	struct release release;
 	struct mountpoint* mountpoints;
 	size_t mountpoints_used;
-	char* machine;
+	char* platform;
 };
 
 static struct installation* installations;
@@ -79,7 +79,7 @@ static bool add_installation(struct blockdevice* bdev,
                              struct release* release,
                              struct mountpoint* mountpoints,
                              size_t mountpoints_used,
-                             char* machine)
+                             char* platform)
 {
 	if ( installations_count == installations_length )
 	{
@@ -98,37 +98,43 @@ static bool add_installation(struct blockdevice* bdev,
 	installation->release = *release;
 	installation->mountpoints = mountpoints;
 	installation->mountpoints_used = mountpoints_used;
-	installation->machine = machine;
+	installation->platform = platform;
 	return true;
 }
 
 static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 {
-	char* release_errpath;
-	if ( asprintf(&release_errpath, "%s: /etc/sortix-release",
-	              path_of_blockdevice(bdev)) < 0 )
+	char* etc_release = join_paths(mnt, "etc/sortix-release");
+	char* lib_release = join_paths(mnt, "lib/sortix-release");
+	char* fstab_path = join_paths(mnt, "etc/fstab");
+	if ( !etc_release || !lib_release || !fstab_path )
 	{
 		warn("malloc");
+		free(etc_release);
+		free(lib_release);
+		free(fstab_path);
 		return;
 	}
-	char* release_path;
-	if ( asprintf(&release_path, "%s/etc/sortix-release", mnt) < 0 )
+	const char* release_path = !access(etc_release, F_OK) ?
+	                           etc_release : lib_release;
+	char* release_errpath;
+	if ( asprintf(&release_errpath, "%s: %s",
+	              path_of_blockdevice(bdev), release_path) < 0 )
 	{
 		warn("malloc");
-		free(release_errpath);
+		free(etc_release);
+		free(lib_release);
+		free(fstab_path);
 		return;
 	}
 	struct release release;
 	bool status = os_release_load(&release, release_path, release_errpath);
-	free(release_path);
 	free(release_errpath);
+	free(etc_release);
+	free(lib_release);
 	if ( !status )
-		return;
-	char* fstab_path;
-	if ( asprintf(&fstab_path, "%s/etc/fstab", mnt) < 0 )
 	{
-		warn("malloc");
-		release_free(&release);
+		free(fstab_path);
 		return;
 	}
 	struct mountpoint* mountpoints;
@@ -136,32 +142,18 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 	status = load_mountpoints(fstab_path, &mountpoints, &mountpoints_used);
 	free(fstab_path);
 	if ( !status )
-	{
 		warn("%s: %s", path_of_blockdevice(bdev), "/etc/fstab");
-		release_free(&release);
-		return;
-	}
-	char* machine_path;
-	if ( asprintf(&machine_path, "%s/etc/machine", mnt) < 0 )
-	{
-		warn("%s: malloc", path_of_blockdevice(bdev));
-		free_mountpoints(mountpoints, mountpoints_used);
-		release_free(&release);
-		return;
-	}
-	char* machine = read_string_file(machine_path);
-	free(machine_path);
-	if ( !machine )
-	{
-		warn("%s/etc/machine", path_of_blockdevice(bdev));
-		free_mountpoints(mountpoints, mountpoints_used);
-		release_free(&release);
-		return;
-	}
+	char* platform = read_platform(mnt);
+	if ( !platform && !release.architecture )
+		warn("%s: /tix/collection.conf: Unable to detect platform",
+		     path_of_blockdevice(bdev));
+	if ( platform && !release.architecture )
+		release.architecture = strndup(platform, strcspn(platform, "-"));
 	if ( !add_installation(bdev, &release, mountpoints, mountpoints_used,
-	                       machine) )
+	                       platform) )
 	{
-		free(machine);
+		warn("malloc");
+		free(platform);
 		free_mountpoints(mountpoints, mountpoints_used);
 		release_free(&release);
 		return;
@@ -542,12 +534,14 @@ int main(void)
 		text("\n");
 	}
 
+	const char* new_release_path =
+		!access("/etc/sortix-release", F_OK) ?
+		"/etc/sortix-release" : "/lib/sortix-release";
 	struct release new_release;
-	if ( !os_release_load(&new_release, "/etc/sortix-release",
-	                                    "/etc/sortix-release") )
+	if ( !os_release_load(&new_release, new_release_path, new_release_path) )
 	{
 		if ( errno == ENOENT )
-			warn("/etc/sortix-release");
+			warn("%s", new_release_path);
 		exit(2);
 	}
 
@@ -593,7 +587,8 @@ int main(void)
 				printf("  %-16s  %s (%s)\n",
 				       path_of_blockdevice(installation->bdev),
 				       installation->release.pretty_name,
-				       installation->machine);
+				       installation->release.architecture ?
+				       installation->release.architecture : "unknown");
 			}
 			text("\n");
 
@@ -623,16 +618,21 @@ int main(void)
 	}
 	text("\n");
 
+	if ( !target->platform )
+		err(2, "failed to find target PLATFORM in /tix/collection.conf");
+	if ( !target->mountpoints )
+		err(2, "failed to find target mountpoints in /etc/fstab");
+
 	struct release* target_release = &target->release;
 
-	char* source_machine = read_string_file("/etc/machine");
-	if ( !source_machine )
-		err(2, "/etc/machine");
-	if ( strcmp(target->machine, source_machine) != 0 )
+	char* source_platform = read_platform("");
+	if ( !source_platform )
+		err(2, "failed to find source PLATFORM in /tix/collection.conf");
+	if ( strcmp(target->platform, source_platform) != 0 )
 	{
 		textf("Warning: You are changing an existing installation to another "
 		      "architecture! (%s -> %s) This is not supported and there is no "
-		      "promise this will work!\n", target->machine, source_machine);
+		      "promise this will work!\n", target->platform, source_platform);
 		while ( true )
 		{
 			prompt(input, sizeof(input), "switch_architecture",
@@ -645,7 +645,7 @@ int main(void)
 			errx(2, "upgrade aborted because of architecture mismatch");
 		text("\n");
 	}
-	free(source_machine);
+	free(source_platform);
 
 	if ( downgrading_version(target_release, &new_release) )
 	{

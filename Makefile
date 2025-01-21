@@ -274,18 +274,25 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /var/empty >> "$(SYSROOT)/tix/manifest/system"
 	echo /var/log >> "$(SYSROOT)/tix/manifest/system"
 	echo /var/run >> "$(SYSROOT)/tix/manifest/system"
-	echo "$(HOST_MACHINE)" > "$(SYSROOT)/etc/machine"
-	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
 	(echo 'NAME="Sortix"' && \
 	 echo 'VERSION="$(VERSION)"' && \
 	 echo 'ID=sortix' && \
 	 echo 'VERSION_ID="$(VERSION)"' && \
 	 echo 'PRETTY_NAME="Sortix $(VERSION)"' && \
+	 echo 'ARCHITECTURE="$(HOST_MACHINE)"' && \
 	 echo 'SORTIX_ABI=2.2' && \
-	 true) > "$(SYSROOT)/etc/sortix-release"
+	 true) > "$(SYSROOT)/lib/sortix-release"
+	echo /lib/sortix-release >> "$(SYSROOT)/tix/manifest/system"
+	ln -sf sortix-release "$(SYSROOT)/lib/os-release"
+	echo /lib/os-release >> "$(SYSROOT)/tix/manifest/system"
+	# TODO: After releasing Sortix 1.1, delete these machine and sortix-release
+	#       compatibility files needed to sysmerge from Sortix 1.0.
+	echo "$(HOST_MACHINE)" > "$(SYSROOT)/lib/machine"
+	echo /lib/machine >> "$(SYSROOT)/tix/manifest/system"
+	ln -sf ../lib/machine "$(SYSROOT)/etc/machine"
+	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
+	ln -sf ../lib/sortix-release "$(SYSROOT)/etc/sortix-release"
 	echo /etc/sortix-release >> "$(SYSROOT)/tix/manifest/system"
-	ln -sf sortix-release "$(SYSROOT)/etc/os-release"
-	echo /etc/os-release >> "$(SYSROOT)/tix/manifest/system"
 	find share | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
 	cp -RT share "$(SYSROOT)/share"
 	export SYSROOT="$(SYSROOT)" && \
