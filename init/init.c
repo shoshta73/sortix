@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -4310,7 +4310,10 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 	const char* pretend_where = mountpoint->entry.fs_file;
 	const char* where = mountpoint->absolute;
 	const char* read_only = NULL;
-	if ( fs->flags & (FILESYSTEM_FLAG_FSCK_SHOULD | FILESYSTEM_FLAG_FSCK_MUST) )
+	if ( !(fs->flags & FILESYSTEM_FLAG_WRITABLE) )
+		read_only = "-r";
+	else if ( fs->flags & (FILESYSTEM_FLAG_FSCK_SHOULD |
+	                       FILESYSTEM_FLAG_FSCK_MUST) )
 	{
 		if ( !fsck(fs) && (fs->flags & FILESYSTEM_FLAG_FSCK_MUST) )
 		{

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2020, 2021, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015-2016, 2020-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -192,6 +192,8 @@ static bool should_install_bootloader(void)
 	for ( size_t i = 0; i < hds_count; i++ )
 	{
 		struct harddisk* hd = hds[i];
+		if ( !hd->writable )
+			continue;
 		if ( hd->bdev.pt )
 		{
 			for ( size_t n = 0; n < hd->bdev.pt->partitions_count; n++ )

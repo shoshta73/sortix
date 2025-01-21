@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021-2022, 2024-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -679,6 +679,11 @@ const char* Port::GetRevision()
 const unsigned char* Port::GetATAIdentify(size_t* size_ptr)
 {
 	return *size_ptr = sizeof(identify_data), identify_data;
+}
+
+bool Port::IsWritable()
+{
+	return !is_packet_interface;
 }
 
 int Port::sync(ioctx_t* ctx)

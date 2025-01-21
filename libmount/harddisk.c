@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -96,6 +96,10 @@ bool harddisk_inspect_blockdevice(struct harddisk* hd)
 	if ( !(str = atcgetblob(hd->fd, "harddisk-sectors", NULL)) )
 		return harddisk_close(hd), false;
 	hd->sectors = (uint16_t) strtoul(str, NULL, 10);
+	free(str);
+	if ( !(str = atcgetblob(hd->fd, "harddisk-writable", NULL)) )
+		return harddisk_close(hd), false;
+	hd->writable = !strcmp(str, "true");
 	free(str);
 	if ( !hd->logical_block_size )
 		return errno = ENOMEDIUM, false;

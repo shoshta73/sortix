@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,6 +49,7 @@ struct blockdevice
 extern "C" {
 #endif
 
+bool blockdevice_is_writable(const struct blockdevice*);
 blksize_t blockdevice_logical_block_size(const struct blockdevice*);
 bool blockdevice_check_reasonable_block_size(blksize_t);
 off_t blockdevice_size(const struct blockdevice*);

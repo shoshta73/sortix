@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -494,10 +494,14 @@ static void remove_partition_devices(const char* path)
 	free(dir_path);
 }
 
-static int harddisk_compare_path(const void* a_ptr, const void* b_ptr)
+static int harddisk_compare(const void* a_ptr, const void* b_ptr)
 {
 	struct harddisk* a = *((struct harddisk**) a_ptr);
 	struct harddisk* b = *((struct harddisk**) b_ptr);
+	if ( a->writable && !b->writable )
+		return -1;
+	if ( !a->writable && b->writable )
+		return 1;
 	return strcmp(a->path, b->path);
 }
 
@@ -1371,7 +1375,7 @@ static void on_devices(size_t argc, char** argv)
 {
 	(void) argc;
 	(void) argv;
-	qsort(hds, hds_count, sizeof(struct harddisk*), harddisk_compare_path);
+	qsort(hds, hds_count, sizeof(struct harddisk*), harddisk_compare);
 	display_rows_columns(display_harddisk_format, hds, 1 + hds_count, 5);
 }
 
@@ -2870,7 +2874,7 @@ int main(int argc, char* argv[])
 	if ( !devices_open_all(&hds, &hds_count) )
 		err(1, "iterating devices");
 
-	qsort(hds, hds_count, sizeof(struct harddisk*), harddisk_compare_path);
+	qsort(hds, hds_count, sizeof(struct harddisk*), harddisk_compare);
 
 	if ( 2 <= argc )
 	{

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -103,7 +103,8 @@ ssize_t PortNode::tcgetblob(ioctx_t* ctx, const char* name, void* buffer,
 	                            "harddisk-cylinders\0"
 	                            "harddisk-heads\0"
 	                            "harddisk-sectors\0"
-	                            "harddisk-ata-identify\0";
+	                            "harddisk-ata-identify\0"
+	                            "harddisk-writable\0";
 
 	if ( !name )
 	{
@@ -170,6 +171,11 @@ ssize_t PortNode::tcgetblob(ioctx_t* ctx, const char* name, void* buffer,
 	{
 		if ( !(result_pointer = harddisk->GetATAIdentify(&result_size)) )
 			return -1;
+	}
+	else if ( !strcmp(name, "harddisk-writable") )
+	{
+		result_pointer = harddisk->IsWritable() ? "true" : "false";
+		result_size = strlen((const char*) result_pointer);
 	}
 	else
 	{

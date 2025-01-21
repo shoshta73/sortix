@@ -69,6 +69,13 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Recognize read-only block devices
+The
+.Xr tcgetblob 2
+system call has gained the new
+.Sy harddisk-writable
+key, which returns whether a block device is writable.
+This is a minor compatible ABI change.
 .Ss Add tix-repository(8)
 The new
 .Xr tix-repository 8

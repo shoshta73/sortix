@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -150,6 +150,9 @@ static enum filesystem_error ext2_inspect(struct filesystem** fs_ptr,
 	fs->driver = "extfs";
 	if ( sb->s_feature_incompat & ~EXT2_FEATURE_INCOMPAT_SUPPORTED )
 		fs->driver = NULL;
+	else if ( !(sb->s_feature_compat & ~EXT2_FEATURE_COMPAT_SUPPORTED) &&
+	          blockdevice_is_writable(bdev) )
+		fs->flags |= FILESYSTEM_FLAG_WRITABLE;
 	fs->flags |= FILESYSTEM_FLAG_UUID;
 	memcpy(&fs->uuid, sb->s_uuid, 16);
 	struct timespec now;

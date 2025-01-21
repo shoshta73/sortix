@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -54,6 +54,7 @@ public:
 	virtual const char* GetSerial();
 	virtual const char* GetRevision();
 	virtual const unsigned char* GetATAIdentify(size_t* size_ptr);
+	virtual bool IsWritable();
 	virtual int sync(ioctx_t* ctx);
 	virtual ssize_t pread(ioctx_t* ctx, unsigned char* buf, size_t count, off_t off);
 	virtual ssize_t pwrite(ioctx_t* ctx, const unsigned char* buf, size_t count, off_t off);

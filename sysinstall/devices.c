@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -190,7 +190,17 @@ bool check_lacking_partition_table(void)
 
 bool check_multiple_harddisks(void)
 {
-	return 2 <= hds_count;
+	bool any_writable = false;
+	for ( size_t di = 0; di < hds_count; di++ )
+	{
+		if ( hds[di]->writable )
+		{
+			if ( any_writable )
+				return true;
+			any_writable = true;
+		}
+	}
+	return false;
 }
 
 bool fsck(struct filesystem* fs)
@@ -332,6 +342,9 @@ bool mountpoint_mount(struct mountpoint* mountpoint)
 	struct blockdevice* bdev = fs->bdev;
 	const char* bdev_path = path_of_blockdevice(bdev);
 	assert(bdev_path);
+	const char* read_only = NULL;
+	if ( !(fs->flags & FILESYSTEM_FLAG_WRITABLE) )
+		read_only = "-r";
 	if ( fs->flags & FILESYSTEM_FLAG_FSCK_MUST && !fsck(fs) )
 	{
 		warnx("Failed to fsck %s", bdev_path);
@@ -378,7 +391,8 @@ bool mountpoint_mount(struct mountpoint* mountpoint)
 			_exit(127);
 		}
 		execlp(fs->driver, fs->driver, "--foreground", bdev_path, where,
-		       "--pretend-mount-path", pretend_where, (const char*) NULL);
+		       "--pretend-mount-path", pretend_where, read_only,
+		       (const char*) NULL);
 		warn("Failed mount %s on %s: execvp: %s",
 		     bdev_path, pretend_where, fs->driver);
 		_exit(127);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,6 +29,14 @@
 #include <mount/blockdevice.h>
 #include <mount/harddisk.h>
 #include <mount/partition.h>
+
+bool blockdevice_is_writable(const struct blockdevice* bdev)
+{
+	while ( bdev->p )
+		bdev = bdev->p->parent_bdev;
+	assert(bdev->hd);
+	return bdev->hd->writable;
+}
 
 blksize_t blockdevice_logical_block_size(const struct blockdevice* bdev)
 {

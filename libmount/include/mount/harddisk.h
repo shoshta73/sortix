@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -43,6 +43,7 @@ struct harddisk
 	uint16_t cylinders;
 	uint16_t heads;
 	uint16_t sectors;
+	bool writable;
 };
 
 #if defined(__cplusplus)
