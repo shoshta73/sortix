@@ -227,7 +227,6 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/boot"
 	mkdir -p "$(SYSROOT)/dev"
 	mkdir -p "$(SYSROOT)/etc"
-	mkdir -p "$(SYSROOT)/etc/skel"
 	mkdir -p "$(SYSROOT)/home"
 	mkdir -p "$(SYSROOT)/include"
 	mkdir -p "$(SYSROOT)/lib"
@@ -260,7 +259,6 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /boot >> "$(SYSROOT)/tix/manifest/system"
 	echo /dev >> "$(SYSROOT)/tix/manifest/system"
 	echo /etc >> "$(SYSROOT)/tix/manifest/system"
-	echo /etc/skel >> "$(SYSROOT)/tix/manifest/system"
 	echo /home >> "$(SYSROOT)/tix/manifest/system"
 	echo /include >> "$(SYSROOT)/tix/manifest/system"
 	echo /lib >> "$(SYSROOT)/tix/manifest/system"
@@ -512,7 +510,7 @@ $(LIVE_INITRD): sysroot
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
 	echo "include /etc/default/group.d/*" >> $(LIVE_INITRD).d/etc/group
 	mkdir -p $(LIVE_INITRD).d/root -m 700
-	cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root
+	if [ -e "$(SYSROOT)/etc/skel" ]; then cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root; fi
 	(echo "You can view the documentation for new users by typing:" && \
 	 echo && \
 	 echo "  man user-guide" && \

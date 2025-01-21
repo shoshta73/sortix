@@ -269,6 +269,8 @@ static bool passwd_has_name(const char* passwd_path, const char* name)
 
 static void install_skel(const char* home, uid_t uid, gid_t gid)
 {
+	if ( access("etc/skel", F_OK) < 0 && errno == ENOENT )
+		return;
 	const char* argv[] = { "cp", "-RT", "--", "etc/skel", home, NULL };
 	execute(argv, "ug", uid, gid);
 }
