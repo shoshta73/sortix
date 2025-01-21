@@ -1,3 +1,24 @@
+diff -Paur --no-dereference -- libssl.upstream/Makefile.in libssl/Makefile.in
+--- libssl.upstream/Makefile.in
++++ libssl/Makefile.in
+@@ -892,7 +892,7 @@
+ 	@if [ "@OPENSSLDIR@x" != "x" ]; then \
+ 		OPENSSLDIR="$(DESTDIR)@OPENSSLDIR@"; \
+ 	else \
+-		OPENSSLDIR="$(DESTDIR)$(sysconfdir)/ssl"; \
++		OPENSSLDIR="$(DESTDIR)$(sysconfdir)/default/ssl"; \
+ 	fi; \
+ 	mkdir -p "$$OPENSSLDIR/certs"; \
+ 	for i in cert.pem openssl.cnf x509v3.cnf; do \
+@@ -907,7 +907,7 @@
+ 	@if [ "@OPENSSLDIR@x" != "x" ]; then \
+ 		OPENSSLDIR="$(DESTDIR)@OPENSSLDIR@"; \
+ 	else \
+-		OPENSSLDIR="$(DESTDIR)$(sysconfdir)/ssl"; \
++		OPENSSLDIR="$(DESTDIR)$(sysconfdir)/default/ssl"; \
+ 	fi; \
+ 	for i in cert.pem openssl.cnf x509v3.cnf; do \
+ 		if cmp -s "$$OPENSSLDIR/$$i" "$(srcdir)/$$i"; then \
 diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/netcat.c
 --- libssl.upstream/apps/nc/netcat.c
 +++ libssl/apps/nc/netcat.c
@@ -219,6 +240,15 @@ diff -Paur --no-dereference -- libssl.upstream/configure libssl/configure
 diff -Paur --no-dereference -- libssl.upstream/crypto/Makefile.in libssl/crypto/Makefile.in
 --- libssl.upstream/crypto/Makefile.in
 +++ libssl/crypto/Makefile.in
+@@ -92,7 +92,7 @@
+ @ENABLE_LIBTLS_ONLY_TRUE@am__append_1 = libcrypto.la
+ @HAVE_EXPLICIT_BZERO_FALSE@am__append_2 = libcompatnoopt.la
+ @OPENSSLDIR_DEFINED_TRUE@am__append_3 = -DOPENSSLDIR=\"@OPENSSLDIR@\"
+-@OPENSSLDIR_DEFINED_FALSE@am__append_4 = -DOPENSSLDIR=\"$(sysconfdir)/ssl\"
++@OPENSSLDIR_DEFINED_FALSE@am__append_4 = -DOPENSSLDIR=\"$(sysconfdir)/ssl\" -DOPENSSLDIR_DEFAULT=\"$(sysconfdir)/default/ssl\"
+ 
+ # compatibility functions that need to be built without optimizations
+ @HAVE_EXPLICIT_BZERO_FALSE@am__append_5 = libcompatnoopt.la
 @@ -1448,7 +1448,8 @@
  CC = @CC@
  CCAS = @CCAS@
@@ -269,6 +299,67 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/bio/bss_bio.c libssl/crypt
  #include <assert.h>
  #include <limits.h>
  #include <stdlib.h>
+diff -Paur --no-dereference -- libssl.upstream/crypto/cryptlib.h libssl/crypto/cryptlib.h
+--- libssl.upstream/crypto/cryptlib.h
++++ libssl/crypto/cryptlib.h
+@@ -72,6 +72,13 @@
+ #define X509_CERT_DIR_EVP        "SSL_CERT_DIR"
+ #define X509_CERT_FILE_EVP       "SSL_CERT_FILE"
+ 
++// PATCH: Search /etc/default/ssl if /etc/ssl doesn't exist.
++#ifdef OPENSSLDIR_DEFAULT
++#define X509_CERT_AREA_DEFAULT	OPENSSLDIR_DEFAULT
++#define X509_CERT_DIR_DEFAULT	OPENSSLDIR_DEFAULT "/certs"
++#define X509_CERT_FILE_DEFAULT	OPENSSLDIR_DEFAULT "/cert.pem"
++#endif
++
+ #define CTLOG_FILE		OPENSSLDIR "/ct_log_list.cnf"
+ #define CTLOG_FILE_EVP		"CTLOG_FILE"
+ 
+diff -Paur --no-dereference -- libssl.upstream/crypto/x509/x509_def.c libssl/crypto/x509/x509_def.c
+--- libssl.upstream/crypto/x509/x509_def.c
++++ libssl/crypto/x509/x509_def.c
+@@ -57,6 +57,7 @@
+  */
+ 
+ #include <stdio.h>
++#include <unistd.h>
+ #include "cryptlib.h"
+ #include <openssl/crypto.h>
+ #include <openssl/x509.h>
+@@ -71,6 +72,10 @@
+ const char *
+ X509_get_default_cert_area(void)
+ {
++#ifdef X509_CERT_AREA_DEFAULT
++	if (access(X509_CERT_AREA, F_OK) == -1)
++		return X509_CERT_AREA_DEFAULT;
++#endif
+ 	return (X509_CERT_AREA);
+ }
+ LCRYPTO_ALIAS(X509_get_default_cert_area);
+@@ -78,6 +83,10 @@
+ const char *
+ X509_get_default_cert_dir(void)
+ {
++#ifdef X509_CERT_DIR_DEFAULT
++	if (access(X509_CERT_DIR, F_OK) == -1)
++		return X509_CERT_DIR_DEFAULT;
++#endif
+ 	return (X509_CERT_DIR);
+ }
+ LCRYPTO_ALIAS(X509_get_default_cert_dir);
+@@ -85,6 +94,10 @@
+ const char *
+ X509_get_default_cert_file(void)
+ {
++#ifdef X509_CERT_FILE_DEFAULT
++	if (access(X509_CERT_FILE, F_OK) == -1)
++		return X509_CERT_FILE_DEFAULT;
++#endif
+ 	return (X509_CERT_FILE);
+ }
+ LCRYPTO_ALIAS(X509_get_default_cert_file);
 diff -Paur --no-dereference -- libssl.upstream/include/compat/unistd.h libssl/include/compat/unistd.h
 --- libssl.upstream/include/compat/unistd.h
 +++ libssl/include/compat/unistd.h
@@ -286,10 +377,42 @@ diff -Paur --no-dereference -- libssl.upstream/include/compat/unistd.h libssl/in
  
  #define pledge(request, paths) 0
  #define unveil(path, permissions) 0
+diff -Paur --no-dereference -- libssl.upstream/tls/Makefile.in libssl/tls/Makefile.in
+--- libssl.upstream/tls/Makefile.in
++++ libssl/tls/Makefile.in
+@@ -90,7 +90,7 @@
+ build_triplet = @build@
+ host_triplet = @host@
+ @OPENSSLDIR_DEFINED_TRUE@am__append_1 = -DTLS_DEFAULT_CA_FILE=\"@OPENSSLDIR@/cert.pem\"
+-@OPENSSLDIR_DEFINED_FALSE@am__append_2 = -DTLS_DEFAULT_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\"
++@OPENSSLDIR_DEFINED_FALSE@am__append_2 = -DTLS_DEFAULT_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\" -DTLS_DEFAULT_CA_FILE_DEFAULT=\"$(sysconfdir)/default/ssl/cert.pem\"
+ @HOST_WIN_TRUE@am__append_3 = compat/ftruncate.c compat/pread.c \
+ @HOST_WIN_TRUE@	compat/pwrite.c
+ subdir = tls
 diff -Paur --no-dereference -- libssl.upstream/tls/tls_config.c libssl/tls/tls_config.c
 --- libssl.upstream/tls/tls_config.c
 +++ libssl/tls/tls_config.c
-@@ -742,8 +742,8 @@
+@@ -29,11 +29,19 @@
+ 
+ #include "tls_internal.h"
+ 
++// PATCH: Search /etc/default/ssl if /etc/ssl doesn't exist.
+ static const char default_ca_file[] = TLS_DEFAULT_CA_FILE;
++#ifdef TLS_DEFAULT_CA_FILE_DEFAULT
++static const char default_ca_file_default[] = TLS_DEFAULT_CA_FILE_DEFAULT;
++#endif
+ 
+ const char *
+ tls_default_ca_cert_file(void)
+ {
++#ifdef TLS_DEFAULT_CA_FILE_DEFAULT
++	if (access(default_ca_file, F_OK) == -1)
++		return default_ca_file_default;
++#endif
+ 	return default_ca_file;
+ }
+ 
+@@ -742,8 +750,8 @@
  
  	if (sb.st_uid != getuid()) {
  		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
