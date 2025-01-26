@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -2044,7 +2044,7 @@ static int run(FILE* fp,
 			read_command_non_interactive(&sh_read_command, fp);
 
 		if ( sh_read_command.abort_condition )
-			break;
+			continue;
 
 		if ( sh_read_command.eof_condition )
 		{
