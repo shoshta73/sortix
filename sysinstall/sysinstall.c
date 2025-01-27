@@ -169,10 +169,16 @@ static bool should_install_bootloader_bdev(struct blockdevice* bdev)
 		return false;
 	if ( !bdev->fs->driver )
 		return false;
-	char mnt[] = "/tmp/fs.XXXXXX";
+	char* mnt = join_paths(get_tmpdir(), "fs.XXXXXX");
+	if ( !mnt )
+	{
+		warn("malloc");
+		return false;
+	}
 	if ( !mkdtemp(mnt) )
 	{
-		warn("mkdtemp: %s", "/tmp/fs.XXXXXX");
+		warn("mkdtemp: %s", mnt);
+		free(mnt);
 		return false;
 	}
 	struct mountpoint mp = { 0 };
@@ -182,11 +188,13 @@ static bool should_install_bootloader_bdev(struct blockdevice* bdev)
 	if ( !mountpoint_mount(&mp) )
 	{
 		rmdir(mnt);
+		free(mnt);
 		return false;
 	}
 	bool should = should_install_bootloader_path(mnt, bdev);
 	mountpoint_unmount(&mp);
 	rmdir(mnt);
+	free(mnt);
 	return should;
 }
 
@@ -435,9 +443,9 @@ static pid_t main_pid;
 static struct mountpoint* mountpoints;
 static size_t mountpoints_used;
 static bool etc_made = false;
-static char etc[] = "/tmp/etc.XXXXXX";
+static char* etc;
 static bool fs_made = false;
-static char fs[] = "/tmp/fs.XXXXXX";
+static char* fs;
 static int exit_gui_code = -1;
 
 static void unmount_all_but_root(void)
@@ -503,8 +511,10 @@ int main(void)
 	if ( atexit(exit_handler) != 0 )
 		err(2, "atexit");
 
+	if ( !(etc = join_paths(get_tmpdir(), "etc.XXXXXX")) )
+		err(2, "malloc");
 	if ( !mkdtemp(etc) )
-		err(2, "mkdtemp: %s", "/tmp/etc.XXXXXX");
+		err(2, "mkdtemp: %s", etc);
 	etc_made = true;
 	// Export for the convenience of users escaping to a shell.
 	setenv("SYSINSTALL_ETC", fs, 1);
@@ -1052,8 +1062,10 @@ int main(void)
 
 	printf(" - Mounting filesystems...\n");
 
+	if ( !(fs = join_paths(get_tmpdir(), "fs.XXXXXX")) )
+		err(2, "malloc");
 	if ( !mkdtemp(fs) )
-		err(2, "mkdtemp: %s", "/tmp/fs.XXXXXX");
+		err(2, "mkdtemp: %s", fs);
 	fs_made = true;
 	// Export for the convenience of users escaping to a shell.
 	setenv("SYSINSTALL_TARGET", fs, 1);

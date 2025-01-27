@@ -72,7 +72,7 @@ static pid_t main_pid;
 static struct mountpoint* mountpoints;
 static size_t mountpoints_used;
 static bool fs_made = false;
-static char fs[] = "/tmp/fs.XXXXXX";
+static char* fs;
 static int exit_gui_code = -1;
 
 static bool add_installation(struct blockdevice* bdev,
@@ -545,8 +545,10 @@ int main(void)
 		exit(2);
 	}
 
+	if ( !(fs = join_paths(get_tmpdir(), "fs.XXXXXX")) )
+		err(2, "malloc");
 	if ( !mkdtemp(fs) )
-		err(2, "mkdtemp: %s", "/tmp/fs.XXXXXX");
+		err(2, "mkdtemp: %s", fs);
 	fs_made = true;
 	// Export for the convenience of users escaping to a shell.
 	setenv("SYSINSTALL_TARGET", fs, 1);

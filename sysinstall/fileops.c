@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017, 2020, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015-2017, 2020-2021, 2023-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -253,4 +253,10 @@ char* akernelinfo(const char* request)
 		if ( !(buffer = malloc(size)) )
 			return NULL;
 	}
+}
+
+const char* get_tmpdir(void)
+{
+	const char* tmpdir = getenv("TMPDIR");
+	return tmpdir ? tmpdir : "/tmp";
 }
