@@ -22,6 +22,7 @@
 #include <sys/mount.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/un.h>
 #include <sys/wait.h>
@@ -345,6 +346,9 @@ static char* chain_path;
 static bool chain_path_made;
 static char* chain_dev_path;
 static bool chain_dev_path_made;
+static char* chain_tmp_path;
+static char* chain_tmp_path_real;
+static bool chain_tmp_path_made;
 
 static pid_t main_pid;
 static pid_t forward_signal_pid = -1;
@@ -4485,6 +4489,14 @@ static void niht(void)
 		chain_dev_path_made = false;
 	}
 
+	if ( chain_tmp_path_made )
+	{
+		clean_tmp(chain_tmp_path);
+		unmount(chain_tmp_path, 0);
+		rmdir(chain_tmp_path_real);
+		chain_tmp_path_made = false;
+	}
+
 	mountpoints_unmount();
 
 	if ( chain_path_made )
@@ -4563,7 +4575,9 @@ int main(int argc, char* argv[])
 	     !(random_seed_path = join_paths(prefix, "boot/random.seed")) ||
 	     !(server_path = join_paths(run_path, "init")) ||
 	     !(chain_path = join_paths(tmp_path, "fs.XXXXXX")) ||
-	     !(chain_dev_path = join_paths(chain_path, "dev")) )
+	     !(chain_dev_path = join_paths(chain_path, "dev")) ||
+	     !(chain_tmp_path = join_paths(chain_path, "tmp")) ||
+	     !(chain_tmp_path_real = strdup("/dev/tmp/XXXXXX")) )
 		fatal("malloc: %m");
 
 	// Remember the controlling terminal to give it away and reclaim it.
@@ -4659,6 +4673,9 @@ int main(int argc, char* argv[])
 	umask(0000);
 	mkdir(tmp_path, 01777);
 	clean_tmp(tmp_path);
+	if ( strcmp(tmp_path, "/tmp") != 0 &&
+	     setenv("TMPDIR", tmp_path, 1) < 0 )
+		fatal("setenv: %m");
 
 	// Make sure that we have a /var/run directory.
 	umask(0000);
@@ -4697,11 +4714,14 @@ int main(int argc, char* argv[])
 		chain_path_made = true;
 		// Rewrite the filesystem table to mount inside the temporary directory.
 		bool found_root = false;
+		bool found_tmp = false;
 		for ( size_t i = 0; i < mountpoints_used; i++ )
 		{
 			struct mountpoint* mountpoint = &mountpoints[i];
 			if ( !strcmp(mountpoint->entry.fs_file, "/") )
 				found_root = true;
+			if ( !strcmp(mountpoint->entry.fs_file, "/tmp") )
+				found_tmp = true;
 			char* absolute = join_paths(chain_path, mountpoint->absolute);
 			if ( !absolute )
 				fatal("malloc: %m");
@@ -4728,6 +4748,35 @@ int main(int argc, char* argv[])
 		chain_dev_path_made = true;
 		close(new_dev_fd);
 		close(old_dev_fd);
+		// Mount /tmp as a ramfs if the root filesystem isn't writable.
+		// TODO: Move this to the nested init instead when there is a system
+		//       call that lets one instantiate a new ramfs.
+		struct statvfs stvfs;
+		if ( statvfs(chain_path, &stvfs) < 0 )
+			fatal("statvfs: /: %m");
+		if ( !found_tmp && (stvfs.f_flag & ST_RDONLY) )
+		{
+			if ( mkdir("/dev/tmp", 01777) && errno != EEXIST )
+				fatal("mkdir: /dev/tmp: %m");
+			if ( !mkdtemp(chain_tmp_path_real) )
+				fatal("mkdtemp: %s: %m", chain_tmp_path_real);
+			memcpy(chain_tmp_path, chain_path, strlen(chain_path));
+			if ( mkdir(chain_tmp_path, 0755) < 0 &&
+				 errno != EEXIST && errno != EROFS )
+				fatal("mkdir: %s: %m", chain_tmp_path);
+			int old_tmp_fd = open(chain_tmp_path_real, O_DIRECTORY | O_RDONLY);
+			if ( old_tmp_fd < 0 )
+				fatal("%s: %m", chain_tmp_path_real);
+			int new_tmp_fd = open(chain_tmp_path, O_DIRECTORY | O_RDONLY);
+			if ( new_tmp_fd < 0 )
+				fatal("%s: %m", chain_tmp_path);
+			if ( fsm_fsbind(old_tmp_fd, new_tmp_fd, 0) < 0 )
+				fatal("mount: `%s' onto `%s': %m", chain_tmp_path_real,
+				      chain_tmp_path);
+			chain_tmp_path_made = true;
+			close(new_tmp_fd);
+			close(old_tmp_fd);
+		}
 		// TODO: Forward the early init log to the chain init.
 		// Run the chain booted operating system.
 		pid_t child_pid = fork();
