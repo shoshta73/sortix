@@ -22,6 +22,7 @@
 #include <sys/kernelinfo.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
@@ -1676,8 +1677,14 @@ int main(void)
 
 	while ( true )
 	{
-		prompt(input, sizeof(input), "finally",
-		       "What now? (exit/poweroff/reboot/halt/boot/chroot)", "boot");
+		struct statvfs stvfs;
+		bool is_live = !access("/etc/fstab", F_OK) &&
+		               statvfs("/", &stvfs) && !(stvfs.f_flag & ST_RDONLY);
+		const char* question =
+			is_live ? "What now? (exit/poweroff/reboot/halt/boot/chroot)" :
+			          "What now? (exit/poweroff/reboot/halt/chroot)";
+		const char* answer = is_live ? "boot" : "reboot";
+		prompt(input, sizeof(input), "finally", question, answer);
 		if ( !strcasecmp(input, "exit") )
 			exit(0);
 		else if ( !strcasecmp(input, "poweroff") )
@@ -1688,7 +1695,7 @@ int main(void)
 			exit_gui(2);
 		else if ( !strcasecmp(input, "boot") )
 		{
-			if ( !access("/etc/fstab", F_OK) )
+			if ( !is_live )
 			{
 				printf("Only a live environment can reinit installations.\n");
 				continue;
