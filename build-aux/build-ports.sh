@@ -121,7 +121,7 @@ tix-metabuild \
   $DISTCLEAN \
   ${END:+--end="$END"} \
   --generation=3 \
-  --host=$HOST \
+  ${HOST:+--host="$HOST"} \
   ${SORTIX_PORTS_MIRROR:+--mirror="$SORTIX_PORTS_MIRROR"} \
   --mirror-directory="$SORTIX_MIRROR_DIR" \
   --packages="${PACKAGES-all!!}" \
