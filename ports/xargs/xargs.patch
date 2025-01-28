@@ -6,7 +6,7 @@ diff -Paur --no-dereference -- xargs.upstream/Makefile xargs/Makefile
 +include ../../../build-aux/version.mak
 +include ../../../build-aux/dirs.mak
 +
-+OPTLEVEL?=-g -O2
++OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 +CFLAGS?=$(OPTLEVEL)
 +
 +CFLAGS:=$(CXXFLAGS) -Wall -Wextra

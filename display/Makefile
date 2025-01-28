@@ -3,7 +3,7 @@ include ../build-aux/platform.mak
 include ../build-aux/compiler.mak
 include ../build-aux/dirs.mak
 
-OPTLEVEL?=-g -O2
+OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 CFLAGS?=$(OPTLEVEL)
 
 CFLAGS:=$(CFLAGS) -Wall -Wextra

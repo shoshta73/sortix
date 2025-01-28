@@ -8,7 +8,7 @@ diff -Paur --no-dereference -- video-player.upstream/Makefile video-player/Makef
 +
 +PKG_CONFIG?=pkg-config
 +
-+OPTLEVEL?=-g -O2
++OPTLEVEL?=$(DEFAULT_OPTLEVEL)
 +CFLAGS?=$(OPTLEVEL)
 +
 +CPPFLAGS:=$(CPPFLAGS)
