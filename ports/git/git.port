@@ -10,7 +10,7 @@ UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_PROGRAMS='asciidoc? dblatex? docbook2x? xmlto?'
 BUILD_SYSTEM=configure
 DIRTY_FILE=config.mak.autogen
-CONFIGURE_ARGS='--with-editor=editor --with-pager=pager --with-shell=sh --with-perl=perl --with-python=python'
+CONFIGURE_ARGS='--with-editor=editor --with-pager=less --with-shell=sh --with-perl=perl --with-python=python'
 CONFIGURE_VARS='ac_cv_fread_reads_directories=no ac_cv_snprintf_returns_bogus=no'
 # TODO: We force MAKE to make because I occasionally use a tool called colormake
 #       that likes to colorize even when the output device is a pipe, which

@@ -81,7 +81,7 @@ struct command commands[] =
 	{MOUNT, "extfs", "system", NULL},
 	{MOUNT, "mount", NULL, NULL},
 
-	{PAGER, "less", NULL, NULL},
+	{PAGER, "less", "less", NULL},
 	{PAGER, "more", NULL, NULL},
 	{PAGER, "pager", "system", NULL},
 

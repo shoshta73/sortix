@@ -1,0 +1,11 @@
+diff -Paur --no-dereference -- less.upstream/Makefile.in less/Makefile.in
+--- less.upstream/Makefile.in
++++ less/Makefile.in
+@@ -35,7 +35,6 @@
+ mandir = @mandir@
+ manext = 1
+ manprefix = 
+-DESTDIR =
+ 
+ #### End of system configuration section. ####
+ 

@@ -6,7 +6,7 @@ diff -Paur --no-dereference -- mdocml.upstream/apropos.1 mdocml/apropos.1
  .Fl c
  is not specified, use
 -.Xr more 1
-+.Xr pager 1
++.Xr less 1
  to paginate them.
  In
  .Fl a
@@ -15,7 +15,7 @@ diff -Paur --no-dereference -- mdocml.upstream/apropos.1 mdocml/apropos.1
  .Fl a
  mode, copy the formatted manual pages to the standard output without using
 -.Xr more 1
-+.Xr pager 1
++.Xr less 1
  to paginate them.
  .It Fl f
  Search for all words in
@@ -24,7 +24,7 @@ diff -Paur --no-dereference -- mdocml.upstream/apropos.1 mdocml/apropos.1
  .Ev MANPAGER
  will be used instead of the standard pagination program,
 -.Xr more 1 .
-+.Xr pager 1 .
++.Xr less 1 .
  .It Ev MANPATH
  The standard search path used by
  .Xr man 1
@@ -33,7 +33,7 @@ diff -Paur --no-dereference -- mdocml.upstream/apropos.1 mdocml/apropos.1
  is not defined.
  If neither PAGER nor MANPAGER is defined,
 -.Pa /usr/bin/more Fl s
-+.Pa pager Fl R
++.Pa less Fl R
  will be used.
  .El
  .Sh FILES
@@ -366,7 +366,7 @@ diff -Paur --no-dereference -- mdocml.upstream/main.c mdocml/main.c
  		pager = getenv("PAGER");
  	if (pager == NULL || *pager == '\0')
 -		pager = "/usr/bin/more -s";
-+		pager = "pager -R";
++		pager = "less -R";
  	cp = mandoc_strdup(pager);
  
  	/*
@@ -416,7 +416,7 @@ diff -Paur --no-dereference -- mdocml.upstream/man.1 mdocml/man.1
  .It Fl c
  Copy the manual page to the standard output instead of using
 -.Xr more 1
-+.Xr pager 1
++.Xr less 1
  to paginate it.
  This is done by default if the standard output is not a terminal device.
  .It Fl f
@@ -425,7 +425,7 @@ diff -Paur --no-dereference -- mdocml.upstream/man.1 mdocml/man.1
  .Ev MANPAGER
  will be used instead of the standard pagination program,
 -.Xr more 1 .
-+.Xr pager 1 .
++.Xr less 1 .
  .It Ev MANPATH
  The standard search path used by
  .Nm
@@ -434,7 +434,7 @@ diff -Paur --no-dereference -- mdocml.upstream/man.1 mdocml/man.1
  is not defined.
  If neither PAGER nor MANPAGER is defined,
 -.Pa /usr/bin/more Fl s
-+.Pa pager Fl R
++.Pa less Fl R
  will be used.
  .El
  .Sh FILES
@@ -446,14 +446,14 @@ diff -Paur --no-dereference -- mdocml.upstream/mandoc.1 mdocml/mandoc.1
  .Fl c
  is not specified, use
 -.Xr more 1
-+.Xr pager 1
++.Xr less 1
  to paginate the output, just like
  .Xr man 1
  would.
  .It Fl c
  Copy the formatted manual pages to the standard output without using
 -.Xr more 1
-+.Xr pager 1
++.Xr less 1
  to paginate them.
  This is the default.
  It can be specified to override
@@ -462,14 +462,14 @@ diff -Paur --no-dereference -- mdocml.upstream/mandoc.1 mdocml/mandoc.1
  .Ev MANPAGER
  will be used instead of the standard pagination program,
 -.Xr more 1 .
-+.Xr pager 1 .
++.Xr less 1 .
  .It Ev PAGER
  Specifies the pagination program to use when
  .Ev MANPAGER
  is not defined.
  If neither PAGER nor MANPAGER is defined,
 -.Pa /usr/bin/more Fl s
-+.Pa pager Fl R
++.Pa less Fl R
  will be used.
  .El
  .Sh EXIT STATUS
@@ -602,7 +602,7 @@ diff -Paur --no-dereference -- mdocml.upstream/manpage.c mdocml/manpage.c
  			getenv("MANPAGER") :
  			(NULL != getenv("PAGER") ?
 -			 getenv("PAGER") : "more");
-+			 getenv("PAGER") : "pager");
++			 getenv("PAGER") : "less");
  		execlp(cmd, cmd, (char *)NULL);
  		perror(cmd);
  		exit(EXIT_FAILURE);
