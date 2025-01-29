@@ -116,17 +116,17 @@ export CXXFLAGS
 tix-metabuild \
   ${BUILD:+--build="$BUILD"} \
   $CACHE_PACKAGE \
-  --collection="$SYSROOT" \
-  --destination="$SORTIX_REPOSITORY_DIR" \
+  ${SYSROOT:+--collection="$SYSROOT"} \
+  ${SORTIX_REPOSITORY_DIR:+--destination="$SORTIX_REPOSITORY_DIR"} \
   $DISTCLEAN \
   ${END:+--end="$END"} \
   --generation=3 \
   ${HOST:+--host="$HOST"} \
   ${SORTIX_PORTS_MIRROR:+--mirror="$SORTIX_PORTS_MIRROR"} \
-  --mirror-directory="$SORTIX_MIRROR_DIR" \
+  ${SORTIX_MIRROR_DIR:+--mirror-directory="$SORTIX_MIRROR_DIR"} \
   --packages="${PACKAGES-all!!}" \
   --prefix= \
   $RANDOMIZE \
   ${START:+--start="$START"} \
-  --sysroot="$SYSROOT" \
+  ${SYSROOT:+--sysroot="$SYSROOT"} \
   "$SORTIX_PORTS_DIR"
