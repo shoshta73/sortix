@@ -51,8 +51,10 @@ bool abi_compatible(unsigned long a_major, unsigned long a_minor,
 	return a_major == b_major && a_minor <= b_minor;
 }
 
-int version_compare(unsigned long a_major, unsigned long a_minor, bool a_dev,
-                    unsigned long b_major, unsigned long b_minor, bool b_dev)
+int version_compare(unsigned long a_major, unsigned long a_minor,
+                    unsigned long a_patch, bool a_dev,
+                    unsigned long b_major, unsigned long b_minor,
+                    unsigned long b_patch, bool b_dev)
 {
 	if ( a_major < b_major )
 		return -1;
@@ -61,6 +63,10 @@ int version_compare(unsigned long a_major, unsigned long a_minor, bool a_dev,
 	if ( a_minor < b_minor )
 		return -1;
 	if ( a_minor > b_minor )
+		return 1;
+	if ( a_patch < b_patch )
+		return -1;
+	if ( a_patch > b_patch )
 		return 1;
 	if ( a_dev && !b_dev )
 		return -1;
@@ -127,14 +133,24 @@ static void parse_version(const char* string,
 static void parse_release(const char* string,
                           unsigned long* major_ptr,
                           unsigned long* minor_ptr,
+                          unsigned long* patch_ptr,
                           bool* dev_ptr)
 
 {
 	*major_ptr = strtoul(string, (char**) &string, 10);
+	*minor_ptr = 0;
+	*patch_ptr = 0;
 	if ( *string == '.' )
+	{
 		string++;
-	*minor_ptr = strtoul(string, (char**) &string, 10);
-	*dev_ptr = *string != '\0';
+		*minor_ptr = strtoul(string, (char**) &string, 10);
+		if ( *string == '.' )
+		{
+			string++;
+			*patch_ptr = strtoul(string, (char**) &string, 10);
+		}
+	}
+	*dev_ptr = strchr(string, '-') != NULL;
 }
 
 bool os_release_load(struct release* release,
@@ -216,7 +232,8 @@ bool os_release_load(struct release* release,
 			if ( value )
 			{
 				parse_release(value, &release->version_major,
-				              &release->version_minor, &release->version_dev);
+				              &release->version_minor, &release->version_patch,
+				              &release->version_dev);
 				free(value);
 			}
 			else

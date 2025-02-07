@@ -213,6 +213,7 @@ static void next_version(const struct release* current, struct release* new)
 	{
 		new->version_major = current->version_major;
 		new->version_minor = current->version_minor;
+		new->version_patch = current->version_patch;
 		new->version_dev = false;
 		return;
 	}
@@ -220,6 +221,7 @@ static void next_version(const struct release* current, struct release* new)
 	// Releases increment by 0.1.
 	new->version_major = current->version_major;
 	new->version_minor = current->version_minor + 1;
+	new->version_patch = 0;
 	new->version_dev = false;
 
 	// Major increments instead of minor release 10.
@@ -241,6 +243,10 @@ static bool downgrading_version(const struct release* old,
 		return true;
 	if ( new->version_minor > old->version_minor )
 		return false;
+	if ( new->version_patch < old->version_patch )
+		return true;
+	if ( new->version_patch > old->version_patch )
+		return false;
 	if ( new->version_dev && !old->version_dev )
 		return true;
 	return false;
@@ -249,13 +255,14 @@ static bool downgrading_version(const struct release* old,
 static bool skipping_version(const struct release* old,
                              const struct release* new)
 {
-	// Not skipping a release if upgrading to older release.
+	// Not skipping a release if upgrading to an older release.
 	if ( downgrading_version(old, new) )
 		return false;
 
-	// Not skipping a release if upgrading to same release.
+	// Not skipping a release if upgrading to the same release.
 	if ( new->version_major == old->version_major &&
 	     new->version_minor == old->version_minor &&
+	     new->version_patch == old->version_patch &&
 	     new->version_dev == old->version_dev )
 		return false;
 

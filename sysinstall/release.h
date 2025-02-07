@@ -26,6 +26,7 @@ struct release
 	char* pretty_name;
 	unsigned long version_major;
 	unsigned long version_minor;
+	unsigned long version_patch;
 	bool version_dev;
 	unsigned long abi_major;
 	unsigned long abi_minor;
@@ -35,8 +36,10 @@ int abi_compare(unsigned long a_major, unsigned long a_minor,
                 unsigned long b_major, unsigned long b_minor);
 bool abi_compatible(unsigned long a_major, unsigned long a_minor,
                     unsigned long b_major, unsigned long b_minor);
-int version_compare(unsigned long a_major, unsigned long a_minor, bool a_dev,
-                    unsigned long b_major, unsigned long b_minor, bool b_dev);
+int version_compare(unsigned long a_major, unsigned long a_minor,
+                    unsigned long a_patch, bool a_dev,
+                    unsigned long b_major, unsigned long b_minor,
+                    unsigned long b_patch, bool b_dev);
 void release_free(struct release* release);
 int release_compare_abi(const struct release* a, const struct release* b);
 int release_compare_version(const struct release* a, const struct release* b);

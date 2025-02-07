@@ -242,8 +242,9 @@ void upgrade_prepare(const struct release* old_release,
 	}
 
 	// TODO: After releasing Sortix 1.1, remove this compatibility.
-	if ( version_compare(1, 0, false, old_release->version_major,
-	                     old_release->version_minor, old_release->version_dev)
+	if ( version_compare(1, 0, 0, false, old_release->version_major,
+	                     old_release->version_minor, old_release->version_patch,
+	                     old_release->version_dev)
 	     < 0 /* 1.0 < */ &&
 	     hook_needs_to_be_run(source_prefix, target_prefix,
 	                          "sortix-1.1-leaked-files") )
