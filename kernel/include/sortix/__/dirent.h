@@ -35,7 +35,7 @@
 #define __S_IFMT_SHIFT 12
 #define __S_IFMT_MASK __DT_BITS
 
-#define __IFTODT(mode) (((mode) & __S_IFMT) >> __S_IFMT_SHIFT)
+#define __IFTODT(mode) (((mode) >> __S_IFMT_SHIFT) & __S_IFMT_MASK)
 #define __DTTOIF(dirtype) ((dirtype) << __S_IFMT_SHIFT)
 
 #endif
