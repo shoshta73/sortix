@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2015 Alexandros Alexandrou.
- * Copyright (c) 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,7 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -160,17 +161,29 @@ int main(int argc, char* argv[])
 	{
 		struct tm tm = {0};
 		char* e;
-		if ( !((e = strptime(opt_d, "%a %b %e %H:%M:%S %Z %Y", &tm)) && !*e) &&
-		     !((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%SZ", &tm)) && !*e) &&
-		     !((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%S%z", &tm)) && !*e) &&
-		     !((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%S%Z", &tm)) && !*e) &&
-		     !((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S", &tm)) && !*e) &&
-		     !((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S %z", &tm)) && !*e) &&
-		     !((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S %Z", &tm)) && !*e) )
+		if ( ((e = strptime(opt_d, "%a %b %e %H:%M:%S %Z %Y", &tm)) && !*e) ||
+		     ((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%SZ", &tm)) && !*e) ||
+		     ((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%S%z", &tm)) && !*e) ||
+		     ((e = strptime(opt_d, "%Y-%m-%dT%H:%M:%S%Z", &tm)) && !*e) ||
+		     ((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S", &tm)) && !*e) ||
+		     ((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S %z", &tm)) && !*e) ||
+		     ((e = strptime(opt_d, "%Y-%m-%d %H:%M:%S %Z", &tm)) && !*e) )
+		{
+			time_t time = mktime(&tm);
+			times[0] = timespec_make(time, 0);
+			times[1] = timespec_make(time, 0);
+		}
+		else if ( opt_d[0] == '@' && opt_d[1] )
+		{
+			errno = 0;
+			intmax_t time = strtoimax(opt_d + 1, &e, 10);
+			if ( *e || errno || (time_t) time != time )
+				errx(1, "invalid datetime: %s", opt_d);
+			times[0] = timespec_make((time_t) time, 0);
+			times[1] = timespec_make((time_t) time, 0);
+		}
+		else
 			errx(1, "invalid datetime: %s", opt_d);
-		time_t time = mktime(&tm);
-		times[0] = timespec_make(time, 0);
-		times[1] = timespec_make(time, 0);
 	}
 	else if ( opt_r )
 	{

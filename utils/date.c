@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2021, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2021, 2023, 2025 Jonas 'Sortie' Termansen.
  * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  * Copyright (c) 2022 Dennis Wölfing.
  *
@@ -22,6 +22,8 @@
 #include <sys/stat.h>
 
 #include <err.h>
+#include <errno.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -92,10 +94,28 @@ int main(int argc, char* argv[])
 
 	if ( date )
 	{
-		memset(&tm, 0, sizeof(tm));
-		if ( !strptime(date, format + 1, &tm) )
-			errx(1, "date didn't match %s: %s", format + 1, date);
-		moment.tv_sec = timegm(&tm); // TODO: timelocal
+		char* e;
+		if ( ((e = strptime(date, format + 1, &tm)) && !*e) ||
+		     ((e = strptime(date, "%a %b %e %H:%M:%S %Z %Y", &tm)) && !*e) ||
+		     ((e = strptime(date, "%Y-%m-%dT%H:%M:%SZ", &tm)) && !*e) ||
+		     ((e = strptime(date, "%Y-%m-%dT%H:%M:%S%z", &tm)) && !*e) ||
+		     ((e = strptime(date, "%Y-%m-%dT%H:%M:%S%Z", &tm)) && !*e) ||
+		     ((e = strptime(date, "%Y-%m-%d %H:%M:%S", &tm)) && !*e) ||
+		     ((e = strptime(date, "%Y-%m-%d %H:%M:%S %z", &tm)) && !*e) ||
+		     ((e = strptime(date, "%Y-%m-%d %H:%M:%S %Z", &tm)) && !*e) )
+			moment.tv_sec = timegm(&tm); // TODO: timelocal
+		else if ( date[0] == '@' && date[1] )
+		{
+			errno = 0;
+			intmax_t time = strtoimax(date + 1, &e, 10);
+			if ( *e || errno || (time_t) time != time )
+				errx(1, "invalid datetime: %s", date);
+			moment.tv_sec = (time_t) time;
+			if ( !gmtime_r(&moment.tv_sec, &tm) )
+				err(1, "localtime_r(%ji)", (intmax_t) moment.tv_sec);
+		}
+		else
+			errx(1, "invalid datetime: %s", date);
 	}
 	else
 	{
