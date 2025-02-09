@@ -640,17 +640,17 @@ int main(void)
 	text("\n");
 
 	text("This is not yet a fully fledged operating system. You should adjust "
-	     "your expectations accordingly. You should not consider the system safe "
-	     "for multi-user use. Filesystem permissions are not enforced yet. There "
-	     "are many security issues so setuid(2) blatantly allows every user to "
-	     "become root if they want to.\n\n");
+	     "your expectations accordingly. The system protects against remote "
+	     "threats. However, you should not consider the system secure for local "
+	     "multi-user use. Filesystem permissions are not enforced yet. There "
+	     "are known local-user security issues, so setuid(2) currently "
+	     "blatantly allows any user to become root, to not give a false sense "
+	     "of security.\n\n");
 
 	text("You can always escape to a shell by answering '!' to any regular "
 	     "prompt. You can view the installation(7) manual page by "
 	     "answering '!man'. Default answers are in []'s and can be selected by "
 	     "pressing enter.\n\n");
-	// TODO: You can leave this program by pressing ^C but it can leave your
-	//       system in an inconsistent state.
 
 	install_configurationf("upgrade.conf", "a", "src = yes\n");
 
@@ -1524,16 +1524,6 @@ int main(void)
 		text("A ssh server has been installed. You have the option of starting "
 		     "it on boot to allow remote login over a cryptographically secure "
 		     "channel. Answer no if you don't know what ssh is.\n\n");
-		if ( !any_sshd_keys )
-			text("Warning: " BRAND_DISTRIBUTION_NAME " does not yet collect "
-			     "entropy for secure random numbers. Unless you type '!' and "
-			     "escape to a shell and put 256 bytes of actual randomness "
-			     "into boot/random.seed, the first boot will use the "
-			     "randomness of this installer environment to generate ssh "
-			     "keys. This initial randomness may be as weak as the wall "
-			     "time when you booted the installer, which is easily guessed "
-			     "by an attacker. The same warning applies to outgoing secure "
-			     "connections as well.\n\n");
 		bool might_want_sshd =
 			any_ssh_keys ||
 			any_sshd_keys ||
