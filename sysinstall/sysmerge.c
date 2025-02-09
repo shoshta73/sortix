@@ -396,12 +396,25 @@ int main(int argc, char* argv[])
 			upgrade_prepare(&old_release, &new_release, source, prefix);
 		else
 		{
+			// Run the prepare hooks with the new tools as they have not yet
+			// been installed. This is no problem for the finalize hooks.
+			char* old_path = strdup(getenv("PATH"));
+			if ( !old_path )
+				err(1, "malloc");
+			char* path;
+			if ( asprintf(&path, "%s/bin:%s/sbin", source, source) < 0 ||
+			     setenv("PATH", path, 1) < 0 )
+				err(1, "malloc");
+			free(path);
 			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
 			if ( !new_sysmerge )
 				err(2, "malloc");
 			execute((const char*[]) { new_sysmerge, "--hook-prepare", source,
 			                          NULL }, "e");
 			free(new_sysmerge);
+			if ( setenv("PATH", old_path, 1) < 0 )
+				err(1, "malloc");
+			free(old_path);
 		}
 		if ( hook_prepare )
 			return 0;
