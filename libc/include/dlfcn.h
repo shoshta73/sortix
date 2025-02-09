@@ -34,7 +34,7 @@ typedef struct
 	void* dli_fbase;
 	const char* dli_sname;
 	void* dli_saddr;
-} Dl_info_t;
+} Dl_info_t, Dl_info;
 #endif
 
 #ifdef __cplusplus
