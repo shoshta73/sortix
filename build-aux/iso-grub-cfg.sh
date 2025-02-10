@@ -275,7 +275,7 @@ echo 'function select_ports_set_no {'
 for port in $ports; do
   printf "  port_%s=false\n" "$(portvar "$port")"
 done
-printf "  hook_port_set_no\n"
+printf "  hook_ports_set_no\n"
 echo "}"
 for set in $sets; do
   echo
@@ -284,7 +284,7 @@ for set in $sets; do
   for port in $ports; do
     printf "  port_%s=%s\n" "$(portvar "$port")" "$(isinset "$port" "$set_content")"
   done
-  printf "  hook_port_set_%s\n" "$set"
+  printf "  hook_ports_set_%s\n" "$set"
   echo "}"
 done
 echo
@@ -292,7 +292,7 @@ echo 'function select_ports_set_all {'
 for port in $ports; do
   printf "  port_%s=true\n" "$(portvar "$port")"
 done
-printf "  hook_port_set_all\n"
+printf "  hook_ports_set_all\n"
 echo "}"
 
 echo
