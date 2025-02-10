@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015-2016, 2022-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,6 +66,18 @@ const char* non_modify_basename(const char* path)
 	if ( !last_slash )
 		return path;
 	return last_slash + 1;
+}
+
+__attribute__((format(printf, 1, 2)))
+char* print_string(const char* format, ...)
+{
+	va_list ap;
+	va_start(ap, format);
+	char* ret;
+	if ( vasprintf(&ret, format, ap) < 0 )
+		ret = NULL;
+	va_end(ap);
+	return ret;
 }
 
 typedef struct
@@ -311,19 +323,21 @@ const char* dictionary_get(string_array_t* sa, const char* key)
 	return dictionary_get_def(sa, key, NULL);
 }
 
-void dictionary_normalize_entry(char* entry)
+bool dictionary_set(string_array_t* sa, const char* key, const char* value)
 {
-	bool key = true;
-	size_t input_off, output_off;
-	for ( input_off = output_off = 0; entry[input_off]; input_off++ )
+	char* entry = print_string("%s=%s", key, value);
+	if ( !entry )
+		return false;
+	size_t index = dictionary_lookup_index(sa, key);
+	if ( index == SIZE_MAX )
 	{
-		if ( key && isspace((unsigned char) entry[input_off]) )
-			continue;
-		if ( key && (entry[input_off] == '=' || entry[input_off] == '#') )
-			key = false;
-		entry[output_off++] = entry[input_off];
+		if ( !string_array_append(sa, entry) )
+			return free(entry), false;
+		return true;
 	}
-	entry[output_off] = '\0';
+	free(sa->strings[index]);
+	sa->strings[index] = entry;
+	return true;
 }
 
 bool is_identifier_char(char c)
@@ -487,18 +501,6 @@ int variables_append_file_path(string_array_t* sa, const char* path)
 	int result = variables_append_file(sa, fp);
 	fclose(fp);
 	return result;
-}
-
-__attribute__((format(printf, 1, 2)))
-char* print_string(const char* format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	char* ret;
-	if ( vasprintf(&ret, format, ap) < 0 )
-		ret = NULL;
-	va_end(ap);
-	return ret;
 }
 
 char* read_single_line(FILE* fp)
@@ -1040,17 +1042,16 @@ bool needs_single_quote(const char* string)
 	{
 		char c = string[i];
 		if ( !(('a' <= c && c <= 'z') || ('A' <= c && c <= 'Z') ||
-		       ('0' <= c && c <= '9') ||
+		       ('0' <= c && c <= '9') || c == '@' || c == '^' ||
 		       c == '/' || c == '_' || c == '.' || c == '+' || c == ':' ||
-		       c == '%' || c == '$' || c == '{' || c == '}' || c == '-') )
+		       c == '%' || c == '{' || c == ',' || c == '}' || c == '-') )
 			return true;
 	}
 	return false;
 }
 
-void fwrite_variable(FILE* fp, const char* key, const char* value)
+void fwrite_value(FILE* fp, const char* value)
 {
-	fprintf(fp, "%s=", key);
 	if ( !needs_single_quote(value) )
 		fprintf(fp, "%s\n", value);
 	else
@@ -1063,6 +1064,20 @@ void fwrite_variable(FILE* fp, const char* key, const char* value)
 				fputc(value[i], fp);
 		fputs("'\n", fp);
 	}
+}
+
+void fwrite_variable(FILE* fp, const char* key, const char* value)
+{
+	fprintf(fp, "%s=", key);
+	fwrite_value(fp, value);
+}
+
+void fwrite_variable_raw(FILE* fp, const char* string)
+{
+	size_t assignment = strcspn(string, "=");
+	assert(string[assignment] == '=');
+	fwrite(string, assignment + 1, 1, fp);
+	fwrite_value(fp, string + assignment + 1);
 }
 
 bool is_success_exit_status(int status)

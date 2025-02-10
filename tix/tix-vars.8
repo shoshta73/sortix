@@ -6,10 +6,10 @@
 .Nd evaluate variables in port files
 .Sh SYNOPSIS
 .Nm
-.Op Fl t
+.Op Fl rtv
 .Op Fl d Ar default
 .Ar file
-.Op Ar variable ...
+.Op Ar variable-or-assignment ...
 .Sh DESCRIPTION
 .Nm
 evaluates the variables in the
@@ -20,13 +20,19 @@ or the standard input if
 .Ar file
 is
 .Sq - .
-If any
-.Ar variables
-are requested then their raw values are written as lines.
-Otherwise all the variables are written in a normalized form as lines with an
-equals sign
+.Nm
+considers the assignments and variables in the order of its arguments.
+If an argument is in the format
+.Ar variable Ns Li = Ns Ar value ,
+then the
+.Ar variable
+is assigned to the
+.Ar value .
+Otherwise the argument names a variable, whose raw value is written on a line.
+If no variables were requested, then all variables are written in a normalized
+form as lines with an equals sign
 .Sq =
-separating the variable name and the raw value.
+separating the variable name and the value (quoted as needed).
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
@@ -34,9 +40,14 @@ The options are as follows:
 Use the
 .Ar default
 value instead if the variable is unset.
+.It Fl r
+Write the raw values with no quoting.
 .It Fl t
 Test quietly whether the file is syntactically correct and whether the variables
 are set without writing their contents.
+.It Fl v
+Always include the variable names as an assignment where the value is quoted
+as needed.
 .El
 .Sh EXIT STATUS
 .Nm

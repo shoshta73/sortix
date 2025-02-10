@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2022, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -40,15 +40,19 @@
 int main(int argc, char* argv[])
 {
 	const char* def = NULL;
+	bool raw = false;
+	bool variable = false;
 	bool test = false;
 
 	int opt;
-	while ( (opt = getopt(argc, argv, "d:t")) != -1 )
+	while ( (opt = getopt(argc, argv, "d:rtv")) != -1 )
 	{
 		switch ( opt )
 		{
 		case 'd': def = optarg; break;
+		case 'r': raw = true; variable = false; break;
 		case 't': test = true; break;
+		case 'v': variable = true; raw = false; break;
 		default: return 1;
 		}
 	}
@@ -65,23 +69,47 @@ int main(int argc, char* argv[])
 	else if ( status == -2 )
 		errx(2, "%s: Syntax error", path);
 
-	if ( optind == argc )
+	bool any_output = false;
+
+	for ( int i = optind; i < argc; i++ )
 	{
-		if ( test )
-			return 0;
-		for ( size_t i = 0; i < sa.length; i++ )
-			if ( puts(sa.strings[i]) < 0 )
+		char* string = argv[i];
+		size_t assignment = strcspn(string, "=");
+		if ( string[assignment] == '=' )
+		{
+			string[assignment] = '\0';
+			if ( !dictionary_set(&sa, string, string + assignment + 1) )
+				err(2, "malloc");
+		}
+		else
+		{
+			const char* value = dictionary_get_def(&sa, string, def);
+			if ( !value && test )
+				exit(1);
+			else if ( !value )
+				errx(1, "%s: Variable is unset: %s", path, string);
+			else if ( test )
+				continue;
+			if ( !variable )
+				puts(value);
+			else
+				fwrite_variable(stdout, string, value);
+			if ( ferror(stdout) )
 				err(2, "stdout");
+			any_output = true;
+		}
 	}
-	else for ( int i = optind; i < argc; i++ )
+
+	if ( test )
+		return 0;
+
+	for ( size_t i = 0; !any_output && i < sa.length; i++ )
 	{
-		const char* variable = argv[i];
-		const char* value = dictionary_get_def(&sa, variable, def);
-		if ( !value && test )
-			exit(1);
-		else if ( !value )
-			errx(1, "%s: Variable is unset: %s", path, variable);
-		if ( !test && puts(value) < 0 )
+		if ( raw )
+			puts(sa.strings[i]);
+		else
+			fwrite_variable_raw(stdout, sa.strings[i]);
+		if ( ferror(stdout) )
 			err(2, "stdout");
 	}
 
