@@ -1117,12 +1117,9 @@ int main(void)
 		if ( strcasecmp(accept_grub, "yes") == 0 )
 		{
 			printf(" - Installing bootloader...\n");
-			execute((const char*[]) { "chroot", "-d", ".", "grub-install",
-			        device_path_of_blockdevice(bootloader_filesystem->bdev), NULL },
-			        "_eqQ");
+			execute((const char*[]) { "grub-install", "-q", NULL }, "_ce", ".");
 			printf(" - Configuring bootloader...\n");
-			execute((const char*[]) { "chroot", "-d", ".", "update-grub", NULL },
-			        "_eqQ");
+			execute((const char*[]) { "update-grub", NULL }, "_ceqQ", ".");
 		}
 		else if ( access_or_die("etc/default/grub.d/10_sortix", F_OK) == 0 )
 		{

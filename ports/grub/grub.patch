@@ -827,6 +827,26 @@ diff -Paur --no-dereference -- grub.upstream/include/grub/emu/getroot.h grub/inc
 +#endif
 +
  #endif /* ! GRUB_UTIL_GETROOT_HEADER */
+diff -Paur --no-dereference -- grub.upstream/include/grub/util/install.h grub/include/grub/util/install.h
+--- grub.upstream/include/grub/util/install.h
++++ grub/include/grub/util/install.h
+@@ -67,6 +67,8 @@
+       N_("SBAT metadata"), 0 },						\
+   { "disable-shim-lock", GRUB_INSTALL_OPTIONS_DISABLE_SHIM_LOCK, 0, 0,	\
+       N_("disable shim_lock verifier"), 0 },				\
++  { "quiet", 'q', 0, 0,							\
++    N_("quiet installation."), 1 },					\
+   { "verbose", 'v', 0, 0,						\
+     N_("print verbose messages."), 1 }
+ 
+@@ -115,6 +117,7 @@
+ 
+ enum grub_install_options {
+   GRUB_INSTALL_OPTIONS_DIRECTORY = 'd',
++  GRUB_INSTALL_OPTIONS_QUIET = 'q',
+   GRUB_INSTALL_OPTIONS_VERBOSITY = 'v',
+   GRUB_INSTALL_OPTIONS_MODULES = 0x201,
+   GRUB_INSTALL_OPTIONS_INSTALL_MODULES,
 diff -Paur --no-dereference -- grub.upstream/update-grub grub/update-grub
 --- grub.upstream/update-grub
 +++ grub/update-grub
@@ -920,6 +940,20 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-fstest.c grub/util/grub-f
            root = alloc_root;
          }
      }
+diff -Paur --no-dereference -- grub.upstream/util/grub-install-common.c grub/util/grub-install-common.c
+--- grub.upstream/util/grub-install-common.c
++++ grub/util/grub-install-common.c
+@@ -505,6 +505,10 @@
+       disable_shim_lock = 1;
+       return 1;
+ 
++    case GRUB_INSTALL_OPTIONS_QUIET:
++      verbosity = -1;
++      return 1;
++
+     case GRUB_INSTALL_OPTIONS_VERBOSITY:
+       verbosity++;
+       return 1;
 diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-install.c
 --- grub.upstream/util/grub-install.c
 +++ grub/util/grub-install.c
@@ -942,7 +976,15 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
      }
  
    if (!grub_install_source_directory)
-@@ -956,12 +959,20 @@
+@@ -910,6 +913,7 @@
+ 
+   platform = grub_install_get_target (grub_install_source_directory);
+ 
++  if (0 <= verbosity)
+   {
+     char *platname = grub_install_get_platform_name (platform);
+     fprintf (stderr, _("Installing for %s platform.\n"), platname);
+@@ -956,12 +960,20 @@
        break;
      }
  
@@ -964,7 +1006,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
        break;
      case GRUB_INSTALL_PLATFORM_POWERPC_IEEE1275:
        if (install_device)
-@@ -999,9 +1010,6 @@
+@@ -999,9 +1011,6 @@
        break;
      }
  
@@ -974,7 +1016,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
    {
      char * t = grub_util_path_concat (2, bootdir, GRUB_DIR_NAME);
      grub_install_mkdir_p (t);
-@@ -1913,6 +1921,7 @@
+@@ -1913,6 +1922,7 @@
        break;
  
      case GRUB_INSTALL_PLATFORM_I386_EFI:
@@ -982,7 +1024,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
        if (!efidir_is_mac)
  	{
  	  char *dst = grub_util_path_concat (2, efidir, "grub.efi");
-@@ -1920,6 +1929,7 @@
+@@ -1920,6 +1930,7 @@
  	  grub_install_copy_file (imgfile, dst, 1);
  	  free (dst);
  	}
@@ -990,6 +1032,16 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
        /* Fallthrough.  */
      case GRUB_INSTALL_PLATFORM_X86_64_EFI:
        if (efidir_is_mac)
+@@ -2041,7 +2052,8 @@
+    */
+   grub_set_install_backup_ponr ();
+ 
+-  fprintf (stderr, "%s\n", _("Installation finished. No error reported."));
++  if (0 <= verbosity)
++    fprintf (stderr, "%s\n", _("Installation finished. No error reported."));
+ 
+   /* Free resources.  */
+   grub_gcry_fini_all ();
 diff -Paur --no-dereference -- grub.upstream/util/grub-mkconfig.in grub/util/grub-mkconfig.in
 --- grub.upstream/util/grub-mkconfig.in
 +++ grub/util/grub-mkconfig.in

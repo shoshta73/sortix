@@ -547,6 +547,10 @@ int main(int argc, char* argv[])
 
 		if ( conf.grub )
 		{
+			// TODO: After releasing Sortix 1.1, remove the boot device operand
+			//       and start using -q. The installation is old-style for now
+			//       to allow a mixed port environment with a new base system
+			//       and old grub when bootstrapping Sortix 1.1 on Sortix 1.0.
 			char* boot_path = join_paths(target, "boot");
 			if ( !boot_path )
 				err(2, "malloc");
@@ -558,7 +562,6 @@ int main(int argc, char* argv[])
 				err(2, "Failed to find device of filesystem: %s", boot_path);
 			close(boot_fd);
 			free(boot_path);
-			// TODO: A better design for finding the parent block device.
 			if ( is_partition_name(boot_device) )
 				*strrchr(boot_device, 'p') = '\0';
 			printf(" - Installing bootloader...\n");

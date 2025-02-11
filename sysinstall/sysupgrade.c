@@ -916,12 +916,9 @@ int main(void)
 		if ( do_upgrade_bootloader )
 		{
 			printf(" - Installing bootloader...\n");
-			execute((const char*[]) { "chroot", "-d", ".", "grub-install",
-			        bootloader_dev_path, NULL },
-			        "_eqQ");
+			execute((const char*[]) { "grub-install", "-q", NULL }, "_ce", ".");
 			printf(" - Configuring bootloader...\n");
-			execute((const char*[]) { "chroot", "-d", ".", "update-grub", NULL },
-			        "_eqQ");
+			execute((const char*[]) { "update-grub", NULL }, "_ceqQ", ".");
 		}
 		else if ( conf.system &&
 		          access_or_die("etc/default/grub.d/10_sortix", F_OK) == 0 )
