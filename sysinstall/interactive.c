@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2017, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2017, 2023, 2025 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <termios.h>
+#include <unistd.h>
 #include <wchar.h>
 
 #include <display.h>
@@ -69,7 +70,15 @@ void text(const char* str)
 	fflush(stdout);
 	struct winsize ws;
 	if ( tcgetwinsize(1, &ws) < 0 )
+	{
+		if ( errno == ENOTTY )
+		{
+			fputs(str, stdout);
+			fflush(stdout);
+			return;
+		}
 		err(2, "tcgetwinsize");
+	}
 	size_t columns = ws.ws_col;
 	size_t column = 0;
 	struct wincurpos wcp;
@@ -176,10 +185,12 @@ void promptx(char* buffer,
              const char* answer,
              bool catch_if_shell)
 {
+	bool is_tty = isatty(1);
 	char* autoconf_answer = autoconf_eval(autoconf_name);
 	while ( true )
 	{
-		printf("\e[1m");
+		if ( is_tty )
+			printf("\e[1m");
 		fflush(stdout);
 		text(question);
 		if ( answer )
@@ -199,16 +210,19 @@ void promptx(char* buffer,
 			automatic_answer = answer;
 		if ( automatic_answer )
 		{
-			printf("\e[93m");
+			if ( is_tty )
+				printf("\e[93m");
 			printf("%s\n", automatic_answer);
-			printf("\e[m");
+			if ( is_tty )
+				printf("\e[m");
 			fflush(stdout);
 			strlcpy(buffer, automatic_answer, buffer_size);
 			free(autoconf_answer);
 			return;
 		}
 		fgets(buffer, buffer_size, stdin);
-		printf("\e[22m");
+		if ( is_tty )
+			printf("\e[22m");
 		fflush(stdout);
 		size_t buffer_length = strlen(buffer);
 		if ( buffer_length && buffer[buffer_length-1] == '\n' )

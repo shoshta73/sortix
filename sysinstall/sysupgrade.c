@@ -351,13 +351,6 @@ int main(void)
 {
 	shlvl();
 
-	if ( !isatty(0) )
-		errx(2, "fatal: stdin is not a terminal");
-	if ( !isatty(1) )
-		errx(2, "fatal: stdout is not a terminal");
-	if ( !isatty(2) )
-		errx(2, "fatal: stderr is not a terminal");
-
 	if ( getuid() != 0 )
 		errx(2, "You need to be root to install %s", BRAND_DISTRIBUTION_NAME);
 	if ( getgid() != 0 )
@@ -373,6 +366,15 @@ int main(void)
 	bool non_interactive = accepts_defaults &&
 	                       !strcasecmp(accepts_defaults, "yes");
 	free(accepts_defaults);
+
+	if ( !non_interactive && !isatty(0) )
+		errx(2, "fatal: stdin is not a terminal");
+	if ( !non_interactive && !isatty(1) )
+		errx(2, "fatal: stdout is not a terminal");
+	if ( !non_interactive && !isatty(2) )
+		errx(2, "fatal: stderr is not a terminal");
+
+	setvbuf(stdout, NULL, _IOLBF, 0);
 
 	struct utsname uts;
 	uname(&uts);
@@ -937,6 +939,7 @@ int main(void)
 			                          "_eq");
 		}
 		printf(" - Finishing upgrade...\n");
+		fflush(stdout);
 		_exit(0);
 	}
 	int upgrade_code;
