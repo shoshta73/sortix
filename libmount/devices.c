@@ -102,6 +102,8 @@ static bool devices_iterate_open_callback(void* ctx_ptr, const char* path)
 		struct stat st;
 		if ( lstat(path, &st) == 0 && !S_ISBLK(st.st_mode) )
 			return true;
+		if ( errno == ENOTTY ) // /dev/tty with no session
+			return true;
 		errno = true_errno;
 		return false;
 	}
