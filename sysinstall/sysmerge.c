@@ -217,11 +217,11 @@ int main(int argc, char* argv[])
 
 	bool has_system = !access_join_or_die(target, "tix/manifest/system", F_OK);
 
-	if ( wait_default )
-		wait = has_system && !access_join_or_die(target, "etc/fstab", F_OK);
-
 	if ( !has_system )
 		system = false;
+
+	if ( wait_default )
+		wait = system && !access_join_or_die(target, "etc/fstab", F_OK);
 
 	struct conf conf;
 	conf_init(&conf);
