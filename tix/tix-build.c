@@ -787,7 +787,6 @@ static void TixInfo(struct metainfo* minfo)
 	                     join_paths(tixinfodir_rel, minfo->package_name) :
 	                     strdup(tixinfodir_rel);
 
-	const char* alias = metainfo_get(minfo, "ALIAS_OF", "pkg.alias-of");
 	const char* runtime_deps =
 		metainfo_get(minfo, "RUNTIME_DEPS", "pkg.runtime-deps");
 	bool location_independent =
@@ -815,17 +814,12 @@ static void TixInfo(struct metainfo* minfo)
 		if ( version_2 )
 			fwrite_variable(tixinfo_fp, "VERSION_2", version_2);
 		fwrite_variable(tixinfo_fp, "PLATFORM", minfo->host);
-		if ( alias )
-			fwrite_variable(tixinfo_fp, "ALIAS_OF", alias);
+		if ( runtime_deps )
+			fwrite_variable(tixinfo_fp, "RUNTIME_DEPS", runtime_deps);
+		if ( location_independent )
+			fwrite_variable(tixinfo_fp, "LOCATION_INDEPENDENT", "true");
 		else
-		{
-			if ( runtime_deps )
-				fwrite_variable(tixinfo_fp, "RUNTIME_DEPS", runtime_deps);
-			if ( location_independent )
-				fwrite_variable(tixinfo_fp, "LOCATION_INDEPENDENT", "true");
-			else
-				fwrite_variable(tixinfo_fp, "PREFIX", minfo->prefix);
-		}
+			fwrite_variable(tixinfo_fp, "PREFIX", minfo->prefix);
 		const char* renames = metainfo_get(minfo, "RENAMES", "pkg.renames");
 		if ( renames )
 			fwrite_variable(tixinfo_fp, "RENAMES", renames);
@@ -839,17 +833,12 @@ static void TixInfo(struct metainfo* minfo)
 		fprintf(tixinfo_fp, "tix.class=tix\n");
 		fprintf(tixinfo_fp, "tix.platform=%s\n", minfo->host);
 		fprintf(tixinfo_fp, "pkg.name=%s\n", minfo->package_name);
-		if ( alias )
-			fprintf(tixinfo_fp, "pkg.alias-of=%s\n", alias);
+		if ( runtime_deps )
+			fprintf(tixinfo_fp, "pkg.runtime-deps=%s\n", runtime_deps);
+		if ( location_independent )
+			fprintf(tixinfo_fp, "pkg.location-independent=true\n");
 		else
-		{
-			if ( runtime_deps )
-				fprintf(tixinfo_fp, "pkg.runtime-deps=%s\n", runtime_deps);
-			if ( location_independent )
-				fprintf(tixinfo_fp, "pkg.location-independent=true\n");
-			else
-				fprintf(tixinfo_fp, "pkg.prefix=%s\n", minfo->prefix);
-		}
+			fprintf(tixinfo_fp, "pkg.prefix=%s\n", minfo->prefix);
 	}
 
 	if ( ferror(tixinfo_fp) || fflush(tixinfo_fp) == EOF )
@@ -1092,14 +1081,11 @@ static void Bootstrap(struct metainfo* minfo)
 
 static void BuildPackage(struct metainfo* minfo)
 {
-	// Whether this is just an alias for another package.
-	const char* alias = metainfo_get(minfo, "ALIAS_OF", "pkg.alias-of");
-
 	// Determine if the package is location independent.
 	bool location_independent =
 		parse_boolean(metainfo_get_def(minfo, "LOCATION_INDEPENDENT",
 		                               "pkg.location-independent", "false"));
-	if ( !alias && !location_independent && !minfo->prefix )
+	if ( !location_independent && !minfo->prefix )
 		errx(1, "error: %s is not location independent and you need to "
 		        "specify the intended destination prefix using --prefix",
 		        minfo->package_name);
@@ -1113,14 +1099,13 @@ static void BuildPackage(struct metainfo* minfo)
 	const char* use_bootstrap_var =
 		metainfo_get_def(minfo, "USE_BOOTSTRAP", "pkg.use-bootstrap", "false");
 	bool use_bootstrap = parse_boolean(use_bootstrap_var);
-	if ( !alias && use_bootstrap && strcmp(minfo->build, minfo->host) != 0 &&
+	if ( use_bootstrap && strcmp(minfo->build, minfo->host) != 0 &&
 	     SHOULD_DO_BUILD_STEP(BUILD_STEP_CONFIGURE, minfo) )
 		Bootstrap(minfo);
 
 	EmitWrappers(minfo);
 
-	if ( !alias )
-		Compile(minfo);
+	Compile(minfo);
 
 	if ( SHOULD_DO_BUILD_STEP(BUILD_STEP_PACKAGE, minfo) )
 	{
@@ -1152,8 +1137,7 @@ static void VerifySourceTixInformation(struct metainfo* minfo)
 				    "is not suitable for compilation.", pipath, tix_class);
 	}
 	metainfo_verify(minfo, "NAME", "pkg.name");
-	if ( !metainfo_get(minfo, "ALIAS_OF", "pkg.alias-of") )
-		metainfo_verify(minfo, "BUILD_SYSTEM", "pkg.build-system");
+	metainfo_verify(minfo, "BUILD_SYSTEM", "pkg.build-system");
 }
 
 // TODO: The MAKEFLAGS variable is actually not in the same format as the token
