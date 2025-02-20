@@ -9,3 +9,4 @@ UPSTREAM_SITE=https://mandoc.bsd.lv/snapshots
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
 DIRTY_FILE=Makefile.local
+RUNTIME_DEPS=less

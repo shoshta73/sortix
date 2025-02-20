@@ -10,3 +10,4 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/less
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE='GPL-3.0-or-later OR BSD-2-Clause'
 BUILD_SYSTEM=configure
+RUNTIME_DEPS=libcurses
