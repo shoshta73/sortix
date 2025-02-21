@@ -308,20 +308,20 @@ void InstallPackage(const char* tix_path)
 
 	if ( package_prefix && strcmp(coll_prefix, package_prefix) != 0 )
 	{
-		warn("error: `%s' is compiled with the prefix `%s', but the "
-		     "destination collection has the prefix `%s'.", tix_path,
-		     package_prefix, coll_prefix);
-		err(1, "you need to recompile the package with "
-		                "--prefix=\"%s\".", coll_prefix);
+		warnx("error: `%s' is compiled with the prefix `%s', "
+		      "but the destination collection has the prefix `%s'.",
+		      tix_path, package_prefix, coll_prefix);
+		errx(1, "you need to recompile the package with "
+		        "--prefix=\"%s\".", coll_prefix);
 	}
 
 	if ( package_platform && strcmp(coll_platform, package_platform) != 0 )
 	{
-		warn("error: `%s' is compiled with the platform `%s', but "
-		                "the destination collection has the platform `%s'.",
-		                tix_path, package_platform, coll_platform);
-		err(1, "you need to recompile the package with "
-		       "--host=%s\".", coll_platform);
+		warnx("error: `%s' is compiled with the platform `%s', "
+		      "but the destination collection has the platform `%s'.",
+		      tix_path, package_platform, coll_platform);
+		errx(1, "you need to recompile the package with "
+		        "--host=%s\".", coll_platform);
 	}
 
 	if ( !quiet )
