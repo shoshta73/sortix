@@ -155,13 +155,22 @@ static bool TryWriteCommandToPort(uint8_t command, uint8_t port, uint8_t* answer
 
 static bool IsKeyboardResponse(uint8_t* response, size_t size)
 {
+	// Original AT keyboards do not identify themselves.
 	if ( size == 0 )
+		return true;
+	// "Standard" PS/2 keyboards reply AB 83 or AB C1.
+	// If translation is enabled, AB 83 becomes AB 41 and AB C1 stays as-in
+	if ( size == 2 && response[0] == 0xAB && response[1] == 0x83 )
 		return true;
 	if ( size == 2 && response[0] == 0xAB && response[1] == 0x41 )
 		return true;
 	if ( size == 2 && response[0] == 0xAB && response[1] == 0xC1 )
 		return true;
-	if ( size == 2 && response[0] == 0xAB && response[1] == 0x83 )
+	// "Compact" PS/2 keyboards reply AB 84.
+	// If translation is enabled, AB 84 becomes AB 54.
+	if ( size == 2 && response[0] == 0xAB && response[1] == 0x84 )
+		return true;
+	if ( size == 2 && response[0] == 0xAB && response[1] == 0x54 )
 		return true;
 	return false;
 }
