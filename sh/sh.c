@@ -1912,13 +1912,17 @@ void read_command_interactive(struct sh_read_command* sh_read_command)
 	free((char*) edit_state.ps1);
 	free((char*) edit_state.ps2);
 
-	if ( edit_state.abort_editing )
+	if ( edit_state.error_condition )
+	{
+		sh_read_command->error_condition = true;
+		return;
+	}
+	else if ( edit_state.abort_editing )
 	{
 		sh_read_command->abort_condition = true;
 		return;
 	}
-
-	if ( edit_state.eof_condition )
+	else if ( edit_state.eof_condition )
 	{
 		sh_read_command->eof_condition = true;
 		return;

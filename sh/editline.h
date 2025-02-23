@@ -50,6 +50,7 @@ struct edit_line
 	bool editing;
 	bool abort_editing;
 	bool eof_condition;
+	bool error_condition;
 	bool double_tab;
 	// TODO: Should these be stored here, or outside the line editing context?
 	bool left_control;

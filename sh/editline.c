@@ -710,8 +710,7 @@ void edit_line(struct edit_line* edit_state)
 		char c;
 		if ( read(0, &c, sizeof(c)) != sizeof(c) )
 		{
-			edit_state->eof_condition = true;
-			edit_state->abort_editing = true;
+			edit_state->error_condition = true;
 			break;
 		}
 
