@@ -411,21 +411,21 @@ int main(int argc, char* argv[])
 
 		if ( full )
 		{
-			int fd = open(full_path, O_WRONLY | O_CREAT);
+			int fd = open(full_path, O_WRONLY | O_CREAT, 0644);
 			if ( fd < 0 )
 				err(2, "%s", full_path);
 			close(fd);
 		}
 		if ( system && !ports )
 		{
-			int fd = open(system_path, O_WRONLY | O_CREAT);
+			int fd = open(system_path, O_WRONLY | O_CREAT, 0644);
 			if ( fd < 0 )
 				err(2, "%s", system_path);
 			close(fd);
 		}
 		if ( ports && !system )
 		{
-			int fd = open(ports_path, O_WRONLY | O_CREAT);
+			int fd = open(ports_path, O_WRONLY | O_CREAT, 0644);
 			if ( fd < 0 )
 				err(2, "%s", ports_path);
 			close(fd);
