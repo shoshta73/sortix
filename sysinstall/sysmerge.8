@@ -6,11 +6,12 @@
 .Nd upgrade current operating system from a sysroot
 .Sh SYNOPSIS
 .Nm sysmerge
-.Op Fl cfpsw
+.Op Fl cfmnpsw
 .Op Fl t Ar target
 .Op Fl \-booting
 .Op Fl \-hook-finalize
 .Op Fl \-hook-prepare
+.Op Fl \-is-reboot-needed
 .Ar source
 .Sh DESCRIPTION
 .Nm
@@ -88,6 +89,20 @@ This is meant to be used by the old
 when it invokes the new
 .Nm
 during a non-waiting upgrade.
+.It Fl \-is-reboot-needed
+Exit 0 if an upgrade is scheduled for the next boot, and exit 1 otherwise.
+.It Fl m , Fl \-move-source
+Allow moving the source directory and its contents directly to the destination
+with
+.Xr rename 2 .
+This behavior currently requires an upgrade scheduled with
+.Fl \-wait .
+.It Fl n , Fl \-now
+Perform the upgrade now, rather than waiting for the next boot.
+.Pp
+This behavior is the default if the target is not a system installation.
+If the target is a system installation, then this behavior is not available
+across incompatible ABI changes.
 .It Fl s , Fl \-system
 Upgrade the system.
 This option is implied unless
@@ -144,6 +159,11 @@ the upgrade if grub is enabled in
 otherwise the
 .Pa /etc/default/grub.d/10_sortix.cache
 bootloader fragment can be used to manually bootload the upgrade.
+.Pp
+This behavior is the default if the target is a system installation.
+This option requires the target to be system installation.
+This behavior happens regardless if a system installation is upgraded across
+an incompatible ABI Change.
 .El
 .Sh FILES
 .Bl -tag -width "/etc/default/grub.d/10_sortix.cache" -compact

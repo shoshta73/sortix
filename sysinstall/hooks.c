@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017, 2018, 2020, 2021, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016-2018, 2020-2021, 2023-2024 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -527,6 +527,12 @@ void upgrade_finalize(const struct release* old_release,
 		free(path);
 		hook_did_finalization(target_prefix, "sortix-1.1-tix3g");
 	}
+}
+
+void post_upgrade(const char* source_prefix, const char* target_prefix)
+{
+	(void) source_prefix;
+	(void) target_prefix;
 }
 
 // TODO: After releasing Sortix 1.1, remove this compatibility. These manifests

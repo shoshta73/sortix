@@ -1100,10 +1100,10 @@ int main(void)
 		if ( access("tix/collection.conf", F_OK) < 0 )
 			execute((const char*[]) { "tix-collection", ".", "create",
 			                          "--prefix=", NULL }, "_e");
-		install_manifests_detect("", ".", true, true, true);
+		install_manifests_detect("", ".", true, true, true, false);
 		// TODO: Preserve the existing /src if it exists like in sysupgrade.
 		if ( has_manifest("src") )
-			install_manifest("src", "", ".", (const char*[]){}, 0);
+			install_manifest("src", "", ".", (const char*[]){}, 0, false);
 		printf(" - Creating configuration files...\n");
 		// TODO: Preserve mode/ownership/timestamps?
 		execute((const char*[]) { "cp", "-RTP", etc, "etc", NULL }, "_e");

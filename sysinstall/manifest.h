@@ -26,16 +26,19 @@ void install_manifest(const char* manifest,
                       const char* from_prefix,
                       const char* to_prefix,
                       const char* const* preserved,
-                      size_t preserved_count);
+                      size_t preserved_count,
+                      bool may_hardlink);
 void install_manifests(const char* const* manifests,
                        size_t manifests_count,
                        const char* from_prefix,
-                       const char* to_prefix);
+                       const char* to_prefix,
+                       bool may_hardlink);
 char** read_installed_list(const char* prefix, size_t* out_count);
 void install_manifests_detect(const char* from_prefix,
                               const char* to_prefix,
                               bool system,
                               bool detect_from,
-                              bool detect_to);
+                              bool detect_to,
+                              bool may_hardlink);
 
 #endif

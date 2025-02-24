@@ -879,7 +879,8 @@ int main(void)
 		umask(0022);
 		if ( conf.system )
 			upgrade_prepare(target_release, &new_release, "", ".");
-		install_manifests_detect("", ".", conf.system, conf.ports, conf.ports);
+		install_manifests_detect("", ".", conf.system, conf.ports, conf.ports,
+		                         false);
 		if ( has_manifest("src") )
 		{
 			if ( conf.newsrc )
@@ -894,7 +895,7 @@ int main(void)
 						_exit(2);
 					}
 				}
-				install_manifest("src", "", ".", (const char*[]){}, 0);
+				install_manifest("src", "", ".", (const char*[]){}, 0, false);
 				if ( has_src )
 				{
 					if ( rename("src", "newsrc") < 0 )
@@ -912,11 +913,14 @@ int main(void)
 			else if ( conf.src )
 			{
 				preserve_src("src");
-				install_manifest("src", "", ".", (const char*[]){}, 0);
+				install_manifest("src", "", ".", (const char*[]){}, 0, false);
 			}
 		}
 		if ( conf.system )
+		{
 			upgrade_finalize(target_release, &new_release, "", ".");
+			post_upgrade("", ".");
+		}
 		if ( conf.system )
 		{
 			printf(" - Creating initrd...\n");

@@ -122,6 +122,7 @@ int main(int argc, char* argv[])
 	bool hook_finalize = false;
 	bool hook_prepare = false;
 	bool is_reboot_needed = false;
+	bool move_source = false;
 	bool ports = false;
 	bool system = false;
 	const char* target = "/";
@@ -143,6 +144,7 @@ int main(int argc, char* argv[])
 		{"hook-finalize", no_argument, NULL, OPT_HOOK_FINALIZE},
 		{"hook-prepare", no_argument, NULL, OPT_HOOK_PREPARE},
 		{"is-reboot-needed", no_argument, NULL, OPT_IS_REBOOT_NEEDED},
+		{"move-source", no_argument, NULL, 'm'},
 		{"now", no_argument, NULL, 'n'},
 		{"ports", no_argument, NULL, 'p'},
 		{"system", no_argument, NULL, 's'},
@@ -150,7 +152,7 @@ int main(int argc, char* argv[])
 		{"wait", no_argument, NULL, 'w'},
 		{0, 0, 0, 0}
 	};
-	const char* opts = "cfnpst:w";
+	const char* opts = "cfmnpst:w";
 	int opt;
 	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
 	{
@@ -162,6 +164,7 @@ int main(int argc, char* argv[])
 		case OPT_HOOK_FINALIZE: hook_finalize = true; break;
 		case OPT_HOOK_PREPARE: hook_prepare = true; break;
 		case OPT_IS_REBOOT_NEEDED: is_reboot_needed = true; break;
+		case 'm': move_source = true; break;
 		case 'n': wait = false; wait_default = false; break;
 		case 'p': ports = true; break;
 		case 's': system = true; break;
@@ -173,6 +176,8 @@ int main(int argc, char* argv[])
 	if ( 1 < booting + cancel + hook_finalize + hook_prepare + !wait +
 	         is_reboot_needed )
 		errx(2, "Mutually incompatible options were passed");
+
+	const char* target_prefix = !strcmp(target, "/") ? "" : target;
 
 	if ( is_reboot_needed )
 		exit(has_ready_upgrade(target) ? 0 : 1);
@@ -367,12 +372,6 @@ int main(int argc, char* argv[])
 		my_finalize = false;
 	}
 
-	if ( !system )
-	{
-		run_prepare = false;
-		run_finalize = false;
-	}
-
 	if ( wait && !has_system )
 		err(2, "--wait requires a system is installed in: %s", target);
 
@@ -388,76 +387,27 @@ int main(int argc, char* argv[])
 			printf("Upgrading %s using %s:\n", target, source);
 	}
 
-	// Upgrade hooks that runs before the old system is replaced.
-	if ( has_system && run_prepare )
-	{
-		const char* prefix = !strcmp(target, "/") ? "" : target;
-		if ( my_prepare )
-			upgrade_prepare(&old_release, &new_release, source, prefix);
-		else
-		{
-			// Run the prepare hooks with the new tools as they have not yet
-			// been installed. This is no problem for the finalize hooks.
-			char* old_path = strdup(getenv("PATH"));
-			if ( !old_path )
-				err(1, "malloc");
-			char* path;
-			if ( asprintf(&path, "%s/bin:%s/sbin", source, source) < 0 ||
-			     setenv("PATH", path, 1) < 0 )
-				err(1, "malloc");
-			free(path);
-			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
-			if ( !new_sysmerge )
-				err(2, "malloc");
-			execute((const char*[]) { new_sysmerge, "--hook-prepare", source,
-			                          NULL }, "e");
-			free(new_sysmerge);
-			if ( setenv("PATH", old_path, 1) < 0 )
-				err(1, "malloc");
-			free(old_path);
-		}
-		if ( hook_prepare )
-			return 0;
-	}
-
-	if ( copy_files )
-	{
-		const char* sysmerge = target;
-		if ( wait )
-		{
-			sysmerge = join_paths(target, "sysmerge");
-			if ( !sysmerge )
-				err(2, "malloc");
-			if ( mkdir(sysmerge, 0755) < 0 )
-				err(2, "%s", sysmerge);
-			execute((const char*[]) { "tix-collection", sysmerge, "create",
-			                           NULL }, "e");
-		}
-		const char* prefix = !strcmp(sysmerge, "/") ? "" : sysmerge;
-		install_manifests_detect(source, prefix, system, ports, full);
-	}
-
-	if ( has_system && booting )
-	{
-		char* path;
-		if ( asprintf(&path, "%s/bin:%s/sbin", target, target) < 0 ||
-		     setenv("PATH", path, 1) < 0 )
-			err(1, "malloc");
-		free(path);
-	}
-
 	if ( wait )
 	{
 		printf(" - Scheduling upgrade on next boot...\n");
+
+		char* sysmerge = join_paths(target, "sysmerge");
 		char* system_path = join_paths(target, "sysmerge/tix/sysmerge.system");
 		char* ports_path = join_paths(target, "sysmerge/tix/sysmerge.ports");
 		char* full_path = join_paths(target, "sysmerge/tix/sysmerge.full");
 		char* ready_path = join_paths(target, "sysmerge/tix/sysmerge.ready");
 		char* sysmerge_boot = join_paths(target, "sysmerge/boot");
 		char* boot_sysmerge = join_paths(target, "boot/sysmerge");
-		if ( !system_path || !ports_path || !full_path || !ready_path ||
-		     !sysmerge_boot || !boot_sysmerge )
+		if ( !sysmerge || !system_path || !ports_path || !full_path ||
+		     !ready_path || !sysmerge_boot || !boot_sysmerge )
 			err(2, "malloc");
+
+		if ( !move_source || rename(source, sysmerge) < 0 )
+		{
+			printf(" - Copying %s to %s...\n", source, sysmerge);
+			execute((const char*[]) { "cp", "-RT", source, sysmerge, NULL },
+			         "e");
+		}
 
 		if ( full )
 		{
@@ -507,12 +457,58 @@ int main(int argc, char* argv[])
 		return 0;
 	}
 
-	// Upgrade hooks that run after the new system is installed.
-	if ( has_system && run_finalize )
+	// Upgrade hooks that runs before the old system is replaced.
+	if ( system && run_prepare )
 	{
-		const char* prefix = !strcmp(target, "/") ? "" : target;
+		if ( my_prepare )
+			upgrade_prepare(&old_release, &new_release, source, target_prefix);
+		else
+		{
+			// Run the prepare hooks with the new tools as they have not yet
+			// been installed. This is no problem for the finalize hooks.
+			char* old_path = strdup(getenv("PATH"));
+			if ( !old_path )
+				err(1, "malloc");
+			char* path;
+			if ( asprintf(&path, "%s/bin:%s/sbin", source, source) < 0 ||
+			     setenv("PATH", path, 1) < 0 )
+				err(1, "malloc");
+			free(path);
+			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
+			if ( !new_sysmerge )
+				err(2, "malloc");
+			execute((const char*[]) { new_sysmerge, "--hook-prepare", source,
+			                          NULL }, "e");
+			free(new_sysmerge);
+			if ( setenv("PATH", old_path, 1) < 0 )
+				err(1, "malloc");
+			free(old_path);
+		}
+		if ( hook_prepare )
+			return 0;
+	}
+
+	if ( copy_files )
+		install_manifests_detect(source, target_prefix, system, ports, full,
+		                         booting);
+
+	if ( system && booting )
+	{
+		char* path;
+		if ( asprintf(&path, "%s/bin:%s/sbin", target, target) < 0 ||
+		     setenv("PATH", path, 1) < 0 )
+			err(1, "malloc");
+		free(path);
+	}
+
+	// Upgrade hooks that run after the new system is installed.
+	if ( system && run_finalize )
+	{
 		if ( my_finalize )
-			upgrade_finalize(&old_release, &new_release, source, prefix);
+		{
+			upgrade_finalize(&old_release, &new_release, source, target_prefix);
+			post_upgrade(source, target_prefix);
+		}
 		else
 		{
 			char* new_sysmerge = join_paths(source, "sbin/sysmerge");
@@ -525,6 +521,8 @@ int main(int argc, char* argv[])
 		if ( hook_finalize )
 			return 0;
 	}
+	else if ( run_finalize )
+		post_upgrade(source, target_prefix);
 
 	// Remove the upgrade readiness marker now that the upgrade has gone through
 	// such that the bootloader configuration and initrds don't try to do the
@@ -566,7 +564,7 @@ int main(int argc, char* argv[])
 				*strrchr(boot_device, 'p') = '\0';
 			printf(" - Installing bootloader...\n");
 			execute((const char*[]) { "grub-install", boot_device,
-				                      NULL }, "ceqQ", target);
+			                          NULL }, "ceqQ", target);
 			free(boot_device);
 		}
 
@@ -597,7 +595,7 @@ int main(int argc, char* argv[])
 		free(boot_sysmerge);
 	}
 
-	const char* done = wait ? "Scheduled upgrade" : "Successfully upgraded";
+	const char* done = "Successfully upgraded";
 	if ( new_release.pretty_name )
 		printf("%s to %s.\n", done, new_release.pretty_name);
 	else

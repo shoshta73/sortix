@@ -118,8 +118,17 @@ void install_manifest(const char* manifest,
                       const char* from_prefix,
                       const char* to_prefix,
                       const char* const* preserved,
-                      size_t preserved_count)
+                      size_t preserved_count,
+                      bool may_hardlink)
 {
+	struct stat from_st, to_st;
+	if ( stat(from_prefix[0] ? from_prefix : "/", &from_st) < 0 ||
+	     stat(to_prefix[0] ? to_prefix : "/", &to_st) < 0 )
+	{
+		warn("malloc");
+		_exit(2);
+	}
+	bool can_hardlink = may_hardlink && from_st.st_dev == to_st.st_dev;
 	struct hardlink* hardlinks = NULL;
 	size_t hardlinks_used = 0;
 	size_t hardlinks_length = 0;
@@ -321,6 +330,10 @@ void install_manifest(const char* manifest,
 				}
 			}
 		}
+		else if ( can_hardlink && S_ISREG(inst.st_mode) &&
+		          (unlink_rename_conflict(out_path), true) &&
+		          !link(in_path, out_path) )
+			;
 		else if ( S_ISREG(inst.st_mode) )
 		{
 			unlink_rename_conflict(out_path);
@@ -563,7 +576,8 @@ void install_manifest(const char* manifest,
 void install_manifests(const char* const* manifests,
                        size_t manifests_count,
                        const char* from_prefix,
-                       const char* to_prefix)
+                       const char* to_prefix,
+                       bool may_hardlink)
 {
 	// Load all the paths mentioned in the new set of manifests, which are used
 	// to ensure no files and directories are deleted part way if they are moved
@@ -621,7 +635,7 @@ void install_manifests(const char* const* manifests,
 	all_count = string_array_deduplicate(all, all_count);
 	for ( size_t i = 0; i < manifests_count; i++ )
 		install_manifest(manifests[i], from_prefix, to_prefix,
-		                 (const char* const*) all, all_count);
+		                 (const char* const*) all, all_count, may_hardlink);
 	string_array_free(&all, &all_count, &all_length);
 }
 
@@ -676,7 +690,8 @@ void install_manifests_detect(const char* from_prefix,
                               const char* to_prefix,
                               bool system,
                               bool detect_from,
-                              bool detect_to)
+                              bool detect_to,
+                              bool may_hardlink)
 {
 	char** manifests;
 	size_t manifests_count;
@@ -719,6 +734,6 @@ void install_manifests_detect(const char* from_prefix,
 	                         manifests_count - system_offset);
 	manifests_count = string_array_deduplicate(manifests, manifests_count);
 	install_manifests((const char* const*) manifests, manifests_count,
-	                  from_prefix, to_prefix);
+	                  from_prefix, to_prefix, may_hardlink);
 	string_array_free(&manifests, &manifests_count, &manifests_length);
 }
