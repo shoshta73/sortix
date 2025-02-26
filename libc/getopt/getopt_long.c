@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -152,12 +152,9 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 			*longindex = option_index;
 
 		// Check whether the next argument is the parameter to this option.
-		if ( !option_arg && option->has_arg != no_argument )
-		{
-			if ( optind < argc && argv[optind] &&
-			     (option->has_arg == required_argument || argv[optind][0] != '-') )
-				option_arg = argv[optind++];
-		}
+		if ( !option_arg && option->has_arg == required_argument &&
+		     optind < argc && argv[optind] )
+			option_arg = argv[optind++];
 
 		// Return an error if a required option parameter was missing.
 		if ( !option_arg && option->has_arg == required_argument )
