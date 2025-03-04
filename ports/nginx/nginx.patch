@@ -45,7 +45,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
  
  
  case ".$NGX_PID_PATH" in
-@@ -114,39 +116,31 @@
+@@ -114,39 +116,33 @@
  			'\$(DESTDIR)$NGX_SBIN_PATH.old'
  	cp $NGX_OBJS/nginx$ngx_binext '\$(DESTDIR)$NGX_SBIN_PATH'
  
@@ -101,6 +101,8 @@ diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
 +
 +	cp conf/scgi_params '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/scgi_params'
 +
++	cp conf/ffdhe2048.pem '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/ffdhe2048.pem'
++
 +	cp conf/ssl-config-mozilla-intermediate '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/ssl-config-mozilla-intermediate'
 +
 +	cp conf/ssl-config-mozilla-modern '\$(DESTDIR)$NGX_DEFAULT_CONF_PREFIX/ssl-config-mozilla-modern'
@@ -109,7 +111,7 @@ diff -Paur --no-dereference -- nginx.upstream/auto/install nginx/auto/install
  
  	test -d '\$(DESTDIR)`dirname "$NGX_PID_PATH"`' \\
  		|| mkdir -p '\$(DESTDIR)`dirname "$NGX_PID_PATH"`'
-@@ -156,6 +150,34 @@
+@@ -156,6 +152,34 @@
  
  	test -d '\$(DESTDIR)$NGX_PREFIX/html' \\
  		|| cp -R $NGX_HTML '\$(DESTDIR)$NGX_PREFIX'
@@ -508,12 +510,13 @@ diff -Paur --no-dereference -- nginx.upstream/init/nginx nginx/init/nginx
 diff -Paur --no-dereference -- nginx.upstream/sites-available/acme nginx/sites-available/acme
 --- nginx.upstream/sites-available/acme
 +++ nginx/sites-available/acme
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,12 @@
 +server {
 +	listen 80;
 +
 +	location /.well-known/acme-challenge/ {
-+		root   acme;
++		root /var/www/acme;
++		rewrite ^/\.well-known/acme-challenge/(.*)$ /$1 break;
 +	}
 +
 +	location / {
