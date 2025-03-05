@@ -200,7 +200,7 @@ static inline int re_parse(struct re_parse* parse,
 		}
 		// TODO: This is not properly implemented.
 		// TODO: This is not properly unicode-aware.
-		else if ( c == '[' )
+		else if ( !escaped && c == '[' )
 		{
 			re->re_type = RE_TYPE_SET;
 			bool negate = false;
