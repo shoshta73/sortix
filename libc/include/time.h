@@ -168,6 +168,8 @@ int sub_leap_seconds(time_t*);
 int add_leap_seconds(time_t*);
 #endif
 
+extern int daylight;
+extern long timezone;
 extern char* tzname[2];
 
 #ifdef __cplusplus
