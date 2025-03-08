@@ -385,7 +385,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  esac
  
  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking compiler and flags for sanity" >&5
-@@ -22232,7 +22240,12 @@
+@@ -22226,7 +22234,12 @@
  	long long num = 0x7fffffffffffffffll;
  #endif
  	strcpy(expected_out, "9223372036854775807");
@@ -399,7 +399,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  	if(strcmp(buf, expected_out) != 0)
  		exit(1);
  	exit(0);
-@@ -25166,7 +25179,8 @@
+@@ -25160,7 +25173,8 @@
  	elif ${NROFF} -man ${srcdir}/ssh.1 >/dev/null 2>&1; then
  		MANTYPE=man
  	else
@@ -409,7 +409,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  	fi
  fi
  
-@@ -25355,7 +25369,7 @@
+@@ -25349,7 +25363,7 @@
  		fi
  		if test "$cross_compiling" = yes
  then :
@@ -418,7 +418,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  
  else $as_nop
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -25371,7 +25385,7 @@
+@@ -25365,7 +25379,7 @@
  # ifdef _PATH_USERPATH	/* Irix */
  #  define _PATH_STDPATH _PATH_USERPATH
  # else
@@ -427,7 +427,7 @@ diff -Paur --no-dereference -- ssh.upstream/configure ssh/configure
  # endif
  #endif
  #include <sys/types.h>
-@@ -25403,7 +25417,7 @@
+@@ -25397,7 +25411,7 @@
  then :
     user_path=`cat conftest.stdpath`
  else $as_nop
@@ -662,7 +662,7 @@ diff -Paur --no-dereference -- ssh.upstream/misc.c ssh/misc.c
  /* remove newline at end of string */
  char *
  chop(char *s)
-@@ -2847,17 +2875,17 @@
+@@ -2868,17 +2896,17 @@
  
  		if (geteuid() == 0 &&
  		    initgroups(pw->pw_name, pw->pw_gid) == -1) {
@@ -1302,7 +1302,7 @@ diff -Paur --no-dereference -- ssh.upstream/ssh-add.c ssh/ssh-add.c
 diff -Paur --no-dereference -- ssh.upstream/ssh-agent.c ssh/ssh-agent.c
 --- ssh.upstream/ssh-agent.c
 +++ ssh/ssh-agent.c
-@@ -1948,8 +1948,8 @@
+@@ -1953,8 +1953,8 @@
  		return -1;
  	}
  	if ((euid != 0) && (getuid() != euid)) {
