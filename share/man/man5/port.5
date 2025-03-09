@@ -182,7 +182,7 @@ and
 .It Sy EDITION
 An increasing number used to distinguish this edition of the package from any previous packages by
 the same name.
-A new pacckage with the same name and a different edition will considered a different package.
+A new packages with the same name and a different edition will considered a different package.
 Upgrades will uninstall the old package and will not upgrade to the new edition as if the package
 has stopped existing.
 The
@@ -283,6 +283,12 @@ taking the form of a replacement package name followed by
 .Sq "@"
 and then the replacement package
 .Sy EDITION .
+The replacement package
+.Sq .
+is a short-hand for the source package and source edition before the colon.
+A self-rename from the package's current edition to
+.Sq .
+is automatically generated.
 .It Sy RUNTIME_DEPS
 Space delimited list of ports needed at run time.
 .It Sy SHA256SUM

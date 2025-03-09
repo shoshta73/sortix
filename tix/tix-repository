@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2023, 2024 Jonas 'Sortie' Termansen.
+# Copyright (c) 2023, 2024, 2025 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -98,8 +98,13 @@ metadata)
     tar -xOf "$package.tix.tar.xz" "tix/tixinfo/$package" > "$package.info"
     tar -xOf "$package.tix.tar.xz" "tix/manifest/$package" > "$package.manifest"
     sha256sum "$package.tix.tar.xz" > "$package.tix.tar.xz.sha256sum"
-    tix-vars -d '' "$package.info" RENAMES | tr , '\n' | sed -E '/^$/d' >> renames.list
-    (printf "%s: " "$package" && tix-vars -d '' "$package.info" RUNTIME_DEPS | sed -E 's/ +$//') >> dependencies.list
+    edition=$(tix-vars -d '1' "$package.info" EDITION)
+    tix-vars -d '' "$package.info" RENAMES |
+    tr , '\n' |
+    sed -E '/^$/d' >> renames.list
+    echo "$package@$edition: ." >> renames.list
+    (printf "%s: " "$package" && tix-vars -d '' "$package.info" RUNTIME_DEPS |
+     sed -E 's/ +$//') >> dependencies.list
     sed -E "s/$/:$package/" "$package.manifest" >> manifest.list
     if [ "$(tix-vars -d false "$package.info" IS_SET)" = true ]; then
       echo "$package" >> sets.list
