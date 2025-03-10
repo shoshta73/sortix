@@ -4400,7 +4400,7 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 		if ( errno != ENOMOUNT )
 			warning("Failed mounting %s on %s: unmount: %s: %m",
 					bdev_path, pretend_where, where);
-		kill(mountpoint->pid, SIGQUIT);
+		kill(mountpoint->pid, SIGTERM);
 	}
 	int code;
 	pid_t child = waitpid(mountpoint->pid, &code, 0);

@@ -425,7 +425,7 @@ bool mountpoint_mount(struct mountpoint* mountpoint)
 		if ( errno != ENOMOUNT )
 			warn("Failed mounting %s on %s: unmount: %s",
 			     bdev_path, pretend_where, where);
-		kill(mountpoint->pid, SIGQUIT);
+		kill(mountpoint->pid, SIGTERM);
 	}
 	int code;
 	pid_t child = waitpid(mountpoint->pid, &code, 0);
@@ -460,7 +460,7 @@ void mountpoint_unmount(struct mountpoint* mountpoint)
 	if ( unmount(mountpoint->absolute, 0) < 0 && errno != ENOMOUNT )
 		warn("unmount: %s", mountpoint->entry.fs_file);
 	else if ( errno == ENOMOUNT )
-		kill(mountpoint->pid, SIGQUIT);
+		kill(mountpoint->pid, SIGTERM);
 	int code;
 	if ( waitpid(mountpoint->pid, &code, 0) < 0 )
 		warn("waitpid");
