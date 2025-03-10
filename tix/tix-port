@@ -139,6 +139,10 @@ if [ "${collection+x}" = "" -a \
   collection="$sysroot$prefix"
 fi
 
+if [ "${prefix+x}" = "" -a "${sysroot+x}" = "" -a "${collection+x}" = x ]; then
+  prefix="$collection"
+fi
+
 NAME=$(tix-vars "$port.port" NAME)
 SOURCE_PORT=$(tix-vars -d '' "$port.port" SOURCE_PORT)
 DEVELOPMENT=$(tix-vars -d false "$port.port" DEVELOPMENT)
