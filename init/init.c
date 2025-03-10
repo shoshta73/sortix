@@ -102,6 +102,12 @@ enum type
 	TYPE_ONESHOT,
 };
 
+enum signal_to
+{
+	SIGNAL_TO_PROCESS,
+	SIGNAL_TO_GROUP,
+};
+
 enum daemon_state
 {
 	// Daemon is not running and should not be running.
@@ -245,9 +251,11 @@ struct daemon
 	enum exit_code_meaning exit_code_meaning;
 	enum type type;
 	enum daemon_state state;
+	enum signal_to signal_to;
 	int exit_code;
 	int readyfd;
 	int outputfd;
+	int reload;
 	bool configured;
 	bool echo;
 	bool need_tty;
@@ -286,6 +294,8 @@ struct daemon_config
 	off_t log_line_size;
 	off_t log_size;
 	mode_t log_file_mode;
+	int reload;
+	enum signal_to signal_to;
 	enum type type;
 };
 
@@ -443,6 +453,16 @@ static void uninstall_signal_handler(void)
 	sigaction(SIGTERM, &sa, NULL);
 	sigaction(SIGHUP, &sa, NULL);
 	sigprocmask(SIG_UNBLOCK, &handled_signals, NULL);
+}
+
+static int send_signal_to(pid_t pid, enum signal_to signal_to, int sig)
+{
+	switch ( signal_to )
+	{
+	case SIGNAL_TO_PROCESS: return kill(pid, sig);
+	case SIGNAL_TO_GROUP: return killpg(pid, sig);
+	}
+	__builtin_unreachable();
 }
 
 static char* read_single_line(FILE* fp)
@@ -1357,6 +1377,15 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 			warning("%s:%ji: unknown %s: %s",
 			        path, (intmax_t) line_number, argv[0], argv[1]);
 	}
+	else if ( !strcmp(argv[0], "reload") )
+	{
+		if ( !strcmp(argv[1], "none") )
+			daemon_config->reload = 0;
+		else if ( strncmp(argv[1], "SIG", 3) != 0 ||
+			      str2sig(argv[1] + 3, &daemon_config->reload) < 0 )
+			warning("%s:%ji: unknown signal: %s",
+			        path, (intmax_t) line_number, argv[1]);
+	}
 	else if ( !strcmp(argv[0], "require") )
 	{
 		char* target = strdup(argv[1]);
@@ -1424,6 +1453,16 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 				return false;
 			}
 		}
+	}
+	else if ( !strcmp(argv[0], "signal-to") )
+	{
+		if ( !strcmp(argv[1], "process") )
+			daemon_config->signal_to = SIGNAL_TO_PROCESS;
+		else if ( !strcmp(argv[1], "group") )
+			daemon_config->signal_to = SIGNAL_TO_GROUP;
+		else
+			warning("%s:%ji: unknown signal destination: %s",
+			        path, (intmax_t) line_number, argv[1]);
 	}
 	else if ( !strcmp(argv[0], "tty") )
 	{
@@ -1496,6 +1535,8 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 				warning("%s:%ji: %s %s: unknown: %s", path,
 				        (intmax_t) line_number, argv[0], argv[1], argv[2]);
 		}
+		else if ( !strcmp(argv[0], "reload") )
+			daemon_config->reload = SIGHUP;
 		else if ( !strcmp(argv[1], "require") )
 		{
 			if ( argc < 3 )
@@ -1554,6 +1595,8 @@ static bool daemon_process_command(struct daemon_config* daemon_config,
 					        argv[2], argv[i]);
 			}
 		}
+		else if ( !strcmp(argv[0], "signal-to") )
+			daemon_config->signal_to = SIGNAL_TO_PROCESS;
 		else if ( !strcmp(argv[1], "tty") )
 		{
 			// TODO: Implement.
@@ -1708,6 +1751,8 @@ static void daemon_config_initialize(struct daemon_config* daemon_config)
 	daemon_config->log_line_size = default_config.log_line_size;
 	daemon_config->log_size = default_config.log_size;
 	daemon_config->log_file_mode = default_config.log_file_mode;
+	// TODO: This behavior maybe should be opt-in?
+	daemon_config->reload = SIGHUP;
 }
 
 static struct daemon_config* daemon_config_load(const char* name)
@@ -1990,6 +2035,8 @@ static void daemon_unconfigure(struct daemon* daemon)
 	free(daemon->argv);
 	log_deinitialize(&daemon->log);
 	daemon->exit_code_meaning = EXIT_CODE_MEANING_DEFAULT;
+	daemon->reload = SIGHUP;
+	daemon->signal_to = SIGNAL_TO_PROCESS;
 	daemon->type = TYPE_DAEMON;
 	daemon->echo = false;
 	daemon->need_tty = false;
@@ -2056,6 +2103,8 @@ static void daemon_configure_sub(struct daemon* daemon,
 		fatal("malloc: %m");
 	daemon->echo = daemon_config->echo;
 	daemon->need_tty = daemon_config->need_tty;
+	daemon->reload = daemon_config->reload;
+	daemon->signal_to = daemon_config->signal_to;
 	daemon->type = daemon_config->type;
 	daemon->configured = true;
 }
@@ -2158,7 +2207,7 @@ static void daemon_terminate(struct daemon* daemon)
 	if ( 0 < daemon->pid )
 	{
 		log_status("stopping", "Stopping %s...\n", daemon->name);
-		kill(daemon->pid, SIGTERM);
+		send_signal_to(daemon->pid, daemon->signal_to, SIGTERM);
 		struct timespec now;
 		clock_gettime(CLOCK_MONOTONIC, &now);
 		daemon->timeout = timespec_add(now, timespec_make(30, 0));
@@ -2177,7 +2226,7 @@ static void daemon_reload(struct daemon* daemon)
 		if ( 0 < daemon->pid )
 		{
 			log_status("reload", "Reloading %s.\n", daemon->name);
-			kill(daemon->pid, SIGHUP); // TODO: Configuration.
+			send_signal_to(daemon->pid, daemon->signal_to, daemon->reload);
 		}
 		daemon->want_reload = false;
 	}
@@ -2193,7 +2242,7 @@ static void daemon_signal(struct daemon* daemon, const char* signame, int sig)
 	if ( 0 < daemon->pid )
 	{
 		log_status("signal", "Sending %s to %s.\n", signame, daemon->name);
-		kill(daemon->pid, sig);
+		send_signal_to(daemon->pid, daemon->signal_to, sig);
 	}
 }
 
@@ -2450,7 +2499,7 @@ static void daemon_kill(struct daemon* daemon)
 	if ( 0 < daemon->pid )
 	{
 		log_status("killing", "Killing %s.\n", daemon->name);
-		kill(daemon->pid, SIGKILL);
+		send_signal_to(daemon->pid, daemon->signal_to, SIGKILL);
 		daemon->timeout_set = false;
 	}
 	else
@@ -3516,7 +3565,7 @@ static void init(void)
 				log_status("timeout",
 				           "Stopping %s timed out, sending SIGKILL.\n",
 				           daemon->name);
-				kill(daemon->pid, SIGKILL);
+				send_signal_to(daemon->pid, daemon->signal_to, SIGKILL);
 				daemon->timeout_set = false;
 			}
 			else

@@ -463,6 +463,17 @@ would be
 The name of the network interface is appended as a command line argument on the
 command line of each instantiated daemon.
 It is not possible to depend on the instantiated daemons.
+.It Sy reload Oo Sy none "|" Ar signal Oc
+Specifies that a daemon will reload upon receiving this
+.Ar signal .
+The value can be
+.Sy none
+to disable the feature, or an uppercase symbolic signal name starting with the
+.Sy SIG
+prefix.
+.Pp
+The default value is
+.Sy SIGHUP.
 .It Sy require Ar dependency Oo Ar flag ... Oc
 When the daemon is needed, start the
 .Ar dependency
@@ -509,6 +520,18 @@ Dependencies can be forgotten using
 .Sy unset require Ar dependency .
 Flags on a dependency can be be unset using
 .Sy unset require Ar dependency flag ... .
+.It Sy signal-to Oo Sy process "|" Sy group Oc
+Send all signals to this destination:
+.Bl -tag -width "12345678"
+.It Sy process
+The process only.
+.It Sy group
+The process group.
+.El
+.Pp
+The default is sending signals to the
+.Sy process
+only.
 .It Sy tty Ar device
 If the daemon is a foreground daemon
 .Sy ( need tty

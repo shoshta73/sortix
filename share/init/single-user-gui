@@ -6,5 +6,6 @@ need tty
 
 cd "$HOME"
 exit-code-meaning poweroff-reboot
+reload none
 type oneshot
 exec display

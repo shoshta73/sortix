@@ -5,5 +5,7 @@ tty tty1
 need tty
 
 exec sysinstall
+reload none
+signal-to group
 type oneshot
 exit-code-meaning poweroff-reboot

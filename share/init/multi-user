@@ -5,4 +5,5 @@ tty tty1
 need tty
 
 exit-code-meaning poweroff-reboot
+reload none
 exec login
