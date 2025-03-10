@@ -210,9 +210,9 @@ int main(int argc, char* argv[])
 					continue;
 				int fd;
 				if ( (fd = open(path, O_CREAT | O_RDWR, 0666)) < 0 )
-					err(1, "%s", opt_r);
+					err(1, "%s", path);
 				if ( futimens(fd, times) < 0 )
-					err(1, "%s", opt_r);
+					err(1, "%s", path);
 				close(fd);
 			}
 			else
