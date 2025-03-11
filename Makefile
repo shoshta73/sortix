@@ -67,7 +67,7 @@ SORTIX_INCLUDE_SOURCE_GIT_REPO?=$(shell test -d .git && echo "file://`pwd`")
 SORTIX_INCLUDE_SOURCE_GIT_REPO:=$(SORTIX_INCLUDE_SOURCE_GIT_REPO)
 SORTIX_INCLUDE_SOURCE_GIT_ORIGIN?=https://sortix.org/sortix.git
 SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS?=--single-branch
-SORTIX_INCLUDE_SOURCE_GIT_BRANCHES?=master
+SORTIX_INCLUDE_SOURCE_GIT_BRANCHES?=
 ifneq ($(and $(shell which git 2>/dev/null),$(SORTIX_INCLUDE_SOURCE_GIT_REPO)),)
   SORTIX_INCLUDE_SOURCE?=git
 else
@@ -316,9 +316,14 @@ ifeq ($(SORTIX_INCLUDE_SOURCE),git)
 	rm -rf "$(SYSROOT)/src"
 	git clone --no-hardlinks $(SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS) -- "$(SORTIX_INCLUDE_SOURCE_GIT_REPO)" "$(SYSROOT)/src"
 	(cd "$(SYSROOT)/src" && git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*')
-	-cd "$(SYSROOT)/src" && for BRANCH in $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES); do \
-	  git fetch origin $$BRANCH:refs/remotes/origin/$$BRANCH && \
-	  (git branch -f $$BRANCH origin/$$BRANCH || true) ; \
+	-cd "$(SYSROOT)/src" && \
+	git fetch origin master:refs/remotes/origin/master && \
+	(git branch -f master $$(git merge-base HEAD origin/master) || true)
+	-release_branches=`git for-each-ref --format '%(refname:short)' refs/heads | grep -E '^sortix-'` && \
+	cd "$(SYSROOT)/src" && \
+	for branch in $$release_branches $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES); do \
+	  git fetch origin $$branch:refs/remotes/origin/$$branch && \
+	  (git branch -f $$branch origin/$$branch || true) ; \
 	done
 ifneq ($(SORTIX_INCLUDE_SOURCE_GIT_ORIGIN),)
 	cd "$(SYSROOT)/src" && git remote set-url origin $(SORTIX_INCLUDE_SOURCE_GIT_ORIGIN)
