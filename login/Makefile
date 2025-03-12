@@ -11,6 +11,7 @@ CFLAGS:=$(CXXFLAGS) -Wall -Wextra
 BINARY=login
 
 OBJS=\
+conf.o \
 framebuffer.o \
 graphical.o \
 login.o \

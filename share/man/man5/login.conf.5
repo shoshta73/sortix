@@ -1,0 +1,45 @@
+.Dd August 26, 2023
+.Dt LOGIN.CONF 5
+.Os
+.Sh NAME
+.Nm login.conf
+.Nd login configuration
+.Sh SYNOPSIS
+.Nm /etc/login.conf
+.Sh DESCRIPTION
+.Nm login.conf
+controls the behaviour of
+.Xr login 8
+after booting into the multi-user target.
+The file allows choosing between the graphical and textual login modes,
+and optionally choosing an user to automatically login as on boot.
+.Sh FORMAT
+The file is read line by line.
+The # character starts a comment and the rest of the line is ignored.
+Lines are supposed to contain assignments to variables.
+An assignment is the name of the variable, whitespace, an equal character,
+whitespace, the value, whitespace, and then the end of the line.
+.Bl -tag -width "12345678"
+.It Sy graphical Ns "=" Ns Oo Sy no "|" yes Oc (default Sy no ) .
+Run in GUI mode.
+.It Sy autologin Ns "=" Ns Oo Sy <user> Oc (no default) .
+Login as <user> when
+.Xr login 8
+is first started. Behaviour after <user>'s session ends remains as normal.
+.El
+.Pp
+The defaults will be used if
+.Pa /etc/login.conf
+is missing.
+.Sh FILES
+.Bl -tag -width "/etc/login.conf" -compact
+.It Pa /etc/login.conf
+Upgrade configuration.
+.El
+.Sh EXAMPLES
+.Bd -literal
+graphical = yes
+autologin = root
+.Ed
+.Sh SEE ALSO
+.Xr login 7

@@ -45,6 +45,7 @@
 #include <sortix/limits.h>
 #endif
 
+#include "conf.h"
 #include "login.h"
 
 pid_t forward_sigterm_to = 0;
@@ -365,6 +366,31 @@ bool login(const char* username, const char* session)
 	return true;
 }
 
+static bool autologin(char *str)
+{
+	char* username = NULL;
+	char* session = NULL;
+	enum special_action action;
+
+	if ( !parse_username(str, &username, &session, &action) )
+	{
+		printf("Invalid autologin username\n\n");
+		return false;
+	}
+	if ( action != SPECIAL_ACTION_NONE )
+	{
+		printf("autologin is set to a special action; refusing to %s\n\n", str);
+		return false;
+	}
+	if ( !login(username, session) )
+	{
+		warn("autologin as %s", username);
+		printf("\n");
+		return false;
+	}
+	return true;
+}
+
 static bool read_terminal_line(char* buffer, size_t size)
 {
 	assert(size);
@@ -557,6 +583,11 @@ int textual(void)
 
 int main(void)
 {
+	struct conf conf;
+	conf_init(&conf);
+	if (!conf_load(&conf, "/etc/login.conf"))
+		conf_free(&conf); // the config is still valid after conf_free
+
 	setlocale(LC_ALL, "");
 	if ( getuid() != 0 )
 		errx(2, "must be user root");
@@ -592,8 +623,12 @@ int main(void)
 	sigaction(SIGQUIT, &sa, NULL);
 	sigaddset(&sa.sa_mask, SIGTSTP);
 	sigprocmask(SIG_BLOCK, &sa.sa_mask, NULL);
+
+	if ( conf.autologin && !autologin(conf.autologin) )
+		conf.graphical = false; // make the user see the error
+
 	int result = -1;
-	if ( result == -1 )
+	if ( conf.graphical )
 		result = graphical();
 	if ( result == -1 )
 		result = textual();
