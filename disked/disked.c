@@ -893,6 +893,35 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 	return rewrite_finish(&rewr);
 }
 
+static int has_mountpoint(const char* mountpoint)
+{
+	FILE* fstab_fp = fopen(fstab_path, "r");
+	if ( !fstab_fp )
+		return errno == ENOENT ? 0 : -1;
+	int result = 0;
+	char* line = NULL;
+	size_t line_size = 0;
+	ssize_t line_length;
+	while ( 0 < (line_length = getline(&line, &line_size, fstab_fp)) )
+	{
+		if ( line[line_length - 1] == '\n' )
+			line[--line_length] = '\0';
+		struct fstab fsent;
+		if ( !scanfsent(line, &fsent) )
+			continue;
+		if ( !strcmp(fsent.fs_file, mountpoint) )
+		{
+			result = 1;
+			break;
+		}
+	}
+	if ( ferror(fstab_fp) )
+		result = -1;
+	free(line);
+	fclose(fstab_fp);
+	return result;
+}
+
 static void unscan_partition(struct partition* p)
 {
 	struct blockdevice* bdev = &p->bdev;
@@ -1808,11 +1837,16 @@ static void on_mkpart(size_t argc, char** argv)
 	bool mountable = !strcmp(fstype, "ext2");
 	while ( mountable )
 	{
+		const char* def = "no";
+		if ( !has_mountpoint("/") )
+			def = "/";
+		else if ( !has_mountpoint("/home") )
+			def = "/home";
 		if ( 6 <= argc )
 			strlcpy(mountpoint, argv[5], sizeof(mountpoint));
 		else
 			prompt(mountpoint, sizeof(mountpoint),
-			       "Where to mount partition? (mountpoint or 'no')", "no");
+			       "Where to mount partition? (mountpoint or 'no')", def);
 		if ( !strcmp(mountpoint, "no") )
 		{
 			mountpoint[0] = '\0';
