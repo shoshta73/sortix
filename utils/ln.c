@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2018, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2018, 2020, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -261,6 +261,9 @@ int main(int argc, char* argv[])
 	}
 
 	compact_arguments(&argc, &argv);
+
+	if ( argc == 1 )
+		errx(1, "expected file operand");
 
 	if ( no_target_directory && argc != 3 )
 		errx(1, "unexpected extra operand");
