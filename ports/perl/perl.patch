@@ -290,6 +290,18 @@ diff -Paur --no-dereference -- perl.upstream/cpan/ExtUtils-MakeMaker/lib/ExtUtil
      if ( $^O eq 'darwin' && $^X eq '/usr/bin/perl' ) {
        my @osvers = split /\./, $Config{osvers};
        $Is{ApplCor} = ( $osvers[0] >= 18 );
+diff -Paur --no-dereference -- perl.upstream/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm perl/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
+--- perl.upstream/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
++++ perl/cpan/Pod-Perldoc/lib/Pod/Perldoc.pm
+@@ -1676,7 +1676,7 @@
+         if ($self->is_os2) {
+           unshift @pagers, 'less', 'cmd /c more <';
+         }
+-        push @pagers, qw( more less pg view cat );
++        push @pagers, qw( less pager more pg view cat );
+         unshift @pagers, "$ENV{PAGER} <"  if $ENV{PAGER};
+     }
+ 
 diff -Paur --no-dereference -- perl.upstream/dist/Safe/Safe.pm perl/dist/Safe/Safe.pm
 --- perl.upstream/dist/Safe/Safe.pm
 +++ perl/dist/Safe/Safe.pm
