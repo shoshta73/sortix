@@ -19,6 +19,7 @@
 set -e
 
 unset build
+unset build_id
 cache_package=
 unset collection
 unset destination
@@ -26,25 +27,36 @@ unset distclean
 unset end
 unset exec_prefix
 unset generation
+unset key_search
 unset host
 unset hosts
 unset make
 unset makeflags
 metadata=false
 unset mirror
+unset mirrors
 unset mirror_directory
 unset packages
 unset prefix
+unset public_key
+unset release
 unset release_directory
+release_info=false
+unset release_key
+unset release_url
 unset repository
+unset secret_key
+unset sign
 sort=
 unset source_port
 unset start
 unset sysroot
+unset sysroot_download_packages
 unset sysroots
 unset tar
 unset target
 unset tmp
+unset version
 
 operand=1
 dashdash=
@@ -64,8 +76,11 @@ for argument do
 
   case $dashdash$argument in
   --) dashdash=yes ;;
+  -C) previous_option=collection ;;
   --build=*) build=$parameter ;;
   --build) previous_option=build ;;
+  --build-id=*) build_id=$parameter ;;
+  --build-id) previous_option=build_id ;;
   --cache-package) cache_package=--cache-package ;;
   --collection=*) collection=$parameter ;;
   --collection) previous_option=collection ;;
@@ -82,6 +97,8 @@ for argument do
   --host) previous_option=host ;;
   --hosts=*) hosts=$parameter ;;
   --hosts) previous_option=hosts ;;
+  --key-search=*) key_search=$parameter ;;
+  --key-search) previous_option=key_search ;;
   --make=*) make=$parameter ;;
   --make) previous_option=make ;;
   --makeflags=*) makeflags=$parameter ;;
@@ -89,21 +106,37 @@ for argument do
   --metadata) metadata=true ;;
   --mirror=*) mirror=$parameter ;;
   --mirror) previous_option=mirror ;;
+  --mirrors=*) mirrors=$parameter ;;
+  --mirrors) previous_option=mirrors ;;
   --mirror-directory=*) mirror_directory=$parameter ;;
   --mirror-directory) previous_option=mirror_directory ;;
   --packages=*) packages=$parameter ;;
   --packages) previous_option=packages ;;
   --prefix=*) prefix=$parameter ;;
   --prefix) previous_option=prefix ;;
+  --public-key=*) public_key=$parameter ;;
+  --public-key) previous_option=public_key ;;
   --randomize) sort="-R" ;;
+  --release=*) release=$parameter ;;
+  --release) previous_option=release ;;
   --release-directory=*) release_directory=$parameter ;;
   --release-directory) previous_option=release_directory ;;
+  --release-info) metadata=true; release_info=true ;;
+  --release-key=*) release_key=$parameter ;;
+  --release-key) previous_option=release_key ;;
+  --release-url=*) release_url=$parameter ;;
+  --release-url) previous_option=release_url ;;
   --repository=*) repository=$parameter ;;
   --repository) previous_option=repository ;;
+  --secret-key=*) secret_key=$parameter ;;
+  --secret-key) previous_option=secret_key ;;
+  --sign) metadata=true; release_info=true; sign=--sign ;;
   --start=*) start=$parameter ;;
   --start) previous_option=start ;;
   --sysroot=*) sysroot=$parameter ;;
   --sysroot) previous_option=sysroot ;;
+  --sysroot-download-packages=*) sysroot_download_packages=$parameter ;;
+  --sysroot-download-packages) previous_option=sysroot_download_packages ;;
   --sysroots=*) sysroots=$parameter ;;
   --sysroots) previous_option=sysroots ;;
   --tar=*) tar=$parameter ;;
@@ -112,6 +145,8 @@ for argument do
   --target) previous_option=target ;;
   --tmp=*) tmp=$parameter ;;
   --tmp) previous_option=tmp ;;
+  --version=*) version=$parameter ;;
+  --version) previous_option=version ;;
   -*) echo "$0: unrecognized option $argument" >&2
       exit 1 ;;
   *)
@@ -168,6 +203,13 @@ for host in ${hosts-${host-build}}; do
 
   if [ "$end" != extract -a "$end" != download -a "$end" != tix-build-start -a \
        "$end" != clean -a "$end" != pre-clean -a -z "$distclean" ]; then
+    # Optionally download the appropriate system root.
+    if [ -n "${sysroot+x}" -a -n "${sysroot_download_packages+x}" ]; then
+      if [ ! -e "$sysroot/tix/collection.conf" ]; then
+        tix-create -C "$sysroot" --import=/
+      fi
+      tix-install -C "$sysroot" -- $sysroot_download_packages
+    fi
     # Initialize Tix package management if absent.
     if [ -n "${collection+x}" ]; then
       collection_dir="$collection"
@@ -175,12 +217,14 @@ for host in ${hosts-${host-build}}; do
       collection_dir="$sysroot$prefix"
     fi
     if [ ! -e "$collection_dir/tix/collection.conf" ]; then
-      tix-collection \
+      tix-create \
+        ${build_id+--build-id="$build_id"} \
         ${generation+--generation="$generation"} \
         ${host+--platform="$host"} \
         ${prefix+--prefix="$prefix"} \
-        "$collection_dir" \
-        create
+        ${release_key+--release-key="$release_key"} \
+        ${release_url+--release-url="$release_url"} \
+        -C "$collection_dir"
     fi
     # Decide the order the packages are built in per their dependencies.
     packages="$(echo "$packages" | tr ' ' '\n' | sort $sort)"
@@ -224,3 +268,18 @@ for host in ${hosts-${host-build}}; do
       metadata "$destination"
   fi
 done
+
+# Create and sign the release.
+if $release_info; then
+  tix-release \
+    --build-id="$build_id" \
+    ${generation+--generation="$generation"} \
+    ${key_search+--key_search="$key_search"} \
+    ${mirrors+--mirrors="$mirrors"} \
+    --release="$release" \
+    --version="$version" \
+    ${public_key+--public-key="$public_key"} \
+    ${secret_key+--secret-key="$secret_key"} \
+    $sign \
+    release "$release_directory"
+fi

@@ -115,6 +115,7 @@ export CXXFLAGS
 # Build and install all the packages.
 tix-metabuild \
   ${BUILD:+--build="$BUILD"} \
+  ${BUILD_ID+--build-id="$BUILD_ID"} \
   $CACHE_PACKAGE \
   ${SYSROOT:+--collection="$SYSROOT"} \
   ${SORTIX_REPOSITORY_DIR:+--destination="$SORTIX_REPOSITORY_DIR"} \
@@ -127,6 +128,8 @@ tix-metabuild \
   --packages="${PACKAGES-all!!}" \
   --prefix= \
   $RANDOMIZE \
+  ${SIGNING_PUBLIC_KEY+--release-key="$SIGNING_PUBLIC_KEY"} \
+  ${RELEASE_URL+--release-url="$RELEASE_URL"} \
   ${START:+--start="$START"} \
   ${SYSROOT:+--sysroot="$SYSROOT"} \
   "$SORTIX_PORTS_DIR"

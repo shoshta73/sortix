@@ -25,11 +25,15 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
+#include "conf.h"
+#include "execute.h"
 #include "fileops.h"
 #include "hooks.h"
 #include "manifest.h"
@@ -486,6 +490,131 @@ void upgrade_prepare(const struct release* old_release,
 		}
 		free(path);
 	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-collection-conf") )
+	{
+		printf(" - Migrating /etc/upgrade.conf into /tix/collection.conf...\n");
+		struct conf conf;
+		conf_init(&conf);
+		char* conf_path = join_paths(target_prefix, "etc/upgrade.conf");
+		char* conf_path_new = join_paths(target_prefix, "etc/upgrade.conf.new");
+		char* tix_conf_path = join_paths(target_prefix, "tix/collection.conf");
+		char* tix_conf_path_new =
+			join_paths(target_prefix, "tix/collection.conf.new");
+		if ( !conf_path || !conf_path_new || !tix_conf_path ||
+		     !tix_conf_path_new )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		if ( !conf_load(&conf, conf_path) && errno != ENOENT )
+		{
+			warn("%s", conf_path);
+			_exit(2);
+		}
+		FILE* fp = fopen(tix_conf_path_new, "w");
+		if ( !fp )
+		{
+			warn("%s", tix_conf_path_new);
+			_exit(2);
+		}
+		FILE* fp_in = fopen(tix_conf_path, "r");
+		if ( !fp_in )
+		{
+			warn("%s", tix_conf_path);
+			_exit(2);
+		}
+		int ic;
+		while ( (ic = fgetc(fp_in)) != EOF )
+		{
+			if ( fputc(ic, fp) == EOF )
+			{
+				warn("%s", tix_conf_path_new);
+				_exit(2);
+			}
+		}
+		if ( ferror(fp_in) )
+		{
+			warn("%s", tix_conf_path);
+			_exit(2);
+		}
+		if ( !conf.ports )
+			fprintf(fp, "PORTS=%s\n", conf.ports ? "true" : "false");
+		if ( !conf.system )
+			fprintf(fp, "SYSTEM=%s\n", conf.system ? "true" : "false");
+		if ( ferror(stdout) || fflush(fp) == EOF )
+		{
+			warn("%s", tix_conf_path);
+			_exit(2);
+		}
+		struct stat st;
+		fstat(fileno(fp_in), &st);
+		fchmod(fileno(fp), st.st_mode & 07777);
+		fchown(fileno(fp), st.st_uid, st.st_gid);
+		fclose(fp);
+		fclose(fp_in);
+		fp_in = fopen(conf_path, "r");
+		if ( !fp_in && errno != ENOENT )
+		{
+			warn("%s", conf_path);
+			_exit(2);
+		}
+		else if ( fp_in )
+		{
+			FILE* fp_out = fopen(conf_path_new, "w");
+			if ( !fp_out )
+			{
+				warn("%s", conf_path_new);
+				_exit(2);
+			}
+			char* line = NULL;
+			size_t line_size = 0;
+			while ( 0 < getline(&line, &line_size, fp_in) )
+			{
+				size_t i = 0;
+				while ( isblank((unsigned char) line[i]) )
+					i++;
+				if ( !strncmp(line + i, "ports", strlen("ports")) ||
+				     !strncmp(line + i, "system", strlen("system")) )
+					continue;
+				fputs(line, fp_out);
+			}
+			free(line);
+			if ( ferror(fp_in) )
+			{
+				warn("%s", conf_path);
+				_exit(2);
+			}
+			if ( ferror(stdout) || fflush(fp_out) == EOF )
+			{
+				warn("%s", tix_conf_path);
+				_exit(2);
+			}
+			struct stat st;
+			fstat(fileno(fp_in), &st);
+			fchmod(fileno(fp_out), st.st_mode & 07777);
+			fchown(fileno(fp_out), st.st_uid, st.st_gid);
+			fclose(fp_in);
+			fclose(fp_out);
+			if ( rename(conf_path_new, conf_path) < 0 )
+			{
+				warn("rename: %s -> %s", conf_path_new, conf_path);
+				_exit(2);
+			}
+		}
+		if ( rename(tix_conf_path_new, tix_conf_path) < 0 )
+		{
+			warn("rename: %s -> %s", tix_conf_path_new, tix_conf_path);
+			_exit(2);
+		}
+		free(conf_path);
+		free(conf_path_new);
+		free(tix_conf_path);
+		free(tix_conf_path_new);
+		conf_free(&conf);
+	}
 }
 
 void upgrade_finalize(const struct release* old_release,
@@ -529,10 +658,12 @@ void upgrade_finalize(const struct release* old_release,
 	}
 }
 
-void post_upgrade(const char* source_prefix, const char* target_prefix)
+void post_upgrade(const char* source, const char* target)
 {
-	(void) source_prefix;
-	(void) target_prefix;
+	// Update the release metadata.
+	printf(" - Updating /tix/collection.conf...\n");
+	execute((const char*[]) { "tix-create", "-C", target, "--import", source,
+	                          NULL }, "e");
 }
 
 // TODO: After releasing Sortix 1.1, remove this compatibility. These manifests

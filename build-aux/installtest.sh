@@ -30,6 +30,7 @@ unset hostname
 hostname=installtest
 install=false
 minimal=false
+network_upgrade=false
 unset input
 unset iso
 iso_upgrade=false
@@ -82,6 +83,7 @@ for argument do
   --iso=*) iso=$parameter ;;
   --iso-upgrade) iso_upgrade=true ;;
   --minimal) minimal=true ;;
+  --network-upgrade) network_upgrade=true ;;
   --output) previous_option=output ;;
   --output=*) output=$parameter ;;
   --partitioning) previous_option=partitioning ;;
@@ -178,6 +180,16 @@ if $all; then
        ${display+--display="$display"} --bios="$bios" --iso-upgrade \
        --input="$old_stable_input"
 
+  # Test upgrading from network.
+  network_input="$input/$prefix-$host-network.hdd"
+  if [ ! -e "$network_input" ]; then
+     network_input="$output/$prefix-$host-minimal.hdd"
+  fi
+  "$0" ${enable_kvm+--enable-kvm} --host="$host" --port="$port" --iso="$iso" \
+       ${display+--display="$display"} --bios="$bios" --network-upgrade \
+       --release-key="$release_key" --release-url="$release_url" \
+       --input="$network_input" --output="$output/$prefix-$host-network.hdd"
+
   # Test upgrading from source.
   if [ -e "$input/$prefix-$host.hdd" ]; then
     previous_input="$input/$prefix-$host.hdd"
@@ -194,12 +206,14 @@ if $all; then
   exit
 fi
 
-if ! $install && ! $iso_upgrade && ! $source_upgrade; then
+if ! $install && ! $iso_upgrade && ! $network_upgrade && ! $source_upgrade; then
   install=true
 fi
 
 if $minimal; then
   memory=300
+elif $network_upgrade; then
+  memory=256
 elif $source_upgrade; then
   memory=512
 else
@@ -405,7 +419,7 @@ wait_ssh() {
 
 # Test if the release can be installed correctly.
 
-if $source_upgrade; then
+if $network_upgrade || $source_upgrade; then
   key=sortix.hdd.id_rsa
   known_hosts=sortix.hdd.known_hosts
 fi
@@ -415,6 +429,17 @@ if $install; then
   do_ssh "sysinstall"
 elif $iso_upgrade; then
   do_ssh "sysupgrade"
+elif $network_upgrade; then
+  if [ -n "$release_key" ]; then
+    do_ssh 'cat > /tix/release.pub' < "$release_key"
+  fi
+  if [ -n "$release_url" ]; then
+    do_ssh "tix-vars /tix/collection.conf RELEASE_URL=\"$release_url\" \\
+            > /tix/collection.conf.new &&
+            mv /tix/collection.conf.new /tix/collection.conf"
+  fi
+  do_ssh /sbin/tix-upgrade --cancel
+  do_ssh /sbin/tix-upgrade --force
 elif $source_upgrade; then
   xorriso -indev "$iso" -osirrox on -extract boot/src.tar.xz src.tar.xz
   do_ssh "rm -rf /src && tar -xJ -C /dev" < src.tar.xz
@@ -427,8 +452,6 @@ wait $vmpid
 unset vmpid
 rm pid
 
-# Test if the installation boots correctly.
-
 if $install || $iso_upgrade; then
   cp sortix.iso.known_hosts sortix.hdd.known_hosts
   cp id_rsa sortix.hdd.id_rsa
@@ -436,6 +459,25 @@ if $install || $iso_upgrade; then
 fi
 key=sortix.hdd.id_rsa
 known_hosts=sortix.hdd.known_hosts
+
+# Test if a release can network upgrade to itself after already upgrading.
+if $network_upgrade; then
+
+  qemu &
+  vmpid=$!
+  echo $vmpid > pid
+
+  wait_ssh
+  do_ssh /sbin/tix-upgrade --force
+  do_ssh "poweroff" || true
+
+  wait $vmpid
+  unset vmpid
+  rm pid
+
+fi
+
+# Test if the installation boots correctly.
 
 qemu &
 vmpid=$!

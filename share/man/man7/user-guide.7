@@ -78,6 +78,21 @@ Sortix is currently in the process of being documented and many manual pages are
 missing.
 The current priority is to document areas specific to Sortix and assume standard
 knowledge from other operating systems.
+.Ss Third Party Software
+Releases come with useful third party software installed.
+The
+.Pa /tix/tixinfo
+directory lists all currently installed ports.
+.Pp
+The
+.Xr tix 8
+package management can be used to install more software via the internet:
+.Pp
+.Dl $ tix install foo
+.Pp
+You can upgrade to the latest operating system release using:
+.Pp
+.Dl $ tix upgrade
 .Ss Editor
 .Xr editor 1
 is the standard text file editor.
@@ -92,11 +107,6 @@ The filesystem hierarchy is described in
 The
 .Xr memstat 1
 command shows the current memory usage.
-.Ss Third Party Software
-Releases come with useful third party software installed.
-The
-.Pa /tix/tixinfo
-directory lists all currently installed ports.
 .Ss Source Code
 Releases come full with the system source code in
 .Pa /src

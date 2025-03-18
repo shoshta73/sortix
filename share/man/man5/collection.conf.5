@@ -1,0 +1,205 @@
+.Dd February 18, 2025
+.Dt COLLECTION.CONF 5
+.Os
+.Sh NAME
+.Nm collection.conf
+.Nd tix collection configuration
+.Sh SYNOPSIS
+.Pa /tix/collection.conf
+.Sh DESCRIPTION
+A tix collection created with
+.Xr tix-create 8
+use the
+.Pa /tix/collection.conf
+configuration file inside the installation.
+.Pp
+The
+.Nm
+file is in the
+.Xr tix-vars 8
+format, a subset of the
+.Xr sh 1
+language with only variable assignments.
+.Nm
+controls upgrades of the installation, contains release metadata, and user
+preferences such as which mirror to use.
+.Nm
+can be modified with
+.Xr tix-create 8 ,
+or manually edited and syntax checked with
+.Xr tix-vars 8
+.Fl t .
+.Pp
+.Nm
+affects the behavior of programs such as
+.Xr tix-upgrade 8 ,
+.Xr tix-autoupgrade 8 ,
+.Xr tix-fetch 8 ,
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8 ,
+and generally the rest of the tix package management.
+.Pp
+The variables are as follows:
+.Bl -tag -width "12345678"
+.It Sy AUTOUPGRADE_INTERVAL
+The number of seconds between
+.Xr tix-autoupgrade 8
+checking for upgrades (if enabled).
+The value can optionally be suffixed with
+.Sy m
+for minutes,
+.Sy h
+for hours, or
+.Sy d
+for days.
+The default interval is
+.Sy 24h .
+.It Sy AUTOUPGRADE_OPTIONS
+Additional options that
+.Xr tix-autoupgrade 8
+(if enabled) will forward to
+.Xr tix-upgrade 8 .
+.It Sy AUTOUPGRADE_REBOOT Ns = Ns Oo Sy false "|" true Oc
+Whether
+.Xr tix-autoupgrade 8
+(if enabled) will automatically reboot upon successfully scheduling an upgrade
+for the next boot.
+The default value is
+.Sy false .
+.It Sy AUTOUPGRADE_REBOOT_TIME
+If
+.Xr tix-autoupgrade 8
+is enabled, and
+.Sy AUTOUPGRADE_REBOOT
+is
+.Sy true ,
+then the reboot will happen at this time as a time parameter to
+.Xr shutdown 8
+.Fl r .
+The default is
+.Sy +1 ,
+one minute later.
+.It Sy BUILD_ID
+The build identifier of the currently installed release.
+This value is used by
+.Xr tix-upgrade 8
+to check if the installation is up to date.
+.Pp
+This value is maintained by the tix package management and should not be edited.
+.It Sy FETCH_OPTIONS
+Additional options that
+.Xr tix-upgrade 8
+will pass to
+.Xr tix-fetch 8
+by default.
+This variable is useful for setting the download verbosity and tuning the
+security of the download.
+.It Sy FORCE_MIRROR Ns = Ns Oo Sy false "|" true Oc
+Whether to use the
+.Sy MIRROR ,
+even if is no longer listed as a mirror on the authoritative release
+information.
+.Pp
+Warning: Enabling this option may cause upgrades to fail, since the mirror may
+be removed from the authoritative list if it's no longer up to date.
+The signature on the downloaded release is still verified, stale files are
+rejected, and the mirror must be up to date per the authoritative site.
+.It Sy MIRROR
+The URL to the base of the preferred mirror for downloading packages from.
+.It Sy PLATFORM
+The host triplet the installed packages are built for.
+Packages must have the same platform to be installed, or they must be platform
+independent.
+.Pp
+It is not supported to change this value after the collection has been created.
+.It Sy PORTS Ns = Ns Oo Sy false "|" true Oc
+Whether to upgrade ports in
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8 ,
+and
+.Xr tix-upgrade 8 .
+If set to
+.Sy false ,
+the administrator is personally responsible for keeping the system and ports
+synchronized across ABI changes.
+The default value is
+.Sy true .
+.It Sy PREFIX
+The location the collection will be located at runtime.
+Packages must have the same prefix to be installed, or they must be location
+independent.
+.Pp
+It is not supported to change this value after the collection has been created.
+.It Sy RELEASE_URL
+The URL to the authoritative and signed channel/release information as created
+with
+.Xr tix-release 8 .
+It ordinarily points to the current version on the appropriate channel, such
+that upgrades to new releases are available.
+.Pp
+This value is maintained by the tix package management and should generally not
+be changed, except where explicitly supported.
+It is possible to switch to another channel or to fix the installation to a
+particular release, per the appropriate support rules for the channels and
+releases.
+.It Sy SYSTEM Ns = Ns Oo Sy false "|" true Oc
+Whether to upgrade the system in
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8 ,
+and
+.Xr tix-upgrade 8 .
+If set to
+.Sy false ,
+the administrator is personally responsible for keeping the system and ports
+synchronized across ABI changes.
+The default value is
+.Sy true ,
+if a system package is installed, and
+.Sy false
+otherwise .
+.It Sy TIX_COLLECTION_VERSION
+The version of the tix collection's metadata.
+Currently this value must be
+.Sy 3 .
+.Pp
+This value is maintained by the tix package management and should not be edited.
+.El
+.Sh EXAMPLES
+An example
+.Nm
+with a preferred mirror, configured to automatically upgrade every day and
+reboot at 04:30 AM:
+.Bd -literal -offset indent
+TIX_COLLECTION_VERSION=3
+BUILD_ID=578501924cd5463da9f3cf1e775924970607e504
+PLATFORM=x86_64-sortix
+PREFIX=
+RELEASE_URL=https://example.com/local/channel/stable/1.0
+MIRROR=https://cdn.example.net/local
+AUTOUPGRADE_REBOOT=true
+AUTOUPGRADE_REBOOT_TIME=04:30
+.Ed
+.Pp
+The
+.Xr tix-autoupgrade 8
+daemon can be enabled by running:
+.Bd -literal -offset indent
+service autoupgrade enable
+.Ed
+.Sh SEE ALSO
+.Xr upgrade.conf 5 ,
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8 ,
+.Xr tix-create 8 ,
+.Xr tix-fetch 8 ,
+.Xr tix-upgrade 8 ,
+.Xr tix-vars 8
+.Sh HISTORY
+The
+.Nm
+format originally appeared in Sortix 0.8.
+It was changed to the
+.Xr tix-vars 8
+format and merged with
+.Pa /etc/upgrade.conf
+in Sortix 1.1.

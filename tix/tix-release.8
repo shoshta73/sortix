@@ -1,0 +1,562 @@
+.Dd February 8, 2025
+.Dt TIX-RELEASE 8
+.Os
+.Sh NAME
+.Nm tix-release
+.Nd create and sign tix releases and channels
+.Sh SYNOPSIS
+.Nm
+.Op Fl \-authoritative Ns = Ns Ar url
+.Op Fl \-build-id Ns = Ns Ar build-id
+.Op Fl \-channel Ns = Ns Ar name
+.Op Fl \-dev-releases
+.Op Fl \-extra-releases Ns = Ns Ar releases
+.Op Fl \-generation Ns = Ns Ar level
+.Op Fl \-key-search Ns = Ns Ar path-prefix
+.Op Fl \-mirrors Ns = Ns Ar urls
+.Op Fl \-public-key Ns = Ns Ar file
+.Op Fl \-release Ns = Ns Ar name
+.Op Fl \-release-directories Ns = Ns Ar directory
+.Op Fl \-release-filter Ns = Ns Ar extended-regex
+.Op Fl \-releases Ns = Ns Ar list
+.Op Fl \-same-signing
+.Op Fl \-secret-key Ns = Ns Ar file
+.Op Fl \-sign
+.Op Fl \-unskippable Ns = Ns Oo Li all "|" major "|" minor "|" last-patch "|" patch "|" none Oc
+.Op Fl \-upgrade-release Ns = Ns Ar new-release
+.Op Fl \-upgrade-release-key Ns = Ns public-key
+.Op Fl \-upgrade-release-url Ns = Ns url
+.Op Fl \-version Ns = Ns Ar version
+.Op Fl \-which-public-key
+.Op Fl \-which-secret-key
+.Oo Sy channel "|" channel-entry "|" channels "|" release "|" sign Oc
+.Ar directory
+.Sh DESCRIPTION
+.Nm
+creates tix releases and channels, and signs their information for publication.
+.Pp
+A
+.Xr tix-create 8
+installation has the
+.Xr collection.conf 5
+.Sy RELEASE_URL
+variable that specifies what is installed, pointing to a release or a channel:
+.Pp
+.Bl -bullet -compact
+.It
+A release is a particular static versioned build.
+.It
+A channel dynamically redirects each version to the appropriate release,
+optionally offering an upgrade to a newer version.
+.El
+.Pp
+Installations typically point to a channel in order to receive upgrades.
+The signed
+.Pa release.info.sig
+metadata file format is used for both releases and channels.
+.Pp
+A top-level distribution site conventionally contains a directory named
+.Pa channel
+(containing the channels) and a directory named
+.Pa release
+(containing the releases).
+.Pp
+A tix release is prepared for publication by running the
+.Xr tix-metabuild 8
+command.
+To make the release, the command creates the release directory structure,
+populates the per-platform
+.Pa repository/$platform
+subdirectories with the
+.Pa .tix.tar.xz
+and
+.Pa .version
+files produced by
+.Xr tix-port 8 ,
+runs the
+.Xr tix-repository 8
+.Sy metadata
+command on each platform repository, runs the
+.Nm
+.Sy release
+command on the release directory, and then signs the release
+with the
+.Nm
+.Sy sign
+command.
+.Pp
+A tix channel is prepared for publication using the
+.Sy channel
+command.
+A channel contains subdirectories named after each version, each containing a
+.Pa release.info.sig
+file with metadata.
+The channel redirects to a release on the mirrors.
+The channel version directories are chained together, with each version offering
+an upgrade to the next version (if any).
+.Pp
+The first operand selects a command to execute:
+.Bl -tag -width "12345678"
+.It Sy channel
+Generate a channel inside the top-level channel
+.Ar directory
+named per the
+.Fl \-channel
+option using the releases from the
+.Fl \-release-directories
+option.
+.Pp
+The releases can be selected using the
+.Fl \-releases
+option, otherwise the
+.Fl \-release-directories
+directory is read and filtered using the
+.Fl \-release-filter
+option.
+The
+.Fl \-extra-releases
+option can select additional releases.
+.Pp
+The channel's release upgrade graph is built per the
+.Fl \-unskippable
+upgrade rules, ordered per semantic versioning rules.
+Every entry on the channel will indicate where to find the release and where
+upgrades are available per the
+.Fl \-authoritative
+and
+.Fl \-mirrors
+options.
+.Pp
+Channels must be signed in order to be valid, e.g. by using the
+.Fl \-sign
+option that will sign every entry on the channel.
+.Pp
+The
+.Fl \-authoritative ,
+.Fl \-channel ,
+and
+.Fl \-release-directories
+options must be set.
+.It Sy channel-entry
+Generate an entry for a single version on a channel.
+This low-level command allows manually constructing the channel upgrade graph.
+.Pp
+The
+.Pa ${directory}/${channel}/${version}/release.info
+file is generated per the top-level channel
+.Ar directory ,
+the options supplied, and the release information.
+.Pp
+An upgrade path to a new release can be specified in the
+.Fl \-upgrade-release
+option.
+If the new release is signed, then the upgrade will trust the new key, on the
+authority of the signed channel entry.
+.Pp
+The
+.Fl \-channel ,
+.Fl \-release ,
+and
+.Fl \-release-directories
+options must be set.
+.It Sy channels
+Generate common channels inside the top-level channel
+.Ar directory :
+.Pp
+.Bl -bullet -compact
+.It
+A
+.Sy stable
+channel with stable releases.
+.It
+A
+.Sy ${major}.${minor}
+channel for every major/minor version pair, containing all the patch releases.
+.It
+A
+.Sy ${extra_release}
+channel for every specified
+.Fl \-extra-releases
+containing the normal releases and that
+extra release.
+.El
+.Pp
+The
+.Fl \-release-directories
+option must be set.
+.It Sy release
+Generate the top-level release metadata files in the output release
+.Ar directory :
+.Pp
+.Bl -bullet -compact
+.It
+.Pa release.info
+.It
+.Pa sha256sum
+.El
+.Pp
+The
+.Fl \-build-id ,
+.Fl \-release ,
+and
+.Fl \-version
+must be set.
+.It Sy sign
+Sign
+.Pa release.info
+and
+.Pa sha256sum
+(if it exists)
+in the
+.Ar directory
+as a separate step from creating the files.
+The
+.Fl \-sign
+option can be used with any of the other commands to sign the files as a single
+step at creation time.
+.Pp
+The
+.Fl \-public-key
+and
+.Fl \-secret-key
+options must be set to the
+.Xr signify 1
+key pair, or the
+.Fl \-key-search
+option to search for the appropriate key.
+.El
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-authoritative Ns = Ns Ar url
+The
+.Ar url
+to the top-level authoritative distribution site, in which the
+.Pa channel
+directory will be published.
+.Pp
+This option is required for upgrades to point to the new release and must be
+used for the
+.Sy channel
+and
+.Sy channels
+commands.
+If the
+.Fl \-mirrors
+option is not set, then it defaults to
+.Ar url
+as well.
+.It Fl \-build-id Ns = Ns Ar build-id
+Set the
+.Sy BUILD_ID
+to
+.Ar build-id ,
+a unique identifier of what was built, allowing installations to
+know if they are up to date.
+.Pp
+This option is required for the
+.Sy release
+command.
+.It Fl \-channel Ns = Ns Ar name
+The
+.Ar name
+of the channel being created.
+.Pp
+This option is required for the
+.Sy channels ,
+.Sy channel ,
+and
+.Sy channel-entry
+commands.
+.It Fl \-dev-releases
+When searching for releases, implicitly add releases ending in
+.Sy "-dev"
+for every version found.
+This option ensures that all dev releases that might have existed (but no longer
+do) still have an upgrade path.
+.It Fl \-extra-releases Ns = Ns Ar releases
+Additional
+.Ar releases
+to include for the
+.Sy channel
+command.
+For the
+.Sy channels
+command, each such extra release has its own channel made with itself as the
+only extra release.
+.It Fl \-generation Ns = Ns Ar generation
+Select tix metadata generation level
+(Default: 3)
+.It Fl \-key-search Ns = Ns Ar path-prefix
+Search for the public and secret keys in the file paths starting with this
+.Ar path-prefix ,
+an optional middle section, and ending in
+.Pa ".pub"
+for the public key and
+.Pa ".sec"
+for the secret key.
+.Pp
+The middle section is searched in this order:
+.Bl -bullet -compact
+.It
+The release.
+.It
+The version.
+.It
+The major, minor, and patch version numbers.
+.It
+The major and minor version numbers.
+.It
+The major version number.
+.It
+The empty string.
+.El
+If the middle section isn't empty, then it's prefixed with a hyphen.
+.It Fl \-mirrors Ns = Ns Ar urls
+The space-separated
+.Ar urls
+to the mirrors.
+The first mirror is the primary and default mirror.
+.Pp
+If unset, the default is
+.Fl \-authoritative
+if set.
+.It Fl \-public-key Ns = Ns Ar file
+Sign the release or channel with the
+.Xr signify 1
+public key
+.Ar file.
+.It Fl \-release Ns = Ns Ar name
+The
+.Ar name
+of the release.
+.Pp
+This option must be used with the
+.Sy release
+and
+.Sy channel-entry
+commands.
+For the
+.Sy channel
+command, it optionally specifies the current release of a channel, and excludes
+any newer releases.
+.It Fl \-release-directories Ns = Ns Ar directory
+Find releases inside this
+.Ar directory .
+.Pp
+This option is required for the
+.Sy channels ,
+.Sy channel ,
+and
+.Sy channel-entry
+commands.
+.It Fl \-release-filter Ns = Ns Ar extended-regex
+Find the list of releases by searching the
+.Fl \-release-directories
+directory for entries matching this
+.Ar extended-regex
+given to
+.Xr grep 1
+.Fl E .
+.It Fl \-releases Ns = Ns Ar list
+Override the
+.Fl \-release-filter
+search by manually specifying the space-separated
+.Ar list
+of releases.
+.It Fl \-same-signing
+When signing a channel using
+.Fl \-key-search ,
+try to sign the channel using the same keys as the underlying release, by
+searching for an identical public key.
+.It Fl \-secret-key Ns = Ns Ar file
+Sign the release or channel with the
+.Xr signify 1
+secret key
+.Ar file.
+.It Fl \-sign
+Sign the output
+.Pa release.info
+files per the
+.Fl \-public-key ,
+.Fl \-secret-key ,
+.Fl \-key-search ,
+and
+.Fl \-same-signing
+options.
+This option can be used with any command and has the same effect as the
+.Sy sign
+command.
+.It Fl \-unskippable Ns = Ns Oo Li all "|" major "|" minor "|" last-patch "|" patch "|" none Oc
+Build the channel upgrade paths according to this rule:
+.Pp
+.Bl -tag -compact -width last-patch
+.It Sy all
+Don't allow skipping any release (including prerelease).
+.It Sy patch
+Don't allow skipping patch releases.
+.It Sy last-patch
+Don't allow skipping the last patch of a minor release.
+.It Sy minor
+Don't allow skipping minor releases.
+.It Sy major
+Don't allow skipping major releases.
+.It Sy none
+Allow skipping any release.
+.El
+.Pp
+The default is
+.Sy last-patch .
+.It Fl \-upgrade-release Ns = Ns Ar new-release
+Offer an upgrade to the
+.Ar new-release
+when using the
+.Sy channel-entry
+command.
+.It Fl \-upgrade-release-key Ns = Ns public-key
+Override which
+.Ar public-key
+to trust when offering an upgrade in the
+.Sy channel-entry
+command.
+.Pp
+The default is to use the public key from
+.Fl \-upgrade-release
+if
+.Fl \-same-signing
+is set, otherwise attempting a key search if
+.Fl \-key-search
+is set, and otherwise using
+.Fl \-public-key
+if set.
+.It Fl \-upgrade-release-url Ns = Ns url
+Override the
+.Ar url
+to the new release when offering an upgrade in the
+.Sy channel-entry
+command.
+.It Fl \-version Ns = Ns Ar version
+The
+.Ar version
+of the release.
+.Pp
+This option must be used with the
+.Sy release
+and
+.Sy channel-entry
+commands.
+.It Fl \-which-public-key
+Output the path to the chosen public key.
+.It Fl \-which-secret-key
+Output the path to the chosen secret key.
+.El
+.Sh ENVIRONMENT
+.Bl -tag -width "12345678"
+.It Ev SOURCE_DATE_EPOCH
+Use this timestamp for the
+.Sy DATETIME
+field in the release information.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+.Ss Create a new tix release
+See
+.Xr tix-metabuild 8
+for an example of how to make a new tix release.
+.Ss Sign a tix release
+First create a signing key, either a general signing key to be reused across
+releases, or a per-release signing key to be rotated:
+.Bd -literal
+mkdir -p keys
+signify -G -c 'local repository signing key' -p keys/local.pub -s keys/local.sec
+.Ed
+.Pp
+Use the
+.Xr signify 1
+.Fl n
+option to omit the password for unattended signing.
+.Pp
+Sign the release:
+.Bd -literal
+tix-release \\
+  --secret-key=keys/local.sec \\
+  --public-key=keys/local.pub \\
+  sign release/1.0
+.Ed
+.Ss Create a stable channel with the tix release
+Publish the newly signed release on the authoritative site and mirrors:
+.Bd -literal
+tar -c release/1.0 | ssh example.com 'tar -C /var/www/example.com/local -x'
+tar -c release/1.0 | ssh cdn.example.net 'tar -C /var/www/cdn.example.net/local -x'
+.Ed
+.Pp
+Create or regenerate the stable channel and sign it:
+.Bd -literal
+tix-release \\
+  --authoritative=https://example.com/local \\
+  --channel=stable \\
+  --mirrors='https://example.com/local https://cdn.example.net/local' \\
+  --public-key=keys/local.pub \\
+  --release-directories=release \\
+  --secret-key=keys/local.sec \\
+  --sign \\
+  channel channel/
+.Ed
+.Pp
+Finally, publish the new channel on the authoritative site to provide upgrades
+to installations:
+.Bd -literal
+tar -c channel/stable | \\
+ssh example.com 'tar -C /var/www/example.com/local -x'
+.Ed
+.Ss Generate multiple channels
+The
+.Sy channels
+command is useful for generating multiple channels in one invocation.
+It creates a stable channel, and channel for every major and minor version pair,
+as well channels for any extra releases (such as nightly development releases).
+.Bd -literal
+tix-release \\
+  --authoritative=https://example.com/local \\
+  --dev-releases \\
+  --extra-releases='nightly cross-nightly' \\
+  --key-search=keys/local \\
+  --mirrors='https://example.com/local https://cdn.example.net/local' \\
+  --release-directories=release \\
+  --sign \\
+  channels channel/
+.Ed
+.Pp
+The
+.Fl \-dev-releases
+option is useful to implicitly include dev versions on channels that might have
+existed at one point but don't anymore.
+The
+.Fl \-key-search
+option is useful to search for per-release signing keys.
+.Ss Install the custom ports in a local tix collection
+The custom ports can now be installed from any installation by creating a
+tix collection pointed to the stable channel:
+.Bd -literal
+tix-create -C /local -u https://example.com/local/channel/stable/1.0
+tix-install -C /local foo bar
+.Ed
+.Pp
+The local ports can be updated to any new versions published on the channel:
+.Bd -literal
+tix-upgrade -C /local
+.Ed
+.Sh SEE ALSO
+.Xr signify 1 ,
+.Xr port 5 ,
+.Xr tix 8 ,
+.Xr tix-create 8 ,
+.Xr tix-install 8 ,
+.Xr tix-metabuild 8 ,
+.Xr tix-repository 8 ,
+.Xr tix-upgrade 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

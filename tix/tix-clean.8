@@ -1,0 +1,47 @@
+.Dd February 19, 2025
+.Dt TIX-CLEAN 8
+.Os
+.Sh NAME
+.Nm tix-clean
+.Nd clean temporary package management files
+.Sh SYNOPSIS
+.Nm
+.Op Fl C Ar collection
+.Sh DESCRIPTION
+.Nm
+deletes temporary and cached package management files produced by
+.Xr tix-upgrade 8 ,
+.Xr tix-install 8 ,
+and other programs.
+Ordinarily the large files are cleaned up when the operation is completed,
+leaving behind only small metadata to avoid roundtrips, but large files may be
+left behind if the operation failed midway.
+.Pp
+The specified
+.Ar collection
+is cleaned, defaulting to the root directory collection.
+The cached files are stored in
+.Pa $collection/var/cache/tix ,
+which is deleted.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl C , \-collection Ns = Ns Ar collection
+Clean this
+.Pa collection .
+.El
+.Sh FILES
+.Bl -tag -width "/tix/collection.conf" -compact
+.It Pa /var/cache/tix/
+Temporary and cached package management files.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr tix 8 ,
+.Xr tix-install 8 ,
+.Xr tix-upgrade 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

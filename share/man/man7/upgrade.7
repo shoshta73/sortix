@@ -10,6 +10,20 @@ newer release.
 The
 .Xr installation 7
 manual page covers creating a new installation.
+.Ss Methods
+There are three supported methods of upgrading to a new release:
+.Bl -bullet
+.It
+Upgrading from a new .iso release.
+This is the method described in this manual page.
+.It
+Upgrading via the
+.Xr tix-upgrade 8
+networked package management.
+.It
+Upgrading from source as described in
+.Xr development 7 .
+.El
 .Ss Prerequisites
 You need to prepare a bootable medium with the new release as described in
 .Xr installation 7 .
@@ -153,6 +167,8 @@ Congratulations on your freshly upgraded Sortix system.
 .Xr kernel 7 ,
 .Xr user-guide 7 ,
 .Xr sysinstall 8 ,
+.Xr sysmerge 8 ,
 .Xr sysupgrade 8 ,
+.Xr tix-upgrade 8 ,
 .Xr update-grub 8 ,
 .Xr update-initrd 8

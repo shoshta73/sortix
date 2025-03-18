@@ -30,6 +30,6 @@ void upgrade_finalize(const struct release* old_release,
                       const struct release* new_release,
                       const char* source_prefix,
                       const char* target_prefix);
-void post_upgrade(const char* source_prefix, const char* target_prefix);
+void post_upgrade(const char* source, const char* target);
 
 #endif

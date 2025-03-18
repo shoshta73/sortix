@@ -1,0 +1,229 @@
+.Dd March 10, 2025
+.Dt TIX 8
+.Os
+.Sh NAME
+.Nm tix
+.Nd package packagement
+.Sh SYNOPSIS
+.Nm
+.Op Ar collection
+.Oo Sy clean "|" create "|" fetch "|" install "|" metabuild "|" port "|" uninstall "|" upgrade Oc
+.Op Ar options ...
+.Sh DESCRIPTION
+.Nm
+is a networked binary package manager, which can also build binary packages from
+source
+.Xr port 5
+files.
+.Pp
+A
+.Nm
+installation is called a
+.Ar collection .
+The optional first operand specifies the path to a
+.Ar collection
+to act on, as made with the
+.Sy create
+command, defaulting to the root directory.
+The choice is forwarded as the
+.Fl C
+option to all programs.
+.Pp
+A
+.Nm
+installation ordinarily points to a remote tix channel or release per
+.Xr tix-release 8 ,
+from which packages and upgrades are obtained.
+.Pp
+.Nm
+is the top-level driver for a suite of programs, and the next operand selects
+which program to invoke:
+.Bl -tag -width "12345678"
+.It Sy clean Oo Ar ... Oc
+.Xr tix-clean 8 -
+Delete cached and temporary files in
+.Pa $collection/var/cache/tix .
+.It Sy create Oo Fl u Ar url Oc Oo Ar ... Oc
+.Xr tix-create 8 -
+Create and modify a tix collection.
+.It Sy fetch Ar file ...
+.Xr tix-fetch 8 -
+Download files from the release repository.
+.It Sy install Ar package ...
+.Xr tix-install 8 -
+Download and install packages.
+.It Sy metabuild Ar port ...
+.Xr tix-metabuild 8 -
+Build and install multiple
+.Xr port 5
+files.
+.It Sy port Ar port ...
+.Xr tix-port 8 -
+Build and install a single
+.Xr port 5
+file.
+.It Sy uninstall Ar package ...
+.Xr tix-uninstall 8 -
+Uninstall packages.
+.It Sy upgrade Oo Ar ... Oc
+.Xr tix-upgrade 8 -
+Upgrade to a new release by redownloading all packages and reinstalling them.
+.El
+.Pp
+Additionally the
+.Nm
+suite of programs contain the following low-level programs that are meant to be
+invoked directly and
+.Em not
+through this top-level driver:
+.Bl -tag -width "12345678"
+.It Xr tix-autoupgrade 8
+.Xr daemon 7
+for automatically upgrading to new releases in the background.
+.It Xr tix-build 8
+A low-level build program invoked by
+.Xr tix-port 8 .
+.It Xr tix-eradicate-libtool-la 8
+A helper program that remove unnecessary libtool files from the staging directory
+during the
+.Xr port 5
+build.
+.It Xr tix-execdiff 8
+Diff the executable permission between files in two directory trees.
+.It Xr tix-execpatch 8
+Apply the diff produced by
+.Xr tix-execdiff 8 .
+.It Xr tix-iso-add 8
+Add additional files to a CD-ROM image as per
+.Xr release-iso-modification 7 .
+.It Xr tix-iso-bootconfig 8
+Configure the bootloading of a CD-ROM release per
+.Xr release-iso-modification 7 .
+.It Xr tix-iso-liveconfig 8
+Configure the live environment of a CD-ROM release per
+.Xr release-iso-modification 7 .
+.It Xr tix-list-packages 8
+Compute the set of ports and their build order as per
+.Xr tix-metabuild 8.
+.It Xr tix-release 8
+Publish tix releases and channels.
+.It Xr tix-repository 8
+Generate metadata for a tix repository.
+.It Xr tix-rmdiff 8
+Diff the removed files between files in two directory trees.
+.It Xr tix-rmpatch 8
+Apply the diff produced by
+.Xr tix-rmdiff 8 .
+.It Xr tix-vars 8
+Evaluate variables in the
+.Xr port 5
+format.
+.El
+.Sh FILES
+.Bl -tag -width "/tix/collection.conf" -compact
+.It Pa /tix/
+The tix collection metadata directory.
+.It Pa /tix/collection.conf
+.Xr collection.conf 5
+configuration.
+.It Pa /tix/manifest/
+Sorted file lists for every installed package.
+.It Pa /tix/tixinfo/
+Metadata for every installed package.
+.El
+.Sh EXIT STATUS
+.Nm
+will execute the invoked subprogram and exit as it does.
+.Sh EXAMPLES
+.Ss Install a package
+To install the
+.Sy foo
+package and its runtime dependencies:
+.Bd -literal -offset indent
+tix install foo
+.Ed
+.Ss Uninstall a package
+To uninstall the
+.Sy foo
+package:
+.Bd -literal -offset indent
+tix uninstall foo
+.Ed
+.Ss Upgrade to a new release
+To upgrade to a new release on the current channel:
+.Bd -literal -offset indent
+tix upgrade
+.Ed
+.Pp
+System installations will schedule the upgrade for the next boot, whereas
+non-system installations will upgrade immediately.
+.Ss Download a binary package
+To download a binary package or other metainformation from the repository:
+.Bd -literal -offset indent
+tix fetch foo.tix.tar.xz
+.Ed
+.Ss Third-party packages
+Additional third party packages can be installed by creating another collection
+pointed to the appropriate channel and version:
+.Bd -literal -offset indent
+tix /local create -u https://example.com/local/channel/stable/1.0
+tix /local install foo
+.Ed
+.Pp
+Packages may require installation in a certain directory path, unless they
+happen to be location-independent.
+.Ss Building third-party ports
+All the packages in a third-party
+.Xr port 5
+directory can be built from source and installed into any location:
+.Bd -literal -offset indent
+tix /opt/initech metabuild /path/to/initech/ports
+.Ed
+.Pp
+Use the
+.Fl \-packages
+option to build a subset of packages.
+This method builds location-dependent packages with the right paths for the
+collection.
+.Ss Publishing binary package releases on a channel
+A third-party
+.Xr port 5
+directory can be built as binary packages with the
+.Xr tix-metabuild 8
+command, published as a signed release with
+.Xr tix-release 8 ,
+and the release can be put on a signed channel using
+.Xr tix-release 8 .
+Users can then download the packages by creating a collection using
+.Xr tix-create 8
+pointed to the appropriate channel or release.
+See the documentation for detailed examples.
+.Sh SEE ALSO
+.Xr collection.conf 5 ,
+.Xr port 5 ,
+.Xr tix-autoupgrade 8 ,
+.Xr tix-build 8 ,
+.Xr tix-clean 8 ,
+.Xr tix-create 8 ,
+.Xr tix-eradicate-libtool-la 8 ,
+.Xr tix-execdiff 8 ,
+.Xr tix-execpatch 8 ,
+.Xr tix-fetch 8 ,
+.Xr tix-install 8 ,
+.Xr tix-iso-add 8 ,
+.Xr tix-iso-bootconfig 8 ,
+.Xr tix-iso-liveconfig 8 ,
+.Xr tix-list-packages 8 ,
+.Xr tix-metabuild 8 ,
+.Xr tix-port 8 ,
+.Xr tix-release 8 ,
+.Xr tix-repository 8 ,
+.Xr tix-rmdiff 8 ,
+.Xr tix-rmpatch 8 ,
+.Xr tix-uninstall 8 ,
+.Xr tix-upgrade 8 ,
+.Xr tix-vars 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 0.8.
+It was expanded into a full networked package management solution in Sortix 1.1.

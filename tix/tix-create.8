@@ -1,0 +1,221 @@
+.Dd February 16, 2025
+.Dt TIX-CREATE 8
+.Os
+.Sh NAME
+.Nm tix-create
+.Nd create and manage a tix collection installation
+.Sh SYNOPSIS
+.Nm
+.Op Fl q
+.Op Fl C Ar collection
+.Op Fl u Ar url
+.Op Fl \-build-id Ns = Ns Ar build-id
+.Op Fl \-force-mirror Ns Oo = Ns Ar bool Oc
+.Op Fl \-generation Ns = Ns Ar level
+.Op Fl \-import Ns = Ns Ar collection
+.Op Fl \-mirror Ns = Ns Ar url
+.Op Fl \-platform Ns = Ns Ar platform
+.Op Fl \-prefix Ns = Ns Ar prefix
+.Op Fl \-release-key Ns = Ns Ar path
+.Op Fl \-release-url Ns = Ns Ar url
+.Sh DESCRIPTION
+.Nm
+creates and manages a tix collection of installed packages.
+A tix collection contains a top-level
+.Pa /tix
+directory with the
+.Xr collection.conf 5
+configuration file, along with package metadata in the
+.Pa tixinfo
+and
+.Pa manifest
+directories.
+.Pp
+The specified tix
+.Ar collection
+is created if it does not already exist.
+The root directory is used as the default
+.Ar collection .
+The
+.Xr collection.conf 5
+file is configured per the specified options.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-build-id Ns = Ns Ar build-id
+Set the
+.Ev BUILD_ID
+variable in
+.Xr collection.conf 5
+to
+.Ar build-id ,
+signifying which build is currently installed as per
+.Xr tix-release 8 .
+.It Fl C , \-collection Ns = Ns Ar collection
+Specifies which
+.Pa collection
+to act on.
+.It Fl \-force-mirror Ns Oo = Ns Ar bool Oc
+Set the
+.Ev FORCE_MIRROR
+variable in
+.Xr collection.conf 5
+to the optional value
+.Ar bool ,
+or
+.Sy true
+if
+.Ar bool
+is not specified.
+If set to
+.Sy true ,
+then the mirror is used, even if it is not officially supported.
+.It Fl \-generation Ns = Ns Ar level
+Select tix metadata generation
+.Ar level
+(Default: 3)
+.It Fl \-import Ns = Ns Ar collection
+Import the
+.Xr collection.conf 5
+configuration and
+.Pa release.pub
+public key from this other
+.Ar collection .
+.It Fl \-mirror Ns = Ns Ar url
+Set the
+.Ev MIRROR
+variable in
+.Xr collection.conf 5
+to
+.Ar url ,
+causing downloads to happen from the selected mirror if it is officially
+supported.
+.It Fl \-platform Ns = Ns Ar platform
+Set the
+.Ev PLATFORM
+variable in
+.Xr collection.conf 5
+to this
+.Ar platform
+triplet.
+Packages installed in the collection must be built for the same platform, or
+be platform independent.
+The platform defaults to the triplet of the local system.
+.It Fl \-prefix Ns = Ns Ar prefix
+Set the
+.Ev PREFIX
+variable in
+.Xr collection.conf 5
+to this
+.Ar prefix .
+Packages installed in the collection must be built with the same prefix, or be
+location independent.
+The prefix defaults to the collection, where the empty prefix designates the
+root directory.
+.It Fl q , \-quiet
+Be quiet.
+.It Fl \-release-key Ns = Ns Ar path
+Import the public key from the given
+.Ar path
+and store it as
+.Pa $collection/tix/release.pub .
+A trusted public key is required to download packages.
+.It Fl u , Fl \-release-url Ns = Ns Ar url
+Set the
+.Ev RELEASE_URL
+variable in
+.Xr collection.conf 5
+to
+.Ar url ,
+containing a
+.Xr tix-release 8
+channel or release.
+Packages and upgrades are downloaded from this location and verified with the
+trusted public key from the
+.Fl \-release-key
+option.
+.Pp
+If the
+.Fl \-release-key
+option is not set, then
+.Nm
+will download the public key from
+.Pa $url/release.pub .
+The
+.Ar url
+must use HTTPS.
+.El
+.Sh FILES
+.Bl -tag -width "/tix/collection.conf" -compact
+.It Pa /tix/
+The tix collection metadata directory.
+.It Pa /tix/collection.conf
+.Xr collection.conf 5
+configuration.
+.It Pa /tix/manifest/
+Sorted file lists for every installed package.
+.It Pa /tix/tixinfo/
+Metadata for every installed package.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+Create a tix collection in
+.Pa /local ,
+pointed to an upstream tix release (as made with
+.Xr tix-release 8 ),
+downloading the public key via HTTPS, and installing the
+.Sy foo
+package:
+.Bd -literal -offset indent
+tix-create -C /local -u https://example.com/local/channel/stable/1.0
+tix-install -C /local foo
+.Ed
+.Pp
+Create a system image for
+.Xr chroot 8
+importing the configuration from the system installation:
+.Bd -literal -offset indent
+tix-create -C /tmp/chroot --import=/
+tix-install -C /tmp/chroot system libfoo bar
+.Ed
+.Pp
+Create a system image for another architecture for cross-compilation,
+importing the configuration from the system installation, and overriding
+the architecture:
+.Bd -literal -offset indent
+tix-create -C /tmp/sysroot --import=/ --platform=i686-sortix
+tix-install -C /tmp/sysroot system
+.Ed
+.Pp
+Create a tix collection with no upstream, and build and install your own
+.Xr port 5
+into it with
+.Xr tix-port 8 :
+.Bd -literal -offset indent
+tix-create -C /local
+tix-port -C /local /my/local/ports/libfoo
+.Ed
+.Pp
+The
+.Xr tix-metabuild 8
+command is useful for simultaneously creating a tix collection, and building
+and installing multiple ports into it in the right order.
+.Sh SEE ALSO
+.Xr collection.conf 5 ,
+.Xr port 5 ,
+.Xr tix 8 ,
+.Xr tix-build 8 ,
+.Xr tix-install 8 ,
+.Xr tix-metabuild 8 ,
+.Xr tix-port 8 ,
+.Xr tix-release 8 ,
+.Xr tix-uninstall 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 0.8 as
+.Nm tix-collection .
+It was modernized as
+.Nm
+in Sortix 1.1 to improve usability.

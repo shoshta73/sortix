@@ -1,0 +1,467 @@
+#!/bin/sh
+# Copyright (c) 2023, 2024, 2025 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-release
+# Generate repository metadata.
+
+set -e
+
+generation=3
+
+unset authoritative
+unset build_id
+unset channel
+unset command
+unset dev_releases
+unset extra_releases
+unset key_search
+unset mirrors
+unset public_key
+unset release
+unset release_directories
+unset releases
+release_filter='^[0-9]+(\.[0-9]+)+$'
+unset repository
+unset same_signing
+unset secret_key
+unset sign
+unskippable=last-patch
+unset upgrade_release
+unset upgrade_release_key
+unset upgrade_release_url
+unset version
+which_public_key=false
+which_secret_key=false
+
+operand=1
+dashdash=
+previous_option=
+for argument do
+  if [ -n "$previous_option" ]; then
+    eval $previous_option=\$argument
+    previous_option=
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  --authoritative=*) authoritative=$parameter ;;
+  --authoritative) previous_option=authoritative ;;
+  --build-id=*) build_id=$parameter ;;
+  --build-id) previous_option=build_id ;;
+  --channel=*) channel=$parameter ;;
+  --channel) previous_option=channel ;;
+  --dev-releases) dev_releases=--dev-releases ;;
+  --extra-releases=*) extra_releases=$parameter ;;
+  --extra-releases) previous_option=extra_releases ;;
+  --generation=*) generation=$parameter ;;
+  --generation) previous_option=generation ;;
+  --key-search=*) key_search=$parameter ;;
+  --key-search) previous_option=key_search ;;
+  --mirrors=*) mirrors=$parameter ;;
+  --mirrors) previous_option=mirrors ;;
+  --public-key=*) public_key=$parameter ;;
+  --public-key) previous_option=public_key ;;
+  --release=*) release=$parameter ;;
+  --release) previous_option=release ;;
+  --release-directories=*) release_directories=$parameter ;;
+  --release-directories) previous_option=release_directories ;;
+  --release-filter=*) release_filter=$parameter ;;
+  --release-filter) previous_option=release_filter ;;
+  --releases=*) releases=$parameter ;;
+  --releases) previous_option=releases ;;
+  --same-signing) same_signing=--same-signing ;;
+  --secret-key=*) secret_key=$parameter ;;
+  --secret-key) previous_option=secret_key ;;
+  --sign) sign=--sign ;;
+  --unskippable=*) unskippable=$parameter ;;
+  --unskippable) previous_option=unskippable ;;
+  --upgrade-release=*) upgrade_release=$parameter ;;
+  --upgrade-release) previous_option=upgrade_release ;;
+  --upgrade-release-key=*) upgrade_release_key=$parameter ;;
+  --upgrade-release-key) previous_option=upgrade_release_key ;;
+  --upgrade-release-url=*) upgrade_release_url=$parameter ;;
+  --upgrade-release-url) previous_option=upgrade_release_url ;;
+  --version=*) version=$parameter ;;
+  --version) previous_option=version ;;
+  --which-public-key) which_public_key=true; command=sign ;;
+  --which-secret-key) which_secret_key=true; command=sign ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *)
+    if [ $operand = 1 ]; then
+      command="$argument"
+      operand=2
+    elif [ $operand = 2 ]; then
+      directory="$argument"
+      operand=3
+    else
+      echo "$0: unexpected extra operand $argument" >&2
+      exit 1
+    fi
+    ;;
+  esac
+done
+
+if [ -n "$previous_option" ]; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+if [ -z "$command" ]; then
+  echo "$0: error: No command was specified" >&2
+  exit 1
+fi
+
+if [ -z "$directory" ] && ! $which_public_key && ! $which_secret_key; then
+  echo "$0: error: No directory was specified" >&2
+  exit 1
+fi
+
+if [ "$generation" != 3 ]; then
+  echo "$0: error: --generation=$generation is not supported by this version" >&2
+  exit 1
+fi
+
+if [ -n "${authoritative+x}" ]; then
+  mirrors=${mirrors-"$authoritative"}
+fi
+
+key_search() {
+  major_minor_patch=$(echo "$version" | grep -Eo '^[0-9].[0-9].[0-9]')
+  major_minor=$(echo "$version" | grep -Eo '^[0-9].[0-9]')
+  major=$(echo "$version" | grep -Eo '^[0-9]')
+  if [ -e "${key_search}-$release.sec" ]; then
+    key="${key_search}-$release"
+  elif [ -e "${key_search}-$version.sec" ]; then
+    key="${key_search}-$version"
+  elif [ -e "${key_search}-$major_minor_patch.sec" ]; then
+    key="${key_search}-$major_minor_patch"
+  elif [ -e "${key_search}-$major_minor.sec" ]; then
+    key="${key_search}-$major_minor"
+  elif [ -e "${key_search}-$major.sec" ]; then
+    key="${key_search}-$major"
+  elif [ -e "${key_search}.sec" ]; then
+    key="${key_search}"
+  else
+    echo "$0: error: No key found for release $release version $version: $key_search" >&2
+    exit 1
+  fi
+}
+
+case "$command" in
+channels)
+  for extra_release in stable $extra_releases; do
+    "$0" \
+      ${authoritative+--authoritative="$authoritative"} \
+      --channel="$extra_release" \
+      ${dev_releases} \
+      --extra-releases="$extra_release" \
+      --generation=$generation \
+      ${key_search+--key-search="$key_search"} \
+      ${mirrors+--mirrors="$mirrors"} \
+      ${public_key+--public-key="$public_key"} \
+      --release-directories="$release_directories" \
+      ${same_signing} \
+      ${secret_key+--secret-key="$secret_key"} \
+      ${sign} \
+      ${unskippable+--unskippable="$unskippable"} \
+      channel "$directory"
+  done
+  releases=
+  for release in $(ls "$release_directories" |
+                   grep -E '^[0-9]+.[0-9]+' | sort -Vu); do
+    if [ -e "$release/release.info.sig" ]; then
+      releases="$releases $release"
+    fi
+  done
+  for major_minor in $(echo "$releases" | tr ' ' '\n' |
+                       grep -Eo '^[0-9]+.[0-9]+' | sort -Vu); do
+    "$0" \
+      ${authoritative+--authoritative="$authoritative"} \
+      --channel=$major_minor \
+      ${dev_releases} \
+      --generation=$generation \
+      ${key_search+--key-search="$key_search"} \
+      ${mirrors+--mirrors="$mirrors"} \
+      ${public_key+--public-key="$public_key"} \
+      --release-directories="$release_directories" \
+      --release-filter="^`echo "$major_minor" | sed -E 's/\./\\\\./g'`\\." \
+      ${same_signing} \
+      ${secret_key+--secret-key="$secret_key"} \
+      ${sign} \
+      ${unskippable+--unskippable="$unskippable"} \
+      channel "$directory"
+  done
+  unset sign
+  ;;
+channel)
+  mkdir -p "$directory/$channel"
+  stop_release="$release"
+  release_version=
+  write_channel() {
+    echo "$channel channel: $1 ${2+-> $2}"
+    "$0" \
+      ${authoritative+--authoritative="$authoritative"} \
+      --channel="$channel" \
+      --generation=$generation \
+      ${key_search+--key-search="$key_search"} \
+      ${mirrors+--mirrors="$mirrors"} \
+      ${public_key+--public-key="$public_key"} \
+      --release="$1" \
+      --release-directories="$release_directories" \
+      ${same_signing} \
+      ${secret_key+--secret-key="$secret_key"} \
+      ${sign} \
+      ${2+--upgrade-release="$2"} \
+      --version="$1" \
+      channel-entry \
+      "$directory"
+  }
+  # Determine the appropriate releases for the channel.
+  if [ -z "${releases+x}" ]; then
+    releases=$(ls -- "$release_directories" |
+              grep -E -- "$release_filter" || true)
+  fi
+  releases="$releases $extra_releases"
+  # Ignore old releases without metadata.
+  new_releases=
+  for release in $releases; do
+    release_directory="$release_directories/$release"
+    if [ -e "$release_directory/release.info" ]; then
+      new_releases="$new_releases $release"
+    fi
+  done
+  releases="$new_releases"
+  # Implicitly add prior -dev releases for stable releases.
+  if [ -n "$dev_releases" ]; then
+    new_releases=
+    for release in $releases; do
+      case "$release" in
+      *-*) new_releases="$new_releases $release";;
+      *.*) new_releases="$new_releases ${release}-dev $release";;
+      *) new_releases="$new_releases $release";;
+      esac
+    done
+    releases="$new_releases"
+  fi
+  # Deduplicate releases.
+  releases=$(echo "$releases" | tr ' ' '\n' | sort -u)
+  # Sort the releases by semantic version rules.
+  tmpdir=$(mktemp -d --suffix=.tix-release)
+  for release in $releases; do
+    release_directory="$release_directories/$release"
+    if [ -e "$release_directory/release.info"  ]; then
+      version=$(tix-vars "$release_directory/release.info" VERSION)
+    else
+      version="$release"
+    fi
+    # Sort prerelease versions before release versions.
+    case "$version" in *-*) version=${version%-*};; *) version="$version"_;; esac
+    echo "$release" >> "$tmpdir/$version"
+  done
+  releases=
+  for version in $(ls "$tmpdir" | sort -V); do
+    releases="$releases `sort -V "$tmpdir/$version"`"
+  done
+  rm -rf "$tmpdir"
+  # Chain together upgrade paths for the releases on the channel.
+  last=
+  last_prefix=
+  older=
+  pending=
+  for release in $releases; do
+    release_directory="$release_directories/$release"
+    if [ -e "$release_directory/release.info" ]; then
+      version=$(tix-vars "$release_directory/release.info" VERSION)
+    else
+      version="$release"
+    fi
+    if [ "$unskippable" = none ]; then
+      prefix=
+    elif [ "$unskippable" = major ]; then
+      prefix=$(echo "$version" | grep -Eo '^[0-9]+')
+    elif [ "$unskippable" = minor -o "$unskippable" = last-patch ]; then
+      prefix=$(echo "$version" | grep -Eo '^[0-9]+\.[0-9]+')
+    elif [ "$unskippable" = patch ]; then
+      prefix=$(echo "$version" | grep -Eo '^[0-9]+\.[0-9]+\.[0-9]+')
+    else
+      prefix="$version"
+    fi
+    if [ -n "$last" ]; then
+      older="$older $last"
+    fi
+    if [ "$last_prefix" != "$prefix" ]; then
+      if [ "$unskippable" = last-patch ]; then
+        # Don't allow skipping the last patch in a series.
+        for old in $older; do
+          if [ "$old" != "$last" ]; then
+            write_channel "$old" "$last"
+          fi
+        done
+        older="$last"
+     fi
+     # The last release is the last release in the previous series, so upgrade
+     # upgrade the series before the previous series to the last release of the
+     # previous series.
+     for old in $pending; do
+        write_channel "$old" "$last"
+      done
+      pending="$older"
+      older=
+    fi
+    last="$release"
+    last_prefix="$prefix"
+    if [ "$release" = "$stop_release" ]; then
+      break
+    fi
+  done
+  if [ -n "$last" ]; then
+    # Upgrade all the releases in the last series to the last release.
+    for old in $pending $older; do
+      write_channel "$old" "$last"
+    done
+    write_channel "$last"
+  fi
+  unset sign
+  ;;
+channel-entry)
+  current_release="$release_directories/$release"
+  if [ -e "$current_release" ]; then
+    sha256sum=$(sha256sum "$current_release/sha256sum" | grep -Eo '^.{64}')
+    version=$(tix-vars "$current_release/release.info" VERSION)
+    release=$(tix-vars "$current_release/release.info" RELEASE)
+    build_id=$(tix-vars "$current_release/release.info" BUILD_ID)
+  fi
+  unset UPGRADE_VERSION
+  unset UPGRADE_RELEASE_URL
+  unset new_pubkey_sha256sum
+  if [ -n "$upgrade_release" ]; then
+    UPGRADE_RELEASE=$(
+      tix-vars "$release_directories/$upgrade_release/release.info" RELEASE)
+    UPGRADE_VERSION=$(
+      tix-vars "$release_directories/$upgrade_release/release.info" VERSION)
+    if [ -z "$upgrade_release_url" ]; then
+      UPGRADE_RELEASE_URL="$authoritative/channel/$channel/$UPGRADE_VERSION"
+    else
+      UPGRADE_RELEASE_URL="$upgrade_release_url"
+    fi
+    if [ -z "$upgrade_release_key" ]; then
+      if [ -n "$same_signing" ]; then
+        upgrade_release_key="$release_directories/$upgrade_release/release.pub"
+      elif [ -n "$key_search" ]; then
+        saved_version="$version"
+        saved_release="$release"
+        version="$UPGRADE_VERSION"
+        release="$UPGRADE_RELEASE"
+        key_search
+        upgrade_release_key="$key.pub"
+        version="$saved_version"
+        release="$saved_release"
+      elif [ -n "$public_key" ]; then
+        upgrade_release_key="$public_key"
+      fi
+    fi
+    if [ -e "$upgrade_release_key" ]; then
+      upgrade_release_key_sha256sum=$(
+        sha256sum "$upgrade_release_key" | grep -Eo '^.{64}')
+    fi
+  fi
+  datetime=$(TZ=UTC date ${SOURCE_DATE_EPOCH+-d "@$SOURCE_DATE_EPOCH"} \
+                         +%FT%T+00:00)
+  directory="$directory/$channel/$version"
+  mkdir -p "$directory"
+  tix-vars /dev/null \
+    "TIX_RELEASE_VERSION=1" \
+    "VERSION=$version" \
+    "RELEASE=$release" \
+    "BUILD_ID=$build_id" \
+    ${mirrors:+"MIRRORS=$mirrors"} \
+    "SHA256SUM_SHA256SUM=$sha256sum" \
+    ${UPGRADE_VERSION+"UPGRADE_VERSION=$UPGRADE_VERSION"} \
+    ${UPGRADE_RELEASE_URL+"UPGRADE_RELEASE_URL=$UPGRADE_RELEASE_URL"} \
+    ${upgrade_release_key_sha256sum+"UPGRADE_RELEASE_KEY_SHA256SUM=$upgrade_release_key_sha256sum"} \
+    "DATETIME=$datetime" \
+   > "$directory/release.info"
+  ;;
+release)
+  mkdir -p "$directory"
+  { cd "$directory" &&
+    find . -type f '!' -name sha256sum '!' -name '*.html' '!' -name '*.sig' \
+          '!' -name release.pub -exec sha256sum '{}' ';'; } |
+  sed -E 's,^([^ ]*  )\./,\1,' |
+  LC_ALL=C sort -k 2 > "$directory/sha256sum"
+
+  sha256sum=$(sha256sum "$directory/sha256sum" | grep -Eo '^.{64}')
+  datetime=$(TZ=UTC date ${SOURCE_DATE_EPOCH+-d "@$SOURCE_DATE_EPOCH"} \
+                         +%FT%T+00:00)
+  tix-vars /dev/null \
+   "TIX_RELEASE_VERSION=1" \
+   "VERSION=$version" \
+   "RELEASE=$release" \
+   "BUILD_ID=$build_id" \
+   ${mirrors:+"MIRRORS=$mirrors"} \
+   "SHA256SUM_SHA256SUM=$sha256sum" \
+   "DATETIME=$datetime" \
+  > "$directory/release.info"
+  ;;
+sign)
+  sign=--sign
+  ;;
+*)
+  echo "$0: error: unknown command: $command" >&2
+  exit 1
+esac
+
+if [ -n "$sign" ]; then
+  if [ -n "$key_search" ]; then
+    # Search for the closest signing key based on the release and version.
+    if [ -n "$directory" ]; then
+      release=$(tix-vars "$directory/release.info" RELEASE)
+      version=$(tix-vars "$directory/release.info" VERSION)
+    fi
+    key_search
+    # Search for the same signing key as already used by another release.
+    if [ -n "$same_signing" -a -n "$current_release" ]; then
+      for candidate in "${key_search}"*.pub; do
+        if [ -e "$candidate" ] &&
+           cmp -s "$current_release/release.pub" "$candidate"; then
+          key=${candidate%.pub}
+          break
+        fi
+      done
+    fi
+    public_key="$key.pub"
+    secret_key="$key.sec"
+  fi
+  if $which_public_key; then echo "$public_key"; exit; fi
+  if $which_secret_key; then echo "$secret_key"; exit; fi
+  # Sign the release.
+  signify -Se -s "$secret_key" -m "$directory/release.info"
+  sed -Ei -e 's,^(untrusted comment: verify with )(.*/)?([^/]*)$,\1\3,' \
+      "$directory/release.info.sig"
+  cp -- "$public_key" "$directory/release.pub"
+  if [ -e "$directory/sha256sum" ]; then
+    signify -Se -s "$secret_key" -m "$directory/sha256sum"
+    sed -Ei -e 's,^(untrusted comment: verify with )(.*/)?([^/]*)$,\1\3,' \
+        "$directory/sha256sum.sig"
+  fi
+fi

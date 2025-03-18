@@ -1,0 +1,125 @@
+#!/bin/sh
+# Copyright (c) 2024, 2025 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-autoupgrade
+# Daemon automatically applying system upgrades.
+
+collection=/
+unset interval
+now=false
+once=false
+unset options
+unset reboot
+unset reboot_time
+
+dashdash=
+previous_option=
+for argument do
+  if test -n "$previous_option"; then
+    eval $previous_option=\$argument
+    previous_option=
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  -C) previous_option=collection ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --interval=*) interval=$parameter ;;
+  --interval) previous_option=interval ;;
+  --no-reboot) reboot=false ;;
+  --now) now=true ;;
+  --once) once=true; now=true ;;
+  --options=*) options=$parameter ;;
+  --options) previous_option=options ;;
+  --reboot) reboot=true ;;
+  --reboot-time=*) reboot_time=$parameter ;;
+  --reboot-time) previous_option=reboot_time ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *)
+    echo "$0: unexpected extra operand $argument" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+collection=$(cd "$collection" && pwd)
+
+interval=${interval-$(tix-vars -d "24h" "$collection/tix/collection.conf" AUTOUPGRADE_INTERVAL)}
+options=${options-$(tix-vars -d "" "$collection/tix/collection.conf" AUTOUPGRADE_OPTIONS)}
+reboot=${reboot-$(tix-vars -d false "$collection/tix/collection.conf" AUTOUPGRADE_REBOOT)}
+reboot_time=${reboot_time-$(tix-vars -d +1 "$collection/tix/collection.conf" AUTOUPGRADE_REBOOT_TIME)}
+
+need_cancel=false
+
+cancel() {
+  tix-upgrade --collection="$collection" --cancel
+  need_cancel=false
+}
+
+cleanup() {
+  if $need_cancel; then
+    cancel
+  fi
+}
+trap cleanup HUP INT QUIT TERM
+
+attempt() {
+  need_cancel=true
+  mkdir -p -- "$collection/var/cache/tix"
+  touch -- "$collection/var/cache/tix/autoupgrade.stamp"
+  if tix-upgrade --collection="$collection" $options; then
+    need_cancel=false
+    if [ "$reboot" = true ] &&
+       tix-upgrade --collection="$collection" --is-reboot-needed; then
+      rm -f -- "$collection/var/cache/tix/autoupgrade.stamp"
+      exec shutdown -Dr "$reboot_time" "The operating system is being upgraded."
+    fi
+  else
+    cancel
+  fi
+}
+
+if $now; then attempt; fi
+if $once; then exit; fi
+if [ -n "$READYFD" ]; then eval "echo >&$READYFD"; unset READYFD; fi
+if [ -e "$collection/var/cache/tix/autoupgrade.stamp" ]; then
+  last_attempt=$(date -r "$collection/var/cache/tix/autoupgrade.stamp" +%s)
+  case "$interval" in
+  *d) interval=$(expr $(expr "$interval" : '\([0-9]\+\)') '*' 86400) ;;
+  *h) interval=$(expr $(expr "$interval" : '\([0-9]\+\)') '*' 3600) ;;
+  *m) interval=$(expr $(expr "$interval" : '\([0-9]\+\)') '*' 60) ;;
+  esac
+  next_attempt=$(expr "$last_attempt" + "$interval")
+  now=$(date +%s)
+  if [ $now -lt $next_attempt ]; then
+    sleep $(expr $next_attempt - $now)
+  fi
+fi
+attempt
+while sleep -- "$interval"; do attempt; done

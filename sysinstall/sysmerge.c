@@ -507,7 +507,7 @@ int main(int argc, char* argv[])
 		if ( my_finalize )
 		{
 			upgrade_finalize(&old_release, &new_release, source, target_prefix);
-			post_upgrade(source, target_prefix);
+			post_upgrade(source, target);
 		}
 		else
 		{
@@ -522,7 +522,7 @@ int main(int argc, char* argv[])
 			return 0;
 	}
 	else if ( run_finalize )
-		post_upgrade(source, target_prefix);
+		post_upgrade(source, target);
 
 	// Remove the upgrade readiness marker now that the upgrade has gone through
 	// such that the bootloader configuration and initrds don't try to do the

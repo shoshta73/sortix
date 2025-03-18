@@ -68,6 +68,33 @@ const char* non_modify_basename(const char* path)
 	return last_slash + 1;
 }
 
+bool is_absolute_path(const char* path)
+{
+	if ( path[0] != '/' )
+		return false;
+	size_t i = 1;
+	while ( path[i] )
+	{
+		if ( path[i] == '.' )
+		{
+			i++;
+			if ( !path[i] || path[i] == '/' )
+				return false;
+			if ( path[i] == '.' )
+			{
+				i++;
+				if ( !path[i] || path[i] == '/' )
+					return false;
+			}
+		}
+		while ( path[i] && path[i] != '/' )
+			i++;
+		if ( path[i] == '/' )
+			i++;
+	}
+	return true;
+}
+
 __attribute__((format(printf, 1, 2)))
 char* print_string(const char* format, ...)
 {
@@ -249,7 +276,7 @@ char* token_string_of_string_array(const string_array_t* sa)
 	return result;
 }
 
-void string_array_append_file(string_array_t* sa, FILE* fp)
+bool string_array_append_file(string_array_t* sa, FILE* fp)
 {
 	char* entry = NULL;
 	size_t entry_size = 0;
@@ -258,10 +285,11 @@ void string_array_append_file(string_array_t* sa, FILE* fp)
 	{
 		if ( entry[entry_length-1] == '\n' )
 			entry[--entry_length] = '\0';
-		string_array_append(sa, entry);
+		if ( !string_array_append(sa, entry) )
+			return false;
 	}
 	free(entry);
-	assert(!ferror(fp));
+	return !ferror(fp);
 }
 
 bool string_array_append_file_path(string_array_t* sa, const char* path)
@@ -269,9 +297,9 @@ bool string_array_append_file_path(string_array_t* sa, const char* path)
 	FILE* fp = fopen(path, "r");
 	if ( !fp )
 		return false;
-	string_array_append_file(sa, fp);
+	bool result = string_array_append_file(sa, fp);
 	fclose(fp);
-	return true;
+	return result;
 }
 
 size_t string_array_find(string_array_t* sa, const char* str)
@@ -589,7 +617,7 @@ int mkdir_p(const char* path, mode_t mode)
 	return -1;
 }
 
-static void compact_arguments(int* argc, char*** argv)
+void compact_arguments(int* argc, char*** argv)
 {
 	for ( int i = 0; i < *argc; i++ )
 	{
@@ -679,6 +707,11 @@ size_t count_tar_components(const char* path)
 		if ( path[i] == '/' )
 			slashes++;
 	return slashes;
+}
+
+bool is_valid_package_name(const char* package)
+{
+	return strcmp(package, ".") != 0 && strcmp(package, "..") != 0;
 }
 
 #define GET_OPTION_VARIABLE(str, varptr) \
@@ -843,72 +876,9 @@ const char* VerifyInfoVariable(string_array_t* info, const char* var,
 	return ret;
 }
 
-void VerifyTixInformation(string_array_t* tixinfo, const char* tix_path)
-{
-	const char* tix_version = dictionary_get(tixinfo, "tix.version");
-	if ( !tix_version )
-		errx(1, "error: `%s': no `tix.version' variable declared",
-		        tix_path);
-	if ( atoi(tix_version) != 1 )
-		errx(1, "error: `%s': tix version `%s' not supported", tix_path,
-		        tix_version);
-	const char* tix_class = dictionary_get(tixinfo, "tix.class");
-	if ( !tix_class )
-		errx(1, "error: `%s': no `tix.class' variable declared", tix_path);
-	if ( !strcmp(tix_class, "srctix") )
-		errx(1, "error: `%s': this object is a source tix and needs to be "
-		        "compiled into a binary tix prior to installation.",
-		        tix_path);
-	if ( strcmp(tix_class, "tix") )
-		errx(1, "error: `%s': tix class `%s' is not `tix': this object is "
-		        "not suitable for installation.", tix_path, tix_class);
-	if ( !(dictionary_get(tixinfo, "tix.platform")) )
-		errx(1, "error: `%s': no `tix.platform' variable declared", tix_path);
-	if ( !(dictionary_get(tixinfo, "pkg.name")) )
-		errx(1, "error: `%s': no `pkg.name' variable declared", tix_path);
-}
-
 bool IsCollectionPrefixRatherThanCommand(const char* arg)
 {
 	return strchr(arg, '/') || !strcmp(arg, ".") || !strcmp(arg, "..");
-}
-
-void ParseOptionalCommandLineCollectionPrefix(char** collection, int* argcp,
-                                              char*** argvp)
-{
-	if ( 2 <= *argcp && IsCollectionPrefixRatherThanCommand((*argvp)[1]) )
-	{
-		if ( !*collection )
-		{
-			free(*collection);
-			*collection = strdup((*argvp)[1]);
-		}
-		(*argvp)[1] = NULL;
-		compact_arguments(argcp, argvp);
-	}
-	else if ( !*collection )
-	{
-		*collection = strdup("/");
-	}
-}
-
-void VerifyCommandLineCollection(char** collection)
-{
-	if ( !*collection )
-		errx(1, "error: you need to specify which tix collection to administer "
-		        "using --collection or giving the prefix as the first "
-		        "argument.");
-
-	if ( !**collection )
-	{
-		free(*collection);
-		*collection = strdup("/");
-	}
-
-	char* collection_rel = *collection;
-	if ( !(*collection = realpath(collection_rel, NULL)) )
-		err(1, "realpath: %s", collection_rel);
-	free(collection_rel);
 }
 
 void VerifyTixCollectionConfiguration(string_array_t* info, const char* path)

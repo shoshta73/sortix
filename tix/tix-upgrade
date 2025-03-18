@@ -1,0 +1,373 @@
+#!/bin/sh
+# Copyright (c) 2017, 2021, 2023, 2024, 2025 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-upgrade
+# Upgrade operating system and ports.
+
+set -e
+
+cachedir=""
+cancel=false
+check=false
+clean=false
+collection=/
+cryptographic_horizon_scenario=false
+download_only=false
+fetch_options=
+force=false
+is_reboot_needed=false
+loop=false
+upgrade_ports=false
+upgrade_system=false
+upgrade=--upgrade
+wait=
+
+dashdash=
+previous_option=
+for argument do
+  if test -n "$previous_option"; then
+    eval $previous_option=\$argument
+    previous_option=
+    shift
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  -C) previous_option=collection ;;
+  --back-to-the-future) cryptographic_horizon_scenario=$argument ;;
+  --cachedir=*) cachedir=$parameter ;;
+  --cachedir) previous_option=cachedir ;;
+  --cancel) cancel=true ;;
+  --check) check=true ;;
+  --clean) clean=true ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --cryptographic-horizon-scenario) cryptographic_horizon_scenario=true ;;
+  --download-only) download_only=true ;;
+  --fetch-options=*) fetch_options="$parameter" ;;
+  --fetch-options) previous_option=fetch_options ;;
+  --force) force=true ;;
+  --futurama) cryptographic_horizon_scenario=$argument ;;
+  --insecure-downgrade-to-http) fetch_options="$fetch_options $argument" ;;
+  --insecure-no-check-certificate) fetch_options="$fetch_options $argument" ;;
+  --is-reboot-needed) is_reboot_needed=true ;;
+  --its-an-older-sortix-sir) cryptographic_horizon_scenario=true ;;
+  --loop) loop=true ;;
+  --no-upgrade) upgrade= ;;
+  --now) wait=--now ;;
+  --ports) upgrade_ports=true ;;
+  --reinstall) force=true; upgrade= ;;
+  --system) upgrade_system=true ;;
+  --the-future-is-now) cryptographic_horizon_scenario=true ;;
+  --upgrade) upgrade=--upgrade ;;
+  --wait) wait=--wait ;;
+  --you-have-been-asleep-for-99999) cryptographic_horizon_scenario=$argument ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *) break ;;
+  esac
+
+  shift
+done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+if [ 0 -lt $# ]; then
+  echo "$0: Unexpected extra operand: $1" >&2
+  exit 1
+fi
+
+escape_extended_regex_sed() {
+  printf "%s\n" "$1" | sed -E -e 's/[[$()*?\+.^{|}'"$2"']/\\\0/g'
+}
+
+collection=$(cd "$collection" && pwd)
+cachedir=${cachedir:-${collection%/}/var/cache/tix}
+
+if $is_reboot_needed; then
+  exec sysmerge -t "$collection" --is-reboot-needed
+fi
+
+collection_conf="${collection%/}/tix/collection.conf"
+tix-vars -t "$collection_conf"
+
+# Plan ahead for the future and beyond.
+if [ $cryptographic_horizon_scenario = "--you-have-been-asleep-for-99999" ]; then
+  cat << EOF
+Good morning. You have been in suspension for 9999999999Floating point exception
+EOF
+  wall -m "$0: warning: This courtesy call is to inform you that all test subjects should vacate $(uname -sr) immediately."
+  cat << EOF
+If you are a non-employee who has discovered this system amid the ruins of civilization, welcome! And remember: $(uname -s) is the future, and the future starts with you.
+EOF
+  cryptographic_horizon_scenario=true
+elif [ $cryptographic_horizon_scenario != false ]; then
+  if [ $cryptographic_horizon_scenario = --back-to-the-future ]; then
+    echo "Well, you're safe and sound now, back in good old $(date +%Y)."
+  elif [ $cryptographic_horizon_scenario = --futurama ]; then
+    echo "Welcome to the world of tomorrow!"
+  fi
+  loop=true
+  cryptographic_horizon_scenario=true
+fi
+if $cryptographic_horizon_scenario; then
+  echo "$0: warning: TLS-class Cryptographic Horizon Scenario is in effect"
+  echo "$0: warning: Signing algorithm may be cryptographically broken"
+  echo "$0: warning: Establishing contact with future civilizations using HTTP"
+  fetch_options="$fetch_options --insecure-downgrade-to-http"
+fi
+
+# Convenience for upgrading release by release in a loop.
+if $loop; then
+  if [ -n "$fetch_options" ]; then
+    cat >> "$collection_conf" << EOF
+FETCH_OPTIONS="$fetch_options"
+EOF
+    echo "Adjusted fetch options: $collection_conf"
+  fi
+  cat << EOF >> "$collection_conf"
+AUTOUPGRADE_REBOOT=true
+AUTOUPGRADE_REBOOT_TIME=now
+EOF
+  mkdir -p "$collection/var/cache/tix"
+  touch -d '1970-01-01 00:00:00' "$collection/var/cache/tix/release.info"
+  echo "Enabled post-upgrade reboots: $collection_conf"
+  service autoupgrade enable
+  echo "Enabled background upgrades: service autoupgrade enable"
+  echo "Follow the background upgrade using: tail -f /var/log/autoupgrade.log"
+  exit
+fi
+
+build_id=$(tix-vars -d '' "$collection_conf" BUILD_ID)
+if ! $upgrade_ports && ! $upgrade_system; then
+  upgrade_ports=$(tix-vars -d true "$collection_conf" PORTS)
+  upgrade_system=$(tix-vars -d true "$collection_conf" SYSTEM)
+fi
+more_fetch_options=$(tix-vars -d '' "$collection_conf" FETCH_OPTIONS)
+fetch_options="$more_fetch_options $fetch_options"
+release_url=$(tix-vars -d '' "$collection_conf" RELEASE_URL)
+
+# If this isn't a system installation, only upgrade the ports.
+if [ ! -e "$collection/tix/manifest/system" ]; then
+  upgrade_system=false
+fi
+
+case "$upgrade_system$upgrade_ports" in
+truefalse) what_to_upgrade=--system;;
+falsetrue) what_to_upgrade=--ports;;
+*) what_to_upgrade=;;
+esac
+
+if $cancel || $clean; then
+  echo "Removing cache directory: $cachedir"
+  rm -rf -- "$cachedir"
+fi
+
+if $cancel; then
+  sysmerge -t "$collection" --cancel
+  exit
+fi
+
+mkdir -p -- "$cachedir"
+mkdir -p -- "$cachedir/new"
+
+# Fetch the latest officially signed release.info.sig file.
+tix-fetch $fetch_options \
+          --collection="$collection" \
+          --output-release-pub="$cachedir/new/release.pub" \
+          --output-release-info="$cachedir/new/release.info" \
+          --output-upgrade-info="$cachedir/new/upgrade.info" \
+          $upgrade
+
+# If the release metadata changed, clean the cache directory of downloads that
+# were currently in progress as they might not have the right checksums.
+if [ ! -e "$cachedir/release.pub" ] ||
+   [ ! -e "$cachedir/release.info" ] ||
+   [ ! -e "$cachedir/upgrade.info" ] ||
+   ! (cd "$cachedir/new" && sha256sum release.pub release.info upgrade.info) |
+     (cd "$cachedir" && sha256sum -c --status); then
+  rm -rf -- "$cachedir/repository"
+  rm -rf -- "$cachedir/sha256sum"
+  rm -rf -- "$cachedir/sysroot"
+fi
+
+# Store the new release metadata files so we can resume the download if
+# interrupted and these files still match.
+mv -- "$cachedir/new/release.pub" "$cachedir/release.pub"
+mv -- "$cachedir/new/release.info" "$cachedir/release.info"
+mv -- "$cachedir/new/upgrade.info" "$cachedir/upgrade.info"
+rm -rf -- "$cachedir/new"
+
+# Check if we're upgrading to a new release.
+BUILD_ID=$(tix-vars -d '' "$cachedir/release.info" BUILD_ID)
+UPGRADE_RELEASE_URL=$(tix-vars -d '' "$cachedir/upgrade.info" \
+                               UPGRADE_RELEASE_URL)
+VERSION=$(tix-vars "$cachedir/release.info" VERSION)
+RELEASE=$(tix-vars "$cachedir/release.info" RELEASE)
+if [ "$VERSION" = "$RELEASE" ]; then
+  UPGRADE_NAME="$VERSION"
+else
+  UPGRADE_NAME="$RELEASE $VERSION"
+fi
+if [ -e "${collection%/}/sysmerge/tix/collection.conf" ] &&
+   sysmerge -t "$collection" --is-reboot-needed &&
+   [ "$(tix-vars -d '' "${collection%/}/sysmerge/tix/collection.conf" \
+        BUILD_ID)" = "$BUILD_ID" ]; then
+  echo "Upgrade to $UPGRADE_NAME has already been scheduled."
+  if $check; then exit 1; fi
+  exit 0
+fi
+if [ -n "$upgrade" ] && [ -n "$UPGRADE_RELEASE_URL" ]; then
+  if $check; then
+    echo "Available upgrade to $UPGRADE_NAME."
+    exit 0
+  fi
+  echo "Upgrading to $UPGRADE_NAME."
+else
+  if ! $check && [ -n "$UPGRADE_RELEASE_URL" ]; then
+    echo "Ignoring available upgrade to $UPGRADE_NAME."
+  fi
+  if [ "$build_id" = "$BUILD_ID" ]; then
+    if $force; then
+      echo "Reinstalling the same build."
+      if $check; then exit 0; fi
+    else
+      echo "No upgrade is available."
+      if $check; then exit 1; fi
+      exit 0
+    fi
+  else
+    echo "A new build is available."
+    if $check; then exit 0; fi
+  fi
+fi
+
+mkdir -p -- "$cachedir/repository"
+
+# Download the repository metadata for package resolution.
+tix-fetch $fetch_options \
+          --collection="$collection" \
+          --input-release-info="$cachedir/release.info" \
+          --output-sha256sum="$cachedir/sha256sum" \
+          -c -O "$cachedir/repository" -- \
+          packages.list dependencies.list renames.list
+
+# Decide what binary packages to upgrade.
+installed_packages=$(LC_ALL=C ls -- "$collection/tix/tixinfo")
+if $upgrade_system && $upgrade_ports; then
+  upgrade_packages="$installed_packages"
+else
+  upgrade_packages=
+  for package in $installed_packages; do
+    is_system=$(tix-vars -d false "$collection/tix/tixinfo/$package" SYSTEM)
+    if ($upgrade_system && [ "$is_system" = true ]) ||
+       ($upgrade_ports && [ "$is_system" = false ]); then
+      upgrade_packages="$upgrade_packages $package"
+    fi
+  done
+fi
+
+# Follow RENAMES recursively to handle renames, splits, and deletions.
+rename() {
+  if grep -Eq "^$(escape_extended_regex_sed "$1"):" \
+          "$cachedir/repository/renames.list"; then
+    for new in $(grep -E "^$(escape_extended_regex_sed "$1"):" \
+                      "$cachedir/repository/renames.list" |
+                 grep -Eo '[^:]*$'); do
+      if [ "$new" = . -o "$new" = "$1" ]; then
+        echo "$1" | grep -Eo '^[^@]*'
+      else
+        rename "$new"
+      fi
+    done
+  fi
+}
+
+# Determine the final package list after the renames.
+packages=""
+for package in $upgrade_packages; do
+  edition=$(tix-vars -d 1 "$collection/tix/tixinfo/$package" EDITION)
+  packages="$packages $(rename "$package@$edition")"
+done
+
+# Sort and deduplicate the packages and check for existence and dependencies.
+packages=$(for package in $packages; do
+             # The package exists if it's in the package list.
+             if grep -Eq "^$(escape_extended_regex_sed "$package")$" \
+                     "$cachedir/repository/packages.list"; then
+               echo $package
+               # Install dependencies as well.
+               for dep in \
+                   $(grep -E "^$(escape_extended_regex_sed "$package"):" \
+                             "$cachedir/repository/dependencies.list" |
+                     grep -Eo '[^:]*$'); do
+                 case $dep in
+                 \*) cat "$cachedir/repository/packages.list" ;;
+                 *\?) ;; # Omit optional runtime dependencies.
+                 *) echo $dep ;;
+                 esac
+               done
+             fi
+           done | LC_ALL=C sort -u)
+
+# Fetch each binary package from the mirror.
+for package in $packages; do
+  tix-fetch $fetch_options \
+            --collection="$collection" \
+            --input-release-info="$cachedir/release.info" \
+            --input-sha256sum="$cachedir/sha256sum" \
+            -c -O "$cachedir/repository" -- \
+            "$package.tix.tar.xz"
+done
+
+# Stop if only downloading.
+if $download_only; then
+  exit
+fi
+
+rm -rf -- "$cachedir/sysroot"
+mkdir -p -- "$cachedir/sysroot"
+
+# Create a collection with the upgrade metadata.
+tix-create \
+   --build-id="$BUILD_ID" \
+   --prefix="$(tix-vars "$collection_conf" PREFIX)" \
+   --platform="$(tix-vars "$collection_conf" PLATFORM)" \
+   --release-key="$cachedir/release.pub" \
+   --release-url="${UPGRADE_RELEASE_URL:-$release_url}" \
+   -C "$cachedir/sysroot"
+
+# Extract the binary packages into the sysroot.
+for package in $packages; do
+  echo "Extracting $package.tix.tar.xz..."
+  tar -C "$cachedir/sysroot" -xJf "$cachedir/repository/$package.tix.tar.xz"
+  rm -f "$cachedir/repository/$package.tix.tar.xz"
+done
+
+# Merge the new sysroot onto the installation.
+sysmerge -fm -t "$collection" $what_to_upgrade $wait "$cachedir/sysroot"
+
+rm -rf -- "$cachedir/repository"
+rm -rf -- "$cachedir/sysroot"

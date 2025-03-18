@@ -1,0 +1,82 @@
+.Dd February 17, 2025
+.Dt TIX-INSTALL 8
+.Os
+.Sh NAME
+.Nm tix-install
+.Nd install packages into a collection
+.Sh SYNOPSIS
+.Nm
+.Op Fl q
+.Op Fl C Ar collection
+.Op Fl \-reinstall
+.Ar
+.Sh DESCRIPTION
+.Nm
+installs packages in the
+.Pa .tix.tar.xz
+format into a tix collection, as created with
+.Xr tix-create 8 .
+.Nm
+is a low-level tool and ordinarily installations and upgrades would occur
+through the
+.Xr tix 8 ,
+.Xr tix-upgrade 8 ,
+.Xr tix-port 8 ,
+.Xr sysinstall 8 ,
+.Xr sysupgrade 8 ,
+or
+.Xr sysmerge 8
+programs instead.
+Packages are created from
+.Xr port 5
+files using tools such as
+.Xr tix-port 8 .
+.Pp
+The arguments are package files that will be installed into the selected
+.Ar collection ,
+or the root directory collection if not specified.
+The installation will fail if the packages are already installed.
+Packages can be uninstalled with
+.Xr tix-uninstall 8 .
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl C , \-collection Ns = Ns Ar collection
+Specifies which
+.Pa collection
+to install into.
+.It Fl \-reinstall
+Reinstall packages if already installed, rather than failing.
+.Pp
+Warning: This option is currently unsupported.
+.Nm
+does not use the upgrade engine of
+.Xr sysmerge 8
+and will leak files that are not present in the new package.
+Uninstall the package first using
+.Xr tix-uninstall 8 ,
+or use the supported
+.Xr sysupgrade 8
+and
+.Xr sysmerge 8
+upgrade methods instead.
+.It Fl q , \-quiet
+Be quiet rather than outputting a message saying the package is being
+uninstalled.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr port 5 ,
+.Xr sysinstall 8 ,
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8 ,
+.Xr tix 8 ,
+.Xr tix-create 8 ,
+.Xr tix-port 8 ,
+.Xr tix-uninstall 8 ,
+.Xr tix-upgrade 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

@@ -36,6 +36,7 @@
 #include <fstab.h>
 #include <limits.h>
 #include <pwd.h>
+#include <regex.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -1097,9 +1098,8 @@ int main(void)
 	{
 		printf(" - Populating root filesystem...\n");
 		chmod(".", 0755);
-		if ( access("tix/collection.conf", F_OK) < 0 )
-			execute((const char*[]) { "tix-collection", ".", "create",
-			                          "--prefix=", NULL }, "_e");
+		execute((const char*[]) { "tix-create", "-C", ".", "--import=/", NULL },
+		        "_e");
 		install_manifests_detect("", ".", true, true, true, false);
 		// TODO: Preserve the existing /src if it exists like in sysupgrade.
 		if ( has_manifest("src") )
@@ -1413,8 +1413,6 @@ int main(void)
 	if ( !has_autoconf )
 		text("\n");
 
-	// TODO: Ask if networking should be disabled / enabled.
-
 	while ( true )
 	{
 		prompt(input, sizeof(input), "enable_gui",
@@ -1435,6 +1433,150 @@ int main(void)
 		break;
 	}
 	text("\n");
+
+	bool autoupgrade = false;
+	while ( true )
+	{
+		text("The operating system can automatically download new versions "
+		     "in the background and schedule an upgrade on the subsequent "
+		     "boot. Alternatively you can invoke tix-upgrade(8) manually.\n\n");
+		text("Privacy notice: If enabled, the operating system's website and "
+		     "download mirror will be periodically checked for new releases, "
+		     "which will be downloaded and installed.\n\n");
+		prompt(input, sizeof(input), "enable_autoupgrade",
+			   "Enable automatically upgrading the operating system?", "no");
+		if ( strcasecmp(input, "no") == 0 )
+			break;
+		if ( strcasecmp(input, "yes") != 0 )
+			continue;
+		if ( !install_configurationf("etc/init/local", "a",
+		                             "require autoupgrade optional\n") )
+		{
+			warn("etc/init/local");
+			continue;
+		}
+		text("Added 'require autoupgrade optional' to /etc/init/local\n");
+		autoupgrade = true;
+		break;
+	}
+	text("\n");
+
+	while ( autoupgrade )
+	{
+		text("The system can optionally automatically reboot whenever an "
+		     "upgrade has been scheduled for the next boot. The reboot time "
+		     "can be selected in the shutdown(8) format: Reboot immediately "
+		     "(now), at a given time (HH:MM), or after a delay of n minutes "
+		     "(+n). If yes, the default delay is one minute (+1). "
+		     "Warning messages will be broadcast with wall(1).\n\n");
+		prompt(input, sizeof(input), "enable_autoupgrade_reboot",
+			   "Automatically reboot to upgrade? (no/yes/now/HH:MM/+minutes)",
+		       "no");
+		if ( strcasecmp(input, "no") == 0 )
+			break;
+		if ( !install_configurationf("tix/collection.conf", "a",
+		                             "AUTOUPGRADE_REBOOT=true\n") )
+		{
+			warn("tix/collection.conf");
+			continue;
+		}
+		text("Added 'AUTOUPGRADE_REBOOT=true' to /tix/collection.conf\n");
+		if ( strcasecmp(input, "yes") == 0 )
+			break;
+		if ( !install_configurationf("tix/collection.conf", "a",
+		                             "AUTOUPGRADE_REBOOT_TIME=%s\n", input) )
+		{
+			warn("tix/collection.conf");
+			continue;
+		}
+		textf("Added 'AUTOUPGRADE_REBOOT_TIME=%s' to /tix/collection.conf\n",
+		      input);
+		break;
+	}
+	text("\n");
+
+	bool is_stable = !strchr(VERSIONSTR, '-');
+	bool ask_channel = autoconf_has("channel") || autoupgrade;
+	while ( ask_channel )
+	{
+		char* release_url;
+		execute((const char*[]) {"tix-vars", "tix/collection.conf",
+			                     "RELEASE_URL", NULL}, "eo", &release_url);
+		size_t release_url_len = strlen(release_url);
+		if ( release_url_len && release_url[release_url_len - 1] == '\n' )
+			release_url[release_url_len - 1] = '\0';
+		regex_t re;
+		if ( regcomp(&re,
+		             "^.*/channel/+([^/]+)/+(([0-9]+\\.[0-9]+)([-.][^/]+)?)/*$",
+		             REG_EXTENDED) )
+			errx(2, "regcomp failed");
+		regmatch_t match[5];
+		int r = regexec(&re, release_url, 5, match, 0);
+		regfree(&re);
+		if ( r )
+		{
+			free(release_url);
+			ask_channel = false;
+			break;
+		}
+		char* channel = strndup(release_url + match[1].rm_so,
+		                        match[1].rm_eo - match[1].rm_so);
+		char* version = strndup(release_url + match[2].rm_so,
+		                        match[2].rm_eo - match[2].rm_so);
+		char* major_minor = strndup(release_url + match[3].rm_so,
+		                            match[3].rm_eo - match[3].rm_so);
+		if ( !channel || !version || !major_minor )
+			err(2, "malloc");
+		release_url[match[1].rm_so] = '\0';
+
+		text("You can receive upgrades on different channels:\n\n");
+		if ( is_stable )
+		{
+			text("stable: stable operating system releases\n");
+			textf("%s: %s.x stable patch releases only\n",
+			      major_minor, major_minor);
+		}
+		text("nightly: daily builds with the latest features\n");
+		if ( strcmp(channel, "stable") != 0 &&
+		     strcmp(channel, major_minor) != 0 &&
+		     strcmp(channel, "nightly") != 0 )
+			textf("%s: the default channel for this release\n", channel);
+		text("\n");
+		char question[] =
+			"What upgrade channel to use? (stable/" VERSIONSTR "/nightly)";
+		if ( is_stable )
+		{
+			textf("The 'stable' and 'nightly' channels will upgrade across "
+			      "major operating system releases. The '%s' channel may be "
+			      "ideal for production systems, as only bug fixes will be "
+			      "delivered, and you can manually upgrade to new major "
+			      "releases with incompatible changes.\n\n", major_minor);
+			snprintf(question, sizeof(question),
+			         "What upgrade channel to use? (stable/%s/nightly)",
+			         major_minor);
+		}
+		else
+			snprintf(question, sizeof(question),
+			         "What upgrade channel to use? (nightly)");
+		prompt(input, sizeof(input), "channel", question, channel);
+		char* new_release_url;
+		if ( asprintf(&new_release_url, "%s%s/%s", release_url, input,
+		               version) < 0 )
+			err(2, "malloc");
+		free(channel);
+		free(version);
+		free(major_minor);
+		free(release_url);
+		execute((const char*[]) { "tix-create", "-C", ".", "--release-url",
+		                           new_release_url, "--release-key=", NULL },
+		        "e");
+		textf("Updated /tix/collection.conf RELEASE_URL to %s\n",
+		      new_release_url);
+		free(new_release_url);
+		break;
+	}
+	if ( ask_channel )
+		text("\n");
 
 	if ( !access_or_die("/tix/tixinfo/ntpd", F_OK) )
 	{

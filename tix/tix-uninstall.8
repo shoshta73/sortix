@@ -1,0 +1,52 @@
+.Dd February 17, 2025
+.Dt TIX-INSTALL 8
+.Os
+.Sh NAME
+.Nm tix-uninstall
+.Nd uninstall packages from a collection
+.Sh SYNOPSIS
+.Nm
+.Op Fl q
+.Op Fl C Ar collection
+.Ar packages ...
+.Sh DESCRIPTION
+.Nm
+uninstalls packages from a tix collection.
+.Nm
+is a low-level tool and ordinarily uninstallations would occur through the
+.Xr tix 8 ,
+.Xr tix-upgrade 8 ,
+.Xr sysinstall 8 ,
+.Xr sysupgrade 8 ,
+or
+.Xr sysmerge 8
+programs instead.
+.Pp
+The arguments are package names that will be uninstalled from the selected
+.Ar collection ,
+or the root directory collection if not specified.
+The installation will fail if the packages are not installed.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl C , \-collection Ns = Ns Ar collection
+Specifies which
+.Pa collection
+to install into.
+.It Fl q , \-quiet
+Be quiet rather than outputting a message saying the package is being
+uninstalled.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8 ,
+.Xr tix 8 ,
+.Xr tix-install 8 ,
+.Xr tix-port 8 ,
+.Xr tix-upgrade 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

@@ -69,6 +69,32 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add networked package management
+The
+.Sy system
+and
+.Sy ports
+variables in
+.Pa /etc/upgrade.conf
+.Xr ( upgrade.conf 5 )
+has been moved to the
+.Pa /tix/collection.conf
+.Xr ( collection.conf 5 )
+configuration file in the
+.Xr tix-vars 8
+format and renamed to
+.Sy SYSTEM
+and
+.Sy PORTS .
+.Pp
+An upgrade hook will move the configuration to the new file.
+.Pp
+The tix package management has gained network support and must be upgraded:
+.Bd -literal
+    cd /src/tix &&
+    make clean &&
+    make install
+.Ed
 .Ss Recognize read-only block devices
 The
 .Xr tcgetblob 2

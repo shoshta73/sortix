@@ -21,7 +21,7 @@ set -e
 generation=3
 
 unset command
-unset repository
+unset directory
 
 operand=1
 dashdash=
@@ -50,7 +50,7 @@ for argument do
       command="$argument"
       operand=2
     elif [ $operand = 2 ]; then
-      repository="$argument"
+      directory="$argument"
       operand=3
     else
       echo "$0: unexpected extra operand $argument" >&2
@@ -70,8 +70,8 @@ if [ -z "$command" ]; then
   exit 1
 fi
 
-if [ -z "$repository" ]; then
-  echo "$0: error: No repository was specified" >&2
+if [ -z "$directory" ]; then
+  echo "$0: error: No directory was specified" >&2
   exit 1
 fi
 
@@ -80,10 +80,10 @@ if [ "$generation" != 3 ]; then
   exit 1
 fi
 
-cd "$repository"
-
 case "$command" in
 metadata)
+  cd "$directory"
+
   ls |
   grep -E '\.tix.tar.xz$' |
   grep -Eo '^[^.]*' |

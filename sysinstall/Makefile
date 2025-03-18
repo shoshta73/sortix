@@ -63,6 +63,7 @@ install: all
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-group
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix3g
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-grub-cache
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-collection-conf
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount -ldisplay
@@ -85,7 +86,7 @@ devices.o: devices.h
 execute.o: execute.h
 fileops.o: fileops.h string_array.h
 string_array.o: string_array.h
-hooks.o: fileops.h manifest.h release.h string_array.h
+hooks.o: conf.h execute.h fileops.h manifest.h release.h string_array.h
 interactive.o: interactive.h autoconf.h execute.h
 manifest.o: manifest.h fileops.h string_array.h
 release.o: execute.h fileops.h release.h

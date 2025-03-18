@@ -168,11 +168,17 @@ the sysroot-source target includes all the sources
 and the system headers works in all supported configurations
 .Sy ( verify-headers ) .
 .It Sy release
-Make
-.Sy iso
-and construct release directory tree in
+Make a release and construct a release directory tree in
 .Pa /src/release
 suitable for online publishing.
+The release is stored in a subdirectory named per the
+.Ev RELEASE
+variable.
+The release is optionally signed with
+.Xr tix-release 8
+per the
+.Ev SIGNING
+environment variables below.
 .It Sy sortix.iso
 Make
 .Sy iso
@@ -216,6 +222,23 @@ The important environment variables influencing the Makefile are:
 .It Ev BUILD
 The platform of the current operating system.
 This defaults to the current machine and operating system.
+.It Ev BUILD_ID
+The build identifier for the build, which is stored in the release information,
+allowing installations to check if they are up to date, or whether a new build
+is available.
+This variable defaults to the commit hash if built from git, and otherwise to
+the
+.Ev RELEASE
+variable.
+.It Ev CHANNEL
+The name of the
+.Xr tix-release 8
+channel the release will use.
+This variable affects the
+.Ev RELEASE_URL
+variable.
+This variable defaults to the value in
+.Pa build-aux/version.mak .
 .It Ev HOST
 Specifies platform on which the compiled code will run.
 This defaults to the current machine and operating system.
@@ -246,6 +269,81 @@ can be specified as well.
 For instance
 .Sy PACKAGES=minimal!
 builds all the minimal ports with no optional dependencies.
+.It Ev RELEASE
+The name of the
+.Xr tix-release 8
+release to produce in the
+.Sy release
+makefile target.
+This variable defaults to the version number in the
+.Ev VERSION
+variable.
+.It Ev RELEASE_AUTHORITATIVE
+The URL to the official authoritative release site where channels and releases
+are published in the
+.Pa channel
+and
+.Pa release
+subdirectories per
+.Xr tix-release 8 .
+This variable affects the
+.Ev RELEASE_URL
+variable.
+This variable defaults to the value in
+.Pa build-aux/version.mak .
+.It Ev RELEASE_URL
+The URL to the channel or release to receive upgrades from.
+The release will place the value in the
+.Ev RELEASE_URL
+variable in the
+.Xr collection.conf 5
+configuration file upon installation or upgrade.
+This default value is to use the
+.Ev CHANNEL
+channel on the
+.Pa RELEASE_AUTHORITATIVE
+site, namely:
+.Pa $RELEASE_AUTHORITATIVE/channel/$CHANNEL/$VERSION
+.Pp
+The
+.Ev SIGNING_PUBLIC_KEY
+public key is used to verify downloads from this URL.
+.It Ev SIGNING_KEY
+The base path to the
+.Xr tix-release 8
+signing key, where where the secret key is in this
+path with the
+.Pa .sec
+file extension and the public key is this path with the
+.Pa .pub
+file extension.
+.It Ev SIGNING_KEY_SEARCH
+The base path to the release signing key, subject to the
+.Xr tix-release 8
+.Fl \-key-search
+feature.
+.It Ev SIGNING_PUBLIC_KEY
+The path to the
+.Xr tix-release 8
+public key to sign the release with.
+If unset,
+.Ev SIGNING_KEY
+or
+.Ev SIGNING_KEY_SEARCH
+are used instead, if set.
+This public key is placed in the release as
+.Pa /tix/release.pub
+and will be used to verify downloads from
+.Ev RELEASE_URL .
+.It Ev SIGNING_SECRET_KEY
+The path to the
+.Xr tix-release 8
+public key to sign the release with.
+If unset,
+.Ev SIGNING_KEY
+or
+.Ev SIGNING_KEY_SEARCH
+are used instead, if set.
 .It Ev SORTIX_INCLUDE_SOURCE
 Specifies whether the source code is included in the sysroot.
 This must be one of
@@ -274,6 +372,10 @@ failed.
 .It Ev SORTIX_RELEASE_ADDITIONAL
 Optionally can be set to a directory that contains addition files that are
 copied into the release directory.
+.It Ev VERSION
+The version number being built.
+This variable defaults to the value in
+.Pa build-aux/version.mak .
 .El
 .Ss Components
 The operating systems components, such as libc and the kernel, each have their
@@ -451,6 +553,14 @@ target and prepare a
 .Pa /src/release
 directory with a directory structure and miscellaneous files suitable for a
 formal online release.
+The release is optionally signed with
+.Xr tix-release 8
+per the
+.Ev SIGNING
+environment variables above, or it can be signed at a later time.
+.Xr tix-release 8
+is used to publish the signed releases on a signed channel, allowing
+installations to upgrade to the latest release.
 .Ss Following Development
 The
 .Xr following-development 7

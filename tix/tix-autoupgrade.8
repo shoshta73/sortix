@@ -1,0 +1,172 @@
+.Dd February 19, 2025
+.Dt TIX-AUTOUPGRADE 8
+.Os
+.Sh NAME
+.Nm tix-autoupgrade
+.Nd daemon for automated operating system upgrades
+.Sh SYNOPSIS
+.Nm
+.Op Fl C Ar collection
+.Op Fl \-interval Ns = Ns Ar interval
+.Op Fl \-now
+.Op Fl \-once
+.Op Fl \-options Ns = Ns Ar options
+.Op Fl \-no-reboot
+.Op Fl \-reboot
+.Op Fl \-reboot-time Ns = Ns Ar when
+.Sh DESCRIPTION
+.Nm
+is a daemon that does an automated and unattended operating system
+.Xr upgrade 7
+by running
+.Xr tix-upgrade 8 .
+The upgrade will be scheduled for the next boot.
+.Pp
+.Nm
+is configured in
+.Xr collection.conf 5 .
+The specified
+.Ar collection
+is upgraded, defaulting to the root directory collection.
+.Pp
+If no upgrade has ever been attempted, or an upgrade has just happened,
+.Nm
+will attempt an upgrade immediately.
+Otherwise an upgrade will be attempted every
+.Sy AUTOUPGRADE_INTERVAL
+interval (default is
+.Sy 24h )
+since the previous attempt.
+The
+.Sy AUTOUPGRADE_OPTIONS
+options are forwarded to
+.Xr tix-upgrade 8 .
+If an upgrade becomes scheduled and
+.Sy AUTOUPGRADE_REBOOT
+is set to
+.Sy true
+(the default is
+.Sy false ) ,
+then a reboot is scheduled with
+.Xr shutdown 8
+.Fl r
+at
+.Sy AUTOUPGRADE_REBOOT_TIME
+(default is
+.Sy +1 ,
+one minute later).
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl C , \-collection Ns = Ns Ar collection
+Upgrade this
+.Pa collection .
+.It Fl \-interval Ns = Ns Ar interval
+Override
+.Sy AUTOUPGRADE_INTERVAL
+and check for upgrades every
+.Ar interval .
+.It Fl \-now
+Attempt an upgrade immediately.
+Delay signaling daemon readiness until the first attempt has been made.
+.It Fl \-no-reboot
+Override
+.Sy AUTOUPGRADE_REBOOT
+with
+.Sy false
+and do not reboot after an upgrade has been scheduled.
+.It Fl \-once
+Attempt an upgrade immediately and exit 0 afterwards.
+.It Fl \-options Ns = Ns Ar options
+Override
+.Sy AUTOUPGRADE_OPTIONS
+and pass these
+.Ar options
+to
+.Xr tix-upgrade 8 .
+.It Fl \-reboot
+Override
+.Sy AUTOUPGRADE_REBOOT
+with
+.Sy true
+and reboot after an upgrade has been scheduled.
+.It Fl \-reboot-time Ns = Ns Ar when
+Override
+.Sy AUTOUPGRADE_REBOOT_TIME
+and reboot at
+.Ar when
+after an upgrade has been scheduled.
+.El
+.Sh FILES
+.Bl -tag -width "/tix/collection.conf" -compact
+.It Pa /boot/sysmerge/
+New kernel and initrd files.
+.It Pa /sysmerge/
+.Xr sysmerge 8
+upgrades scheduled for the next boot.
+.It Pa /tix/collection.conf
+.Xr collection.conf 5
+configuration.
+.It Pa /var/cache/tix/
+Temporary downloaded of the new release.
+.It Pa /var/cache/tix/autoupgrade.stamp
+Timestamp of the last upgrade attempt.
+.It Pa /var/log/autoupgrade.log
+The default
+.Xr init 5
+log file.
+.El
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGUSR1"
+.It Dv SIGTERM
+Request daemon termination.
+Any in-progress upgrade will be aborted and canceled.
+.El
+.Sh EXIT STATUS
+.Nm
+runs as a
+.Xr daemon 7
+until stopped by
+.Dv SIGTERM .
+.Nm
+signals readiness on the
+.Ev READYFD
+when it has started, before checking for any upgrades.
+.Pp
+.Nm
+exits 0 if
+.Fl \-now
+after an upgrade attempt.
+.Pp
+.Nm
+exits non-zero on any fatal errors.
+.Sh EXAMPLES
+An example
+.Xr collection.conf 5
+configured to automatically upgrade every day and
+reboot at 04:30 AM:
+.Bd -literal -offset indent
+TIX_COLLECTION_VERSION=3
+BUILD_ID=578501924cd5463da9f3cf1e775924970607e504
+PLATFORM=x86_64-sortix
+PREFIX=
+RELEASE_URL=https://example.com/local/channel/stable/1.0
+AUTOUPGRADE_REBOOT=true
+AUTOUPGRADE_REBOOT_TIME=04:30
+.Ed
+.Pp
+The
+.Xr tix-autoupgrade 8
+daemon can be enabled by running:
+.Bd -literal -offset indent
+service autoupgrade enable
+.Ed
+.Sh SEE ALSO
+.Xr collection.conf 5 ,
+.Xr upgrade 7 ,
+.Xr tix 8 ,
+.Xr tix-release 8 ,
+.Xr tix-upgrade 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

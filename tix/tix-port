@@ -61,6 +61,7 @@ for argument do
 
   case $dashdash$argument in
   --) dashdash=yes ;;
+  -C) previous_option=collection ;;
   --build=*) build=$parameter ;;
   --build) previous_option=build ;;
   --cache-package) cache_package=true ;;
@@ -584,5 +585,6 @@ if should_run_step tix-install; then
   tix-install \
     ${collection+--collection="$collection"} \
     --reinstall \
+    --file \
     "$destination/$NAME.tix.tar.xz"
 fi

@@ -15,8 +15,9 @@
 .Ar source
 .Sh DESCRIPTION
 .Nm
-upgrades the current operating system by copying the system files from the
-specified
+does an
+.Xr upgrade 7
+of the current operating system by copying the system files from the specified
 .Ar source
 directory (usually a sysroot) onto the current root filesystem.
 This is meant to be used when building the operating system from source as
@@ -48,6 +49,14 @@ built versions.
 The
 .Xr sysupgrade 8
 program is by contrast an interactive program.
+.Pp
+.Nm
+is one of three supported upgrade methods.
+The other two are upgrading from the network using
+.Xr tix-upgrade 8 ,
+and
+.Xr sysupgrade 8
+from a new .iso release.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
@@ -194,4 +203,5 @@ The pending systen upgrade is stored here.
 .Xr kernel 7 ,
 .Xr upgrade 7 ,
 .Xr sysinstall 8 ,
-.Xr sysupgrade 8
+.Xr sysupgrade 8 ,
+.Xr tix-upgrade 8

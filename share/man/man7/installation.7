@@ -468,6 +468,51 @@ is configured to run
 .Xr display 1
 upon login.
 Otherwise the user's preferred shell will be run upon login.
+.Ss Automatic Upgrades
+You will be asked if you would like to enable automatic operating system
+upgrades from the internet.
+This choice will enable the
+.Sy autoupgrade
+daemon
+.Xr ( tix-autoupgrade 8 )
+which invokes
+.Xr tix-upgrade 8
+in the background.
+Each upgrade will be scheduled for the next boot and is completely unattended.
+Alternatively you can invoke
+.Xr tix-upgrade 8
+to do an
+.Xr upgrade 7
+manually.
+.Pp
+Privacy notice: If enabled, the operating system's website and download mirror
+will be periodically checked for new releases, which will be downloaded and
+installed.
+.Pp
+If enabled, you will be asked whether you would like to automatically restart
+the system after an upgrade has been scheduled.
+You can optionally choose the time or delay before the reboot in the
+.Xr shutdown 8
+format, or choose
+.Sy yes
+which sets a one minute delay.
+Warning messages will be broadcast with
+.Xr wall 1
+to give users a chance to save unfinished work.
+.Pp
+If enabled, you will be asked which upgrade channel the system is on.
+For stable releases, you can choose the stable channel, where every new major,
+minor, and patch stable release is published.
+Alternatively for stable releases, you can select the patch channel, which only
+receives stable patches for the current major and minor release, and may be
+ideal for servers as the fixes are maximally stable and compatible.
+However, the patch channel will not upgrade to new major and minor operating
+system releases, and you will need to upgrade manually.
+The nightly channel offers daily builds with the latest source code, which are
+supported and strives to be as stable as possible, but have not been officially
+released yet.
+On development builds, you can select the appropriate default channel
+associated with the release in question.
 .Ss Network Time
 You will be asked if you want to enable the Network Time Protocol client
 .Xr ntpd 8 ,

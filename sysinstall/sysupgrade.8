@@ -8,20 +8,30 @@
 .Nm sysupgrade
 .Sh DESCRIPTION
 .Nm
-is an interactive command line program that upgrades another installation to the
+is an interactive command line program that does an
+.Xr upgrade 7
+of another installation to the
 current operating system.
 It asks basic questions, searches for existing installations, verifies the
 upgrade makes sense, and upgrades the target system according to
 .Xr upgrade.conf 5
 of the target system.
-The upgrade proceeds as described in
-.Xr upgrade 7 .
 .Pp
 .Nm
 must be run as root with stdin, stdout and stderr all pointing to the terminal.
 It is intended to be run from a live environment and not from an actual
 installation.
+.Pp
+.Nm
+is one of three supported upgrade methods.
+The other two are upgrading from the network using
+.Xr tix-upgrade 8 ,
+and building from source and invoking
+.Xr sysmerge 8
+directly.
 .Sh SEE ALSO
 .Xr autoupgrade.conf 5 ,
 .Xr upgrade 7 ,
-.Xr sysinstall 8
+.Xr sysinstall 8 ,
+.Xr sysmerge 8 ,
+.Xr tix-upgrade 8

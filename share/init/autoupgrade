@@ -1,0 +1,4 @@
+require network
+signal-to group
+reload none
+exec tix-autoupgrade

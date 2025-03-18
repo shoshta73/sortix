@@ -1,0 +1,371 @@
+#!/bin/sh
+# Copyright (c) 2017, 2021, 2023, 2024, 2025 Jonas 'Sortie' Termansen.
+#
+# Permission to use, copy, modify, and distribute this software for any
+# purpose with or without fee is hereby granted, provided that the above
+# copyright notice and this permission notice appear in all copies.
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+# WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+# ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+# WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+# ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+# OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# tix-fetch
+# Download operating system files.
+
+set -e
+
+collection=
+continue=
+insecure_downgrade_to_http=false
+insecure_no_check_certificate=false
+input_release_info=
+input_release_info_sig=
+input_release_pub=
+input_sha256sum=
+output=
+output_directory=
+output_release_info=
+output_release_info_sig=
+output_release_pub=
+output_sha256sum=
+url=false
+url_mirror_release=false
+url_release=false
+url_release_info_sig=false
+url_sha256sum=false
+upgrade=false
+if [ -t 2 ]; then
+  # TODO: This hides errors. Fix wget so it has a quiet, but errors, mode.
+  wget_options_default="-q --show-progress"
+else
+  wget_options_default=-nv
+fi
+wget_options="$wget_options_default"
+
+dashdash=
+previous_option=
+for argument do
+  if test -n "$previous_option"; then
+    eval $previous_option=\$argument
+    previous_option=
+    shift
+    continue
+  fi
+
+  case $argument in
+  *=?*) parameter=$(expr "X$argument" : '[^=]*=\(.*\)' || true) ;;
+  *=)   parameter= ;;
+  *)    parameter=yes ;;
+  esac
+
+  case $dashdash$argument in
+  --) dashdash=yes ;;
+  -c) continue="-c" ;;
+  -C) previous_option=collection ;;
+  -o) previous_option=output ;;
+  -O) previous_option=output_directory ;;
+  -q) wget_options="-q" ;;
+  -v) wget_options="-v" ;;
+  --collection=*) collection=$parameter ;;
+  --collection) previous_option=collection ;;
+  --continue) continue="--continue" ;;
+  --download-default) wget_options="$wget_options_default" ;;
+  --download-non-verbose) wget_options="-nv" ;;
+  --download-quiet) wget_options="-q" ;;
+  --download-quiet-progress) wget_options="-q --show-progress" ;;
+  --download-verbose) wget_options="-v" ;;
+  --input-release-info=*) input_release_info=$parameter ;;
+  --input-release-info) previous_option=input_release_info ;;
+  --input-release-info-sig=*) input_release_info_sig=$parameter ;;
+  --input-release-info-sig) previous_option=input_release_info_sig ;;
+  --input-release-pub=*) input_release_pub=$parameter ;;
+  --input-release-pub) previous_option=input_release_pub ;;
+  --input-sha256sum=*) input_sha256sum=$parameter ;;
+  --input-sha256sum) previous_option=input_sha256sum ;;
+  --insecure-downgrade-to-http) insecure_downgrade_to_http=true ;;
+  --insecure-no-check-certificate) insecure_no_check_certificate=true ;;
+  --nv) wget_options="-nv" ;;
+  --output=*) output=$parameter ;;
+  --output) previous_option=output ;;
+  --output-directory=*) output_directory=$parameter ;;
+  --output-directory) previous_option=output_directory ;;
+  --output-release-info=*) output_release_info=$parameter ;;
+  --output-release-info) previous_option=output_release_info ;;
+  --output-release-info-sig=*) output_release_info_sig=$parameter ;;
+  --output-release-info-sig) previous_option=output_release_info_sig ;;
+  --output-release-pub=*) output_release_pub=$parameter ;;
+  --output-release-pub) previous_option=output_release_pub ;;
+  --output-sha256sum=*) output_sha256sum=$parameter ;;
+  --output-sha256sum) previous_option=output_sha256sum ;;
+  --output-upgrade-info=*) output_upgrade_info=$parameter ;;
+  --output-upgrade-info) previous_option=output_upgrade_info ;;
+  --upgrade) upgrade=true ;;
+  --url) url=true; wget_options="-q" ;;
+  --url-mirror-release) url_mirror_release=true; wget_options="-q" ;;
+  --url-release) url_release=true; wget_options="-q" ;;
+  --url-release-info-sig) url_release_info_sig=true; wget_options="-q" ;;
+  --url-sha256sum) url_sha256sum=true; wget_options="-q" ;;
+  --wget-options) previous_option=wget_options ;;
+  --wget-options=*) wget_options=$parameter ;;
+  -*) echo "$0: unrecognized option $argument" >&2
+      exit 1 ;;
+  *) break ;;
+  esac
+
+  shift
+done
+
+if test -n "$previous_option"; then
+  echo "$0: option '$argument' requires an argument" >&2
+  exit 1
+fi
+
+tmpdir=$(mktemp -dt tix-fetch.XXXXXX)
+trap 'rm -rf -- "$tmpdir"' EXIT HUP INT QUIT TERM
+
+collection_conf="${collection%/}/tix/collection.conf"
+PLATFORM=$(tix-vars "$collection_conf" PLATFORM)
+RELEASE_URL=$(tix-vars "$collection_conf" RELEASE_URL)
+MIRROR=$(tix-vars -d '' "$collection_conf" MIRROR)
+FORCE_MIRROR=$(tix-vars -d false "$collection_conf" FORCE_MIRROR)
+USER_AGENT="$(uname -s)/$(uname -r) (tix-fetch; $(uname -m); $(uname -v))"
+
+input_release_pub="${input_release_pub:-${collection%/}/tix/release.pub}"
+
+if $insecure_no_check_certificate; then
+  echo "$0: warning: insecurely not checking https certificates" >&2
+  wget_options="$wget_options --no-check-certificate"
+fi
+if $insecure_downgrade_to_http; then
+  echo "$0: warning: insecurely downloading without https" >&2
+  RELEASE_URL="$(echo "$RELEASE_URL" | sed -E 's,^https:,http:,')"
+fi
+
+if $url_release; then
+  printf "%s\n" "$RELEASE_URL"
+  exit
+elif $url_release_info_sig; then
+  printf "%s\n" "$RELEASE_URL/release.info.sig"
+  exit
+fi
+
+# HACK: Provide more useful errors when wget is silent:
+do_wget() {
+  (set +e
+   wget "$@"
+   status=$?
+   set -e
+   what=
+   case $status in
+   0) exit 0 ;;
+   1) what="Generic error" ;;
+   2) what="Parse error" ;;
+   3) what="File I/O error" ;;
+   4) what="Network I/O error" ;;
+   5) what="Transport Layer Security verification failure" ;;
+   6) what="Username/password failure" ;;
+   7) what="Protocol error" ;;
+   8) what="Error response" ;;
+   *) what="Exit code $status" ;;
+   esac
+   echo "$0: $what when running: wget $@" >&2
+   exit $status)
+}
+
+download_release_sh() {
+  (cd "$tmpdir" &&
+   do_wget -U "$USER_AGENT" $wget_options -O release.info.sig \
+           -- "$RELEASE_URL/release.info.sig")
+  signify -Vq -p "$input_release_pub" -em "$tmpdir/release.info"
+}
+
+# Download the signed release information.
+true > "$tmpdir/upgrade.info"
+if [ -z "$input_release_info" -a -z "$input_release_info_sig" ]; then
+  download_release_sh
+  tix-vars "$tmpdir/release.info" | \
+  grep -E '^UPGRADE_' | \
+  cat > "$tmpdir/upgrade.info"
+  # Accept an upgrade to a new release if requested
+  UPGRADE_RELEASE_URL=$(tix-vars -d '' "$tmpdir/upgrade.info" \
+                                 UPGRADE_RELEASE_URL)
+  if $insecure_downgrade_to_http; then
+    UPGRADE_RELEASE_URL="$(echo "$UPGRADE_RELEASE_URL" |
+                           sed -E 's,^https:,http:,')"
+  fi
+  if $upgrade && [ -n "$UPGRADE_RELEASE_URL" ]; then
+    RELEASE_URL="$UPGRADE_RELEASE_URL"
+    # Download the new public key (if any) which is signed by this release.
+    UPGRADE_RELEASE_PUB_SHA256SUM=$(tix-vars -d '' "$tmpdir/upgrade.info" \
+                                             UPGRADE_RELEASE_KEY_SHA256SUM)
+    if [ -n "$UPGRADE_RELEASE_PUB_SHA256SUM" ]; then
+      (cd "$tmpdir" &&
+       do_wget -U "$USER_AGENT" $wget_options -O release.pub \
+               -- "$RELEASE_URL/release.pub")
+      echo "$UPGRADE_RELEASE_PUB_SHA256SUM  $tmpdir/release.pub" |
+      sha256sum -c --quiet
+      input_release_pub="$tmpdir/release.pub"
+    fi
+    download_release_sh
+  fi
+fi
+
+# Verify the release information signature.
+if [ -n "$input_release_info" ]; then
+  cp -T -- "$input_release_info" "$tmpdir/release.info"
+elif [ -n "$input_release_info_sig" ]; then
+  signify -Vq -p "$input_release_pub" -em "$tmpdir/release.info"
+fi
+
+# Store the verified release files if requested.
+if [ -n "$output_release_pub" ]; then
+  cp -T -- "$input_release_pub" "$output_release_pub"
+fi
+if [ -n "$output_release_info_sig" ]; then
+  cp -T -- "$tmpdir/release.info.sig" "$output_release_info_sig"
+fi
+if [ -n "$output_release_info" ]; then
+  cp -T -- "$tmpdir/release.info" "$output_release_info"
+fi
+if [ -n "$output_upgrade_info" ]; then
+  cp -T -- "$tmpdir/upgrade.info" "$output_upgrade_info"
+fi
+
+# Load the release description.
+SHA256SUM_SHA256SUM=$(tix-vars "$tmpdir/release.info" SHA256SUM_SHA256SUM)
+
+# If a channel with mirrors is used, default to the main mirror but switch to
+# the preferred mirror if the release description knows about the mirror and
+# believes it to be trustworthy.
+if tix-vars -t "$tmpdir/release.info" MIRRORS; then
+  RELEASE=$(tix-vars "$tmpdir/release.info" RELEASE)
+  MIRRORS=$(tix-vars -d '' "$tmpdir/release.info" MIRRORS)
+  unset choice
+  for POTENTIAL_MIRROR in $MIRRORS; do
+    choice=${choice-$POTENTIAL_MIRROR}
+    if [ "$POTENTIAL_MIRROR" = "$MIRROR" ]; then
+      choice="$MIRROR"
+    fi
+  done
+  if [ -n "$MIRROR" ] && [ "$choice" != "$MIRROR" ]; then
+    if [ "$FORCE_MIRROR" = true ]; then
+      choice="$MIRROR"
+    else
+      echo "$0: warning: ignoring unsupported mirror $MIRROR" >&2
+    fi
+  fi
+  RELEASE_URL="$choice/release/$RELEASE"
+fi
+
+if $insecure_downgrade_to_http; then
+  RELEASE_URL="$(echo "$RELEASE_URL" | sed -E 's,^https:,http:,')"
+fi
+
+if $url_mirror_release; then
+  printf "%s\n" "$RELEASE_URL"
+  exit
+fi
+
+escape_extended_regex() {
+  printf "%s\n" "$1" | sed -E -e 's/[[$()*?\+.^{|}]/\\\0/g'
+}
+
+download() {
+  # If download is resumable, store the file directly to the destination path.
+  # Otherwise download to a temporary directory and move only to the final
+  # location if the cryptographic check is passed.
+  HASH=$(grep -E "^[a-zA-Z0-9]+  $(escape_extended_regex "$FULL_REQUEST")$" \
+              "$input_sha256sum" | grep -Eo "^[a-zA-Z0-9]+" || true)
+  if [ -n "$continue" ]; then
+    DOWNLOAD_DIR=$(dirname -- "$FINAL")
+    BASENAME=$(basename -- "$FINAL")
+    OUTPUT="$FINAL"
+    # Delete a partial file if the desired hash changed mid-download.
+    if [ -e "$OUTPUT.hash" ]; then
+      if [ "`cat "$OUTPUT.hash"`" != "$HASH" ]; then
+        rm -f -- "$OUTPUT" "$OUTPUT.hash"
+      fi
+    # Use an existing file if it's correct, otherwise redownload.
+    elif [ -e "$OUTPUT" ]; then
+      if echo "$HASH  $BASENAME" |
+         (cd "$DOWNLOAD_DIR" && sha256sum --status -c); then
+        return
+      fi
+      rm -f -- "$OUTPUT"
+    fi
+  else
+    DOWNLOAD_DIR="$tmpdir/download"
+    BASENAME=$(basename -- "$FULL_REQUEST")
+    OUTPUT="$DOWNLOAD_DIR/$BASENAME"
+  fi
+
+  mkdir -p -- "$(dirname -- "$OUTPUT")"
+  # Fetch the file.
+  if [ -n "$continue" ]; then echo "$HASH" > "$OUTPUT.hash"; fi
+  (cd "$DOWNLOAD_DIR" &&
+   do_wget -U "$USER_AGENT" $wget_options $continue -O "$BASENAME" \
+           -- "$RELEASE_URL/$FULL_REQUEST")
+  if [ -n "$continue" ]; then rm -f -- "$OUTPUT.hash"; fi
+
+  # Verify the cryptographic integrity of the fetched file.
+  ABSOLUTE_OUTPUT=$(realpath -- "$OUTPUT")
+  ABSOLUTE_SHA256SUM=$(realpath -- "$input_sha256sum")
+  mkdir -p -- "$tmpdir/check"
+  (cd "$tmpdir/check" &&
+   mkdir -p -- "$(dirname -- "$FULL_REQUEST")"
+   ln -s -- "$ABSOLUTE_OUTPUT" "$FULL_REQUEST"
+   if ! echo "$HASH  $FULL_REQUEST" | sha256sum --quiet -c; then
+    # Don't leave behind a file that didn't pass a cryptographic check.
+    if [ -n "$continue" ]; then
+      echo "error: Deleting corrupted output file: $OUTPUT" 2>&1
+      rm -f -- "$ABSOLUTE_OUTPUT"
+    fi
+    exit 1
+   fi)
+  rm -rf -- "$tmpdir/check"
+
+  # Move the file to the final destination if not already there.
+  if [ -z "$continue" ]; then
+    mkdir -p -- "$(dirname -- "$FINAL")"
+    cp -T -- "$OUTPUT" "$FINAL"
+    rm -rf -- "$tmpdir/download"
+  fi
+}
+
+# Stop early if there's nothing to do.
+if [ -z "$output_sha256sum" -a $# = 0 ] && ! $url_sha256sum; then exit; fi
+
+# Fetch sha256sum file and check its SHA256 hash with the release description.
+if [ -z "$input_sha256sum" ]; then
+  input_sha256sum="$tmpdir/sha256sum.sha256sum"
+  echo "$SHA256SUM_SHA256SUM  sha256sum" > "$input_sha256sum"
+  FULL_REQUEST=sha256sum
+  if $url_sha256sum; then
+    printf '%s\n' "$RELEASE_URL/$FULL_REQUEST"
+    exit
+  fi
+  FINAL="${output_sha256sum:-$tmpdir/sha256sum}"
+  download
+  input_sha256sum="$FINAL"
+fi
+
+# Fetch each of the specified signed files from the mirror.
+for REQUEST; do
+  FULL_REQUEST="repository/$PLATFORM/$REQUEST"
+  if $url; then
+    printf '%s\n' "$RELEASE_URL/$FULL_REQUEST"
+    exit
+  fi
+  if [ -n "$output" ]; then
+    FINAL="$output"
+  elif [ -n "$output_directory" ]; then
+    FINAL="$output_directory/$REQUEST"
+  else
+    FINAL="$REQUEST"
+  fi
+  download
+done

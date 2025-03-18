@@ -1,0 +1,196 @@
+.Dd February 17, 2025
+.Dt TIX-UPGRADE 8
+.Os
+.Sh NAME
+.Nm tix-upgrade
+.Nd upgrade to a new release via the network
+.Sh SYNOPSIS
+.Nm
+.Op Fl C Ar collection
+.Op Fl \-cachedir Ns = Ns Ar directory
+.Op Fl \-cancel
+.Op Fl \-check
+.Op Fl \-clean
+.Op Fl \-fetch-options Ns = Ns Ar options
+.Op Fl \-force
+.Op Fl \-insecure-downgrade-to-http
+.Op Fl \-insecure-no-check-certificate
+.Op Fl \-is-reboot-needed
+.Op Fl \-loop
+.Op Fl \-no-upgrade
+.Op Fl \-now
+.Op Fl \-ports
+.Op Fl \-reinstall
+.Op Fl \-system
+.Op Fl \-upgrade
+.Op Fl \-wait
+.Sh DESCRIPTION
+.Nm
+does an
+.Xr upgrade 7
+of the installation to a new release, if available.
+.Nm
+uses
+.Xr tix-fetch 8
+to download the new release information and packages, verifies the signatures,
+prepares a new system image, and invokes
+.Xr sysmerge 8
+to perform the upgrade.
+If the collection is a system installation, then the upgrade is scheduled for
+the next boot.
+.Pp
+The specified
+.Ar collection
+is upgraded, defaulting to the root directory collection.
+The
+.Sy RELEASE_URL
+variable in the
+.Xr collection.conf 5
+configuration file points to the URL of a channel or release, as per
+.Xr tix-release 8 .
+The public key in
+.Pa $collection/tix/release.pub
+is used to verify the release signature.
+If the URL points to a channel, which has an upgrade available for the current
+version, then the upgrade is accepted unless
+.Fl \-no-upgrade
+is passed.
+Otherwise if a new build is available of the same release, then the new build
+is installed.
+.Nm
+exits immediately if no new build or upgrade is available.
+.Pp
+The download of a previous partial upgrade is resumed, unless the release
+checksums have since changed.
+Upgrades can be automatically installed by enabling the
+.Xr tix-autoupgrade 8
+daemon.
+The set of installed packages is automatically adjusted based on the repository
+metadata, handling renamed packages, split packages, deleted packages, and
+packages with new runtime dependencies.
+.Pp
+.Nm
+is one of three supported upgrade methods.
+The other two are
+.Xr sysupgrade 8
+from a new .iso release, and building from source and invoking
+.Xr sysmerge 8
+directly.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl \-cachedir Ns = Ns Ar directory
+Store the temporary downloaded files in this
+.Pa directory
+rather than the default
+.Pa $collection/var/cache/tix .
+.It Fl \-cancel
+Cancel a scheduled
+.Xr sysmerge 8
+for the next boot.
+.It Fl \-check
+Exit 0 if an upgrade is available, and exit 1 otherwise.
+.It Fl \-clean
+Clean the cache before performing the upgrade.
+Use
+.Xr tix-clean 8
+to only clean without upgrading.
+.It Fl C , \-collection Ns = Ns Ar collection
+Upgrade this
+.Pa collection .
+.It Fl \-fetch-options Ns = Ns Ar options
+Pass these options to
+.Xr tix-fetch 8 .
+This option is useful to set the download verbosity.
+.It Fl \-force
+Upgrade to the same build, even if no new build and no new upgrade is available.
+.It Fl \-insecure-downgrade-to-http
+Downgrade the release URL from HTTPS to an insecure HTTP download.
+.Pp
+Warning: HTTP downloads makes it possible for man-in-the-middle attacks to
+interfere with the download and enables eavesdropping.
+However, the release is still cryptographically signed as a secondary layer of
+protection, which still protects the download integrity.
+This option is useful in the future when the client and server may not have
+overlapping cryptographic protocols and ciphers.
+.It Fl \-insecure-no-check-certificate
+Don't check the HTTPS certificates.
+.Pp
+Warning: HTTPS downloading without trusting the certificate makes it possible
+for man-in-the-middle attacks to interfere with the download and enables
+eavesdropping.
+However, the release is still cryptographically signed as a secondary layer of
+protection, which still protects the download integrity.
+.It Fl \-is-reboot-needed
+Exit 0 if an upgrade is scheduled for the next boot, and exit 1 otherwise.
+.It Fl \-loop
+Enable the
+.Xr tix-autoupgrade 8
+daemon to repeatedly upgrade to new releases, all the way to the latest release.
+.It Fl \-no-upgrade
+Don't accept upgrades to a new release, but look for a new build of the same
+release.
+.It Fl \-now
+Perform the upgrade now, rather than scheduling it for the next boot.
+.Pp
+This behavior is the default if the collection is not a system installation.
+Note this method may not be available if the upgrade is across an incompatible
+ABI change, which will implicitly force
+.Fl \-wait .
+.It Fl \-ports
+Upgrade the ports.
+If
+.Fl \-system
+is not set, then
+.Fl \-now
+is implied.
+If neither this option nor
+.Fl \-system
+are set, then both options are set by default.
+.It Fl \-reinstall
+Reinstall the same build and do not upgrade to a new release.
+This option is equivalent to
+.Fl \-force
+and
+.Fl \-no-upgrade .
+.It Fl \-system
+Upgrade the system.
+If neither this option nor
+.Fl \-port
+are set, then both options are set by default.
+.It Fl \-upgrade
+Accept upgrades to a new release.
+This behavior is the default.
+.It Fl \-wait
+Schedule the upgrade for the next boot.
+.Pp
+This behavior is the default if the collection is a system installation.
+This option requires the collection to be a system installation.
+.El
+.Sh FILES
+.Bl -tag -width "/tix/collection.conf" -compact
+.It Pa /boot/sysmerge/
+New kernel and initrd files.
+.It Pa /sysmerge/
+.Xr sysmerge 8
+upgrades scheduled for the next boot.
+.It Pa /tix/collection.conf
+.Xr collection.conf 5
+configuration.
+.It Pa /var/cache/tix/
+Temporary downloaded of the new release.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr collection.conf 5 ,
+.Xr upgrade 7 ,
+.Xr sysmerge 8 ,
+.Xr sysupgrade 8 ,
+.Xr tix 8 ,
+.Xr tix-autoupgrade 8 ,
+.Xr tix-release 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.

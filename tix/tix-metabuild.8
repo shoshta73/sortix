@@ -6,9 +6,10 @@
 .Nd build packages from ports
 .Sh SYNOPSIS
 .Nm
+.Op Fl C Ar collection
 .Op Fl \-build Ns = Ns Ar triplet
+.Op Fl \-build-id Ns = Ns Ar build-id
 .Op Fl \-cache-package
-.Op Fl \-collection Ns = Ns Ar collection
 .Op Fl \-destination Ns = Ns Ar directory
 .Op Fl \-distclean
 .Op Fl \-end Ns = Ns Ar step
@@ -21,17 +22,27 @@
 .Op Fl \-metadata
 .Op Fl \-mirror Ns = Ns Ar url
 .Op Fl \-mirror-directory Ns = Ns Ar directory
+.Op Fl \-mirrors Ns = Ns Ar urls
 .Op Fl \-packages Ns = Ns Ar packages
 .Op Fl \-prefix Ns = Ns Ar prefix
+.Op Fl \-public-key Ns = Ns Ar path
 .Op Fl \-randomize
+.Op Fl \-release Ns = Ns Ar release
 .Op Fl \-release-directory Ns = Ns Ar directory
+.Op Fl \-release-key Ns = Ns Ar file
+.Op Fl \-release-info
+.Op Fl \-release-url Ns = Ns Ar url
 .Op Fl \-repository Ns = Ns Ar directory
+.Op Fl \-secret-key Ns = Ns Ar path
+.Op Fl \-sign
 .Op Fl \-start Ns = Ns Ar step
 .Op Fl \-sysroot Ns = Ns Ar directory
+.Op Fl \-sysroot-download-packages Ns = Ns Ar packages
 .Op Fl \-sysroots Ns = Ns Ar directory
 .Op Fl \-tar Ns = Ns Ar path
 .Op Fl \-target Ns = Ns Ar triplet
 .Op Fl \-tmp Ns = Ns Ar directory
+.Op Fl \-version Ns = Ns Ar version
 .Ar ports
 .Sh DESCRIPTION
 .Nm
@@ -57,8 +68,19 @@ for the official ports.
 If the end of the build is beyond the
 .Sy clean
 phase, then the tix collection is automatically created if needed using
-.Xr tix-collection 8
+.Xr tix-create 8
 before the builds begin.
+.Pp
+Optionally
+.Nm
+can create a tix release and sign it per the
+.Fl \-metadata ,
+.Fl \-release-info ,
+and
+.Fl \-sign
+options which invoke
+.Xr tix-repository 8
+appropriately.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
@@ -67,13 +89,20 @@ The platform
 .Ar triplet
 for the machine the port is built on.
 (Default: Automatically detected.)
+.It Fl \-build-id Ns = Ns Ar build-id
+The overall build identifier, such as a git commit hash, forwarded to the
+.Xr tix-create 8
+and
+.Xr tix-release 8
+.Sy release
+invocations.
 .It Fl \-cache-package
 Skip the build if the binary package already exists and is the right version.
-.It Fl \-collection Ns = Ns Ar collection
+.It Fl C , \-collection Ns = Ns Ar collection
 Install the binary package into this
 .Ar collection
 created with
-.Xr tix-collection 8 .
+.Xr tix-create 8 .
 (Default:
 .Fl \-sysroot
 plus
@@ -190,6 +219,16 @@ in the layout that can be used as a mirror for the
 option.
 (Default:
 .Ar port Ns Pa .mirror )
+.It Fl \-mirrors Ns = Ns Ar url
+The space-separated URLs to the mirrors in the release information.
+Forwarded to the
+.Xr tix-repository 8
+.Sy release
+invocation.
+This option is usually not used, as the mirror feature should be used in a
+.Xr tix-repository 8
+.Sy channel
+instead.
 .It Fl \-packages Ns = Ns Ar packages
 Build these
 .Ar packages
@@ -201,8 +240,23 @@ The defaullt is
 Build the port into this
 .Ar prefix .
 (Default: The empty prefix designating the root directory)
+.It Fl \-public-key Ns = Ns Ar path
+The public key to use for the
+.Fl \-sign
+option.
+Forwarded to the
+.Xr tix-repository 8
+.Sy sign
+invocation.
 .It Fl \-randomize
 Build the ports in a random order while still respecting the build dependencies.
+.It Fl \-release Ns = Ns Ar release
+The name of the
+.Ar release .
+Forwarded to the
+.Xr tix-repository 8
+.Sy release
+invocation.
 .It Fl \-release-directory Ns = Ns Ar release
 Place the binary package inside the
 .Pa $release/repository/$host
@@ -211,12 +265,60 @@ directory, if the
 and
 .Fl \-repository
 options are not set.
+.It Fl \-release-key Ns = Ns Ar file
+Copy the release public key from the
+.Pa file ,
+forwarded to the
+.Xr tix-create 8
+invocation.
+.It Fl \-release-info
+Generate the top-level release information by invoking
+.Xr tix-repository 8
+.Sy release .
+Implies the
+.Fl \-metadata
+option and requires the
+.Fl \-build-id ,
+.Fl \-release ,
+and
+.Fl \-version
+options to be set.
+.It Fl \-release-url Ns = Ns Ar url
+The url to the location where the release being built will be published,
+.Pa file ,
+forwarded to the
+.Xr tix-create 8
+invocation.
 .It Fl \-repository Ns = Ns Ar repository
 Place the binary package inside the
 .Pa $repository/$host
 directory, if the
 .Fl \-destination
 option is not set.
+.It Fl \-secret-key Ns = Ns Ar path
+The secret key to use for the
+.Fl \-sign
+option.
+Forwarded to the
+.Xr tix-repository 8
+.Sy sign
+invocation.
+.It Fl \-sign
+Sign the top-level release information by invoking
+.Xr tix-repository 8
+.Sy sign .
+Implies the
+.Fl \-metadata
+and
+.Fl \-release-info
+option and requires the
+.Fl \-build-id ,
+.Fl \-public-key ,
+.Fl \-release ,
+.Fl \-secret-key ,
+and
+.Fl \-version
+options to be set.
 .It Fl \-start Ns = Ns Ar step
 Start the build at this step (see
 .Fl \-end ) .
@@ -225,6 +327,17 @@ Start the build at this step (see
 .It Fl \-sysroot Ns = Ns Ar directory
 The system root to use while building and installing the port.
 The toolchain is wrapped to transparently use this sysroot during the build.
+.It Fl \-sysroot-download-packages Ns = Ns Ar packages
+Create a collection with
+.Xr tix-create 8
+inside the system root if needed by importing the configuration from the
+.Pa /
+collection, and then download and install the packages in the space-separated
+.Ar packages
+list along with their runtime dependencies.
+The
+.Sy system
+package is useful to get the headers and libraries for the base system.
 .It Fl \-sysroots Ns = Ns Ar directory
 In combination with
 .Fl \-hosts,
@@ -249,18 +362,84 @@ Place temporary files in this
 .Ev TMPDIR
 if set otherwise
 .Pa /tmp )
+.It Fl \-version Ns = Ns Ar version
+The
+.Ar version
+number of the release.
+Forwarded to the
+.Xr tix-repository 8
+.Sy release
+invocation.
 .El
 .Sh EXIT STATUS
 .Nm
 will exit 0 on success and non-zero otherwise.
+.Sh EXAMPLES
+.Ss Create a new tix release
+First create a signing key either to be reused across releases, or a per-release
+signing key to be rotated:
+.Bd -literal
+mkdir -p keys
+signify -G -c 'local repository signing key' -p keys/local.pub -s keys/local.sec
+.Ed
+.Pp
+Use the
+.Xr signify 1
+.Fl n
+option to omit the password for unattended signing.
+.Pp
+Create a tix release with custom
+.Xr port 5
+packages from the
+.Pa ports
+directory, meant to be installed into
+.Pa /local ,
+cross-compiling to multiple hosts using downloaded system roots
+containing the base system, and create it as the 1.0 release signed with the
+secret key:
+.Bd -literal
+tix-metabuild \\
+  --build-id=$(git rev-parse HEAD) \\
+  --hosts='i686-sortix x86_64-sortix' \\
+  --prefix=/local \\
+  --public-key=keys/local.pub \\
+  --release=1.0 \\
+  --release-directory=release/1.0 \\
+  --secret-key=keys/local.sec \\
+  --sign \\
+  --sysroot-download-packages=minimal \\
+  --sysroots=sysroots \\
+  --version=1.0 \\
+  ports
+.Ed
+.Pp
+The
+.Pa release
+directory can published after signing.
+.Pp
+Next use the
+.Xr tix-release 8
+.Sy channel
+command to provide a layer of indirection with dynamic data such as available
+upgrades and available mirrors.
+The release directory is meant to be immutable whereas the channel is modified
+and re-signed as needed.
+See
+.Xr tix-repository 8
+for more information.
 .Sh SEE ALSO
+.Xr signify 1 ,
 .Xr port 5 ,
 .Xr development 7 ,
 .Xr porting 7 ,
-.Xr tix-collection 8 ,
+.Xr tix 8 ,
+.Xr tix-create 8 ,
 .Xr tix-install 8 ,
 .Xr tix-list-packages 8 ,
-.Xr tix-port 8
+.Xr tix-port 8 ,
+.Xr tix-release 8 ,
+.Xr tix-repository 8 ,
+.Xr tix-uninstall 8
 .Sh HISTORY
 .Nm
 originally appeared in Sortix 1.1.

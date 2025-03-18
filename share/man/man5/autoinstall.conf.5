@@ -256,6 +256,34 @@ Enable the
 graphical user interface?
 The choice is remembered in
 .Xr session 5 .
+.It Sy enable_autoupgrade Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
+Enable automatically upgrading the operating system with
+.Xr tix-autoupgrade 8 ?
+The choice is remembered in
+.Xr collection.conf 5 .
+.It Sy enable_autoupgrade_reboot "=" Ns Oo Sy no "|" Sy yes "|" Ar when Oc ( default Sy no )
+Automatically reboot to upgrade after scheduling an upgrade in
+.Xr tix-autoupgrade 8 ,
+and if so, when?
+If
+.Sy no ,
+don't reboot.
+If
+.Sy yes ,
+then reboot one minuter later.
+Otherwise, ask
+.Xr shutdown 8
+to reboot at the time specified by
+.Ar when.
+The choice is remembered in
+.Xr collection.conf 5 .
+.It Sy channel Ns "=" Ns Ar channel No ( default is unchanged )
+Change the release channel to
+.Ar channel .
+The choice updates the
+.Sy RELEASE_URL
+variable in
+.Xr collection.conf 5 .
 .It Sy enable_ntpd Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy no )
 Automatically get time from the network using
 .Xr ntpd 8 ?

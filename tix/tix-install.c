@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015-2017, 2020, 2022-2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015-2017, 2020, 2022-2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <getopt.h>
 #include <libgen.h>
 #include <limits.h>
 #include <signal.h>
@@ -40,49 +41,7 @@
 
 #include "util.h"
 
-void TipTixCollection(const char* prefix)
-{
-	warnx("error: `%s' isn't a tix collection, use \"tix-collection %s "
-	      "create\" before " "installing packages.", prefix, prefix);
-}
-
-void VerifyTixCollection(const char* prefix)
-{
-	if ( !IsDirectory(prefix) )
-	{
-		if ( errno == ENOENT )
-			TipTixCollection(prefix);
-		err(1, "error: tix collection unavailable: `%s'", prefix);
-	}
-}
-
-void VerifyTixDirectory(const char* prefix, const char* tix_dir)
-{
-	if ( !IsDirectory(tix_dir) )
-	{
-		if ( errno == ENOENT )
-			TipTixCollection(prefix);
-		err(1, "error: tix database unavailable: `%s'", tix_dir);
-	}
-}
-
-void VerifyTixDatabase(const char* prefix,
-                       const char* tixdb_path)
-{
-	if ( !IsDirectory(tixdb_path) )
-		err(1, "error: tix database unavailable: `%s'", tixdb_path);
-	char* info_path = join_paths(tixdb_path, "collection.conf");
-	if ( !IsFile(info_path) )
-	{
-		if ( errno == ENOENT )
-			TipTixCollection(prefix);
-		err(1, "error: tix collection information unavailable: `%s'",
-		        info_path);
-	}
-	free(info_path);
-}
-
-bool IsPackageInstalled(const char* tixdb_path, const char* package)
+static bool IsPackageInstalled(const char* tixdb_path, const char* package)
 {
 	char* tixinfo_dir = join_paths(tixdb_path, "tixinfo");
 	if ( !tixinfo_dir )
@@ -97,7 +56,7 @@ bool IsPackageInstalled(const char* tixdb_path, const char* package)
 }
 
 // TODO: After releasing Sortix 1.1, delete generation 2 compatibility.
-void MarkPackageAsInstalled(const char* tixdb_path, const char* package)
+static void MarkPackageAsInstalled(const char* tixdb_path, const char* package)
 {
 	char* installed_list_path = join_paths(tixdb_path, "installed.list");
 	FILE* installed_list_fp = fopen(installed_list_path, "a");
@@ -112,96 +71,95 @@ void MarkPackageAsInstalled(const char* tixdb_path, const char* package)
 	free(installed_list_path);
 }
 
-static void help(FILE* fp, const char* argv0)
+static bool ends_with(const char* str, const char* end)
 {
-	fprintf(fp, "Usage: %s [OPTION]... [--collection=PREFIX] PACKAGE...\n", argv0);
-	fprintf(fp, "Install a tix into a tix collection.\n");
+	size_t len = strlen(str);
+	size_t endlen = strlen(end);
+	return endlen <= len && !strcmp(str + len - endlen, end);
 }
 
-static void version(FILE* fp, const char* argv0)
+static int strcmp_indirect(const void* a_ptr, const void* b_ptr)
 {
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
+	const char* a = *(const char* const*) a_ptr;
+	const char* b = *(const char* const*) b_ptr;
+	return strcmp(a, b);
 }
 
-static char* collection = NULL;
-static bool reinstall = false;
-static bool quiet = false;
-static char* tix_directory_path = NULL;
+static bool file;
+static const char* collection = "/";
+static bool package;
+static bool quiet;
+static bool reinstall;
+
+static char* tix_directory_path;
 static int generation;
 static const char* coll_prefix;
 static const char* coll_platform;
 
-void InstallPackage(const char* tix_path);
+void ResolvePackages(string_array_t* packages, string_array_t* fetch_argv);
+void InstallPackage(const char* package, string_array_t* fetch_argv);
+void InstallFile(const char* tix_path);
 
 int main(int argc, char* argv[])
 {
-	collection = strdup("/");
-
-	const char* argv0 = argv[0];
-	for ( int i = 0; i < argc; i++ )
+	enum
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		OPT_REINSTALL = 256,
+	};
+	const struct option longopts[] =
+	{
+		{"collection", required_argument, NULL, 'C'},
+		{"file", no_argument, NULL, 'f'},
+		{"package", no_argument, NULL, 'p'},
+		{"quiet", no_argument, NULL, 'q'},
+		{"reinstall", no_argument, NULL, OPT_REINSTALL},
+		{0, 0, 0, 0}
+	};
+	const char* opts = "C:fpq";
+	int opt;
+	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
+	{
+		switch ( opt )
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			case 'q': quiet = true; break;
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
-			}
-		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
-		else if ( GET_OPTION_VARIABLE("--collection", &collection) ) { }
-		else if ( !strcmp(arg, "--reinstall") )
-			reinstall = true;
-		else if ( !strcmp(arg, "--quiet") )
-			quiet = true;
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
+		case 'C': collection = optarg; break;
+		case 'f': file = true; package = false; break;
+		case 'p': file = false; package = true; break;
+		case 'q': quiet = true; break;
+		case OPT_REINSTALL: reinstall = true; break;
+		default: return 1;
 		}
 	}
 
-	if ( argc == 1 )
-	{
-		help(stdout, argv0);
-		exit(0);
-	}
+	if ( !collection[0] )
+		collection = "/";
 
-	compact_arguments(&argc, &argv);
-
-	if ( argc <= 1 )
-	{
-		fprintf(stderr, "%s: no package specified\n", argv0);
-		exit(1);
-	}
-
-	if ( !*collection )
-	{
-		free(collection);
-		collection = strdup("/");
-	}
-
-	VerifyTixCollection(collection);
+	if ( argc - optind < 1 )
+		errx(1, "expected package to install");
 
 	tix_directory_path = join_paths(collection, "tix");
-	VerifyTixDirectory(collection, tix_directory_path);
-	VerifyTixDatabase(collection, tix_directory_path);
-
 	char* coll_conf_path = join_paths(tix_directory_path, "collection.conf");
+	if ( !tix_directory_path || !coll_conf_path )
+		err(1, "malloc");
+
+	if ( !IsDirectory(collection) )
+	{
+		if ( errno == ENOENT )
+			errx(1, "%s is not a tix collection", collection);
+		err(1, "%s", collection);
+	}
+	else if ( !IsDirectory(tix_directory_path) )
+	{
+		if ( errno == ENOENT )
+			errx(1, "%s is not a tix collection", collection);
+		err(1, "%s", tix_directory_path);
+	}
+	else if ( !IsFile(coll_conf_path) )
+	{
+		if ( errno == ENOENT )
+			errx(1, "%s is not a tix collection", collection);
+		err(1, "%s", coll_conf_path);
+	}
+
 	string_array_t coll_conf = string_array_make();
 	switch ( variables_append_file_path(&coll_conf, coll_conf_path) )
 	{
@@ -233,14 +191,70 @@ int main(int argc, char* argv[])
 	else
 		errx(1, "%s: Unsupported TIX_COLLECTION_VERSION: %i",
 		     coll_conf_path, generation);
-	if ( !coll_prefix )
-		err(1, "%s: No PREFIX was set", coll_conf_path);
-	if ( !coll_platform )
-		err(1, "%s: No PLATFORM was set", coll_conf_path);
 
-	for ( int i = 1; i < argc; i++ )
-		InstallPackage(argv[i]);
+	const char* fetch_options = dictionary_get(&coll_conf, "FETCH_OPTIONS");
+	string_array_t fetch_argv = string_array_make();
+	if ( !string_array_append(&fetch_argv, "tix-fetch") )
+		err(1, "malloc");
+	if ( fetch_options )
+	{
+		char* copy = strdup(fetch_options);
+		if ( !copy )
+			err(1, "malloc");
+		char* state = copy;
+		char* arg;
+		while ( (arg = strsep(&state, " \t\n")) )
+		{
+			if ( !*arg )
+				continue;
+			if ( *arg && !string_array_append(&fetch_argv, arg) )
+				err(1, "malloc");
+		}
+		free(copy);
+	}
 
+	// TODO: After releasing Sortix 1.1, drop the implicit detection of the
+	//       .tix.tar.xz file extension and require -f.
+	if ( !package || !file )
+	{
+		for ( int i = optind; i < argc; i++ )
+		{
+			if ( ends_with(argv[i], ".tix.tar.xz") )
+			{
+				file = true;
+				break;
+			}
+		}
+	}
+
+	if ( file )
+	{
+		for ( int i = optind; i < argc; i++ )
+			InstallFile(argv[i]);
+	}
+	else
+	{
+		string_array_t packages = string_array_make();
+		for ( int i = optind; i < argc; i++ )
+		{
+			if ( IsPackageInstalled(tix_directory_path, argv[i]) )
+			{
+				if ( !quiet )
+				{
+					printf("Package %s is already installed\n", argv[i]);
+					fflush(stdout);
+				}
+			}
+			else if ( !string_array_append(&packages, argv[i]) )
+				err(1, "malloc");
+		}
+		ResolvePackages(&packages, &fetch_argv);
+		for ( size_t i = 0; i < packages.length; i++ )
+			InstallPackage(packages.strings[i], &fetch_argv);
+		string_array_reset(&packages);
+	}
+
+	string_array_reset(&fetch_argv);
 	string_array_reset(&coll_conf);
 
 	free(tix_directory_path);
@@ -249,14 +263,215 @@ int main(int argc, char* argv[])
 	return 0;
 }
 
-static int strcmp_indirect(const void* a_ptr, const void* b_ptr)
+struct pkg
 {
-	const char* a = *(const char* const*) a_ptr;
-	const char* b = *(const char* const*) b_ptr;
-	return strcmp(a, b);
+	char* name;
+	char* deps;
+	bool picked;
+};
+
+static int pkg_search(const void* name_ptr, const void* pkg_ptr)
+{
+	const char* name = (const char*) name_ptr;
+	struct pkg* pkg = *(struct pkg**) pkg_ptr;
+	return strcmp(name, pkg->name);
 }
 
-void InstallPackage(const char* tix_path)
+static struct pkg* pkg_lookup(struct pkg** pkgs, size_t used, const char* name)
+{
+	struct pkg** entry_ptr =
+		bsearch(name, pkgs, used, sizeof(struct pkg*), pkg_search);
+	return entry_ptr ? *entry_ptr : NULL;
+}
+
+static int pkg_cmp_indirect(const void* a_ptr, const void* b_ptr)
+{
+	struct pkg* a = *(struct pkg* const*) a_ptr;
+	struct pkg* b = *(struct pkg* const*) b_ptr;
+	return strcmp(a->name, b->name);
+}
+
+void WantPackage(string_array_t* packages, const char* package,
+                 struct pkg** pkgs, size_t pkgs_used)
+{
+	struct pkg* pkg = pkg_lookup(pkgs, pkgs_used, package);
+	if ( pkg->picked )
+		return;
+	pkg->picked = true;
+	if ( IsPackageInstalled(tix_directory_path, package) )
+		return;
+	if ( !string_array_append(packages, package) )
+		err(1, "malloc");
+}
+
+void ResolvePackages(string_array_t* packages, string_array_t* fetch_argv)
+{
+	if ( !packages->length )
+		return;
+	char* cache = join_paths(collection, "var/cache/tix");
+	if ( !cache )
+		err(1, "malloc");
+	char* release_info = join_paths(cache, "release.info");
+	char* sha256sum = join_paths(cache, "sha256sum");
+	char* dependencies_list = join_paths(cache, "dependencies.list");
+	if ( !release_info || !sha256sum || !dependencies_list )
+		err(1, "malloc");
+	if ( mkdir_p(cache, 0755) < 0 && errno != EEXIST )
+		err(1, "mkdir: %s", cache);
+	if ( fork_and_wait_or_death() )
+	{
+		if ( quiet && !string_array_append(fetch_argv, "-q") )
+			err(1, "malloc");
+		const char* args[] =
+		{
+			"-C", collection,
+			"-c",
+			"-O", cache,
+			"--output-release-info", release_info,
+			"--output-sha256sum", sha256sum,
+			"dependencies.list",
+			NULL
+		};
+		for ( size_t i = 0; i < sizeof(args) / sizeof(args[0]); i++ )
+			if ( !string_array_append(fetch_argv, args[i]) )
+				err(1, "malloc");
+		execvp(fetch_argv->strings[0], (char* const*) fetch_argv->strings);
+		err(127, "%s", fetch_argv->strings[0]);
+	}
+	FILE* dependencies_fp = fopen(dependencies_list, "r");
+	if ( !dependencies_fp )
+		err(1, "%s", dependencies_list);
+	struct pkg** pkgs = NULL;
+	size_t pkgs_used = 0;
+	size_t pkgs_length = 0;
+	char* line = NULL;
+	size_t line_size = 0;
+	ssize_t line_len;
+	bool sorted = true;
+	while ( 0 < (line_len = getline(&line, &line_size, dependencies_fp)) )
+	{
+		if ( line[line_len-1] == '\n' )
+			line[--line_len] = '\0';
+		char* sep = strchr(line, ':');
+		if ( !sep )
+			err(1, "%s: invalid line: %s", dependencies_list, line);
+		*sep = '\0';
+		const char* key = line;
+		const char* value = sep + 1;
+		struct pkg* pkg = calloc(1, sizeof(struct pkg));
+		if ( !pkg ||
+		     !(pkg->name = strdup(key)) ||
+		     !(pkg->deps = strdup(value)) )
+			err(1, "malloc");
+		if ( pkgs_used == pkgs_length )
+		{
+			size_t old_length = pkgs_length ? pkgs_length : 4;
+			struct pkg** new_pkgs =
+				reallocarray(pkgs, old_length, 2 * sizeof(struct pkg));
+			if ( !new_pkgs )
+				err(1, "malloc");
+			pkgs = new_pkgs;
+			pkgs_length = 2 * old_length;
+		}
+		if ( sorted && pkgs_used )
+			sorted = strcmp(pkgs[pkgs_used - 1]->name, key) < 0;
+		pkgs[pkgs_used++] = pkg;
+	}
+	free(line);
+	if ( ferror(dependencies_fp) )
+		err(1, "%s", dependencies_list);
+	fclose(dependencies_fp);
+	if ( !sorted )
+		qsort(pkgs, pkgs_used, sizeof(pkgs[0]), pkg_cmp_indirect);
+	for ( size_t i = 0; i < packages->length; i++ )
+	{
+		struct pkg* pkg = pkg_lookup(pkgs, pkgs_used, packages->strings[i]);
+		if ( pkg )
+			pkg->picked = true;
+	}
+	for ( size_t i = 0; i < packages->length; i++ )
+	{
+		const char* package = packages->strings[i];
+		struct pkg* pkg = pkg_lookup(pkgs, pkgs_used, package);
+		if ( !pkg )
+			errx(1, "No such package: %s", package);
+		char* copy = strdup(pkg->deps);
+		if ( !copy )
+			err(1, "malloc");
+		char* state = copy;
+		char* dep;
+		while ( (dep = strsep(&state, " \t")) )
+		{
+			if ( !*dep )
+				continue;
+			if ( !strcmp(dep, "*") )
+			{
+				for ( size_t i = 0; i < pkgs_used; i++ )
+					WantPackage(packages, pkgs[i]->name, pkgs, pkgs_used);
+				continue;
+			}
+			else
+				WantPackage(packages, dep, pkgs, pkgs_used);
+		}
+		free(copy);
+	}
+	qsort(packages->strings, packages->length, sizeof(char*), strcmp_indirect);
+	for ( size_t i = 0; i < pkgs_used; i++ )
+	{
+		free(pkgs[i]->name);
+		free(pkgs[i]->deps);
+		free(pkgs[i]);
+	}
+	free(pkgs);
+	free(dependencies_list);
+	free(sha256sum);
+	free(release_info);
+	free(cache);
+}
+
+void InstallPackage(const char* package_name, string_array_t* fetch_argv)
+{
+	char* cache = join_paths(collection, "var/cache/tix");
+	if ( !cache )
+		err(1, "malloc");
+	char* release_info = join_paths(cache, "release.info");
+	char* sha256sum = join_paths(cache, "sha256sum");
+	char* package_file = print_string("%s.tix.tar.xz", package_name);
+	if ( !release_info || !sha256sum || !package_file )
+		err(1, "malloc");
+	if ( fork_and_wait_or_death() )
+	{
+		if ( quiet && !string_array_append(fetch_argv, "-q") )
+			err(1, "malloc");
+		const char* args[] =
+		{
+			"-C", collection,
+			"-c",
+			"-O", cache,
+			"--input-release-info", release_info,
+			"--input-sha256sum", sha256sum,
+			package_file,
+			NULL
+		};
+		for ( size_t i = 0; i < sizeof(args) / sizeof(args[0]); i++ )
+			if ( !string_array_append(fetch_argv, args[i]) )
+				err(1, "malloc");
+		execvp(fetch_argv->strings[0], (char* const*) fetch_argv->strings);
+		err(127, "%s", fetch_argv->strings[0]);
+	}
+	char* package_path = join_paths(cache, package_file);
+	if ( !package_file )
+		err(1, "malloc");
+	InstallFile(package_path);
+	unlink(package_path);
+	free(package_path);
+	free(package_file);
+	free(sha256sum);
+	free(release_info);
+	free(cache);
+}
+
+void InstallFile(const char* tix_path)
 {
 	if ( !IsFile(tix_path) )
 		err(1, "`%s'", tix_path);
@@ -283,7 +498,6 @@ void InstallPackage(const char* tix_path)
 	}
 
 	fclose(tixinfo_fp);
-
 	const char* version = dictionary_get(&tixinfo, "TIX_VERSION");
 	if ( modern && (!version || strcmp(version, "3") != 0) )
 		errx(1, "%s: unsupported TIX_VERSION: %s", tix_path, version);

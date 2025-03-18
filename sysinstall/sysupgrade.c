@@ -789,6 +789,22 @@ int main(void)
 		if ( !conf_load(&conf, "etc/upgrade.conf") && errno != ENOENT )
 			err(2, "etc/upgrade.conf");
 
+		// TODO: After releasing Sortix 1.1, replace the defaults with true
+		//       here instead of seeding with the old configuration file.
+		char* str;
+		execute((const char*[]) { "tix-vars", "-d",
+		                          conf.system ? "true" : "false",
+		                          "tix/collection.conf", "SYSTEM",
+		                          NULL }, "eo", &str);
+		conf.system = !strcmp(str, "true\n");
+		free(str);
+		execute((const char*[]) { "tix-vars", "-d",
+		                          conf.ports ? "true" : "false",
+		                          "tix/collection.conf", "PORTS",
+		                          NULL }, "eo", &str);
+		conf.ports = !strcmp(str, "true\n");
+		free(str);
+
 		do_upgrade_bootloader =
 			conf.grub && (conf.ports || (conf.system && can_run_old_abi));
 
@@ -919,7 +935,7 @@ int main(void)
 		if ( conf.system )
 		{
 			upgrade_finalize(target_release, &new_release, "", ".");
-			post_upgrade("", ".");
+			post_upgrade("/", ".");
 		}
 		if ( conf.system )
 		{

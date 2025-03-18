@@ -6,9 +6,9 @@
 .Nd download, patch, build, install, and clean a port
 .Sh SYNOPSIS
 .Nm
+.Op Fl C Ar collection
 .Op Fl \-build Ns = Ns Ar triplet
 .Op Fl \-cache-package
-.Op Fl \-collection Ns = Ns Ar collection
 .Op Fl \-destination Ns = Ns Ar directory
 .Op Fl \-distclean
 .Op Fl \-end Ns = Ns Ar step
@@ -73,11 +73,11 @@ for the machine the port is built on.
 (Default: Automatically detected.)
 .It Fl \-cache-package
 Skip the build if the binary package already exists and is the right version.
-.It Fl \-collection Ns = Ns Ar collection
+.It Fl C , \-collection Ns = Ns Ar collection
 Install the binary package into this
 .Ar collection
 created with
-.Xr tix-collection 8 .
+.Xr tix-create 8 .
 (Default:
 .Fl \-sysroot
 plus
@@ -255,8 +255,7 @@ can be downloaded, extracted, patched, built and installed into the
 .Pa /local
 prefix for non-system software by running:
 .Bd -literal -offset indent
-mkdir -p /local # if not already done
-tix-collection /local create # if not already done
+tix-create -C /local
 tix-port --prefix=/local example
 .Ed
 .Pp
@@ -278,10 +277,12 @@ by stopping after the binary package has been stripped.
 .Xr port 5 ,
 .Xr development 7 ,
 .Xr porting 7 ,
+.Xr tix 8 ,
 .Xr tix-build 8 ,
-.Xr tix-collection 8 ,
+.Xr tix-create 8 ,
 .Xr tix-install 8 ,
-.Xr tix-metabuild 8
+.Xr tix-metabuild 8 ,
+.Xr tix-uninstall 8
 .Sh HISTORY
 .Nm
 originally appeared in Sortix 1.1 as a networked higher level interface around

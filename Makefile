@@ -57,7 +57,25 @@ SORTIX_ISO_COMPRESSION?=xz
 
 SORTIX_PORTS_MIRROR?=https://pub.sortix.org/mirror
 
-# TODO: Update development(7).
+MIRRORS?=
+
+SIGNING_KEY?=
+ifneq ($(SIGNING_KEY),)
+SIGNING_PUBLIC_KEY?=$(SIGNING_KEY).pub
+SIGNING_SECRET_KEY?=$(SIGNING_KEY).sec
+else
+ifneq ($(SIGNING_KEY_SEARCH),)
+SIGNING_PUBLIC_KEY?=$(shell tix-release --generation=3 --release="$(RELEASE)" --version="$(VERSION)" --key-search="$(SIGNING_KEY_SEARCH)" --which-public-key)
+SIGNING_SECRET_KEY?=$(shell tix-release --generation=3 --release="$(RELEASE)" --version="$(VERSION)" --key-search="$(SIGNING_KEY_SEARCH)" --which-secret-key)
+ifeq ($(SIGNING_PUBLIC_KEY),)
+$(error error: Failed to determine the signing key: searching: $(SIGNING_KEY_SEARCH))
+endif
+else
+SIGNING_VERSION?=$(shell echo "$(VERSION)" | grep -Eo '[0-9]+\.[0-9]+')
+SIGNING_PUBLIC_KEY?=etc/default/signify/sortix-$(SIGNING_VERSION).pub
+SIGNING_SECRET_KEY?=
+endif
+endif
 
 SORTIX_RELEASE_ADDITIONAL?=
 SORTIX_RELEASE_MANHTML?=yes
@@ -293,6 +311,8 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
 	ln -sf ../lib/sortix-release "$(SYSROOT)/etc/sortix-release"
 	echo /etc/sortix-release >> "$(SYSROOT)/tix/manifest/system"
+	find etc | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
+	cp -RT etc "$(SYSROOT)/etc"
 	find share | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
 	cp -RT share "$(SYSROOT)/share"
 	export SYSROOT="$(SYSROOT)" && \
@@ -336,6 +356,7 @@ else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
 	cp Makefile -t "$(SYSROOT)/src"
 	cp README -t "$(SYSROOT)/src"
 	cp -RT build-aux "$(SYSROOT)/src/build-aux"
+	cp -RT etc "$(SYSROOT)/src/etc"
 	cp -RT share "$(SYSROOT)/src/share"
 	cp -RT ports "$(SYSROOT)/src/ports"
 	(for D in $(MODULES); do cp -R $$D -t "$(SYSROOT)/src" || exit $$?; done)
@@ -389,6 +410,9 @@ sysroot-ports: sysroot-fsh sysroot-base-headers sysroot-system sysroot-source
 	 SORTIX_PORTS_DIR="$(SORTIX_PORTS_DIR)" \
 	 SORTIX_REPOSITORY_DIR="$(SORTIX_REPOSITORY_DIR)" \
 	 SORTIX_PORTS_MIRROR="$(SORTIX_PORTS_MIRROR)" \
+	 SIGNING_PUBLIC_KEY="$(SIGNING_PUBLIC_KEY)" \
+	 RELEASE_URL="$(RELEASE_URL)" \
+	 BUILD_ID="$(BUILD_ID)" \
 	 SYSROOT="$(SYSROOT)" \
 	 BUILD="$(BUILD)" \
 	 HOST="$(HOST)" \
@@ -530,7 +554,7 @@ $(LIVE_INITRD): sysroot
 	 echo "You can view the installation instructions by typing:" && \
 	 echo && \
 	 echo "  man installation") > $(LIVE_INITRD).d/root/welcome
-	tix-collection $(LIVE_INITRD).d create --platform=$(HOST) --prefix= --generation=3
+	tix-create -C $(LIVE_INITRD).d --platform=$(HOST) --prefix= --generation=3 --build-id="$(BUILD_ID)" --release-key="$(SIGNING_PUBLIC_KEY)" --release-url="$(RELEASE_URL)"
 	LC_ALL=C ls -A $(LIVE_INITRD).d | \
 	tar -cf $(LIVE_INITRD) -C $(LIVE_INITRD).d --numeric-owner --owner=0 --group=0 -T -
 	rm -rf $(LIVE_INITRD).d
@@ -742,10 +766,10 @@ release-shared: release-man release-man-html release-readme release-scripts rele
 
 .PHONY: release
 release: release-arch release-shared
-	cd $(SORTIX_RELEASE_DIR)/$(RELEASE) && \
-	find . -type f '!' -name sha256sum '!' -name '*.html' -exec sha256sum '{}' ';' | \
-	sed -E 's,^([^ ]*  )\./,\1,' | \
-	LC_ALL=C sort -k 2 > sha256sum
+	tix-release --generation=3 --version=$(VERSION) --release=$(RELEASE) --build-id=$(BUILD_ID) --mirrors="$(MIRRORS)" release $(SORTIX_RELEASE_DIR)/$(RELEASE)
+ifneq ($(SIGNING_SECRET_KEY),)
+	tix-release --generation=3 --public-key=$(SIGNING_PUBLIC_KEY) --secret-key=$(SIGNING_SECRET_KEY) sign $(SORTIX_RELEASE_DIR)/$(RELEASE)
+endif
 
 # Presubmit checks
 

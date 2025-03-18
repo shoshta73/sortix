@@ -1,9 +1,10 @@
 tix
 tix-build
-tix-collection
+tix-create
 tix-execdiff
 tix-execpatch
 tix-install
 tix-rmdiff
 tix-rmpatch
 tix-vars
+tix-uninstall

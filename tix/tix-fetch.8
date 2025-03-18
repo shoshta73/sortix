@@ -1,0 +1,218 @@
+.Dd February 17, 2025
+.Dt TIX-FETCH 8
+.Os
+.Sh NAME
+.Nm tix-fetch
+.Nd download files from repository
+.Sh SYNOPSIS
+.Nm
+.Op Fl c
+.Op Fl q
+.Op Fl v
+.Op Fl C Ar collection
+.Op Fl o Ar file
+.Op Fl O Ar directory
+.Op Fl \-continue
+.Op Fl \-download-default
+.Op Fl \-download-non-verbose
+.Op Fl \-download-quiet
+.Op Fl \-download-quiet-progress
+.Op Fl \-download-verbose
+.Op Fl \-input-release-info Ns = Ns Ar file
+.Op Fl \-input-release-info-sig Ns = Ns Ar file
+.Op Fl \-input-release-pub Ns = Ns Ar file
+.Op Fl \-input-sha256sum Ns = Ns Ar file
+.Op Fl \-insecure-downgrade-to-http
+.Op Fl \-insecure-no-check-certificate
+.Op Fl \-nv
+.Op Fl \-output Ar file
+.Op Fl \-output-directory Ar directory
+.Op Fl \-output-release-info Ns = Ns Ar file
+.Op Fl \-output-release-info-sig Ns = Ns Ar file
+.Op Fl \-output-release-pub Ns = Ns Ar file
+.Op Fl \-output-sha256sum Ns = Ns Ar file
+.Op Fl \-output-upgrade-info Ns = Ns Ar file
+.Op Fl \-upgrade
+.Op Fl \-url
+.Op Fl \-url-mirror-release
+.Op Fl \-url-release-info-sig
+.Op Fl \-url-sha256sum
+.Op Fl \-wget-options Ns = Ns Ar options
+.Ar file ...
+.Sh DESCRIPTION
+.Nm
+downloads files from a tix repository.
+.Nm
+downloads the signed
+.Pa release.info.sig
+release information, verifies the signature with
+.Xr signify 1 ,
+downloads the
+.Pa sha256sum
+file, and then downloads the requested
+.Ar files .
+Every file in the repository has a cryptographic chain leading back to the
+signed release information, and the download will be rejected if the files have
+been tampered with.
+.Pp
+The specified
+.Ar collection
+is used to locate the repository URL.
+The root directory collection is used if no
+.Fl \-collection
+is specified.
+The
+.Sy RELEASE_URL
+variable in the
+.Xr collection.conf 5
+configuration file is used to locate the signed
+.Pa release.info.sig
+information.
+If the URL points to a channel, then the channel redirection is followed to the
+appropriate release, and optionally upgraded to a new release per the
+.Fl \-upgrade
+option.
+The signature of the release information is verified with the public key in the
+collection.
+Once the authoritative release information is obtained, the release URL is
+rewritten to use the configured mirror if any, and the requested
+.Ar files
+are downloaded from the mirror.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl C , \-collection Ns = Ns Ar collection
+Use the repository of this
+.Pa collection .
+.It Fl c , \-continue
+Fetch the file as a resumable download.
+During the download, a file suffixed with
+.Pa .hash
+is placed adjacent to the output file with the desired checksum, to prevent
+continuing the download if the remote file changes.
+.It Fl \-download-default
+Pass the default options to
+.Xr wget 1 .
+.It Fl \-nv , \-download-non-verbose
+Pass the
+.Fl nv
+option to
+.Xr wget 1
+for a non-verbose download.
+.Pp
+This behavior is the default if the standard error is not a terminal.
+.It Fl q , \-download-quiet
+Pass the
+.Fl q
+option to
+.Xr wget 1
+for a quiet download.
+.It Fl \-download-quiet-progress
+Pass the
+.Fl q
+.Fl \-show-progress
+options to
+.Xr wget 1
+for a quiet download with a progress bar.
+.Pp
+This behavior is the default if the standard error is a terminal.
+.It Fl v , \-download-verbose
+Pass the
+.Fl v
+option to
+.Xr wget 1
+for a verbose download.
+.It Fl \-input-release-info Ns = Ns Ar file
+Use
+.Pa path
+as the unsigned release information rather than downloading it.
+.It Fl \-input-release-info-sig Ns = Ns Ar file
+Use
+.Pa path
+as the signed release info information rather than downloading it.
+.It Fl \-input-release-pub Ns = Ns Ar file
+Use
+.Pa path
+as the public key, rather than the default
+.Pa $collection/tix/release.pub .
+.It Fl \-input-sha256sum Ns = Ns Ar file
+Use
+.Pa path
+as the sha256sum file rather than downloading it.
+.It Fl \-insecure-downgrade-to-http
+Downgrade the release URL from HTTPS to an insecure HTTP download.
+.Pp
+Warning: HTTP downloads makes it possible for man-in-the-middle attacks to
+interfere with the download and enables eavesdropping.
+However, the release is still cryptographically signed as a secondary layer of
+protection, which still protects the download integrity.
+This option is useful in the future when the client and server may not have
+overlapping cryptographic protocols and ciphers.
+.It Fl \-insecure-no-check-certificate
+Don't check the HTTPS certificates.
+.Pp
+Warning: HTTPS downloading without trusting the certificate makes it possible
+for man-in-the-middle attacks to interfere with the download and enables
+eavesdropping.
+However, the release is still cryptographically signed as a secondary layer of
+protection, which still protects the download integrity.
+.It Fl o , \-output Ar file
+Write the download to the output
+.Ar file .
+.It Fl O , \-output-directory Ar directory
+Write the downloaded files into the output
+.Ar directory.
+.It Fl \-output-release-info Ns = Ns Ar file
+Write the unsigned release information (after the signature check) to this
+.Ar file .
+.It Fl \-output-release-info-sig Ns = Ns Ar file
+Write the signed release information to this
+.Ar file .
+.It Fl \-output-release-pub Ns = Ns Ar file
+Write the used public key to this
+.Ar file .
+.It Fl \-output-sha256sum Ns = Ns Ar file
+Write the sha256sum file to this
+.Ar file .
+.It Fl \-output-upgrade-info Ns = Ns Ar file
+Write the unsigned upgrade information (after the signature check) to this
+.Ar file .
+.It Fl \-upgrade
+If the
+.Pa RELEASE_URL
+variable points to a channel, and an upgrade is available, then accept it and
+download that upgraded release instead.
+.It Fl \-url
+Output the URLs to the requested files.
+.It Fl \-url-mirror-release
+Output the URL to the release on the mirror.
+.It Fl \-url-release-info-sig
+Output the URL to the signed release information.
+.It Fl \-url-sha256sum
+Output the URL to the sha256sum file.
+.It Fl \-wget-options Ns = Ns Ar options
+Pass these download
+.Ar options
+to
+.Xr wget 1 .
+.El
+.Sh FILES
+.Bl -tag -width "/tix/collection.conf" -compact
+.It Pa /tix/collection.conf
+.Xr collection.conf 5
+configuration.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr signify 1 ,
+.Xr wget 1 ,
+.Xr collection.conf 5 ,
+.Xr tix 8 ,
+.Xr tix-install 8 ,
+.Xr tix-port 8 ,
+.Xr tix-upgrade 8
+.Sh HISTORY
+.Nm
+originally appeared in Sortix 1.1.
