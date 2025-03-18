@@ -317,8 +317,8 @@ ifeq ($(SORTIX_INCLUDE_SOURCE),git)
 	git clone --no-hardlinks $(SORTIX_INCLUDE_SOURCE_GIT_CLONE_OPTIONS) -- "$(SORTIX_INCLUDE_SOURCE_GIT_REPO)" "$(SYSROOT)/src"
 	(cd "$(SYSROOT)/src" && git config remote.origin.fetch '+refs/heads/*:refs/remotes/origin/*')
 	-cd "$(SYSROOT)/src" && \
-	git fetch origin master:refs/remotes/origin/master && \
-	(git branch -f master $$(git merge-base HEAD origin/master) || true)
+	git fetch origin main:refs/remotes/origin/main && \
+	(git branch -f main $$(git merge-base HEAD origin/main) || true)
 	-release_branches=`git for-each-ref --format '%(refname:short)' refs/heads | grep -E '^sortix-'` && \
 	cd "$(SYSROOT)/src" && \
 	for branch in $$release_branches $(SORTIX_INCLUDE_SOURCE_GIT_BRANCHES); do \
