@@ -219,8 +219,7 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 		}
 
 		// Otherwise, the next element (if any) is the parameter.
-		else if ( optind + 1 < argc && argv[optind+1] &&
-		          (required || argv[optind+1][0] != '-') )
+		else if ( required && optind + 1 < argc && argv[optind+1] )
 		{
 			optarg = argv[optind+1];
 			optind += 2;
