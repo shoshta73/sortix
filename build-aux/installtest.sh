@@ -444,7 +444,7 @@ elif $source_upgrade; then
   xorriso -indev "$iso" -osirrox on -extract boot/src.tar.xz src.tar.xz
   do_ssh "rm -rf /src && tar -xJ -C /dev" < src.tar.xz
   rm -f src.tar.xz
-  do_ssh "cd /dev/src && make PACKAGES= sysmerge"
+  do_ssh "cd /dev/src && make install-build-tools && make clean-build-tools && make PACKAGES= sysmerge"
 fi
 do_ssh "poweroff" || true
 
