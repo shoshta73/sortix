@@ -600,11 +600,14 @@ int ext2_fuse_main(const char* argv0,
 	{
 		(char*) argv0,
 		(char*) "-s",
-		(char*) mount_path,
+		(char*) (foreground ? "-f" : mount_path),
+		(char*) (foreground ? mount_path : NULL),
 		(char*) NULL,
 	};
 
-	int argc_fuse = sizeof(argv_fuse) / sizeof(argv_fuse[0]) - 1;
+	int argc_fuse = 0;
+	while ( argv_fuse[argc_fuse] )
+		argc_fuse++;
 
 	struct ext2_fuse_ctx ext2_fuse_ctx;
 	ext2_fuse_ctx.fs = fs;
