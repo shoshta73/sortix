@@ -599,6 +599,7 @@ int ext2_fuse_main(const char* argv0,
 	char* argv_fuse[] =
 	{
 		(char*) argv0,
+		(char*) "-ouse_ino",
 		(char*) "-s",
 		(char*) (foreground ? "-f" : mount_path),
 		(char*) (foreground ? mount_path : NULL),
