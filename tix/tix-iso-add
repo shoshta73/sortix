@@ -97,13 +97,15 @@ else
   rm -f -- "$dest"
 fi
 
+# TODO: Switch to '-boot_image any replay' once it works in xorriso 1.5.8 and
+#       the release has been generally adopted.
 xorriso \
   -indev "$input" \
   -outdev "$dest" \
-  -boot_image grub keep \
+  -hfsplus on \
   -pathspecs on \
-  -add \
-  ="$directory"
+  -add ="$directory" -- \
+  -boot_image grub keep
 
 # xorriso doesn't write out the destination file if the directory is empty.
 if [ ! -e "$dest" ]; then
