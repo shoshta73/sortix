@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -150,6 +150,17 @@ bool blockdevice_probe_partition_table_type(enum partition_table_type* result_ou
 	{
 		struct gpt gpt;
 		memcpy(&gpt, leading + 1 * block_size, sizeof(gpt));
+		gpt_decode(&gpt);
+		if ( memcmp(gpt.signature, "EFI PART", 8) != 0 )
+			break;
+		result = PARTITION_TABLE_TYPE_GPT;
+		goto out;
+	} while ( 0 );
+
+	do if ( block_size != 512 && 512 + sizeof(struct gpt) <= amount )
+	{
+		struct gpt gpt;
+		memcpy(&gpt, leading + 512, sizeof(gpt));
 		gpt_decode(&gpt);
 		if ( memcmp(gpt.signature, "EFI PART", 8) != 0 )
 			break;

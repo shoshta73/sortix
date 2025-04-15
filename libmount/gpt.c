@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -185,15 +185,29 @@ blockdevice_get_partition_table_gpt(struct partition_table** pt_ptr,
 	if ( !gpt_block )
 		return PARTITION_ERROR_ERRNO;
 	if ( blockdevice_preadall(bdev, gpt_block, logical_block_size,
-	                          1 * logical_block_size) != (size_t) logical_block_size )
+	                          1 * logical_block_size)
+	     != (size_t) logical_block_size )
 		return free(gpt_block), PARTITION_ERROR_ERRNO;
-
 	struct gpt gpt;
 	memcpy(&gpt, gpt_block, sizeof(gpt));
 	gpt_decode(&gpt);
 
+	// Try the 512 logical block size as a fallback.
+	if ( memcmp(gpt.signature, "EFI PART", 8) != 0 &&
+	     logical_block_size != 512 )
+	{
+		logical_block_size = 512;
+		if ( blockdevice_preadall(bdev, gpt_block, logical_block_size,
+			                      1 * logical_block_size)
+		     != (size_t) logical_block_size )
+			return free(gpt_block), PARTITION_ERROR_ERRNO;
+		memcpy(&gpt, gpt_block, sizeof(gpt));
+		gpt_decode(&gpt);
+	}
+
 	if ( memcmp(gpt.signature, "EFI PART", 8) != 0 )
 		return PARTITION_ERROR_INVALID;
+
 	static_assert( 92 == sizeof(gpt) - sizeof(gpt.reserved1),
 	              "92 == sizeof(gpt) - sizeof(gpt.reserved1)");
 	if ( gpt.header_size < 92 )
