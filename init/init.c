@@ -4809,6 +4809,8 @@ int main(int argc, char* argv[])
 				fatal("mkdir: /dev/tmp: %m");
 			if ( !mkdtemp(chain_tmp_path_real) )
 				fatal("mkdtemp: %s: %m", chain_tmp_path_real);
+			if ( chmod(chain_tmp_path_real, 01777) < 0 )
+				fatal("chmod: %s: %m", chain_tmp_path_real);
 			memcpy(chain_tmp_path, chain_path, strlen(chain_path));
 			if ( mkdir(chain_tmp_path, 0755) < 0 &&
 				 errno != EEXIST && errno != EROFS )
