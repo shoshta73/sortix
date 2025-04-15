@@ -54,6 +54,7 @@ blksize_t blockdevice_logical_block_size(const struct blockdevice*);
 bool blockdevice_check_reasonable_block_size(blksize_t);
 off_t blockdevice_size(const struct blockdevice*);
 size_t blockdevice_preadall(const struct blockdevice*, void*, size_t, off_t);
+bool blockdevice_match(const struct blockdevice*, const char* spec);
 
 #if defined(__cplusplus)
 } /* extern "C" */

@@ -134,15 +134,14 @@ void scan_devices(void)
 		scan_device(hds[i]);
 }
 
-struct filesystem* search_for_filesystem_by_uuid(const unsigned char* uuid)
+struct filesystem* search_for_filesystem_by_spec(const char* spec)
 {
 	for ( size_t di = 0; di < hds_count; di++ )
 	{
 		struct blockdevice* dbdev = &hds[di]->bdev;
 		if ( dbdev->fs )
 		{
-			if ( (dbdev->fs->flags & FILESYSTEM_FLAG_UUID) &&
-			     memcmp(dbdev->fs->uuid, uuid, 16) == 0 )
+			if ( filesystem_match(dbdev->fs, spec) )
 				return dbdev->fs;
 		}
 		else if ( dbdev->pt )
@@ -150,27 +149,10 @@ struct filesystem* search_for_filesystem_by_uuid(const unsigned char* uuid)
 			for ( size_t pi = 0; pi < dbdev->pt->partitions_count; pi++ )
 			{
 				struct blockdevice* pbdev = &dbdev->pt->partitions[pi]->bdev;
-				if ( !pbdev->fs )
-					continue;
-				if ( (pbdev->fs->flags & FILESYSTEM_FLAG_UUID) &&
-					 memcmp(pbdev->fs->uuid, uuid, 16) == 0 )
+				if ( pbdev->fs && filesystem_match(pbdev->fs, spec) )
 					return pbdev->fs;
 			}
 		}
-	}
-	return NULL;
-}
-
-struct filesystem* search_for_filesystem_by_spec(const char* spec)
-{
-	if ( strncmp(spec, "UUID=", strlen("UUID=")) == 0 )
-	{
-		const char* uuid_string = spec + strlen("UUID=");
-		if ( !uuid_validate(uuid_string) )
-			return NULL;
-		unsigned char uuid[16];
-		uuid_from_string(uuid, uuid_string);
-		return search_for_filesystem_by_uuid(uuid);
 	}
 	return NULL;
 }

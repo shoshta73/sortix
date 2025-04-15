@@ -531,30 +531,6 @@ static int device_area_compare_start(const void* a_ptr, const void* b_ptr)
 	return 0;
 }
 
-static bool match_fstab_device(const char* device, struct blockdevice* bdev)
-{
-	if ( strncmp(device, "UUID=", strlen("UUID=")) == 0 )
-	{
-		device += strlen("UUID=");
-		if ( !bdev->fs )
-			return false;
-		if ( !(bdev->fs->flags & FILESYSTEM_FLAG_UUID) )
-			return false;
-		if ( !uuid_validate(device) )
-			return false;
-		unsigned char uuid[16];
-		uuid_from_string(uuid, device);
-		if ( memcmp(bdev->fs->uuid, uuid, 16) != 0 )
-			return false;
-		return true;
-	}
-	else if ( bdev->p && !strcmp(device, bdev->p->path) )
-		return true;
-	else if ( !bdev->p && bdev->hd && !strcmp(device, bdev->hd->path) )
-		return true;
-	return false;
-}
-
 struct rewrite
 {
 	FILE* in;
@@ -764,7 +740,7 @@ static bool lookup_fstab_by_blockdevice(struct fstab* out_fsent,
 			line[--line_length] = '\0';
 		if ( !scanfsent(line, out_fsent) )
 			continue;
-		if ( match_fstab_device(out_fsent->fs_spec, bdev) )
+		if ( blockdevice_match(bdev, out_fsent->fs_spec) )
 		{
 			*out_storage = line;
 			fclose(fstab_fp);
@@ -797,7 +773,7 @@ static bool remove_blockdevice_from_fstab(struct blockdevice* bdev)
 			return rewrite_abort(&rewr), false;
 		struct fstab fsent;
 		if ( !scanfsent(dup, &fsent) ||
-		     !match_fstab_device(fsent.fs_spec, bdev) )
+		     !blockdevice_match(bdev, fsent.fs_spec) )
 			fprintf(rewr.out, "%s\n", line);
 		free(dup);
 	}
@@ -811,14 +787,9 @@ static void print_blockdevice_fsent(FILE* fp,
                                     struct blockdevice* bdev,
                                     const char* mountpoint)
 {
-	char uuid[5 + UUID_STRING_LENGTH + 1];
 	const char* spec = bdev->p ? bdev->p->path : bdev->hd->path;
-	if ( bdev->fs->flags & FILESYSTEM_FLAG_UUID )
-	{
-		strcpy(uuid, "UUID=");
-		uuid_to_string(bdev->fs->uuid, uuid + 5);
-		spec = uuid;
-	}
+	if ( bdev->fs )
+		spec = filesystem_get_mount_spec(bdev->fs);
 	fprintf(fp, "%s %s %s %s %i %i\n",
 	        spec,
 	        mountpoint,
@@ -864,7 +835,7 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 		{
 			fprintf(rewr.out, "%s\n", line);
 		}
-		else if ( match_fstab_device(fsent.fs_spec, bdev) )
+		else if ( blockdevice_match(bdev, fsent.fs_spec) )
 		{
 			fprintf(rewr.out, "%s %s %s %s %i %i\n",
 			        fsent.fs_spec,
@@ -2185,7 +2156,7 @@ static void on_mkpart(size_t argc, char** argv)
 		}
 		printf("(Formatted %s as ext2)\n", device_name(p->path));
 		scan_partition(p);
-		if ( !p->bdev.fs || !(p->bdev.fs->flags & FILESYSTEM_FLAG_UUID) )
+		if ( !p->bdev.fs )
 		{
 			command_errorx("%s: %s: Failed to scan expected ext2 filesystem",
 			               argv[0], device_name(p->path));

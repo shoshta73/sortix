@@ -32,7 +32,6 @@ struct blockdevice;
 struct filesystem;
 struct filesystem_handler;
 
-#define FILESYSTEM_FLAG_UUID (1 << 0)
 #define FILESYSTEM_FLAG_FSCK_SHOULD (1 << 1)
 #define FILESYSTEM_FLAG_FSCK_MUST (1 << 2)
 #define FILESYSTEM_FLAG_NOT_FILESYSTEM (1 << 3)
@@ -47,8 +46,10 @@ struct filesystem
 	const char* fsck;
 	const char* driver;
 	int flags;
-	unsigned char uuid[16];
 	void* user_ctx;
+	char** identifiers;
+	size_t identifiers_used;
+	size_t identifiers_length;
 };
 
 struct filesystem_handler
@@ -68,6 +69,10 @@ const char* filesystem_error_string(enum filesystem_error);
 enum filesystem_error
 blockdevice_inspect_filesystem(struct filesystem**, struct blockdevice*);
 void filesystem_release(struct filesystem*);
+bool filesystem_add_identifier(struct filesystem*, const char*, const char*);
+const char* filesystem_get_identifier(const struct filesystem*, const char*);
+bool filesystem_match(const struct filesystem*, const char*);
+const char* filesystem_get_mount_spec(const struct filesystem*);
 
 #if defined(__cplusplus)
 } /* extern "C" */

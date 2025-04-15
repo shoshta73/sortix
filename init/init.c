@@ -67,7 +67,6 @@
 #include <mount/filesystem.h>
 #include <mount/harddisk.h>
 #include <mount/partition.h>
-#include <mount/uuid.h>
 
 struct device_match
 {
@@ -3875,22 +3874,15 @@ static void prepare_block_devices(void)
 		fatal("iterating devices: %m");
 }
 
-static void search_by_uuid(const char* uuid_string,
+static void search_by_spec(const char* spec,
                            void (*cb)(void*, struct device_match*),
                            void* ctx)
 {
-	unsigned char uuid[16];
-	uuid_from_string(uuid, uuid_string);
 	for ( size_t i = 0; i < hds_used; i++ )
 	{
 		struct blockdevice* bdev = &hds[i]->bdev;
-		if ( bdev->fs )
+		if ( bdev->fs && filesystem_match(bdev->fs, spec) )
 		{
-			struct filesystem* fs = bdev->fs;
-			if ( !(fs->flags & FILESYSTEM_FLAG_UUID) )
-				continue;
-			if ( memcmp(uuid, fs->uuid, 16) != 0 )
-				continue;
 			struct device_match match;
 			match.path = hds[i]->path;
 			match.bdev = bdev;
@@ -3901,12 +3893,7 @@ static void search_by_uuid(const char* uuid_string,
 			for ( size_t j = 0; j < bdev->pt->partitions_count; j++ )
 			{
 				struct partition* p = bdev->pt->partitions[j];
-				if ( !p->bdev.fs )
-					continue;
-				struct filesystem* fs = p->bdev.fs;
-				if ( !(fs->flags & FILESYSTEM_FLAG_UUID) )
-					continue;
-				if ( memcmp(uuid, fs->uuid, 16) != 0 )
+				if ( !p->bdev.fs || !filesystem_match(p->bdev.fs, spec) )
 					continue;
 				struct device_match match;
 				match.path = p->path;
@@ -4326,28 +4313,16 @@ static struct filesystem* mountpoint_lookup(const struct mountpoint* mountpoint)
 {
 	const char* path = mountpoint->entry.fs_file;
 	const char* spec = mountpoint->entry.fs_spec;
-	if ( strncmp(spec, "UUID=", strlen("UUID=")) == 0 )
+	struct device_match match;
+	memset(&match, 0, sizeof(match));
+	search_by_spec(spec, ensure_single_device_match, &match);
+	if ( !match.path || !match.bdev )
 	{
-		const char* uuid = spec + strlen("UUID=");
-		if ( !uuid_validate(uuid) )
-		{
-			warning("%s: `%s' is not a valid uuid", path, uuid);
-			return NULL;
-		}
-		struct device_match match;
-		memset(&match, 0, sizeof(match));
-		search_by_uuid(uuid, ensure_single_device_match, &match);
-		if ( !match.path || !match.bdev )
-		{
-			warning("%s: No devices matching uuid %s were found", path, uuid);
-			return NULL;
-		}
-		assert(match.bdev->fs);
-		return match.bdev->fs;
+		warning("%s: No matching devices were found: %s", path, spec);
+		return NULL;
 	}
-	// TODO: Lookup by device name.
-	warning("%s: Don't know how to resolve `%s' to a filesystem", path, spec);
-	return NULL;
+	assert(match.bdev->fs);
+	return match.bdev->fs;
 }
 
 static bool mountpoint_mount(struct mountpoint* mountpoint)

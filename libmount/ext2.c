@@ -27,6 +27,7 @@
 #include <mount/blockdevice.h>
 #include <mount/ext2.h>
 #include <mount/filesystem.h>
+#include <mount/uuid.h>
 
 #include "util.h"
 
@@ -153,8 +154,6 @@ static enum filesystem_error ext2_inspect(struct filesystem** fs_ptr,
 	else if ( !(sb->s_feature_compat & ~EXT2_FEATURE_COMPAT_SUPPORTED) &&
 	          blockdevice_is_writable(bdev) )
 		fs->flags |= FILESYSTEM_FLAG_WRITABLE;
-	fs->flags |= FILESYSTEM_FLAG_UUID;
-	memcpy(&fs->uuid, sb->s_uuid, 16);
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	time_t next_check = (time_t)
@@ -166,6 +165,15 @@ static enum filesystem_error ext2_inspect(struct filesystem** fs_ptr,
 		fs->flags |= FILESYSTEM_FLAG_FSCK_SHOULD;
 	else if ( sb->s_checkinterval && next_check <= now.tv_sec )
 		fs->flags |= FILESYSTEM_FLAG_FSCK_SHOULD;
+	char uuid_str[UUID_STRING_LENGTH + 1];
+	uuid_to_string(sb->s_uuid, uuid_str);
+	char volume_name[16 + 1];
+	strncpy(volume_name, sb->s_volume_name, 16);
+	volume_name[16] = '\0';
+	if ( !filesystem_add_identifier(fs, "TYPE", "ext2") ||
+	     !filesystem_add_identifier(fs, "UUID", uuid_str) ||
+	     !filesystem_add_identifier(fs, "LABEL", sb->s_volume_name) )
+		return ext2_release(fs), FILESYSTEM_ERROR_ERRNO;
 	return *fs_ptr = fs, FILESYSTEM_ERROR_NONE;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -32,6 +33,7 @@
 #include <mount/ext2.h>
 #include <mount/extended.h>
 #include <mount/filesystem.h>
+#include <mount/harddisk.h>
 #include <mount/partition.h>
 
 const char* filesystem_error_string(enum filesystem_error error)
@@ -62,6 +64,12 @@ void filesystem_release(struct filesystem* fs)
 {
 	if ( !fs || !fs->handler )
 		return;
+	for ( size_t i = 0; i < fs->identifiers_used; i++ )
+		free(fs->identifiers[i]);
+	free(fs->identifiers);
+	fs->identifiers = NULL;
+	fs->identifiers_used = 0;
+	fs->identifiers_length = 0;
 	fs->handler->release(fs);
 }
 
@@ -94,4 +102,71 @@ blockdevice_inspect_filesystem(struct filesystem** fs_ptr,
 		if ( !leading[i] )
 			return free(leading), FILESYSTEM_ERROR_UNRECOGNIZED;
 	return free(leading), FILESYSTEM_ERROR_ABSENT;
+}
+
+bool filesystem_add_identifier(struct filesystem* fs, const char* key,
+                               const char* value)
+{
+	if ( !value[0] )
+		return true;
+	if ( fs->identifiers_used == fs->identifiers_length )
+	{
+		size_t old_size = fs->identifiers_length ? fs->identifiers_length : 2;
+		char** new_identifiers =
+			reallocarray(fs->identifiers, old_size, 2 * sizeof(char*));
+		if ( !new_identifiers )
+			return false;
+		fs->identifiers = new_identifiers;
+		fs->identifiers_length = 2 * old_size;
+	}
+	char* identifier;
+	if ( asprintf(&identifier, "%s=%s", key, value) < 0 )
+		return false;
+	fs->identifiers[fs->identifiers_used++] = identifier;
+	return true;
+}
+
+const char* filesystem_get_identifier(const struct filesystem* fs,
+                                      const char* id)
+{
+	size_t id_len = strlen(id);
+	for ( size_t i = 0; i < fs->identifiers_used; i++ )
+	{
+		if ( !strncmp(fs->identifiers[i], id, id_len) &&
+		     fs->identifiers[i][id_len] == '=' )
+			return fs->identifiers[i] + id_len + 1;
+	}
+	return NULL;
+}
+
+bool filesystem_match(const struct filesystem* fs, const char* spec)
+{
+	if ( spec[0] != '/' && strchr(spec, '=') )
+	{
+		for ( size_t i = 0; i < fs->identifiers_used; i++ )
+			if ( !strcmp(fs->identifiers[i], spec) )
+				return true;
+		return false;
+	}
+	if ( fs->bdev->p && !strcmp(spec, fs->bdev->p->path) )
+		return true;
+	else if ( !fs->bdev->p && fs->bdev->hd && !strcmp(spec, fs->bdev->hd->path) )
+		return true;
+	return false;
+}
+
+const char* filesystem_get_mount_spec(const struct filesystem* fs)
+{
+	const char* prefix = "UUID=";
+	size_t prefix_len = strlen(prefix);
+	for ( size_t i = 0; i < fs->identifiers_used; i++ )
+	{
+		if ( !strncmp(fs->identifiers[i], prefix, prefix_len) )
+			return fs->identifiers[i];
+	}
+	if ( fs->bdev->p )
+		return fs->bdev->p->path;
+	else if ( fs->bdev->hd )
+		return fs->bdev->hd->path;
+	return NULL;
 }

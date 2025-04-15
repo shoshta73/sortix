@@ -25,8 +25,10 @@
 #include <ioleast.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <mount/blockdevice.h>
+#include <mount/filesystem.h>
 #include <mount/harddisk.h>
 #include <mount/partition.h>
 
@@ -84,4 +86,15 @@ size_t blockdevice_preadall(const struct blockdevice* bdev,
 	}
 	assert(bdev->hd);
 	return preadall(bdev->hd->fd, buffer, count, off);
+}
+
+bool blockdevice_match(const struct blockdevice* bdev, const char* spec)
+{
+	if ( bdev->fs )
+		return filesystem_match(bdev->fs, spec);
+	if ( bdev->p && !strcmp(spec, bdev->p->path) )
+		return true;
+	else if ( !bdev->p && bdev->hd && !strcmp(spec, bdev->hd->path) )
+		return true;
+	return false;
 }
