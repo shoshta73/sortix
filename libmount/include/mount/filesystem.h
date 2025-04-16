@@ -52,9 +52,12 @@ struct filesystem
 	size_t identifiers_length;
 };
 
+#define FILESYSTEM_HANDLER_FLAG_IGNORE_PARTITIONS (1 << 0)
+
 struct filesystem_handler
 {
 	const char* handler_name;
+	int flags;
 	size_t (*probe_amount)(struct blockdevice*);
 	bool (*probe)(struct blockdevice*, const unsigned char*, size_t);
 	enum filesystem_error (*inspect)(struct filesystem**, struct blockdevice*);

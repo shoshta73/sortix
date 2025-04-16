@@ -81,6 +81,10 @@ blockdevice_inspect_filesystem(struct filesystem** fs_ptr,
 	size_t leading_size = 65536;
 	for ( size_t i = 0; filesystem_handlers[i]; i++ )
 	{
+		const struct filesystem_handler* handler = filesystem_handlers[i];
+		if ( bdev->pt &&
+		     !(handler->flags & FILESYSTEM_HANDLER_FLAG_IGNORE_PARTITIONS) )
+			continue;
 		size_t amount = filesystem_handlers[i]->probe_amount(bdev);
 		if ( leading_size < amount )
 			leading_size = amount;
@@ -93,10 +97,14 @@ blockdevice_inspect_filesystem(struct filesystem** fs_ptr,
 		return free(leading), *fs_ptr = NULL, FILESYSTEM_ERROR_ERRNO;
 	for ( size_t i = 0; filesystem_handlers[i]; i++ )
 	{
-		if ( !filesystem_handlers[i]->probe(bdev, leading, amount) )
+		const struct filesystem_handler* handler = filesystem_handlers[i];
+		if ( bdev->pt &&
+		     !(handler->flags & FILESYSTEM_HANDLER_FLAG_IGNORE_PARTITIONS) )
+			continue;
+		if ( !handler->probe(bdev, leading, amount) )
 			continue;
 		free(leading);
-		return filesystem_handlers[i]->inspect(fs_ptr, bdev);
+		return handler->inspect(fs_ptr, bdev);
 	}
 	for ( size_t i = 0; i < amount; i++ )
 		if ( !leading[i] )

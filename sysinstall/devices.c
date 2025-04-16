@@ -97,16 +97,17 @@ void scan_device(struct harddisk* hd)
 	struct blockdevice* bdev = &hd->bdev;
 	enum partition_error parterr =
 		blockdevice_get_partition_table(&bdev->pt, bdev);
-	if ( parterr == PARTITION_ERROR_ABSENT ||
-	     parterr == PARTITION_ERROR_UNRECOGNIZED )
+	if ( parterr == PARTITION_ERROR_ERRNO ||
+	     (parterr != PARTITION_ERROR_NONE &&
+	      parterr != PARTITION_ERROR_ABSENT &&
+	      parterr != PARTITION_ERROR_UNRECOGNIZED) )
 	{
-		scan_filesystem(bdev);
+		warn("scanning device: %s: %s", hd->path,
+		     partition_error_string(parterr));
 		return;
 	}
-	else if ( parterr == PARTITION_ERROR_ERRNO ||
-	          parterr != PARTITION_ERROR_NONE )
-		return; // TODO: Perhaps print an error here?
-	for ( size_t i = 0; i < bdev->pt->partitions_count; i++ )
+	scan_filesystem(bdev);
+	for ( size_t i = 0; bdev->pt && i < bdev->pt->partitions_count; i++ )
 		scan_filesystem(&bdev->pt->partitions[i]->bdev);
 }
 
@@ -139,12 +140,9 @@ struct filesystem* search_for_filesystem_by_spec(const char* spec)
 	for ( size_t di = 0; di < hds_count; di++ )
 	{
 		struct blockdevice* dbdev = &hds[di]->bdev;
-		if ( dbdev->fs )
-		{
-			if ( filesystem_match(dbdev->fs, spec) )
-				return dbdev->fs;
-		}
-		else if ( dbdev->pt )
+		if ( dbdev->fs && filesystem_match(dbdev->fs, spec) )
+			return dbdev->fs;
+		if ( dbdev->pt )
 		{
 			for ( size_t pi = 0; pi < dbdev->pt->partitions_count; pi++ )
 			{

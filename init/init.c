@@ -3811,13 +3811,7 @@ static bool prepare_block_device(void* ctx, const char* path)
 	hds[hds_used++] = hd;
 	struct blockdevice* bdev = &hd->bdev;
 	enum partition_error parterr = blockdevice_get_partition_table(&bdev->pt, bdev);
-	if ( parterr == PARTITION_ERROR_ABSENT ||
-	     parterr == PARTITION_ERROR_UNRECOGNIZED )
-	{
-		prepare_filesystem(path, bdev);
-		return true;
-	}
-	else if ( parterr == PARTITION_ERROR_ERRNO )
+	if ( parterr == PARTITION_ERROR_ERRNO )
 	{
 		if ( errno == EIO || errno == EINVAL )
 			warning("%s: %s", path, partition_error_string(parterr));
@@ -3825,12 +3819,15 @@ static bool prepare_block_device(void* ctx, const char* path)
 			fatal("%s: %s", path, partition_error_string(parterr));
 		return true;
 	}
-	else if ( parterr != PARTITION_ERROR_NONE )
+	else if ( parterr != PARTITION_ERROR_NONE &&
+	          parterr != PARTITION_ERROR_ABSENT &&
+	          parterr != PARTITION_ERROR_UNRECOGNIZED )
 	{
 		warning("%s: %s", path, partition_error_string(parterr));
 		return true;
 	}
-	for ( size_t i = 0; i < bdev->pt->partitions_count; i++ )
+	prepare_filesystem(path, bdev);
+	for ( size_t i = 0; bdev->pt && i < bdev->pt->partitions_count; i++ )
 	{
 		struct partition* p = bdev->pt->partitions[i];
 		assert(p->path);
@@ -3888,7 +3885,7 @@ static void search_by_spec(const char* spec,
 			match.bdev = bdev;
 			cb(ctx, &match);
 		}
-		else if ( bdev->pt )
+		if ( bdev->pt )
 		{
 			for ( size_t j = 0; j < bdev->pt->partitions_count; j++ )
 			{

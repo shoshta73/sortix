@@ -512,7 +512,7 @@ struct device_area
 	off_t extended_start;
 	off_t ebr_off;
 	off_t ebr_move_off;
-	struct partition* p;
+	struct blockdevice* bdev;
 	char* filesystem;
 	char* mountpoint;
 	size_t ebr_index;
@@ -920,7 +920,12 @@ static void unscan_device(void)
 	}
 	current_pt = NULL;
 	current_pt_type = PARTITION_TABLE_TYPE_UNKNOWN;
+	current_hd->bdev.pt = NULL;
 	current_hd->bdev.pt_error = PARTITION_ERROR_NONE;
+	if ( current_hd->bdev.fs )
+		filesystem_release(current_hd->bdev.fs);
+	current_hd->bdev.fs = NULL;
+	current_hd->bdev.fs_error = FILESYSTEM_ERROR_NONE;
 }
 
 static void scan_partition(struct partition* p)
@@ -942,41 +947,59 @@ static void scan_device(void)
 		return;
 	unscan_device();
 	struct blockdevice* bdev = &current_hd->bdev;
-	if ( !blockdevice_probe_partition_table_type(&current_pt_type, bdev) )
-	{
-		// TODO: Try probe for a filesystem here to see if one covers the whole
-		//       device.
-		command_error("Scanning `%s'", device_name(current_hd->path));
-		current_hd = NULL;
-		current_pt_type = PARTITION_TABLE_TYPE_UNKNOWN;
-		return;
-	}
 	bdev->pt_error = blockdevice_get_partition_table(&current_pt, bdev);
 	if ( bdev->pt_error != PARTITION_ERROR_NONE )
 	{
+		partition_table_release(current_pt);
+		current_hd->bdev.pt = NULL;
+		current_pt = NULL;
+		current_pt_type = bdev->pt_error == PARTITION_ERROR_ABSENT ?
+		                  PARTITION_TABLE_TYPE_NONE :
+		                  PARTITION_TABLE_TYPE_UNKNOWN;
 		if ( bdev->pt_error != PARTITION_ERROR_ABSENT &&
 		     bdev->pt_error != PARTITION_ERROR_UNRECOGNIZED )
-			command_errorx("Scanning `%s': %s", device_name(current_hd->path),
+		{
+			command_errorx("Scanning for partition table: %s: %s",
+			               device_name(current_hd->path),
 			               partition_error_string(bdev->pt_error));
-		partition_table_release(current_pt);
-		current_pt = NULL;
+			return;
+		}
+	}
+	else
+		current_pt_type = current_pt->type;
+	bdev->fs_error = blockdevice_inspect_filesystem(&bdev->fs, bdev);
+	if ( bdev->fs_error != FILESYSTEM_ERROR_NONE &&
+	     bdev->fs_error != FILESYSTEM_ERROR_ABSENT &&
+	     bdev->fs_error != FILESYSTEM_ERROR_UNRECOGNIZED )
+	{
+		command_errorx("Scanning for filesystem: %s: %s",
+		               device_name(current_hd->path),
+		               filesystem_error_string(bdev->fs_error));
 		return;
 	}
-	current_pt_type = current_pt->type;
+	if ( bdev->fs && current_pt_type == PARTITION_TABLE_TYPE_NONE )
+		current_pt_type = PARTITION_TABLE_TYPE_UNKNOWN;
+	if ( !bdev->fs && !current_pt )
+		return;
 	// TODO: In case of GPT, verify the header is supported for write (version
 	//       check, just using it blindly is safe for read compatibility, but
 	//       we need to refuse updating the GPT if uses extensions). Then after
 	//       deciding this, check this condition in all commands that modify
 	//       the partition table.
-	for ( size_t i = 0; i < current_pt->partitions_count; i++ )
+	for ( size_t i = 0; current_pt && i < current_pt->partitions_count; i++ )
 		scan_partition(current_pt->partitions[i]);
+	size_t area_offset = bdev->fs ? 1 : 0;
 	size_t areas_length;
-	size_t partitions_count = current_pt->partitions_count;
+	size_t partitions_count = current_pt ? current_pt->partitions_count : 0;
 	if ( __builtin_mul_overflow(2, partitions_count, &areas_length) ||
-	     __builtin_add_overflow(1, areas_length, &areas_length ) )
+	     __builtin_add_overflow(1, areas_length, &areas_length ) ||
+	     __builtin_add_overflow(area_offset, areas_length, &areas_length ) )
 	{
 		errno = EOVERFLOW;
 		command_error("Scanning `%s'", device_name(current_hd->path));
+		partition_table_release(current_pt);
+		current_hd->bdev.pt = NULL;
+		current_pt = NULL;
 		return;
 	}
 	if ( current_pt_type == PARTITION_TABLE_TYPE_MBR )
@@ -991,9 +1014,22 @@ static void scan_device(void)
 	{
 		command_error("malloc");
 		partition_table_release(current_pt);
+		current_hd->bdev.pt = NULL;
 		current_pt = NULL;
 		return;
 	}
+	current_areas_count = 0;
+	if ( bdev->fs )
+	{
+		struct device_area* area = &current_areas[current_areas_count++];
+		memset(area, 0, sizeof(*area));
+		area->start = 0;
+		area->length = current_hd->st.st_size;
+		area->bdev = bdev;
+		area->inside_extended = false;
+	}
+	if ( !current_pt )
+		return;
 	struct device_area* sort_areas =
 		current_areas + areas_length - current_pt->partitions_count;
 	for ( size_t i = 0; i < current_pt->partitions_count; i++ )
@@ -1003,17 +1039,17 @@ static void scan_device(void)
 		memset(area, 0, sizeof(*area));
 		area->start = p->start;
 		area->length = p->length;
-		area->p = p;
+		area->bdev = &p->bdev;
 		area->inside_extended = p->type == PARTITION_TYPE_LOGICAL;
 	}
 	qsort(sort_areas, current_pt->partitions_count, sizeof(struct device_area),
 	      device_area_compare_start);
 	off_t last_end = current_pt->usable_start;
-	current_areas_count = 0;
+
 	for ( size_t i = 0; i < current_pt->partitions_count; i++ )
 	{
 		struct device_area* area = &sort_areas[i];
-		if ( area->p->type == PARTITION_TYPE_LOGICAL )
+		if ( area->bdev->p->type == PARTITION_TYPE_LOGICAL )
 			continue;
 		if ( last_end < area->start )
 		{
@@ -1024,7 +1060,7 @@ static void scan_device(void)
 		}
 		current_areas[current_areas_count++] = *area;
 		last_end = area->start + area->length;
-		if ( area->p->type == PARTITION_TYPE_EXTENDED &&
+		if ( area->bdev->p->type == PARTITION_TYPE_EXTENDED &&
 		     current_pt_type == PARTITION_TABLE_TYPE_MBR )
 		{
 			off_t extended_start = area->start;
@@ -1043,7 +1079,8 @@ static void scan_device(void)
 					ebr = &mbrpt->ebr_chain[ebr_i];
 				struct device_area* larea = NULL;
 				if ( larea_i < current_pt->partitions_count &&
-				     sort_areas[larea_i].p->type == PARTITION_TYPE_LOGICAL )
+				     sort_areas[larea_i].bdev->p->type ==
+				     PARTITION_TYPE_LOGICAL )
 					larea = &sort_areas[larea_i];
 				off_t ebr_start = ebr ? ebr->offset : extended_end;
 				off_t larea_start = larea ? larea->start : extended_end;
@@ -1105,7 +1142,7 @@ static void scan_device(void)
 	size_t new_areas_count = 0;
 	for ( size_t i = 0; i < current_areas_count; i++ )
 	{
-		if ( !current_areas[i].p )
+		if ( !current_areas[i].bdev )
 		{
 			uintmax_t mask = ~(UINTMAX_C(1048576) - 1);
 			off_t start = current_areas[i].start;
@@ -1158,19 +1195,20 @@ static bool lookup_harddisk_by_string(struct harddisk** out,
 	return false;
 }
 
-static bool lookup_partition_by_string(struct partition** out,
-                                       const char* argv0,
-                                       const char* numstr)
+static struct blockdevice* lookup_blockdevice_by_string(const char* argv0,
+                                                        const char* numstr)
 {
 	char* end;
 	unsigned long part_index = strtoul(numstr, &end, 10);
 	if ( *end )
 	{
 		command_errorx("%s: Invalid partition number `%s'", argv0, numstr);
-		return false;
+		return NULL;
 	}
+	if ( part_index == 0 )
+		return &current_hd->bdev;
 	struct partition* part = NULL;
-	for ( size_t i = 0; i < current_pt->partitions_count; i++ )
+	for ( size_t i = 0; current_pt && i < current_pt->partitions_count; i++ )
 	{
 		if ( current_pt->partitions[i]->index == part_index )
 		{
@@ -1178,13 +1216,13 @@ static bool lookup_partition_by_string(struct partition** out,
 			break;
 		}
 	}
-	if ( !part)
+	if ( !part )
 	{
 		command_errorx("%s: No such partition `%sp%lu'", argv0,
 		               device_name(current_hd->path), part_index);
-		return false;
+		return NULL;
 	}
-	return *out = part, true;
+	return &part->bdev;
 }
 
 bool gpt_update(const char* argv0, struct gpt_partition_table* gptpt)
@@ -1386,20 +1424,21 @@ static void on_fsck(size_t argc, char** argv)
 		command_errorx("%s: No partition specified", argv[0]);
 		return;
 	}
-	struct partition* p;
-	if ( !lookup_partition_by_string(&p, argv[0], argv[1]) )
+	struct blockdevice* bdev = lookup_blockdevice_by_string(argv[0], argv[1]);
+	if ( !bdev )
 		return;
-	if ( !p->bdev.fs )
+	const char* path = bdev->hd ? bdev->hd->path : bdev->p->path;
+	if ( !bdev->fs )
 	{
 		command_errorx("%s: %s: No filesystem recognized", argv[0],
-		               device_name(p->path));
+		               device_name(path));
 		return;
 	}
-	struct filesystem* fs = p->bdev.fs;
+	struct filesystem* fs = bdev->fs;
 	if ( !fs->fsck )
 	{
 		command_errorx("%s: %s: fsck is not supported for %s", argv[0],
-		               device_name(p->path), fs->fstype_name);
+		               device_name(path), fs->fstype_name);
 		return;
 	}
 	bool interactive_fsck = false;
@@ -1414,9 +1453,9 @@ retry_interactive_fsck:
 	if ( child_pid == 0 )
 	{
 		if ( interactive_fsck )
-			execlp(fs->fsck, fs->fsck, "--", p->path, (const char*) NULL);
+			execlp(fs->fsck, fs->fsck, "--", path, (const char*) NULL);
 		else
-			execlp(fs->fsck, fs->fsck, "-p", "--", p->path, (const char*) NULL);
+			execlp(fs->fsck, fs->fsck, "-p", "--", path, (const char*) NULL);
 		warn("%s: Failed to load filesystem checker: %s", argv[0], fs->fsck);
 		_Exit(127);
 	}
@@ -1424,13 +1463,13 @@ retry_interactive_fsck:
 	waitpid(child_pid, &code, 0);
 	if ( WIFSIGNALED(code) )
 		command_errorx("%s: %s: Filesystem check failed: %s: %s", argv[0],
-		               p->path, fs->fsck, strsignal(WTERMSIG(code)));
+		               path, fs->fsck, strsignal(WTERMSIG(code)));
 	else if ( !WIFEXITED(code) )
 		command_errorx("%s: %s: Filesystem check failed: %s: %s", argv[0],
-		               p->path, fs->fsck, "Unexpected unusual termination");
+		               path, fs->fsck, "Unexpected unusual termination");
 	else if ( WEXITSTATUS(code) == 127 )
 		command_errorx("%s: %s: Filesystem check failed: %s: %s", argv[0],
-		               p->path, fs->fsck, "Filesystem checker is not installed");
+		               path, fs->fsck, "Filesystem checker is not installed");
 	else if ( WEXITSTATUS(code) & 4 && !interactive_fsck )
 	{
 		interactive_fsck = true;
@@ -1438,7 +1477,7 @@ retry_interactive_fsck:
 	}
 	else if ( WEXITSTATUS(code) != 0 && WEXITSTATUS(code) != 1 )
 		command_errorx("%s: %s: Filesystem check failed: %s: %s", argv[0],
-		               p->path, fs->fsck, "Filesystem checker was unsuccessful");
+		               path, fs->fsck, "Filesystem checker was unsuccessful");
 }
 
 static void on_help(size_t argc, char** argv)
@@ -1474,7 +1513,7 @@ static char* display_area_format(void* ctx, size_t row, size_t column)
 	}
 	struct device_area* areas = (struct device_area*) ctx;
 	struct device_area* area = &areas[row - 1];
-	if ( !area->p )
+	if ( !area->bdev )
 	{
 		switch ( column )
 		{
@@ -1485,28 +1524,46 @@ static char* display_area_format(void* ctx, size_t row, size_t column)
 		default: return NULL;
 		}
 	}
+	const char* path =
+		area->bdev->hd ? area->bdev->hd->path : area->bdev->p->path;
 	switch ( column )
 	{
 	case 0:
 		if ( area->inside_extended )
-			return print_string("  %s", device_name(area->p->path));
+			return print_string("  %s", device_name(path));
 		else
-			return strdup(device_name(area->p->path));
+			return strdup(device_name(path));
 	case 1: return format_bytes_amount((uintmax_t) area->length);
 	case 2:
-		if ( area->p->bdev.fs )
-			return strdup(area->p->bdev.fs->fstype_name);
-		switch ( area->p->bdev.fs_error )
+		if ( area->bdev->fs )
+			return strdup(area->bdev->fs->fstype_name);
+		switch ( area->bdev->fs_error )
 		{
 		case FILESYSTEM_ERROR_NONE: return strdup("(no error)");
 		case FILESYSTEM_ERROR_ABSENT: return strdup("none");
-		case FILESYSTEM_ERROR_UNRECOGNIZED: return strdup("unrecognized");
+		case FILESYSTEM_ERROR_UNRECOGNIZED:
+			if ( area->bdev->p &&
+			     area->bdev->p->table_type == PARTITION_TABLE_TYPE_MBR )
+			{
+				char id[5];
+				snprintf(id, sizeof(id), "0x%02X",
+				         area->bdev->p->mbr_system_id);
+				return strdup(id);
+			}
+			else if ( area->bdev->p &&
+			          area->bdev->p->table_type == PARTITION_TABLE_TYPE_GPT )
+			{
+				char uuid[UUID_STRING_LENGTH + 1];
+				uuid_to_string(area->bdev->p->gpt_type_guid, uuid);
+				return strdup(uuid);
+			}
+			return strdup("(unrecognized)");
 		case FILESYSTEM_ERROR_ERRNO: return strdup("(error)");
 		}
 		return strdup("(unknown error)");
 	case 3:
 	{
-		struct blockdevice* bdev = &area->p->bdev;
+		struct blockdevice* bdev = area->bdev;
 		char* storage;
 		struct fstab fsent;
 		if ( lookup_fstab_by_blockdevice(&fsent, &storage, bdev) )
@@ -1578,7 +1635,7 @@ static char* display_hole_format(void* ctx, size_t row, size_t column)
 	size_t num_hole = 0;
 	for ( size_t i = 0; i < current_areas_count; i++ )
 	{
-		if ( areas[i].p )
+		if ( areas[i].bdev )
 			continue;
 		if ( num_hole == row - 1 )
 		{
@@ -1603,7 +1660,7 @@ static void on_mkpart(size_t argc, char** argv)
 	struct device_area* hole = NULL;
 	for ( size_t i = 0; i < current_areas_count; i++ )
 	{
-		if ( current_areas[i].p )
+		if ( current_areas[i].bdev )
 			continue;
 		num_holes++;
 		hole = &current_areas[i];
@@ -1636,7 +1693,7 @@ static void on_mkpart(size_t argc, char** argv)
 			}
 			for ( size_t i = 0; i < current_areas_count; i++ )
 			{
-				if ( current_areas[i].p )
+				if ( current_areas[i].bdev )
 					continue;
 				if ( --num != 0 )
 					continue;
@@ -2345,7 +2402,6 @@ static void on_mktable(size_t argc, char** argv)
 	switch_device(current_hd);
 }
 
-
 static void on_mount(size_t argc, char** argv)
 {
 	if ( argc < 2 )
@@ -2353,8 +2409,8 @@ static void on_mount(size_t argc, char** argv)
 		command_errorx("%s: No partition specified", argv[0]);
 		return;
 	}
-	struct partition* part;
-	if ( !lookup_partition_by_string(&part, argv[0], argv[1]) )
+	struct blockdevice* bdev = lookup_blockdevice_by_string(argv[0], argv[1]);
+	if ( !bdev )
 		return;
 	if ( argc < 3 )
 	{
@@ -2362,11 +2418,12 @@ static void on_mount(size_t argc, char** argv)
 		return;
 	}
 	char* mountpoint = argv[2];
+	const char* path = bdev->hd ? bdev->hd->path : bdev->p->path;
 	if ( !strcmp(mountpoint, "no") )
 	{
-		if ( !remove_blockdevice_from_fstab(&part->bdev) )
+		if ( !remove_blockdevice_from_fstab(bdev) )
 		{
-			command_error("%s: %s: Failed to remove partition",
+			command_error("%s: %s: Failed to remove mountpoint",
 			              argv[0], fstab_path);
 			return;
 		}
@@ -2379,14 +2436,14 @@ static void on_mount(size_t argc, char** argv)
 			return;
 		}
 		simplify_mountpoint(mountpoint);
-		if ( !part->bdev.fs || !part->bdev.fs->driver )
+		if ( !bdev->fs || !bdev->fs->driver )
 		{
-			const char* name = device_name(part->path);
+			const char* name = device_name(path);
 			printf("Warning: `%s' is not a mountable filesystem.\n", name);
 		}
-		if ( !add_blockdevice_to_fstab(&part->bdev, mountpoint) )
+		if ( !add_blockdevice_to_fstab(bdev, mountpoint) )
 		{
-			command_error("%s: %s: Failed to remove partition",
+			command_error("%s: %s: Failed to add mountpoint",
 			              argv[0], fstab_path);
 			return;
 		}
@@ -2407,9 +2464,16 @@ static void on_rmpart(size_t argc, char** argv)
 		command_errorx("%s: No partition specified", argv[0]);
 		return;
 	}
-	struct partition* part;
-	if ( !lookup_partition_by_string(&part, argv[0], argv[1]) )
+
+	struct blockdevice* bdev = lookup_blockdevice_by_string(argv[0], argv[1]);
+	if ( !bdev )
 		return;
+	struct partition* part = bdev->p;
+	if ( !part )
+	{
+		command_errorx("%s: Not a partition: %s", argv[0], bdev->hd->path);
+		return;
+	}
 	bool ok = false;
 	if ( part->type == PARTITION_TYPE_EXTENDED )
 	{
@@ -2618,6 +2682,9 @@ static void on_rmtable(size_t argc, char** argv)
 		const char* name = device_name(current_hd->path);
 		textf("WARNING: This will \e[91mERASE ALL DATA\e[m on the device "
 		      "\e[93m%s\e[m!\n", name);
+		if ( current_hd->bdev.fs )
+			textf("WARNING: Device \e[93m%s\e[m \e[91mHAS A FILESYSTEM\e[m!\n",
+			      name);
 		// TODO: List all the partitions?
 		// TODO: Use the name and mount point of the partition if such!
 		if ( current_pt && 0 < current_pt->partitions_count )
@@ -2732,13 +2799,13 @@ static const struct command commands[] =
 	{ "ds", on_devices, "a" },
 	{ "e", on_quit, "a" },
 	{ "exit", on_quit, "" },
-	{ "fsck", on_fsck, "dtp" },
+	{ "fsck", on_fsck, "dTp" },
 	{ "help", on_help, "" },
-	{ "ls", on_ls, "dt" },
+	{ "ls", on_ls, "dT" },
 	{ "man", on_man, "s" },
 	{ "mkpart", on_mkpart, "dt" },
 	{ "mktable", on_mktable, "d" },
-	{ "mount", on_mount, "dtp" },
+	{ "mount", on_mount, "dTp" },
 	{ "q", on_quit, "a" },
 	{ "quit", on_quit, "a" },
 	{ "rmpart", on_rmpart, "dtp" },
@@ -2761,7 +2828,8 @@ static void execute_argv(int argc, char** argv)
 			fprintf(stderr, "You can list devices with the `devices' command.\n");
 			return;
 		}
-		if ( strchr(commands[i].flags, 't') && !current_pt )
+		if ( (strchr(commands[i].flags, 't') && !current_pt) ||
+		     (strchr(commands[i].flags, 'T') && !current_pt && !current_areas) )
 		{
 			if ( current_pt_type == PARTITION_TABLE_TYPE_NONE )
 				printf("%s: No partition table found\n",
