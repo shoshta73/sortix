@@ -1507,7 +1507,7 @@ static char* display_area_format(void* ctx, size_t row, size_t column)
 		case 1: return strdup("SIZE");
 		case 2: return strdup("FILESYSTEM");
 		case 3: return strdup("MOUNTPOINT");
-		// TODO: LABEL
+		case 4: return strdup("LABEL");
 		default: return NULL;
 		}
 	}
@@ -1521,6 +1521,7 @@ static char* display_area_format(void* ctx, size_t row, size_t column)
 		case 1: return format_bytes_amount((uintmax_t) area->length);
 		case 2: return strdup("-");
 		case 3: return strdup("-");
+		case 4: return strdup("-");
 		default: return NULL;
 		}
 	}
@@ -1574,6 +1575,13 @@ static char* display_area_format(void* ctx, size_t row, size_t column)
 		}
 		return strdup("-");
 	}
+	case 4:
+	{
+		const char* label = NULL;
+		if ( area->bdev->fs )
+			label = filesystem_get_identifier(area->bdev->fs, "LABEL");
+		return strdup(label && label[0] ? label : "-");
+	}
 	default: return NULL;
 	}
 }
@@ -1583,7 +1591,7 @@ static void on_ls(size_t argc, char** argv)
 	(void) argc;
 	(void) argv;
 	display_rows_columns(display_area_format, current_areas,
-	                     1 + current_areas_count, 4);
+	                     1 + current_areas_count, 5);
 }
 
 static void on_man(size_t argc, char** argv)
