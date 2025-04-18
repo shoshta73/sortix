@@ -254,7 +254,7 @@ int ext2_fuse_link(const char* oldname, const char* newname)
 	Inode* newdir = ext2_fuse_parent_dir(&newname);
 	if ( !newdir )
 		return inode->Unref(), -errno;
-	bool success = inode->Link(newname, inode, false);
+	bool success = newdir->Link(newname, inode, false);
 	newdir->Unref();
 	inode->Unref();
 	return success ? 0 : -errno;
