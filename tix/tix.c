@@ -29,7 +29,9 @@ int main(int argc, char* argv[])
 		errx(1, "expected collection or command");
 	int i = 1;
 	const char* collection = NULL;
-	if ( strchr(argv[i], '/') )
+	if ( strchr(argv[i], '/') ||
+	     !strcmp(argv[i], ".") ||
+	     !strcmp(argv[i], "..") )
 		collection = argv[i++];
 
 	if ( argc == i )
