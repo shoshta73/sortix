@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,7 +27,8 @@ static const size_t DEVICE_HASH_LENGTH = 1 << 16;
 class Device
 {
 public:
-	Device(int fd, const char* path, uint32_t block_size, bool write);
+	Device(int fd, const char* path, uint32_t block_size, size_t block_limit,
+	       bool write);
 	~Device();
 
 public:

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,12 +74,11 @@ void Block::Refer()
 
 void Block::Unref()
 {
-	if ( !--reference_count )
+	--reference_count;
+	if ( !device->block_limit )
 	{
-#if 0
 		device->block_count--;
 		delete this;
-#endif
 	}
 }
 

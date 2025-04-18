@@ -186,7 +186,11 @@ static bool should_install_bootloader_bdev(struct blockdevice* bdev)
 	struct mountpoint mp = { 0 };
 	mp.absolute = mnt;
 	mp.fs = bdev->fs;
-	mp.entry.fs_file = mnt;
+	mp.entry.fs_spec = (char*) (bdev->hd ? bdev->hd->path : bdev->p->path);
+	mp.entry.fs_file = (char*) mnt;
+	mp.entry.fs_vfstype = (char*) bdev->fs->fstype_name;
+	mp.entry.fs_mntops = (char*) "ro";
+	mp.entry.fs_type = (char*) "ro";
 	if ( !mountpoint_mount(&mp) )
 	{
 		rmdir(mnt);

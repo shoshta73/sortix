@@ -169,7 +169,11 @@ static void search_installation_bdev(const char* mnt, struct blockdevice* bdev)
 	struct mountpoint mp = { 0 };
 	mp.absolute = (char*) mnt;
 	mp.fs = bdev->fs;
+	mp.entry.fs_spec = (char*) (bdev->hd ? bdev->hd->path : bdev->p->path);
 	mp.entry.fs_file = (char*) mnt;
+	mp.entry.fs_vfstype = (char*) bdev->fs->fstype_name;
+	mp.entry.fs_mntops = (char*) "ro";
+	mp.entry.fs_type = (char*) "ro";
 	if ( !mountpoint_mount(&mp) )
 		return;
 	search_installation_path(mnt, bdev);

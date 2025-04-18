@@ -4333,10 +4333,11 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 	const char* bdev_path = bdev->p ? bdev->p->path : bdev->hd->path;
 	assert(bdev_path);
 	const char* pretend_where = mountpoint->entry.fs_file;
+	const char* options = mountpoint->entry.fs_mntops;
 	const char* where = mountpoint->absolute;
-	const char* read_only = NULL;
+	bool read_only = false;
 	if ( !(fs->flags & FILESYSTEM_FLAG_WRITABLE) )
-		read_only = "-r";
+		read_only = true;
 	else if ( fs->flags & (FILESYSTEM_FLAG_FSCK_SHOULD |
 	                       FILESYSTEM_FLAG_FSCK_MUST) )
 	{
@@ -4344,7 +4345,7 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 		{
 			warning("Mounting inconsistent filesystem %s read-only on %s",
 				    bdev_path, pretend_where);
-			read_only = "-r";
+			read_only = true;
 		}
 	}
 	if ( !fs->driver )
@@ -4386,9 +4387,30 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 			        bdev_path, pretend_where);
 			_exit(127);
 		}
-		execlp(fs->driver, fs->driver, "--foreground", bdev_path, where,
-		       "--pretend-mount-path", pretend_where, read_only,
-		        (const char*) NULL);
+		bool ro_mntopt = !strcmp(mountpoint->entry.fs_type, "ro");
+		bool pretend = strcmp(pretend_where, where) != 0;
+		const char* argv[] =
+		{
+				fs->driver,
+				"-f",
+				options[0] ? "-o" : NULL,
+				options[0] ? options : NULL,
+				read_only && !ro_mntopt ? "-o" : NULL,
+				read_only && !ro_mntopt ? "ro" : NULL,
+				pretend ? "-p" : NULL,
+				pretend ? pretend_where : NULL,
+				bdev_path,
+				where,
+				NULL,
+		};
+		int argc = 0;
+		for ( size_t i = 0; i < sizeof(argv) / sizeof(argv[0]); i++ )
+		{
+				if ( argv[i] )
+					argv[argc++] = argv[i];
+		}
+		argv[argc] = NULL;
+		execvp(argv[0], (char**) argv);
 		warning("Failed mount %s on %s: execvp: %s: %m",
 		        bdev_path, pretend_where, fs->driver);
 		_exit(127);

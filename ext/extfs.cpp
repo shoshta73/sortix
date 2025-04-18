@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,8 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <getopt.h>
+#include <inttypes.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -126,110 +128,91 @@ void StatInode(Inode* inode, struct stat* st)
 	st->st_blocks = inode->data->i_blocks;
 }
 
-static void compact_arguments(int* argc, char*** argv)
-{
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
-}
-
-static void help(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "Usage: %s [OPTION]... DEVICE [MOUNT-POINT]\n", argv0);
-}
-
-static void version(FILE* fp, const char* argv0)
-{
-	fprintf(fp, "%s (Sortix) %s\n", argv0, VERSIONSTR);
-}
-
 int main(int argc, char* argv[])
 {
-	const char* argv0 = argv[0];
+	size_t memory;
+#ifdef __sortix__
+	memstat(NULL, &memory);
+#else
+	memory = (uintmax_t) sysconf(_SC_PAGE_SIZE) *
+	         (uintmax_t) sysconf(_SC_PHYS_PAGES);
+#endif
+	size_t cache_size = (memory / 10);
+
+	const char* fuse_options = NULL;
 	const char* pretend_mount_path = NULL;
 	bool foreground = false;
-	bool read = false;
 	bool write = false;
-	for ( int i = 1; i < argc; i++ )
+	enum
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
+		OPT_FUSE_OPTIONS = 257,
+	};
+	const struct option longopts[] =
+	{
+		{"fuse-options", required_argument, NULL, OPT_FUSE_OPTIONS},
+		{"background", no_argument, NULL, 'b'},
+		{"foreground", no_argument, NULL, 'f'},
+		{"pretend-mount-path", required_argument, NULL, 'p'},
+		{0, 0, 0, 0}
+	};
+	const char* opts = "bfo:p:";
+	int opt;
+	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
+	{
+		switch ( opt )
+		{
+		case OPT_FUSE_OPTIONS: fuse_options = optarg; break;
+		case 'b': foreground = false; break;
+		case 'f': foreground = true; break;
+		case 'o':
+		{
+			char* arg = optarg;
+			char* save;
+			char* tok;
+			while ( (tok = strtok_r(arg, ",", &save)) )
+			{
+				if ( !strcmp(tok, "ro") )
+					write = false;
+				else if ( !strcmp(tok, "rw") )
+					write = true;
+				else if ( !strncmp(tok, "cache=", strlen("cache=")) )
+				{
+					char* end;
+					uintmax_t val = strtoumax(tok + strlen("cache="), &end, 10);
+					uintmax_t mult;
+					if ( !strcmp(end, "%" ) )
+						mult = (memory / 100);
+					else if ( !strcmp(end, "K" ) )
+						mult = 1024ULL << 0;
+					else if ( !strcmp(end, "M" ) )
+						mult = 1024ULL << 10;
+					else if ( !strcmp(end, "G" ) )
+						mult = 1024ULL << 20;
+					else if ( !strcmp(end, "" ) )
+						mult = 1;
+					else
+						errx(1, "warning: invalid cache size: %s", tok);
+					if ( __builtin_mul_overflow(val, mult, &cache_size) )
+						errx(1, "warning: invalid cache size: %s", tok);
+				}
+				else
+					warnx("warning: unknown mount option: %s", tok);
+				arg = NULL;
+			}
 			break;
-		if ( arg[1] != '-' )
-		{
-			while ( char c = *++arg ) switch ( c )
-			{
-			case 'r': read = true; break;
-			case 'w': write = true; break;
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				help(stderr, argv0);
-				exit(1);
-			}
 		}
-		else if ( !strcmp(arg, "--help") )
-			help(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--version") )
-			version(stdout, argv0), exit(0);
-		else if ( !strcmp(arg, "--background") )
-			foreground = false;
-		else if ( !strcmp(arg, "--foreground") )
-			foreground = true;
-		else if ( !strcmp(arg, "--read") )
-			read = true;
-		else if ( !strcmp(arg, "--write") )
-			write = true;
-		else if ( !strncmp(arg, "--pretend-mount-path=", strlen("--pretend-mount-path=")) )
-			pretend_mount_path = arg + strlen("--pretend-mount-path=");
-		else if ( !strcmp(arg, "--pretend-mount-path") )
-		{
-			if ( i+1 == argc )
-			{
-				fprintf(stderr, "%s: --pretend-mount-path: Missing operand\n", argv0);
-				exit(1);
-			}
-			pretend_mount_path = argv[++i];
-			argv[i] = NULL;
-		}
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			help(stderr, argv0);
-			exit(1);
+		case 'p': pretend_mount_path = optarg; break;
+		default: return 1;
 		}
 	}
 
-	// It doesn't make sense to have a write-only filesystem.
-	read = read || write;
+	if ( argc - optind < 1 )
+		err(1, "expected device");
+	if ( argc - optind < 2 )
+		err(1, "expected mountpoint");
 
-	// Default to read and write filesystem access.
-	bool default_access = !read && !write ? (read = write = true) : false;
-
-	if ( argc == 1 )
-	{
-		help(stdout, argv0);
-		exit(0);
-	}
-
-	compact_arguments(&argc, &argv);
-
-	const char* device_path = 2 <= argc ? argv[1] : NULL;
-	const char* mount_path = 3 <= argc ? argv[2] : NULL;
-
-	if ( !device_path )
-	{
-		help(stderr, argv0);
-		exit(1);
-	}
+	const char* device_path = argv[optind + 0];
+	const char* mount_path = argv[optind + 1];
 
 	if ( !pretend_mount_path )
 		pretend_mount_path = mount_path;
@@ -261,13 +244,6 @@ int main(int argc, char* argv[])
 	if ( sb.s_feature_compat & ~EXT2_FEATURE_INCOMPAT_SUPPORTED )
 		errx(1, "%s: Uses unsupported and incompatible features", device_path);
 
-	// Verify that no incompatible features are in use if opening for write.
-	if ( !default_access && write &&
-	     sb.s_feature_ro_compat & ~EXT2_FEATURE_RO_COMPAT_SUPPORTED )
-		errx(1, "%s: Uses unsupported and incompatible features, "
-		     "read-only access is possible, but write-access was requested",
-		     device_path);
-
 	if ( write && sb.s_feature_ro_compat & ~EXT2_FEATURE_RO_COMPAT_SUPPORTED )
 	{
 		warnx("warning: %s: Uses unsupported and incompatible features, "
@@ -290,8 +266,9 @@ int main(int argc, char* argv[])
 		warnx("warning: %s: Filesystem wasn't unmounted cleanly", device_path);
 
 	uint32_t block_size = 1024U << sb.s_log_block_size;
+	size_t block_limit = cache_size / block_size;
 
-	Device* dev = new Device(fd, device_path, block_size, write);
+	Device* dev = new Device(fd, device_path, block_size, block_limit, write);
 	if ( !dev ) // TODO: Use operator new nothrow!
 		err(1, "malloc");
 	Filesystem* fs = new Filesystem(dev, pretend_mount_path);
@@ -308,8 +285,10 @@ int main(int argc, char* argv[])
 		return 0;
 
 #if defined(__sortix__)
-	return fsmarshall_main(argv0, mount_path, foreground, fs, dev);
+	(void) fuse_options;
+	return fsmarshall_main(argv[0], mount_path, foreground, fs, dev);
 #else
-	return ext2_fuse_main(argv0, mount_path, foreground, fs, dev);
+	return ext2_fuse_main(argv[0], mount_path, fuse_options, foreground, fs,
+	                      dev);
 #endif
 }

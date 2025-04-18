@@ -106,7 +106,7 @@ Partitions are counted from 1.
 Display this manual page if no operands are given, otherwise run
 .Xr man 1
 with the given command line.
-.It Sy mkpart Ar hole Ar offset Ar length Ar filesystem Ar mountpoint
+.It Sy mkpart Ar hole Ar offset Ar length Ar filesystem Ar mountpoint Ar options
 Create a partition on the current device.
 If the partition table has multiple unused regions
 .Pq holes ,
@@ -143,13 +143,24 @@ create a
 .Ar mountpoint
 for the partition, which will be added to
 .Xr fstab 5 .
+If a mountpoint is created, then you will be asked for the comma-separated mount
+options for the filesystem, which are typically
+.Sy rw
+for read-write access,
+.Sy ro
+for read-only access,
+.Sy cache Ns = Ns Ar N Ns %
+to set the cache size to N percent of system memory, or other filesystem
+specific values.
 .It Sy mktable Oo mbr "|" gpt Oc
 Create a partition table on the current device of the specified type.
-.It Sy mount Ar partition-index Oo Ar mountpoint Li "|" Sy no Oc
+.It Sy mount Ar partition-index Oo Ar mountpoint Li "|" Sy no Oc Ar options
 Mount the partition
 .Ar partition-index
 of the current device on
 .Ar mountpoint
+with the mount
+.Ar options
 in
 .Xr fstab 5 ,
 or if
@@ -226,6 +237,7 @@ filesystem table (see
 50%                     # use half the disk
 ext2                    # format an ext2 filesystem
 /home/user              # use as /home/user filesystem
+rw,cache=2%             # read-write, use 2% of memory as cache
 (ahci1) ls              # inspect partition table
 (ahci1) mount 1 /home   # change partition 1 mountpoint to /home
 (ahci1) exit            # done

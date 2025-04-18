@@ -556,6 +556,7 @@ int ext2_fuse_utimens(const char* path, const struct timespec tv[2])
 
 int ext2_fuse_main(const char* argv0,
                    const char* mount_path,
+                   const char* fuse_options,
                    bool foreground,
                    Filesystem* fs,
                    Device* dev)
@@ -600,6 +601,8 @@ int ext2_fuse_main(const char* argv0,
 	{
 		(char*) argv0,
 		(char*) "-ouse_ino",
+		(char*) "-o",
+		(char*) (fuse_options ? fuse_options : "use_ino"),
 		(char*) "-s",
 		(char*) (foreground ? "-f" : mount_path),
 		(char*) (foreground ? mount_path : NULL),

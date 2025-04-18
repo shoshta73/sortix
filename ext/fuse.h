@@ -25,6 +25,7 @@ class Filesystem;
 
 int ext2_fuse_main(const char* argv0,
                    const char* mount_path,
+                   const char* fuse_options,
                    bool foreground,
                    Filesystem* fs,
                    Device* dev);

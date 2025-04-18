@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,7 +37,8 @@ void* Device__SyncThread(void* ctx)
 	return NULL;
 }
 
-Device::Device(int fd, const char* path, uint32_t block_size, bool write)
+Device::Device(int fd, const char* path, uint32_t block_size,
+               size_t block_limit, bool write)
 {
 	// sync_thread unset.
 	this->sync_thread_cond = PTHREAD_COND_INITIALIZER;
@@ -59,14 +60,7 @@ Device::Device(int fd, const char* path, uint32_t block_size, bool write)
 	this->sync_thread_should_exit = false;
 	this->sync_in_transit = false;
 	this->block_count = 0;
-#ifdef __sortix__
-	// TODO: This isn't scaleable if there's multiple filesystems mounted.
-	size_t memory;
-	memstat(NULL, &memory);
-	this->block_limit = (memory / 10) / block_size;
-#else
-	this->block_limit = 32768;
-#endif
+	this->block_limit = block_limit;
 }
 
 Device::~Device()

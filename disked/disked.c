@@ -785,7 +785,8 @@ static bool remove_blockdevice_from_fstab(struct blockdevice* bdev)
 
 static void print_blockdevice_fsent(FILE* fp,
                                     struct blockdevice* bdev,
-                                    const char* mountpoint)
+                                    const char* mountpoint,
+                                    const char* options)
 {
 	const char* spec = bdev->p ? bdev->p->path : bdev->hd->path;
 	if ( bdev->fs )
@@ -794,13 +795,14 @@ static void print_blockdevice_fsent(FILE* fp,
 	        spec,
 	        mountpoint,
 	        bdev->fs->fstype_name,
-		    "rw",
+		    options,
 		    1,
 		    !strcmp(mountpoint, "/") ? 1 : 2);
 }
 
 static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
-                                     const char* mountpoint)
+                                     const char* mountpoint,
+                                     const char* options)
 {
 	assert(bdev->fs);
 	struct rewrite rewr;
@@ -811,7 +813,7 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 			FILE* fp = fopen(fstab_path, "w");
 			if ( !fp )
 				return false;
-			print_blockdevice_fsent(fp, bdev, mountpoint);
+			print_blockdevice_fsent(fp, bdev, mountpoint, options);
 			if ( ferror(fp) || fflush(fp) == EOF )
 				return fclose(fp), false;
 			fclose(fp);
@@ -841,7 +843,7 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 			        fsent.fs_spec,
 			        mountpoint,
 			        fsent.fs_vfstype,
-			        fsent.fs_mntops,
+			        options,
 			        fsent.fs_freq,
 			        fsent.fs_passno);
 			found = true;
@@ -860,7 +862,7 @@ static bool add_blockdevice_to_fstab(struct blockdevice* bdev,
 	if ( ferror(rewr.in) )
 		return rewrite_abort(&rewr), false;
 	if ( !found )
-		print_blockdevice_fsent(rewr.out, bdev, mountpoint);
+		print_blockdevice_fsent(rewr.out, bdev, mountpoint, options);
 	return rewrite_finish(&rewr);
 }
 
@@ -1851,8 +1853,6 @@ static void on_mkpart(size_t argc, char** argv)
 		}
 		break;
 	}
-	if ( argc < 4 )
-		printf("\n");
 	char fstype[256];
 	while ( true )
 	{
@@ -1889,6 +1889,8 @@ static void on_mkpart(size_t argc, char** argv)
 		}
 		break;
 	}
+	if ( argc < 5 )
+		printf("\n");
 	char mountpoint[256] = "";
 	bool mountable = !strcmp(fstype, "ext2");
 	while ( mountable )
@@ -1900,6 +1902,8 @@ static void on_mkpart(size_t argc, char** argv)
 			def = "/home";
 		if ( 6 <= argc )
 			strlcpy(mountpoint, argv[5], sizeof(mountpoint));
+		else if ( !interactive )
+			strlcpy(mountpoint, "no", sizeof(mountpoint));
 		else
 			prompt(mountpoint, sizeof(mountpoint),
 			       "Where to mount partition? (mountpoint or 'no')", def);
@@ -1917,7 +1921,34 @@ static void on_mkpart(size_t argc, char** argv)
 		simplify_mountpoint(mountpoint);
 		break;
 	}
-	if ( mountable && argc < 6 )
+	char options[256] = "";
+	while ( mountpoint[0] )
+	{
+		// TODO: Get read-only status from libmount.
+		const char* def = "rw";
+		if ( 7 <= argc )
+			strlcpy(options, argv[6], sizeof(options));
+		else if ( !interactive )
+			strlcpy(options, def, sizeof(options));
+		else
+			prompt(options, sizeof(options),
+			       "Comma-separated mount options? (rw/ro/...)", def);
+		if ( !options[0] )
+		{
+			command_errorx("%s: %s: %s: Mount options must be non-empty",
+	                       argv[0], device_name(current_hd->path), mountpoint);
+			continue;
+		}
+		if ( options[strcspn(options, " \t\n")] )
+		{
+			command_errorx("%s: %s: %s: Mount options cannot have whitespace: "
+			               "`%s'", argv[0], device_name(current_hd->path),
+			               mountpoint, options);
+			continue;
+		}
+		break;
+	}
+	if ( mountpoint[0] && argc < 7 )
 		printf("\n");
 	size_t renumbered_partitions = 0;
 	if ( current_pt_type == PARTITION_TABLE_TYPE_MBR && hole->inside_extended )
@@ -2247,13 +2278,14 @@ static void on_mkpart(size_t argc, char** argv)
 			               argv[0], device_name(p->path));
 			return;
 		}
-		if ( mountpoint[0] )
+	}
+	if ( mountpoint[0] )
+	{
+		if ( !add_blockdevice_to_fstab(&p->bdev, mountpoint, options) )
 		{
-			if ( !add_blockdevice_to_fstab(&p->bdev, mountpoint) )
-			{
-				command_error("%s: %s: Failed to add partition", argv[0], fstab_path);
-				return;
-			}
+			command_error("%s: %s: Failed to add partition", argv[0],
+			              fstab_path);
+			return;
 		}
 	}
 }
@@ -2447,6 +2479,36 @@ static void on_mount(size_t argc, char** argv)
 	}
 	char* mountpoint = argv[2];
 	const char* path = bdev->hd ? bdev->hd->path : bdev->p->path;
+	char* storage = NULL;
+	struct fstab fsent;
+	// TODO: Get read-only status from libmount.
+	const char* options_def = "rw";
+	if ( lookup_fstab_by_blockdevice(&fsent, &storage, bdev) )
+		options_def = fsent.fs_mntops;
+	char options[256] = "";
+	while ( mountpoint[0] )
+	{
+		if ( 4 <= argc )
+			strlcpy(options, argv[3], sizeof(options));
+		else
+			prompt(options, sizeof(options),
+			       "Comma-separated mount options? (rw/ro/...)", options_def);
+		if ( !options[0] )
+		{
+			command_errorx("%s: %s: %s: Mount options must be non-empty",
+	                       argv[0], device_name(path), mountpoint);
+			continue;
+		}
+		if ( options[strcspn(options, " \t\n")] )
+		{
+			command_errorx("%s: %s: %s: Mount options cannot have whitespace: "
+			               "`%s'", argv[0], device_name(path), mountpoint,
+			               options);
+			continue;
+		}
+		break;
+	}
+	free(storage);
 	if ( !strcmp(mountpoint, "no") )
 	{
 		if ( !remove_blockdevice_from_fstab(bdev) )
@@ -2469,7 +2531,7 @@ static void on_mount(size_t argc, char** argv)
 			const char* name = device_name(path);
 			printf("Warning: `%s' is not a mountable filesystem.\n", name);
 		}
-		if ( !add_blockdevice_to_fstab(bdev, mountpoint) )
+		if ( !add_blockdevice_to_fstab(bdev, mountpoint, options) )
 		{
 			command_error("%s: %s: Failed to add mountpoint",
 			              argv[0], fstab_path);
