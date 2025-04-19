@@ -56,6 +56,7 @@ char* find_fstype(char* str)
 		FSTAB_XX,
 	};
 	size_t count = sizeof(types) / sizeof(types[0]);
+	const char* result = NULL;
 	while ( *str )
 	{
 		while ( *str == ',' )
@@ -68,11 +69,11 @@ char* find_fstype(char* str)
 		{
 			for ( size_t i = 0; i < count; i++ )
 				if ( str[0] == types[i][0] && str[1] == types[i][1] )
-					return (char*) types[i];
+					result = types[i];
 		}
 		str += length;
 	}
-	return NULL;
+	return (char*) result;
 }
 
 int scanfsent(char* str, struct fstab* fs)
