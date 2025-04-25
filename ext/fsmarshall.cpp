@@ -758,15 +758,23 @@ int fsmarshall_main(const char* argv0,
 	signal(SIGTERM, TerminationHandler);
 	signal(SIGQUIT, TerminationHandler);
 
-	// Become a background process in its own process group by default.
+	// Become a background process in its own session by default.
 	if ( !foreground )
 	{
+		int null_fd = open("/dev/null", O_RDWR);
+		if ( null_fd < 0 )
+			err(1, "/dev/null");
 		pid_t child_pid = fork();
 		if ( child_pid < 0 )
 			err(1, "fork");
 		if ( child_pid )
 			exit(0);
-		setpgid(0, 0);
+		if ( setsid() < 0 )
+			err(1, "setsid");
+		dup2(null_fd, 0);
+		dup2(null_fd, 1);
+		dup2(null_fd, 2);
+		close(null_fd);
 	}
 	else
 		ready();
