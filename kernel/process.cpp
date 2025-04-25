@@ -534,10 +534,6 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 
 	ScopedLock lock(&process_family_lock);
 
-	// A process can only wait if it has children.
-	if ( !first_child && !zombie_child )
-		return errno = ECHILD, -1;
-
 	// Processes can only wait for their own children to exit.
 	if ( 0 < thepid )
 	{
@@ -557,6 +553,9 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 	Process* zombie = NULL;
 	while ( !zombie )
 	{
+		// A process can only wait if it has children.
+		if ( !first_child && !zombie_child )
+			return errno = ECHILD, -1;
 		for ( zombie = zombie_child; zombie; zombie = zombie->next_sibling )
 			if ( (thepid == -1 || thepid == zombie->pid) && !zombie->no_zombify )
 				break;
