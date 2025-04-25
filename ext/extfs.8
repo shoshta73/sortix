@@ -1,0 +1,210 @@
+.Dd April 20, 2025
+.Dt EXTFS 8
+.Os
+.Sh NAME
+.Nm extfs
+.Nd ext2 filesystem driver
+.Sh SYNOPSIS
+.Nm
+.Op Fl bf
+.Op Fl o Ar mount-options
+.Op Fl p Ar path
+.Ar device
+.Ar mountpoint
+.Sh DESCRIPTION
+.Nm
+mounts the ext2 filesystem on the
+.Ar device
+for reading and writing at the
+.Ar mountpoint .
+.Nm
+forks and runs in the background once the filesystem has been mounted.
+.Pp
+A compatible ext2 filesystem can be created using
+.Xr mkfs.ext2 8
+using the
+.Fl O Ar none,large_file,filetype
+option, and such filesystems can be checked and repaired using
+.Xr fsck.ext2 8 .
+The filesystem parameters can be tuned with
+.Xr tune2fs 8 ,
+and the filesystem label can be set with
+.Xr e2label 8 .
+Filesystems can be automatically mounted by
+.Xr init 8
+on boot by creating an entry in
+.Xr fstab 5
+with the
+.Sy ext2
+type.
+.Xr disked 8
+is typically used for partition and filesystem administration.
+.Pp
+.Nm
+will mount the filesystem as read-only if the filesystem uses unimplemented
+features that are read-compatible, and will refuse to mount if the
+filesystem uses read-incompatible unimplemented features.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl b , \-background
+Run in the background in a subprocess after successfully mounting.
+This is the default behavior.
+.It Fl f , \-foreground
+Run in the foreground and do not detach in a subprocess.
+.It Fl o Ar mount-options
+Mount the filesystem with the following comma-separated
+.Ar mount-options :
+.Bl -tag -width "1234567890"
+.It Sy cache Ns = Ns Ar size
+Sets the filesystem cache to the specified
+.Ar size ,
+which is measured in an optional suffix:
+.Sy %
+for percent of system memory,
+.Sy K
+for KiB,
+.Sy M
+for MiB,
+or
+.Sy G
+for GiB.
+The default is
+.Sy 10%
+of the system memory.
+.It Sy ro
+Mount the filesystem as read-only.
+.It Sy rw
+Mount the filesystem for read and write.
+This option is the default behavior.
+.El
+.It Fl p , \-pretend-mount-path Ns = Ns Ar path
+When answering requests about where the filesystem is mounted, reply with this
+.Pa path
+instead of the actual mountpoint in
+.Xr tcgetblob 2 .
+This behavior is useful for
+.Xr chroot 2
+environments.
+.El
+.Pp
+The following identifiers are available to recognize a filesystem in
+.Xr fstab 5
+in the
+.Ft fs_spec
+field and can be queried with the
+.Xr disked 8
+.Sy id
+command:
+.Bl -tag -width "12345678"
+.It Sy LABEL Ns = Ns Ar label
+Search for a filesystem with this
+.Ar label .
+.It Sy UUID Ns = Ns Ar uuid
+Search for a filesystem with this 16-byte hexadecimal
+.Ar uuid .
+This identifier is recommended for filesystem searches to avoid mounting the
+wrong filesystem.
+.El
+.Sh IMPLEMENTATION NOTES
+If
+.Fl f ,
+then
+.Nm
+signals readiness when it has successfully mounted the filesystem.
+.Pp
+.Nm
+implements the
+.Sy filetype
+and
+.Sy large_file
+extensions.
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGTERM"
+.It Dv SIGTERM
+Request daemon termination.
+.Nm
+will exit after gracefully unmounting the filesystem.
+.El
+.Sh EXIT STATUS
+If
+.Fl b ,
+.Nm
+exits 0 after successfully mounting the filesystem and serving requests in a
+background process.
+.Pp
+If
+.Fl f ,
+.Nm
+signals readiness on the
+.Ev READYFD
+file descriptor when filesystem has been mounted, and continues running in the
+same process.
+.Pp
+.Nm
+runs as a
+.Xr daemon 7
+until stopped by
+.Dv SIGTERM
+or until the filesystem is unmounted with
+.Xr unmount 8
+or
+.Xr unmount 2 ,
+after which
+.Nm
+exits 0 if the filesystem was cleanly unmounted.
+.Pp
+.Nm
+exits non-zero on fatal errors.
+.Sh EXAMPLES
+.Bd -literal
+$ mkfs.ext2 -O Ar none,large_file,filetype /dev/foo0
+$ extfs /dev/foo0 /mnt
+$ echo bar > /mnt/bar
+$ unmount /mnt
+$ fsck.ext2 /dev/foo0
+.Ed
+.Sh SEE ALSO
+.Xr fstab 5 ,
+.Xr disked 8 ,
+.Xr e2label 8 ,
+.Xr fsck.ext2 8 ,
+.Xr init 8 ,
+.Xr lsblk 8 ,
+.Xr mkfs.ext2 8 ,
+.Xr tune2fs 8 ,
+.Xr unmount 8
+.Sh STANDARDS
+.Rs
+.%A D. Poirier
+.%D May 8, 2019
+.%T Second Extended File System
+.%U https://www.nongnu.org/ext2-doc/ext2.html
+.Re
+.Sh BUGS
+Many extensions are not implemented yet, including the extensions needed for
+ext3 and ext4 support.
+.Pp
+.Xr readdir 2
+runs in O(n) linear time, which takes O(n^2) quadratic time when reading a full
+directory.
+Many other internal operations have similar quadratic time performance problems.
+.Pp
+The owner and group of files might not be set and respected correctly in all
+cases.
+.Pp
+The timestamps are limited to 32-bit seconds after 1970 and will overflow in
+2106.
+The owner and group values are limited to 16-bit.
+.Pp
+.Xr fsync 2
+does not sync the inode data contents, but only its metadata.
+.Nm
+will sync in the background, but this fact cannot be observed yet.
+To reliably sync, unmount the filesystem.
+.Pp
+The filesystem bookkeeping information is not always correctly updated and
+.Xr fsck.ext2 8
+may complain and fix the incorrect cached counts in the filesystem.
+.Pp
+The preferred block group heuristic is not tuned and properly used.

@@ -18,6 +18,7 @@ ifeq ($(HOST_IS_SORTIX),0)
 endif
 
 BINARIES:=extfs
+MANPAGES8:=extfs.8
 
 all: $(BINARIES)
 
@@ -26,6 +27,8 @@ all: $(BINARIES)
 install: all
 	mkdir -p $(DESTDIR)$(SBINDIR)
 	install $(BINARIES) $(DESTDIR)$(SBINDIR)
+	mkdir -p $(DESTDIR)$(MANDIR)/man8
+	install $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
 extfs: *.cpp *.h
 	$(CXX) $(PTHREAD_OPTION) -std=gnu++11 $(CPPFLAGS) $(CXXFLAGS) *.cpp -o $@ $(LIBS)
