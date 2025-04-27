@@ -20,6 +20,7 @@ extended.o \
 filesystem.o \
 gpt.o \
 harddisk.o \
+iso9660.o \
 mbr.o \
 partition.o \
 uuid.o \

@@ -34,6 +34,7 @@
 #include <mount/extended.h>
 #include <mount/filesystem.h>
 #include <mount/harddisk.h>
+#include <mount/iso9660.h>
 #include <mount/partition.h>
 
 const char* filesystem_error_string(enum filesystem_error error)
@@ -57,6 +58,9 @@ static const struct filesystem_handler* filesystem_handlers[] =
 	&biosboot_handler,
 	&extended_handler,
 	&ext2_handler,
+	// TODO: Applications should search for ISO 9660 filesystems only on the
+	//       root block device even if there's a MBR/GPT.
+	&iso9660_handler,
 	NULL,
 };
 

@@ -163,6 +163,12 @@ static bool should_install_bootloader_path(const char* mnt,
 	return result;
 }
 
+static bool should_ignore_bootloader_on_filesystem(struct blockdevice* bdev)
+{
+	return bdev->fs && bdev->fs->fstype_name &&
+	       !strcmp(bdev->fs->fstype_name, "iso9660");
+}
+
 static bool should_install_bootloader_bdev(struct blockdevice* bdev)
 {
 	if ( !bdev->fs )
@@ -216,13 +222,16 @@ static bool should_install_bootloader(void)
 		{
 			for ( size_t n = 0; n < hd->bdev.pt->partitions_count; n++ )
 			{
-				any_systems = true;
 				struct partition* p = hd->bdev.pt->partitions[n];
+				if ( should_ignore_bootloader_on_filesystem(&p->bdev) )
+					continue;
+				any_systems = true;
 				if ( should_install_bootloader_bdev(&p->bdev) )
 					return true;
 			}
 		}
-		else if ( hd->bdev.fs )
+		else if ( hd->bdev.fs &&
+		          !should_ignore_bootloader_on_filesystem(&hd->bdev) )
 		{
 			any_systems = true;
 			if ( should_install_bootloader_bdev(&hd->bdev) )

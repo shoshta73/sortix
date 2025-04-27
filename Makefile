@@ -24,6 +24,7 @@ games \
 hostname \
 ifconfig \
 init \
+iso9660 \
 kblayout \
 kblayout-compiler \
 login \

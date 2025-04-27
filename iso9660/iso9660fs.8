@@ -1,0 +1,266 @@
+.Dd April 26, 2025
+.Dt EXTFS 8
+.Os
+.Sh NAME
+.Nm iso9660fs
+.Nd iso 9660 filesystem driver
+.Sh SYNOPSIS
+.Nm
+.Op Fl bf
+.Op Fl o Ar mount-options
+.Op Fl p Ar path
+.Ar device
+.Ar mountpoint
+.Sh DESCRIPTION
+.Nm
+mounts the ISO 9660 aka ECMA-119 filesystem on the
+.Ar device
+for reading at the
+.Ar mountpoint .
+.Nm
+forks and runs in the background once the filesystem has been mounted.
+.Pp
+A compatible ISO 9660 filesystem can be created using
+.Xr xorriso 1 .
+Filesystems can be automatically mounted by
+.Xr init 8
+on boot by creating an entry in
+.Xr fstab 5
+with the
+.Sy iso9660
+type.
+.Pp
+.Nm
+implements the System Use Sharing Protocol that allows extensions such as Rock
+Ridge.
+.Pp
+.Nm
+implements the Rock Ridge 1.10 and 1.12 extensions that provide POSIX metadata,
+such as long file names with arbitary characters, deep directory hiearchies,
+permissions, owner and group metadata, special files, hard links, symbolic
+links, multiple timestamps with 10 ms precision until year 9999, and more.
+Sparse files are not implemented.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl b , \-background
+Run in the background in a subprocess after successfully mounting.
+This is the default behavior.
+.It Fl f , \-foreground
+Run in the foreground and do not detach in a subprocess.
+.It Fl o Ar mount-options
+Mount the filesystem with the following comma-separated
+.Ar mount-options :
+.Bl -tag -width "1234567890"
+.It Sy cache Ns = Ns Ar size
+Sets the filesystem cache to the specified
+.Ar size ,
+which is measured in an optional suffix:
+.Sy %
+for percent of system memory,
+.Sy K
+for KiB,
+.Sy M
+for MiB,
+or
+.Sy G
+for GiB.
+The default is
+.Sy 10%
+of the system memory.
+.It Sy nosusp
+Disable the System Use Share Protocol and therefore Rock Ridge.
+.It Sy norock
+Disable the Rock Ridge extensions.
+.It Sy ro
+Mount the filesystem as read-only.
+This option is the default behavior and write support is not possible.
+.El
+.It Fl p , \-pretend-mount-path Ns = Ns Ar path
+When answering requests about where the filesystem is mounted, reply with this
+.Pa path
+instead of the actual mountpoint in
+.Xr tcgetblob 2 .
+This behavior is useful for
+.Xr chroot 2
+environments.
+.El
+.Pp
+The following identifiers are available to recognize a filesystem in
+.Xr fstab 5
+in the
+.Ft fs_spec
+field and can be queried with the
+.Xr disked 8
+.Sy id
+command:
+.Bl -tag -width "12345678"
+.It Sy LABEL Ns = Ns Ar label
+Search for a filesystem with this
+.Ar label
+as the volume identifier.
+.It Sy ABSTRACT_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the abstract file id.
+.It Sy APPLICATION_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the application id.
+.It Sy BIBLIOGRAPHIC_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the bibliographic file id.
+.It Sy COPYRIGHT_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the copyright file id.
+.It Sy DATA_PREPARER_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the data preparer id.
+.It Sy PUBLISHER_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the publisher id.
+.It Sy VOLUME_SET_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the volume set id.
+This identifier may be a good choice for the filesystem search if it has been
+set to a unique value.
+.It Sy SYSTEM_ID Ns = Ns Ar value
+Search for a filesystem with this
+.Ar value
+as the system id that can interpret the boot data.
+.It Sy UUID Ns = Ns Ar creation-time
+Search for a filesystem with this
+.Ar creation-time
+in the YYYY-MM-DD-HH-MM-SS-CC format, without respecting the time zone field.
+.Ar uuid .
+This identifier is generally recommended for filesystem searches to avoid
+mounting the wrong filesystem, but may not be unique, and another identifier may
+be better suited depending on the volume.
+.El
+.Sh IMPLEMENTATION NOTES
+If
+.Fl f ,
+then
+.Nm
+signals readiness when it has successfully mounted the filesystem.
+.Pp
+The System Use Sharing Protocol continuation areas are limited to 32 blocks.
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGTERM"
+.It Dv SIGTERM
+Request daemon termination.
+.Nm
+will exit after gracefully unmounting the filesystem.
+.El
+.Sh EXIT STATUS
+If
+.Fl b ,
+.Nm
+exits 0 after successfully mounting the filesystem and serving requests in a
+background process.
+.Pp
+If
+.Fl f ,
+.Nm
+signals readiness on the
+.Ev READYFD
+file descriptor when filesystem has been mounted, and continues running in the
+same process.
+.Pp
+.Nm
+runs as a
+.Xr daemon 7
+until stopped by
+.Dv SIGTERM
+or until the filesystem is unmounted with
+.Xr unmount 8
+or
+.Xr unmount 2 ,
+after which
+.Nm
+exits 0 if the filesystem was cleanly unmounted.
+.Pp
+.Nm
+exits non-zero on fatal errors.
+.Sh EXAMPLES
+.Bd -literal
+$ iso9660fs /dev/foo0 /mnt
+$ ls /mnt
+$ unmount /mnt
+.Ed
+.Sh SEE ALSO
+.Xr xorriso 1 ,
+.Xr fstab 5 ,
+.Xr disked 8 ,
+.Xr init 8 ,
+.Xr unmount 8
+.Sh STANDARDS
+.Rs
+.%D 2023
+.%I ISO International Organization for Standardization
+.%R ISO/IEC 9660:2023
+.%T Volume and File Structure of CD-ROM for Information Interchange
+.%Q ISO/IEC JTC 1/SC 23
+.Re
+.Pp
+.Rs
+.%D December 2024
+.%I Ecma International
+.%R ECMA-119 5th Edition
+.%T Volume and File Structure of CDROM for Information Interchange
+.Re
+.Pp
+.Rs
+.%D July 8, 1994
+.%I Institute of Electrical and Electronics Engineers
+.%Q IEEE CD-ROM File System Format Working Group
+.%R IEEE P1281 1.12
+.%T System Use Sharing Protocol
+.Re
+.Pp
+.Rs
+.%D July 8, 1994
+.%I Institute of Electrical and Electronics Engineers
+.%Q IEEE CD-ROM File System Format Working Group
+.%R IEEE P1282 1.12
+.%T Rock Ridge Interchange Protocol
+.Re
+.Sh BUGS
+Hard links are not perfectly implemented, as the different directory entries
+have different inode numbers due to current technical limitations.
+.Pp
+Multiple sessions are not supported yet due to no driver support.
+.Pp
+Multiple file extents are not supported.
+.Pp
+Rock Ridge sparse files are not implemented.
+This lack of support matches
+.Xr xorriso 1 .
+.Pp
+Interleaved files via the Interleave Gap Size and File Unit Size are not
+implemented.
+This lack of support matches
+.Xr xorriso 1 .
+.Pp
+.Xr readdir 2
+runs in O(n) linear time, which takes O(n^2) quadratic time when reading a full
+directory.
+.Pp
+ISO 9660 Extended Attributes are not implemented, as Rock Ridge provides the
+needed features.
+.Pp
+The Rock Ridge long form timestamps have a four digit year field and will
+overflow in the year 10000.
+If this extension is not used, the timestamps use a byte count since the year
+1970 and will overflow in the year 2156.
+.Pp
+The owner and group values are limited to 32-bit.
+.Pp
+The logical sector size must be 2048 bytes.
+Supporting other sector sizes would require searching multiple offsets for the
+sector size used by the filesystem, which might not match the underlying device.
