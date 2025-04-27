@@ -921,6 +921,8 @@ int main(void)
 		char* disked_input = autoconf_eval("disked");
 		if ( execute(argv, "fi", disked_input) != 0 )
 		{
+			if ( disked_input )
+				errx(2, "partitioning failed");
 			free(disked_input);
 			// TODO: We also end up here on SIGINT.
 			// TODO: Offer a shell here instead of failing?
