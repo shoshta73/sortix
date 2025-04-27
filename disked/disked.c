@@ -1497,6 +1497,26 @@ static void on_help(size_t argc, char** argv)
 	printf("\n");
 }
 
+static void on_id(size_t argc, char** argv)
+{
+	if ( argc < 2 )
+	{
+		command_errorx("%s: No partition specified", argv[0]);
+		return;
+	}
+	struct blockdevice* bdev = lookup_blockdevice_by_string(argv[0], argv[1]);
+	if ( !bdev )
+		return;
+	const char* path = bdev->hd ? bdev->hd->path : bdev->p->path;
+	if ( !bdev->fs )
+	{
+		command_errorx("%s: %s: No filesystem is recognized", argv[0], path);
+		return;
+	}
+	for ( size_t i = 0; i < bdev->fs->identifiers_used; i++ )
+		printf("%s\n", bdev->fs->identifiers[i]);
+}
+
 static char* display_area_format(void* ctx, size_t row, size_t column)
 {
 	if ( row == 0 )
@@ -2809,6 +2829,7 @@ static const struct command commands[] =
 	{ "exit", on_quit, "" },
 	{ "fsck", on_fsck, "dTp" },
 	{ "help", on_help, "" },
+	{ "id", on_id, "dT" },
 	{ "ls", on_ls, "dT" },
 	{ "man", on_man, "s" },
 	{ "mkpart", on_mkpart, "dt" },

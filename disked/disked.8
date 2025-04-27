@@ -90,6 +90,15 @@ filesystem check of the partition
 on the current device.
 .It Sy help
 List available commands.
+.It Sy id Ar partition-index
+List the identifiers for the filesystem on the partition
+.Ar partition-index
+on the current device.
+These identifiers are key-values separated by an equals character, suitable for
+use in the
+.Xr fstab 5
+.Fa fs_spec
+field to locate filesystems.
 .It Sy ls
 Display the partition table of the current device.
 Partitions are counted from 1.
