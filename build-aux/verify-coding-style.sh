@@ -50,8 +50,7 @@ verify_source() {
     complain "$PWD/$FILE" "doesn't have a copyright statement"
     RESULT=false
   fi
-  if grep -q COPYRIGHT -- "$FILE" ||
-     grep -q -E '^/\*{78}$' -- "$FILE" ||
+  if grep -q -E '^/\*{78}$' -- "$FILE" ||
      grep -q -E '^\*{78}/$' -- "$FILE"; then
     complain "$PWD/$FILE" "has an obsolete copyright statement"
     RESULT=false
