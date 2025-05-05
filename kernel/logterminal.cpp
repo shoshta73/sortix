@@ -136,7 +136,13 @@ void LogTerminal::tty_output(const unsigned char* buffer, size_t length)
 		while ( !found_report_cursor && amount < length )
 		{
 			if ( buffer[amount++] == report_cursor[report_cursor_offset++] )
-				found_report_cursor = !report_cursor[report_cursor_offset];
+			{
+				if ( !report_cursor[report_cursor_offset] )
+				{
+					found_report_cursor = true;
+					report_cursor_offset = 0;
+				}
+			}
 			else
 				report_cursor_offset = 0;
 		}
