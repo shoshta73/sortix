@@ -232,6 +232,8 @@ static bool SearchBus(bool (*callback)(uint32_t,
 		{
 			uint32_t devaddr = MakeDevAddr(bus, slot, function);
 			pciid_t id = GetDeviceId(devaddr);
+			if ( id.vendorid == 0xFFFF && id.deviceid == 0xFFFF )
+				continue;
 			pcitype_t type = GetDeviceType(devaddr);
 			uint8_t header = Read8(devaddr, PCIFIELD_HEADER_TYPE);
 			if ( header & 0x80 ) // Multi function device.
@@ -280,15 +282,6 @@ void Search(bool (*callback)(uint32_t,
 	SearchBus(callback, context, &coarse_pattern, patterns, pattern_count, 0);
 }
 
-static bool MatchesPatternByDevAddr(uint32_t devaddr, const pcifind_t* pcifind)
-{
-	pciid_t id = GetDeviceId(devaddr);
-	if ( id.vendorid == 0xFFFF && id.deviceid == 0xFFFF )
-		return false;
-	pcitype_t type = GetDeviceType(devaddr);
-	return MatchesPattern(&id, &type, pcifind);
-}
-
 // TODO: This iterates the whole PCI device tree on each call! Transition the
 //       callers to use the new callback API and delete this API.
 static uint32_t SearchForDevicesOnBus(uint8_t bus, pcifind_t pcifind, uint32_t last = 0)
@@ -302,9 +295,13 @@ static uint32_t SearchForDevicesOnBus(uint8_t bus, pcifind_t pcifind, uint32_t l
 		for ( unsigned int function = 0; function < num_functions; function++ )
 		{
 			uint32_t devaddr = MakeDevAddr(bus, slot, function);
+			pciid_t id = GetDeviceId(devaddr);
+			if ( id.vendorid == 0xFFFF && id.deviceid == 0xFFFF )
+				continue;
+			pcitype_t type = GetDeviceType(devaddr);
 			if ( last < devaddr &&
 			     (!found_any_device || devaddr < next_device) &&
-			     MatchesPatternByDevAddr(devaddr, &pcifind) )
+			     MatchesPattern(&id, &type, &pcifind) )
 				next_device = devaddr, found_any_device = true;
 			uint8_t header = Read8(devaddr, PCIFIELD_HEADER_TYPE);
 			if ( header & 0x80 ) // Multi function device.
