@@ -168,14 +168,13 @@ Inode* SafeGetInode(Filesystem* fs, ino_t ino)
 {
 	if ( (uint32_t) ino != ino )
 		return errno = EBADF, (Inode*) ino;
-	// TODO: Should check if the inode is not deleted.
 	return fs->GetInode((uint32_t) ino);
 }
 
 void HandleRefer(int chl, struct fsm_req_refer* msg, Filesystem* fs)
 {
 	(void) chl;
-	if ( Inode* inode = SafeGetInode(fs, (uint32_t) msg->ino) )
+	if ( Inode* inode = SafeGetInode(fs, msg->ino) )
 	{
 		inode->RemoteRefer();
 		inode->Unref();
@@ -185,7 +184,7 @@ void HandleRefer(int chl, struct fsm_req_refer* msg, Filesystem* fs)
 void HandleUnref(int chl, struct fsm_req_unref* msg, Filesystem* fs)
 {
 	(void) chl;
-	if ( Inode* inode = SafeGetInode(fs, (uint32_t) msg->ino) )
+	if ( Inode* inode = SafeGetInode(fs, msg->ino) )
 	{
 		inode->RemoteUnref();
 		inode->Unref();
