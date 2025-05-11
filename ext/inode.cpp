@@ -867,7 +867,7 @@ bool Inode::Rename(Inode* olddir, const char* oldname, const char* newname)
 {
 	if ( !strcmp(oldname, ".") || !strcmp(oldname, "..") ||
 	     !strcmp(newname, ".") || !strcmp(newname, "..") )
-		return errno = EPERM, false;
+		return errno = EINVAL, false;
 	Inode* src_inode = olddir->Open(oldname, O_RDONLY, 0);
 	if ( !src_inode )
 		return false;
@@ -878,6 +878,7 @@ bool Inode::Rename(Inode* olddir, const char* oldname, const char* newname)
 		if ( same_inode )
 			return src_inode->Unref(), true;
 	}
+	// TODO: Fail if making a directory a subdirectory of itself.
 	// TODO: Prove that this cannot fail and handle such a situation.
 	if ( EXT2_S_ISDIR(src_inode->Mode()) )
 	{
