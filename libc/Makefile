@@ -259,6 +259,10 @@ time/strftime.o \
 time/strptime.o \
 time/timegm.o \
 ubsan/ubsan.o \
+uchar/c16rtomb.o \
+uchar/c32rtomb.o \
+uchar/mbrtoc16.o \
+uchar/mbrtoc32.o \
 wchar/btowc.o \
 wchar/mbrlen.o \
 wchar/mbrtowc.o \

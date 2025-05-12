@@ -138,7 +138,7 @@ size_t mbrtowc(wchar_t* restrict pwc,
 	if ( !ps )
 		ps = &static_ps;
 	if ( !s )
-		s = "", n = 1;
+		s = "", n = 1, pwc = NULL;
 
 	// TODO: Verify whether the current locale is UTF-8.
 	return utf8_mbrtowc(pwc, s, n, ps);
