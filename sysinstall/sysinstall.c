@@ -1508,7 +1508,8 @@ int main(void)
 		      input);
 		break;
 	}
-	text("\n");
+	if ( autoupgrade )
+		text("\n");
 
 	bool is_stable = !strchr(VERSIONSTR, '-');
 	bool ask_channel = autoconf_has("channel") || autoupgrade;
