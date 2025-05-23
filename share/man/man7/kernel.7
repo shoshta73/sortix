@@ -162,7 +162,7 @@ The bootloader must already have decompressed the archive.
 Each multiboot module has its own command line where the options are as follows:
 .Bl -tag -width "12345678"
 .It Fl \-append-to Ns "=" Ns Ar file
-Append the contents of the module to the specifed
+Append the contents of the module to the specified
 .Ar file ,
 creating it with mode 644 if it doesn't exist.
 Non-existent parent directories are created with mode 755 as needed.
@@ -183,7 +183,7 @@ with the current time and other readily available information.
 The bootloader normally loads the random seed from
 .Pa /boot/random.seed .
 .It Fl \-to Ns "=" Ns Ar file
-Write the contents of the module to the specifed
+Write the contents of the module to the specified
 .Ar file ,
 creating it with mode 644 if it doesn't exist, and truncating it if it does exist.
 Non-existent parent directories are created with mode 755 as needed.
