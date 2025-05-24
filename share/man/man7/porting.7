@@ -70,7 +70,7 @@ Ports must both compile natively and cross-compile.
 Ports must assume the best about the host operating system when cross-compiling
 and unable to test for bugs.
 .Pp
-It must be possible to reasonably boostrap the latest ports collection from the
+It must be possible to reasonably bootstrap the latest ports collection from the
 latest stable release.
 .Ss Metadata
 A port named
@@ -172,7 +172,7 @@ The top level makefile uses a sysroot when building the ports which can be used
 to determine which dependencies are mandatory.
 The mandatory ports can be found by starting with an empty list of build
 libraries and a clean sysroot, and then trying to build the port and adding the
-dependencies whose absense is causing the build to fail.
+dependencies whose absence is causing the build to fail.
 .Pp
 The higher level
 .Xr tix-metabuild 8
