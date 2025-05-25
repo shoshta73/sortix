@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -117,4 +117,37 @@ void uuid_to_string(const unsigned char uuid[16], char* string)
 		*string++ = base((uuid[i] >> 0) & 0xF);
 	}
 	*string = '\0';
+}
+
+void uuid_to_from_guid(unsigned char uuid[16])
+{
+	unsigned char t;
+	t = uuid[0];
+	uuid[0] = uuid[3];
+	uuid[3] = t;
+	t = uuid[1];
+	uuid[1] = uuid[2];
+	uuid[2] = t;
+	t = uuid[4];
+	uuid[4] = uuid[5];
+	uuid[5] = t;
+	t = uuid[6];
+	uuid[6] = uuid[7];
+	uuid[7] = t;
+}
+
+void guid_from_string(unsigned char guid[16], const char* string)
+{
+	unsigned char uuid[16];
+	uuid_from_string(uuid, string);
+	uuid_to_from_guid(uuid);
+	memcpy(guid, uuid, 16);
+}
+
+void guid_to_string(const unsigned char guid[16], char* string)
+{
+	unsigned char uuid[16];
+	memcpy(uuid, guid, 16);
+	uuid_to_from_guid(uuid);
+	uuid_to_string(uuid, string);
 }

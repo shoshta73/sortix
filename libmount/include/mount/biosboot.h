@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +22,7 @@
 
 #include <mount/filesystem.h>
 
-#define BIOSBOOT_GPT_TYPE_UUID "48616821-4964-6f6e-744e-656564454649"
+#define BIOSBOOT_GPT_TYPE_GUID "21686148-6449-6e6f-744e-656564454649"
 
 #if defined(__cplusplus)
 extern "C" {

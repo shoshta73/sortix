@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,9 @@ extern "C" {
 bool uuid_validate(const char*);
 void uuid_from_string(unsigned char[16], const char*);
 void uuid_to_string(const unsigned char[16], char*);
+void uuid_to_from_guid(unsigned char[16]);
+void guid_from_string(unsigned char[16], const char*);
+void guid_to_string(const unsigned char[16], char*);
 
 #if defined(__cplusplus)
 } /* extern "C" */

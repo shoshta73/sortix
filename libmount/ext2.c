@@ -100,6 +100,9 @@ static bool ext2_probe(struct blockdevice* bdev,
                        const unsigned char* leading,
                        size_t amount)
 {
+	// TODO: Strongly prefer a UUID indication before probing.
+	// TODO: Note how Sortix 1.0 used a wrong big endian GUID for ext2
+	//       because I didn't notice GUIDs were little endian.
 	(void) bdev;
 	if ( amount < 1024 )
 		return false;

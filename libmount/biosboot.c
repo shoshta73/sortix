@@ -46,9 +46,9 @@ static bool biosboot_probe(struct blockdevice* bdev,
 		return false;
 	if ( p->table_type != PARTITION_TABLE_TYPE_GPT )
 		return false;
-	unsigned char uuid[16];
-	uuid_from_string(uuid, BIOSBOOT_GPT_TYPE_UUID);
-	return memcmp(p->gpt_type_guid, uuid, 16) == 0;
+	unsigned char guid[16];
+	guid_from_string(guid, BIOSBOOT_GPT_TYPE_GUID);
+	return memcmp(p->gpt_type_guid, guid, 16) == 0;
 }
 
 static void biosboot_release(struct filesystem* fs)

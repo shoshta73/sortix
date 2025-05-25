@@ -1576,9 +1576,9 @@ static char* display_area_format(void* ctx, size_t row, size_t column)
 			else if ( area->bdev->p &&
 			          area->bdev->p->table_type == PARTITION_TABLE_TYPE_GPT )
 			{
-				char uuid[UUID_STRING_LENGTH + 1];
-				uuid_to_string(area->bdev->p->gpt_type_guid, uuid);
-				return strdup(uuid);
+				char guid[UUID_STRING_LENGTH + 1];
+				guid_to_string(area->bdev->p->gpt_type_guid, guid);
+				return strdup(guid);
 			}
 			return strdup("(unrecognized)");
 		case FILESYSTEM_ERROR_ERRNO: return strdup("(error)");
@@ -2122,13 +2122,12 @@ static void on_mkpart(size_t argc, char** argv)
 		size_t poff = (slot - 1) * (size_t) gpt.size_of_partition_entry;
 		struct gpt_partition p;
 		memset(&p, 0, sizeof(p));
-		// TODO: This string might need to have some bytes swapped.
 		// TODO: Perhaps just to hell with Linux guids and allocate our own
 		//       Sortix values that denote particular filesystems.
-		const char* type_uuid_str = "0FC63DAF-8483-4772-8E79-3D69D8477DE4";
+		const char* type_guid_str = "0FC63DAF-8483-4772-8E79-3D69D8477DE4";
 		if ( !strcmp(fstype, "biosboot") )
-			type_uuid_str = BIOSBOOT_GPT_TYPE_UUID;
-		uuid_from_string(p.partition_type_guid, type_uuid_str);
+			type_guid_str = BIOSBOOT_GPT_TYPE_GUID;
+		guid_from_string(p.partition_type_guid, type_guid_str);
 		arc4random_buf(p.unique_partition_guid, sizeof(p.unique_partition_guid));
 		off_t pstart = hole->start + start;
 		off_t pend = hole->start + start + length;
