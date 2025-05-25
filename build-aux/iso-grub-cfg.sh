@@ -480,6 +480,15 @@ menuentry "\$title_sysupgrade" '-- /sbin/init --target=sysupgrade'
 
 cat << EOF
 
+if [ "\$grub_platform" = "efi" ]; then
+  fwsetup --is-supported
+  if [ "\$?" = 0 ]; then
+    menuentry "UEFI Firmware Settings" {
+      fwsetup
+    }
+  fi
+fi
+
 if ! $mount; then
 menuentry "Select ports..." {
   configfile /boot/grub/ports.cfg

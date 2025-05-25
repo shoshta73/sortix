@@ -37,7 +37,7 @@ of memory after installation.
 .It
 ATA or AHCI harddisk with at least 1 GiB of unpartitioned space.
 .It
-BIOS firmware, or UEFI firmware in legacy mode.
+BIOS or EFI firmware.
 .It
 PS/2 keyboard/mouse firmware emulation to use those devices.
 .It
@@ -69,12 +69,41 @@ or
 to copy the release physically onto a USB portable storage device.
 If the target machine has a cdrom drive, you can burn the release to a cdrom.
 Insert the installation medium in the computer and power it on.
+.Pp
 If needed, change the boot order in the firmware to prefer the installation
 medium over any existing operating system installations.
 .Pp
 After the installation is complete, remove the installation medium and restore
 the firmware boot order to prioritize the local harddisk.
 Then power the computer on normally to run the new operating system.
+.Ss BIOS or EFI
+BIOS boot is the most compatible and supported way to boot this operating
+system.
+EFI boot is available and supported in principle, but has known issues in
+practice on some systems.
+.Pp
+If you have EFI firmware, you need to disable secure boot.
+EFI boot is preferred over the legacy BIOS boot if it is compatible with this
+operating system, but you can use whatever method you prefer if your firmware
+supports it.
+.Pp
+Note: Strict EFI has known compatibility problems with this operating system on
+some machines.
+If you experience issues detecting or using the harddisk, keyboard, or other
+issues; then please try:
+.Bl -bullet -compact
+.It
+Disabling the GUI to see any kernel warnings during early boot.
+.It
+Enabling the EFI legacy BIOS boot module (if available) but booting as EFI.
+Some hardware may be initialized in a compatible manner if the BIOS mode is
+enabled, even if it is not used.
+.It
+Booting as BIOS (if available).
+.It
+Changing the harddisk controller between AHCI and ATA (if possible).
+.El
+If the above instructions fail, your machine might not be supported yet.
 .Ss Release .iso Modification
 Optionally, you might want to modify a release .iso to meet your custom needs
 per the instructions in
@@ -276,21 +305,62 @@ is a multiboot compatible binary that can be loaded by any multiboot
 specification compatible bootloader such as GRUB.
 You need to use such a bootloader to boot the operating system.
 You will be offered the choice of installing GRUB as the bootloader.
-Note however that this GRUB is not able to detect other operating systems and
+Note however that this GRUB is not able to detect other operating systems, and
 you will have to configure it manually if you wish to use it in a dual boot
 scheme.
-The answer will default to yes if no existing partitions are found, or if an
+On
+.Sy EFI ,
+the answer will default to yes, since the included GRUB bootloader can live side
+by side with other operating system bootloaders.
+On
+.Sy BIOS ,
+the answer will default to yes if no existing partitions are found, or if an
 existing Sortix installation is found that uses the provided bootloader; and
 will otherwise default to no.
 .Pp
-The bootloader will be installed on the boot harddisk, which is the harddisk
-containing the
+On
+.Sy EFI ,
+the bootloader will be installed onto the EFI System Partition that you
+mount as
+.Pa /boot/efi .
+EFI installations should accept the bootloader.
+You will be asked which EFI directory to install the bootloader into.
+If you are able to set the bootloader entries in the EFI firmware or if you can
+use
+.Xr efibootmgr 8
+on another operating system, then select a unique per-installation directory
+name such as
+.Sy sortix .
+After installation, you will then need to manually create a boot entry for the
+.Pa EFI/sortix/grubx64.efi
+(on x86_64)
+or
+.Pa EFI/sortix/grubia32.efi
+(on i686)
+bootloader.
+If you are unable to do so, then select
+.Sy BOOT
+instead to create a removable EFI installation in
+.Pa EFI/BOOT/BOOTX64.EFI
+(x86_64)
+or
+.Pa EFI/BOOT/BOOTIA32.EFI
+(i686),
+which is automatically booted by EFI as a fallback if no other boot order has
+been configured.
+Removable EFI installations are not tied to your machine and can be used on
+other machines too, but does not allow multiple side by side removable
+installations, as they would conflict.
+.Pp
+On
+.Sy BIOS ,
+the bootloader will be installed on the boot harddisk, which is the
+harddisk containing the
 .Pa /boot
 partition if any, and otherwise the harddisk containing the root filesystem.
-.Pp
-Single-boot configurations should use the offered bootloader.
-Dual-boot configurations should refuse it and arrange for bootloading by other
-means.
+Single-boot BIOS configurations should use the offered bootloader.
+Dual-boot BIOS configurations should refuse it and arrange for bootloading by
+other means.
 The installer will generate
 .Pa /etc/default/grub.d/10_sortix.cache
 which is a fragment of GRUB configuration that offers the menu option of running
@@ -346,19 +416,21 @@ You can view all devices with the
 command.
 .Pp
 If the current device does not already have a partition table, you can create a
-.Xr mbr 7
-or
 .Xr gpt 7
+or
+.Xr mbr 7
 partition table using the
 .Sy mktable
 command.
 .Xr gpt 7
 is the preferred choice for new partition tables as
 .Xr mbr 7 has unfortunate limitations.
+EFI installations should use
+.Xr gpt 7 .
 If you are dissatisfied with the current partition table, you can use
 the
 .Sy rmtable
-command which will destroy the partition table and effectively delete all data
+command, which will destroy the partition table and effectively delete all data
 on the harddisk.
 .Pp
 The
@@ -369,40 +441,72 @@ The
 command creates a partition.
 You will be asked interactive questions to determine its location.
 You will be asked if you wish to format a filesystem.
-.Nm ext2
-is the native filesystem.
 If applicable, you will be asked if you wish to create a mountpoint for it in
 .Xr fstab 5 .
+Use the
+.Sy rw
+mount options to mount the filesystem for reading and writing.
 The
 .Sy rmpart Ar partition-number
 command removes a partition table entry and effectively deletes all data on the
 partition.
 .Pp
-If you accepted the included bootloader, it will be installed on the boot
-harddisk, which is the harddisk containing the
-.Pa /boot
-partition if any, and otherwise the harddisk containing the root filesystem.
-If the boot harddisk uses the
-.Xr gpt 7
-partitioning scheme, then you must create a
+If you accepted the included bootloader:
+.Bl -bullet
+.It
+On
+.Sy EFI ,
+you need an
+.Sy EFI System Partition
+mounted at
+.Pa /boot/efi .
+It should be at least 16 MB to provide room for growth in future versions of the
+operating system.
+The partition is shared with other operating systems, enlargen it as required
+if you wish to dual-boot other operating systems.
+The minimum size is 1 MB, however this size is unsupported for operating system
+upgrades and doesn't leave room for other operating systems.
+.It
+On
+.Sy BIOS
+with
+.Sy GPT ,
+you need a
 .Sy biosboot
-partition on the boot harddisk which is where the bootloader will be installed.
+partition on the harddisk containing the
+.Pa /boot
+directory.
 It should be at the start of the boot harddisk and a size of 1 MiB will be more
 than sufficient.
+This partition does not need a mountpoint.
+.It
+On
+.Sy BIOS
+with
+.Sy MBR ,
+you don't need any bootloader partition.
+However, the bootloader will be installed unprotected in the unpartitioned
+space before the first partition on the harddisk containing the
+.Pa /boot
+directory.
+.El
 .Pp
 You need to make a partition containing the root filesystem mounted at
 .Pa / .
+.Nm ext2
+is the native filesystem and must be used for the root filesystem.
 A size of 1 GiB will be comfortable for the base system and ports and basic
-usage.
+usage, but it is strongly recommended to add any additional space needed for
+your use.
 There is no inherent need for a
 .Pa /boot
 or a
 .Pa /home
 partition, so you are encouraged to make the root filesystem as large as you
 wish.
-Operating systems upgrades will preserve the root filesystem and the installer
-handles installing on top of an existing installation and preserves user files
-and local configuration.
+Operating systems upgrades will preserve the root filesystem.
+The installer handles reinstalling on top of an existing installation,
+preserving user files and local configuration.
 .Pp
 Type
 .Sy exit

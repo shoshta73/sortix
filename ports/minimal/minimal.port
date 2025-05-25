@@ -1,5 +1,5 @@
 NAME=minimal
 LOCATION_INDEPENDENT=true
 BUILD_SYSTEM=none
-RUNTIME_DEPS='cut dash e2fsprogs grep grub grub-i386-pc less libcurses libssl mdocml sed signify tar wget xargs xz'
+RUNTIME_DEPS='cut dash dosfstools e2fsprogs grep grub grub-i386-pc grub-i386-efi grub-x86_64-efi less libcurses libssl mdocml sed signify tar wget xargs xz'
 IS_SET=true

@@ -115,13 +115,35 @@ then the default is instead
 Install the GRUB bootloader onto the device containing the
 .Pa /boot
 filesystem (if it exists, otherwise the root filesystem)?
+.Pp
+On BIOS, this is an essential question that must be answered for automatic
+installations.
 The default is
 .Sy yes
 if any existing installations are found with GRUB enabled or if no filesystems
 were found, otherwise the default is
 .Sy no .
 .Pp
-This is an essential question that must be answered for automatic installations.
+On EFI, the default is
+.Sy yes .
+.It Sy grub_distributor Ns "=" Ns Oo Sy BOOT "|" Sy sortix "|" ... Oc ( default Sy BOOT )
+On EFI systems, what
+.Pa /boot/efi/EFI
+subdirectory should the bootloader be installed into?
+.Pp
+If
+.Sy BOOT
+is selected, then a removable EFI installation is made and the non-volatile
+memory is not modified.
+Otherwise this subdirectory scheme lets bootloaders from different operating
+systems live side by side.
+.Pp
+Note: EFI variables are not implemented yet, and this variable currently
+defaults to
+.Sy BOOT ,
+but will change to
+.Sy sortix
+once EFI variable support is implemented.
 .It Sy grub_password Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
 Protect the bootloader with a password to avoid unauthorized root access via the
 advanced bootloader features?
@@ -185,12 +207,18 @@ original
 .Sy disked
 question is unanswered.
 .It Sy missing_bios_boot_partition Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
-Attempt
+On BIOS, attempt
 .Xr disked 8
 again if the GRUB bootloader is installed but the
 .Pa /boot
 directory's filesystem is inside a GPT partition table that doesn't have a
 biosboot partition?
+.It Sy missing_esp_partition Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+On EFI, attempt
+.Xr disked 8
+again if the GRUB bootloader is installed but no EFI System Partition was
+mounted on
+.Pa /boot/efi ?
 .It Sy confirm_install Ns "=" Ns Oo Sy no "|" Sy yes "|" Sy exit "|" Sy poweroff "|" Sy reboot "|" Sy halt Oc ( default Sy yes )
 Install the operating system or abort the installation?
 This is the final confirmation before the operating system is installed, after
@@ -327,6 +355,15 @@ These are
 .Pa /etc/ssh_host_ed25519_key ,
 and
 .Pa /etc/ssh_host_rsa_key .
+.It Sy confirm_efibootmgr Ns "=" Ns Ar confirmation
+On EFI if
+.Sy grub_distributor
+is not set to
+.Sy BOOT ,
+then acknowledge that you have seen the instructions telling you to manually
+set the EFI boot variables in the firmware or using
+.Xr efibootmgr 8
+on another operating system?
 .It Sy finally Ns "=" Ns Oo Sy exit "|" Sy poweroff "|" Sy reboot "|" Sy halt "|" Sy boot "|" Sy chroot Oc ( default Sy boot )
 What action should be taken when the installation is finished?
 .Pp

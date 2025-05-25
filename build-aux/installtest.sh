@@ -318,6 +318,9 @@ fi
 if [ $partitioning = gpt -a $firmware = bios ]; then
   echo "disked++=mkpart 1 0% 1M biosboot" >> liveconfig/etc/autoinstall.conf
 fi
+if [ $firmware = efi ]; then
+  echo "disked++=mkpart 1 0% 64M efi /boot/efi" >> liveconfig/etc/autoinstall.conf
+fi
 cat >> liveconfig/etc/autoinstall.conf << EOF
 disked++=mkpart 1 0% 100% ext2 /
 hostname=$HOSTNAME

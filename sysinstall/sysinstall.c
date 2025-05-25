@@ -71,11 +71,6 @@ const char* prompt_man_page = "installation";
 
 static struct partition_table* search_bios_boot_pt(struct filesystem* root_fs)
 {
-	char firmware[64];
-	if ( kernelinfo("firmware", firmware, sizeof(firmware)) != 0 )
-		return NULL;
-	if ( strcmp(firmware, "bios") != 0 )
-		return NULL;
 	struct blockdevice* bdev = root_fs->bdev;
 	while ( bdev->p )
 		bdev = bdev->p->parent_bdev;
@@ -212,6 +207,10 @@ static bool should_install_bootloader_bdev(struct blockdevice* bdev)
 
 static bool should_install_bootloader(void)
 {
+	char firmware[16];
+	if ( !kernelinfo("firmware", firmware, sizeof(firmware)) &&
+	     !strcmp(firmware, "efi") )
+		return true;
 	bool any_systems = false;
 	for ( size_t i = 0; i < hds_count; i++ )
 	{
@@ -531,7 +530,12 @@ int main(void)
 		err(2, "chdir: %s", etc);
 
 	struct utsname uts;
-	uname(&uts);
+	if ( uname(&uts) < 0 )
+		err(1, "uname");
+
+	char firmware[16];
+	if ( kernelinfo("firmware", firmware, sizeof(firmware)) != 0 )
+		err(1, "kernelinfo");
 
 	struct conf conf;
 	conf_init(&conf);
@@ -601,6 +605,7 @@ int main(void)
 	     missing_program("fsck.ext2") |
 	     missing_program("grub-install") |
 	     missing_program("man") |
+	     (!strcmp(firmware, "efi") && missing_program("mkfs.fat")) |
 	     missing_program("sed") |
 	     missing_program("xargs") )
 	{
@@ -781,13 +786,23 @@ int main(void)
 	text("\n");
 
 	textf("You need a bootloader to start the operating system. GRUB is the "
-	      "standard %s bootloader and this installer comes with a copy. "
-	      "This copy is however unable to automatically detect other operating "
-	      "systems.\n\n", BRAND_DISTRIBUTION_NAME);
-	text("Single-boot installations should accept this bootloader.\n");
-	text("Dual-boot systems should refuse it and manually arrange for "
-	     "bootloading by configuring any existing multiboot compliant "
-	     "bootloader.\n");
+	      "standard %s bootloader and this installer comes with a copy.\n\n",
+	      BRAND_DISTRIBUTION_NAME);
+	if ( !strcmp(firmware, "efi") )
+	{
+		text("This GRUB bootloader will live side by side with other "
+		     "bootloaders in the EFI System Partition. You should accept this "
+		     "bootloader, otherwise you will have to manually arrange for "
+		     "bootloading by configuring any existing multiboot compliant "
+		     "bootloader.\n");
+	}
+	else
+	{
+		text(" Single-boot installations should accept this bootloader.\n");
+		text("Dual-boot systems should refuse it and manually arrange for "
+		     "bootloading by configuring any existing multiboot compliant "
+		     "bootloader.\n");
+	}
 	text("\n");
 	char accept_grub[10];
 	char accept_grub_password[10];
@@ -796,12 +811,94 @@ int main(void)
 	{
 		const char* def = bootloader_default ? "yes" : "no";
 		prompt(accept_grub, sizeof(accept_grub), "grub",
-		       "Install a new GRUB bootloader?", def);
+		       "Install the GRUB bootloader?", def);
 		if ( strcasecmp(accept_grub, "no") == 0 ||
 		     strcasecmp(accept_grub, "yes") == 0 )
 			break;
 	}
 	text("\n");
+
+	char efi_bootloader[256 + sizeof("/boot/EFI//BOOTXXXX.EFI")] = "";
+	char grub_distributor[256] = "";
+	if ( strcasecmp(accept_grub, "yes") == 0 && !strcmp(firmware, "efi") )
+	{
+		char lower_brand[] = BRAND_DISTRIBUTION_NAME;
+		for ( size_t i = 0; lower_brand[i]; i++ )
+			lower_brand[i] = tolower((unsigned char) lower_brand[i]);
+		#ifdef __x86_64__
+		char efi_boot[12] = "BOOTX64.EFI";
+		char efi_grub[12] = "grubx64.efi";
+		#elif defined(__i386__)
+		char efi_boot[12] = "BOOTIA32.EFI";
+		char efi_grub[12] = "grubia32.efi";
+		#elif defined(__ia64__)
+		char efi_boot[12] = "BOOTIA64.EFI";
+		char efi_grub[12] = "grubia64.efi";
+		#elif defined(__arm__)
+		char efi_boot[12] = "BOOTARM.EFI";
+		char efi_grub[12] = "grubarm.efi";
+		#elif defined(__aarch64__)
+		char efi_boot[12] = "BOOTAA64.EFI";
+		char efi_grub[12] = "grubaa64.efi";
+		#elif defined(__riscv) && __INTPTR_WIDTH__ == 32
+		char efi_boot[12] = "BOOTRISCV32.EFI";
+		char efi_grub[12] = "grubriscv32.efi";
+		#elif defined(__riscv) && __INTPTR_WIDTH__ == 64
+		char efi_boot[12] = "BOOTRISCV64.EFI";
+		char efi_grub[12] = "grubriscv64.efi";
+		#elif defined(__riscv) && __INTPTR_WIDTH__ == 128
+		char efi_boot[12] = "BOOTRISCV128.EFI";
+		char efi_grub[12] = "grubriscv128.efi";
+		#elif defined(__loongarch__)
+		char efi_boot[12] = "BOOTLOONGARCH32.EFI";
+		char efi_grub[12] = "grubloongarch32.efi";
+		#elif defined(__loongarch64)
+		char efi_boot[12] = "BOOTLOONGARCH64.EFI";
+		char efi_grub[12] = "grubloongarch64.efi";
+		#else
+		#warning Add EFI architecture here
+		char efi_boot[12] = "BOOT.EFI";
+		char efi_grub[12] = "grub.efi";
+		#endif
+		textf("Bootloaders live side-by-side in the EFI System Partition "
+		      "(/boot/efi) inside EFI subdirectories. The /boot/efi/EFI/BOOT/%s"
+		      " bootloader is booted as a fallback if no boot order has been "
+		      "configured in EFI's non-volatile memory. If boot entries are "
+		      "written to EFI non-volatile memory, then operating system "
+		      "installation specific directories, such as /boot/efi/EFI/%s, "
+		      "can be used to dual boot systems.\n\n", efi_boot, lower_brand);
+		textf(" - 'BOOT' should be picked for single boot systems, and creates "
+		     "a removable EFI installation that isn't computer specific.\n");
+		textf(" - '%s' should be picked for dual boot systems, but you will "
+		      "need to manually use the firmware settings to set the boot "
+		      "variable, or use efibootmgr on another operating system.\n\n",
+		      lower_brand);
+		char question[256];
+		snprintf(question, sizeof(question),
+		         "EFI directory to install GRUB into? "
+		         "(BOOT/%s/...)", lower_brand);
+		while ( true )
+		{
+			prompt(grub_distributor, sizeof(grub_distributor),
+			       "grub_distributor", question, "BOOT");
+			if ( strchr(grub_distributor, '/') )
+				continue;
+			break;
+		}
+		if ( !strcasecmp(grub_distributor, "BOOT") )
+		{
+			strlcpy(grub_distributor, "BOOT", sizeof(grub_distributor));
+			install_configurationf("grub", "w", "GRUB_REMOVABLE=true\n");
+		}
+		else
+		{
+			install_configurationf("grub", "w", "GRUB_DISTRIBUTOR='%s'\n",
+			                       grub_distributor);
+			snprintf(efi_bootloader, sizeof(efi_bootloader), "EFI\\%s\\%s",
+			         grub_distributor, efi_grub);
+		}
+		text("\n");
+	}
 
 	if ( strcasecmp(accept_grub, "yes") == 0 )
 	{
@@ -923,6 +1020,7 @@ int main(void)
 	      mktable_tip, devices_tip);
 	struct filesystem* root_filesystem = NULL;
 	struct filesystem* boot_filesystem = NULL;
+	struct filesystem* esp_filesystem = NULL;
 	struct filesystem* bootloader_filesystem = NULL;
 	bool not_first = false;
 	while ( true )
@@ -967,6 +1065,7 @@ int main(void)
 		}
 		root_filesystem = NULL;
 		boot_filesystem = NULL;
+		esp_filesystem = NULL;
 		bool cant_mount = false;
 		for ( size_t i = 0; i < mountpoints_used; i++ )
 		{
@@ -992,6 +1091,8 @@ int main(void)
 				root_filesystem = mnt->fs;
 			if ( !strcmp(mnt->entry.fs_file, "/boot") )
 				boot_filesystem = mnt->fs;
+			if ( !strcmp(mnt->entry.fs_file, "/boot/efi") )
+				esp_filesystem = mnt->fs;
 		}
 		if ( cant_mount )
 			continue;
@@ -999,12 +1100,13 @@ int main(void)
 		bootloader_filesystem = boot_filesystem ? boot_filesystem : root_filesystem;
 		assert(bootloader_filesystem);
 		if ( !strcasecmp(accept_grub, "yes") &&
+		     !strcmp(firmware, "bios") &&
 		     missing_bios_boot_partition(bootloader_filesystem) )
 		{
 			const char* where = boot_filesystem ? "/boot" : "root";
 			const char* dev = device_path_of_blockdevice(bootloader_filesystem->bdev);
 			assert(dev);
-			textf("You are a installing BIOS bootloader and the %s "
+			textf("You are installing a BIOS bootloader and the %s "
 			      "filesystem is located on a GPT partition, but you haven't "
 			      "made a BIOS boot partition on the %s GPT disk. Pick "
 			      "biosboot during mkpart and make a 1 MiB partition.\n",
@@ -1023,6 +1125,28 @@ int main(void)
 				continue;
 			text("Proceeding, but expect the installation to fail.\n");
 		}
+		else if ( !strcasecmp(accept_grub, "yes") &&
+		          !strcmp(firmware, "efi") &&
+		          !esp_filesystem )
+		{
+			textf("You are installing an EFI bootloader, but you haven't made "
+			      "an EFI System Partition. Pick efi during mkpart and make a "
+			      "partition and mount it as /boot/efi.\n");
+			char return_to_disked[10];
+			while ( true )
+			{
+				prompt(return_to_disked, sizeof(return_to_disked),
+				       "missing_esp_partition",
+				       "Return to disked to make an EFI partition?", "yes");
+				if ( strcasecmp(accept_grub, "no") == 0 ||
+					 strcasecmp(accept_grub, "yes") == 0 )
+					break;
+			}
+			if ( !strcasecmp(return_to_disked, "yes") )
+				continue;
+			text("Proceeding, but expect the installation to fail.\n");
+		}
+
 		break;
 	}
 	text("\n");
@@ -1038,7 +1162,7 @@ int main(void)
 		const char* where = mnt->entry.fs_file;
 		printf("  %-16s  use as %s\n", devname, where);
 	}
-	if ( strcasecmp(accept_grub, "yes") == 0 )
+	if ( strcasecmp(accept_grub, "yes") == 0 && !strcmp(firmware, "bios") )
 	{
 		struct partition* bbp = search_bios_boot_partition(bootloader_filesystem);
 		if ( bbp )
@@ -1046,6 +1170,11 @@ int main(void)
 			       path_of_blockdevice(&bbp->bdev));
 		printf("  %-16s  bootloader installation target\n",
 		       device_path_of_blockdevice(bootloader_filesystem->bdev));
+	}
+	if ( strcasecmp(accept_grub, "yes") == 0 && !strcmp(firmware, "efi") )
+	{
+		printf("  %-16s  grub efi directory\n",
+		       grub_distributor);
 	}
 	text("\n");
 
@@ -1805,6 +1934,21 @@ int main(void)
 			}
 			break;
 		}
+		text("\n");
+	}
+
+	if ( efi_bootloader[0] )
+	{
+		text("Note: You must set a boot variable in the EFI non-volatile "
+		     "memory in order to boot " BRAND_DISTRIBUTION_NAME ", "
+		     "so after finishing the installation, either:\n\n");
+		textf("1) Reboot into the firmware settings and add a boot entry for "
+		      "'%s'; or\n", efi_bootloader);
+		textf("2) Use another operating system and run: "
+		      "efibootmgr -c -w -L '%s' -l '%s\n\n",
+		      grub_distributor, efi_bootloader);
+		prompt(input, sizeof(input), "confirm_efibootmgr", "Acknowledge?",
+		       "yes");
 		text("\n");
 	}
 

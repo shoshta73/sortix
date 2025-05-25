@@ -1,5 +1,5 @@
 NAME=basic
 LOCATION_INDEPENDENT=true
 BUILD_SYSTEM=none
-RUNTIME_DEPS='minimal binutils bison bzip2 diffutils ed flex gawk gcc git grub-i386-efi grub-x86_64-efi gzip irssi libcurl libcurses libstdc++ m4 make nano ntpd patch perl pkg-config python ssh texinfo vim xorriso'
+RUNTIME_DEPS='minimal binutils bison bzip2 diffutils ed flex gawk gcc git gzip irssi libcurl libcurses libstdc++ m4 make mtools nano ntpd patch perl pkg-config python ssh texinfo vim xorriso'
 IS_SET=true
