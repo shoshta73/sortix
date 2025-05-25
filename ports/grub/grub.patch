@@ -692,7 +692,13 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/config.c grub/
    return value;
  }
  
-@@ -78,6 +77,10 @@
+@@ -73,11 +72,20 @@
+   const char *v;
+ 
+   memset (cfg, 0, sizeof (*cfg));
++  cfg->update_nvram = 0;
+ 
+   v = getenv ("GRUB_ENABLE_CRYPTODISK");
    if (v && v[0] == 'y' && v[1] == '\0')
      cfg->is_cryptodisk_enabled = 1;
  
@@ -700,10 +706,14 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/config.c grub/
 +  if (v && grub_strcmp (v, "true") == 0)
 +    cfg->is_removable = 1;
 +
++  v = getenv ("GRUB_UPDATE_NVRAM");
++  if (v && grub_strcmp (v, "false") == 0)
++    cfg->update_nvram = 0;
++
    v = getenv ("GRUB_DISTRIBUTOR");
    if (v)
      cfg->grub_distributor = xstrdup (v);
-@@ -105,8 +108,8 @@
+@@ -105,8 +113,8 @@
        *ptr++ = *iptr;
      }
  
@@ -781,6 +791,45 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/unix/platform.c gru
        bootnum = line + sizeof ("Boot") - 1;
        bootnum[4] = '\0';
        if (!verbosity)
+@@ -144,9 +150,14 @@
+ 
+   if (grub_util_exec_redirect_null ((const char * []){ "efibootmgr", "--version", NULL }))
+     {
++// TODO: Sortix users set EFI variables manually due to no EFI support.
++#ifdef __sortix__
++      return 0;
++#else
+       /* TRANSLATORS: This message is shown when required executable `%s'
+ 	 isn't found.  */
+       grub_util_error (_("%s: not found"), "efibootmgr");
++#endif
+     }
+ 
+   /* On Linux, we need the efivars kernel modules.  */
+diff -Paur --no-dereference -- grub.upstream/grub-core/osdep/windows/config.c grub/grub-core/osdep/windows/config.c
+--- grub.upstream/grub-core/osdep/windows/config.c
++++ grub/grub-core/osdep/windows/config.c
+@@ -36,11 +36,20 @@
+     return;
+ 
+   memset (cfg, 0, sizeof (*cfg));
++  cfg->update_nvram = 0;
+ 
+   v = getenv ("GRUB_ENABLE_CRYPTODISK");
+   if (v && v[0] == 'y' && v[1] == '\0')
+     cfg->is_cryptodisk_enabled = 1;
+ 
++  v = getenv ("GRUB_REMOVABLE");
++  if (v && grub_strcmp (v, "true") == 0)
++    cfg->is_removable = 1;
++
++  v = getenv ("GRUB_UPDATE_NVRAM");
++  if (v && grub_strcmp (v, "false") == 0)
++    cfg->update_nvram = 0;
++
+   v = getenv ("GRUB_DISTRIBUTOR");
+   if (v)
+     cfg->grub_distributor = xstrdup (v);
 diff -Paur --no-dereference -- grub.upstream/grub-core/video/bochs.c grub/grub-core/video/bochs.c
 --- grub.upstream/grub-core/video/bochs.c
 +++ grub/grub-core/video/bochs.c
@@ -807,11 +856,12 @@ diff -Paur --no-dereference -- grub.upstream/grub-core/video/bochs.c grub/grub-c
 diff -Paur --no-dereference -- grub.upstream/include/grub/emu/config.h grub/include/grub/emu/config.h
 --- grub.upstream/include/grub/emu/config.h
 +++ grub/include/grub/emu/config.h
-@@ -36,6 +36,7 @@
+@@ -36,6 +36,8 @@
  struct grub_util_config
  {
    int is_cryptodisk_enabled;
 +  int is_removable;
++  int update_nvram;
    char *grub_distributor;
  };
  
@@ -868,7 +918,7 @@ diff -Paur --no-dereference -- grub.upstream/util/bash-completion.d/Makefile.in 
 diff -Paur --no-dereference -- grub.upstream/util/config.c grub/util/config.c
 --- grub.upstream/util/config.c
 +++ grub/util/config.c
-@@ -42,6 +42,17 @@
+@@ -42,6 +42,30 @@
  	    cfg->is_cryptodisk_enabled = 1;
  	  continue;
  	}
@@ -878,11 +928,24 @@ diff -Paur --no-dereference -- grub.upstream/util/config.c grub/util/config.c
 +	  ptr += sizeof ("GRUB_REMOVABLE=") - 1;
 +	  if (*ptr == '"' || *ptr == '\'')
 +	    ptr++;
-+	  if (grub_strncmp (ptr, "true", sizeof ("true") - 1) == 0)
++	  if (grub_strncmp (ptr, "false", sizeof ("false") - 1) == 0)
++	    cfg->is_removable = 0;
++	  else if (grub_strncmp (ptr, "true", sizeof ("true") - 1) == 0)
 +	    cfg->is_removable = 1;
 +	  continue;
 +	}
-+
++      if (grub_strncmp (ptr, "GRUB_UPDATE_NVRAM=",
++			sizeof ("GRUB_UPDATE_NVRAM=") - 1) == 0)
++	{
++	  ptr += sizeof ("GRUB_UPDATE_NVRAM=") - 1;
++	  if (*ptr == '"' || *ptr == '\'')
++	    ptr++;
++	  if (grub_strncmp (ptr, "false", sizeof ("false") - 1) == 0)
++	    cfg->update_nvram = 0;
++	  else if (grub_strncmp (ptr, "true", sizeof ("true") - 1) == 0)
++	    cfg->update_nvram = 1;
++	  continue;
++	}
        if (grub_strncmp (ptr, "GRUB_DISTRIBUTOR=",
  			sizeof ("GRUB_DISTRIBUTOR=") - 1) == 0)
  	{
@@ -957,17 +1020,19 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install-common.c grub/uti
 diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-install.c
 --- grub.upstream/util/grub-install.c
 +++ grub/util/grub-install.c
-@@ -876,6 +876,9 @@
+@@ -876,6 +876,11 @@
  
    grub_util_load_config (&config);
  
 +  if (config.is_removable)
 +    removable = 1;
++  if (!config.update_nvram)
++    update_nvram = 0;
 +
    if (!bootloader_id && config.grub_distributor)
      {
        char *ptr;
-@@ -888,7 +891,7 @@
+@@ -888,7 +893,7 @@
    if (!bootloader_id || bootloader_id[0] == '\0')
      {
        free (bootloader_id);
@@ -976,7 +1041,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
      }
  
    if (!grub_install_source_directory)
-@@ -910,6 +913,7 @@
+@@ -910,6 +915,7 @@
  
    platform = grub_install_get_target (grub_install_source_directory);
  
@@ -984,7 +1049,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
    {
      char *platname = grub_install_get_platform_name (platform);
      fprintf (stderr, _("Installing for %s platform.\n"), platname);
-@@ -956,12 +960,20 @@
+@@ -956,12 +962,20 @@
        break;
      }
  
@@ -1006,7 +1071,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
        break;
      case GRUB_INSTALL_PLATFORM_POWERPC_IEEE1275:
        if (install_device)
-@@ -999,9 +1011,6 @@
+@@ -999,9 +1013,6 @@
        break;
      }
  
@@ -1016,7 +1081,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
    {
      char * t = grub_util_path_concat (2, bootdir, GRUB_DIR_NAME);
      grub_install_mkdir_p (t);
-@@ -1913,6 +1922,7 @@
+@@ -1913,6 +1924,7 @@
        break;
  
      case GRUB_INSTALL_PLATFORM_I386_EFI:
@@ -1024,7 +1089,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
        if (!efidir_is_mac)
  	{
  	  char *dst = grub_util_path_concat (2, efidir, "grub.efi");
-@@ -1920,6 +1930,7 @@
+@@ -1920,6 +1932,7 @@
  	  grub_install_copy_file (imgfile, dst, 1);
  	  free (dst);
  	}
@@ -1032,7 +1097,7 @@ diff -Paur --no-dereference -- grub.upstream/util/grub-install.c grub/util/grub-
        /* Fallthrough.  */
      case GRUB_INSTALL_PLATFORM_X86_64_EFI:
        if (efidir_is_mac)
-@@ -2041,7 +2052,8 @@
+@@ -2041,7 +2054,8 @@
     */
    grub_set_install_backup_ponr ();
  
