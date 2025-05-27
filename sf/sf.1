@@ -21,7 +21,7 @@ uses a simple framing scheme with a start of message byte sequence
 .Li ( 0xF7 0xFF ) ,
 most bytes represent themselves, an escape byte sequence
 .Li ( 0xF7 0xFD ) ,
-and an end of messsage byte sequence
+and an end of message byte sequence
 .Li ( 0xF7 0xFE ) .
 UTF-8 encoded text will never need to be escaped.
 Data can be recursively framed.
