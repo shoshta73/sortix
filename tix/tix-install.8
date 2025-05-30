@@ -6,10 +6,10 @@
 .Nd install packages into a collection
 .Sh SYNOPSIS
 .Nm
-.Op Fl q
+.Op Fl fpq
 .Op Fl C Ar collection
 .Op Fl \-reinstall
-.Ar
+.Ar package ...
 .Sh DESCRIPTION
 .Nm
 installs packages in the
@@ -45,6 +45,22 @@ The options are as follows:
 Specifies which
 .Pa collection
 to install into.
+.It Fl f , \-file
+The
+.Ar packages
+listed on the command line are local
+.Pa .tix.tar.xz
+files that are directly installed.
+This option is the opposite of
+.Fl p .
+.It Fl p , \-package
+The
+.Ar packages
+listed on the command line are downloaded using
+.Xr tix-fetch 8
+and installed.
+This is the default behavior and this option is the opposite of
+.Fl f .
 .It Fl \-reinstall
 Reinstall packages if already installed, rather than failing.
 .Pp
@@ -79,4 +95,4 @@ will exit 0 on success and non-zero otherwise.
 .Xr tix-upgrade 8
 .Sh HISTORY
 .Nm
-originally appeared in Sortix 1.1.
+originally appeared in Sortix 0.8.
