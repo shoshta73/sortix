@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2015, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -85,7 +85,9 @@ int vcbprintf(void* ctx,
 		{
 		incomprehensible_conversion:
 			rejected_bad_specifier = true;
+#ifndef __is_sortix_libk
 		unsupported_conversion:
+#endif
 			format = format_begun_at;
 			goto print_c;
 		}
@@ -414,25 +416,24 @@ int vcbprintf(void* ctx,
 		{
 			char conversion = *format++;
 
-			const char* string;
+			const char* string = NULL;
+			const wchar_t* wstring = NULL;
 			if ( conversion == 'm' )
 				string = strerror(errno), conversion = 's';
 			else if ( length == LENGTH_DEFAULT )
 				string = va_arg(parameters, const char*);
 			else if ( length == LENGTH_LONG )
-			{
-				// TODO: Implement wide character string printing.
-				(void) va_arg(parameters, const wchar_t*);
-				goto unsupported_conversion;
-			}
+				wstring = va_arg(parameters, const wchar_t*);
 			else
 				goto incomprehensible_conversion;
 
-			if ( conversion == 's' && !string )
+			if ( !string && !wstring )
 				string = "(null)";
 
 			size_t string_length = 0;
-			for ( size_t i = 0; i < precision && string[i]; i++ )
+			for ( size_t i = 0; string && i < precision && string[i]; i++ )
+				string_length++;
+			for ( size_t i = 0; wstring && i < precision && wstring[i]; i++ )
 				string_length++;
 
 			if ( !field_width_is_negative && string_length < abs_field_width )
@@ -444,10 +445,26 @@ int vcbprintf(void* ctx,
 					written++;
 				}
 			}
-
-			if ( callback(ctx, string, string_length) != string_length )
-				return -1;
-			written += string_length;
+			if ( string )
+			{
+				if ( callback(ctx, string, string_length) != string_length )
+					return -1;
+				written += string_length;
+			}
+			else if ( wstring )
+			{
+				char buf[MB_CUR_MAX];
+				mbstate_t ps = {0};
+				for ( size_t i = 0; i < string_length; i++ )
+				{
+					size_t bytes = wcrtomb(buf, wstring[i], &ps);
+					if ( bytes == (size_t) -1 )
+						return -1;
+					if ( callback(ctx, buf, bytes) != bytes )
+						return -1;
+					written += bytes;
+				}
+			}
 
 			if ( field_width_is_negative && string_length < abs_field_width )
 			{
