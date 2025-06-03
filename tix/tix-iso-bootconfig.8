@@ -289,11 +289,11 @@ to a single installation.
 .Pp
 Warning: The information in the generated
 .Pa output-directory/boot/random.seed
-file must be kept confidential and should be securely erased whereever it goes
+file must be kept confidential and should be securely erased wherever it goes
 whenever it is no longer useful in a particular place, otherwise the random
 number generation of the system using this entropy might be vulnerable.
 This random seed must not be recycled to boot more than a single system once.
-Additional systems and boots should be done with different entropy by modifiying
+Additional systems and boots should be done with different entropy by modifying
 the release again.
 An installation live environment booted with such a random seed will use it to
 randomly generate secure initial random seeds for each installation made, and
@@ -440,7 +440,7 @@ tix-iso-add sortix.iso bootconfig
 .Ed
 .Ss Boot to Serial Console using Qemu
 To boot to a serial terminal with a custom serial settings and a custom terminal
-window size of 118 colums by 256 rows and a specific
+window size of 118 columns by 256 rows and a specific
 .Ev TERM
 variable inside the qemu virtual machine:
 .Bd -literal

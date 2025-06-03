@@ -139,7 +139,7 @@ Once the
 is no longer useful, the
 .Pa output-directory/root/.ssh/id_rsa
 file inside it should be securely erased.
-If a bootconfig has been made whose liveconfig contains thes private key,
+If a bootconfig has been made whose liveconfig contains the private key,
 .Pa bootconfig/boot/liveconfig.xz
 should be securely erased when no longer useful.
 If a release .iso has been made from
@@ -194,7 +194,7 @@ The fingerprints of each key is printed afterwards by running:
 .Pp
 Warning: The information in the generated
 .Pa output_directory/etc/ssh_host_*_key
-files must be kept confidential and should be securely erased whereever it goes
+files must be kept confidential and should be securely erased wherever it goes
 whenever it is no longer useful in a particular place, otherwise unauthorized
 people may be able to impersonate the ssh server.
 These keys should not be recycled to image more than a single system.
@@ -234,7 +234,7 @@ option on the produced file.
 .It Fl \-sshd-key-known-hosts-hosts Ns = Ns Ar host-list
 A space delimited list of hostnames, network addresses, and hostnames followed
 by a comma and then the network address, which the sshd server will be
-connectible by, used to generate the known_hosts entries in the
+accessible by, used to generate the known_hosts entries in the
 .Fl \-sshd-key-known-hosts-file
 option.
 .It Fl \-videomode Ns = Ns Ar videomode
