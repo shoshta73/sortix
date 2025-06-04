@@ -332,6 +332,7 @@ desired_version() {(
       stamp="$stamp.$VERSION_2.$SHA256SUM_2"
     fi
   fi
+  stamp="$stamp.$(cat "$port.port" | sha256sum | grep -Eo '^[^ ]*')"
   if [ -f "$port.patch" ]; then
     stamp="$stamp.$(cat "$port.patch" | sha256sum | grep -Eo '^[^ ]*')"
   fi
