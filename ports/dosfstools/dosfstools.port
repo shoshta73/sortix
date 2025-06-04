@@ -9,3 +9,4 @@ UPSTREAM_SITE=https://github.com/dosfstools/dosfstools/releases/download/v$VERSI
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--without-libiconv-prefix'

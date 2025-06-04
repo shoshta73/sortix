@@ -6,4 +6,5 @@ BUILD_SYSTEM=configure
 SUBDIR=libstdc++-v3
 CONFIGURE_USE_BUILD_DIRECTORY=true
 VERSION_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*(-rc[0-9]+)?)'
+CONFIGURE_ARGS='--without-libiconv-prefix'
 POST_INSTALL=../../../libstdc++/libstdc++.post-install

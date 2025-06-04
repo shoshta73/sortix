@@ -11,5 +11,5 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/grub
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
-CONFIGURE_ARGS='--disable-werror --program-prefix= --with-platform=none'
+CONFIGURE_ARGS='--disable-werror --program-prefix= --with-platform=none --without-libiconv-prefix --without-libintl-prefix'
 POST_INSTALL=../grub.post-install

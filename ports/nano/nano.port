@@ -9,4 +9,5 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/nano
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--without-libiconv-prefix --without-libintl-prefix'
 RUNTIME_DEPS=libcurses

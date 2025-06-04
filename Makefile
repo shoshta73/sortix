@@ -194,7 +194,9 @@ install-cross-compiler:
 	  --prefix="$(PREFIX)" \
 	  $(CROSS_COMPILER_WITH_SYSROOT) \
 	  --enable-languages=c,c++ \
-	  --with-system-zlib
+	  --with-system-zlib \
+	  --without-libiconv-prefix \
+	  --without-libintl-prefix
 	PATH="$(PREFIX)/bin:$(PATH)" \
 	$(MAKE) -C ports/gcc/gcc.build all-gcc all-target-libgcc
 	PATH="$(PREFIX)/bin:$(PATH)" \

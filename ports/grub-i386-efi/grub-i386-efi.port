@@ -4,7 +4,7 @@ BUILD_LIBRARIES='libiconv? libintl? libfreetype? liblzma?'
 SOURCE_PORT=grub
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
-CONFIGURE_ARGS='--disable-werror --program-prefix= --with-platform=efi --target=i686-sortix'
+CONFIGURE_ARGS='--disable-werror --program-prefix= --with-platform=efi --target=i686-sortix --without-libiconv-prefix --without-libintl-prefix'
 CONFIGURE_VARS='NO_CFLAGS_STRIP=1'
 MAKE_BUILD_TARGET=grub-core
 MAKE_INSTALL_TARGET=install-grub-core

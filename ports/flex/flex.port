@@ -8,5 +8,6 @@ SHA256SUM=d39b15a856906997ced252d76e9bfe2425d7503c6ed811669665627b248e4c73
 UPSTREAM_SITE=https://sourceforge.net/projects/flex/files
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--without-libiconv-prefix --without-libintl-prefix'
 MAKE_VARS='V=1'
 POST_INSTALL=tix-eradicate-libtool-la

@@ -12,7 +12,7 @@ BUILD_SYSTEM=configure
 CONFIGURE_WITH_SYSROOT=true
 CONFIGURE_WITH_SYSROOT_LD_BUG=true
 CONFIGURE_WITH_BUILD_SYSROOT=true
-CONFIGURE_ARGS='--disable-werror --enable-default-execstack=no'
+CONFIGURE_ARGS='--disable-werror --enable-default-execstack=no --without-libiconv-prefix --without-libintl-prefix'
 CONFIGURE_USE_BUILD_DIRECTORY=true
 MAKE_ARGS='tooldir="$(EXEC_PREFIX)"'
 MAKE_VARS='V=1'

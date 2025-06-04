@@ -9,4 +9,5 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/make
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
 LICENSE=GPL-3.0-or-later
+CONFIGURE_ARGS='--without-libiconv-prefix --without-libintl-prefix'
 POST_INSTALL=../make.post-install
