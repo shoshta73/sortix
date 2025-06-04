@@ -712,6 +712,8 @@ void EM::InterruptWork()
 		pkt->next.Reset();
 		AddTransmitDescriptor(pkt);
 	}
+	if ( !tx_queue_first )
+		tx_queue_last.Reset();
 	kthread_mutex_unlock(&tx_lock);
 	interrupt_work_icr = 0;
 	// Unmask interrupts so they can be delivered again.
