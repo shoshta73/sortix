@@ -458,6 +458,8 @@ int main(int argc, char* argv[])
 			fd = open(path, O_RDONLY);
 			free(path);
 		}
+		if ( fd < 0 && errno == ENOENT )
+			errx(1, "%s: No such interface", name);
 		if ( fd < 0 )
 			err(1, "%s", name);
 		struct if_all all;
