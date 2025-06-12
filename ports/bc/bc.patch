@@ -1,12 +1,60 @@
+diff -Paur --no-dereference -- bc.upstream/bc/execute.c bc/bc/execute.c
 --- bc.upstream/bc/execute.c
-+++ bc/bcexecute.c
-@@ -292,8 +292,7 @@
- 	  break;
++++ bc/bc/execute.c
+@@ -293,7 +293,7 @@
  
  	case 'X': /* Random function. */
--	  push_copy (_zero_);
+ 	  push_copy (_zero_);
 -	  bc_int2num (&ex_stack->s_num, random());
-+	  rt_error ("X not implemented");
++	  bc_int2num (&ex_stack->s_num, arc4random() & 0x7FFFFFFF);
  	  break;
  	}
  	break;
+diff -Paur --no-dereference -- bc.upstream/configure bc/configure
+--- bc.upstream/configure
++++ bc/configure
+@@ -5753,14 +5753,14 @@
+ then :
+   withval=$with_readline; case $withval in no) ;;
+       *) LDSAVE=$LDFLAGS
+-	 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for tparm in -lncurses" >&5
+-printf %s "checking for tparm in -lncurses... " >&6; }
++	 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for tparm in -lncurses -lterminfo" >&5
++printf %s "checking for tparm in -lncurses -lterminfo... " >&6; }
+ if test ${ac_cv_lib_ncurses_tparm+y}
+ then :
+   printf %s "(cached) " >&6
+ else case e in #(
+   e) ac_check_lib_save_LIBS=$LIBS
+-LIBS="-lncurses  $LIBS"
++LIBS="-lncurses -lterminfo  $LIBS"
+ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
+@@ -5798,7 +5798,7 @@
+ printf "%s\n" "$ac_cv_lib_ncurses_tparm" >&6; }
+ if test "x$ac_cv_lib_ncurses_tparm" = xyes
+ then :
+-  TERMLIB=-lncurses
++  TERMLIB="-lncurses -lterminfo"
+ else case e in #(
+   e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for tgetent in -ltermcap" >&5
+ printf %s "checking for tgetent in -ltermcap... " >&6; }
+@@ -5851,7 +5851,7 @@
+ esac
+ fi
+ 
+-	 LDFLAGS="$LDFLAGS $TERMLIB"
++	 LDFLAGS="$LDFLAGS"
+ 	 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for readline in -lreadline" >&5
+ printf %s "checking for readline in -lreadline... " >&6; }
+ if test ${ac_cv_lib_readline_readline+y}
+@@ -5859,7 +5859,7 @@
+   printf %s "(cached) " >&6
+ else case e in #(
+   e) ac_check_lib_save_LIBS=$LIBS
+-LIBS="-lreadline  $LIBS"
++LIBS="-lreadline $TERMLIB $LIBS"
+ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+ 
