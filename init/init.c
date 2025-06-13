@@ -1151,9 +1151,12 @@ static char** tokenize(size_t* out_tokens_used, const char* string)
 			errno = 0;
 		return NULL;
 	}
-	char** new_tokens = reallocarray(tokens, tokens_used, sizeof(char*));
-	if ( new_tokens )
-		tokens = new_tokens;
+	if ( tokens_used )
+	{
+		char** new_tokens = reallocarray(tokens, tokens_used, sizeof(char*));
+		if ( new_tokens )
+			tokens = new_tokens;
+	}
 	*out_tokens_used = tokens_used;
 	return tokens;
 }

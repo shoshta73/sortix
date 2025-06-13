@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -162,9 +162,12 @@ static char** tokenize(size_t* out_tokens_used, const char* string)
 			errno = 0;
 		return NULL;
 	}
-	char** new_tokens = reallocarray(tokens, tokens_used, sizeof(char*));
-	if ( new_tokens )
-		tokens = new_tokens;
+	if ( tokens_used )
+	{
+		char** new_tokens = reallocarray(tokens, tokens_used, sizeof(char*));
+		if ( new_tokens )
+			tokens = new_tokens;
+	}
 	*out_tokens_used = tokens_used;
 	return tokens;
 }
