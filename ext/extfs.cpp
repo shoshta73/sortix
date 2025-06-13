@@ -207,9 +207,9 @@ int main(int argc, char* argv[])
 	}
 
 	if ( argc - optind < 1 )
-		err(1, "expected device");
+		errx(1, "expected device");
 	if ( argc - optind < 2 )
-		err(1, "expected mountpoint");
+		errx(1, "expected mountpoint");
 
 	const char* device_path = argv[optind + 0];
 	const char* mount_path = argv[optind + 1];
