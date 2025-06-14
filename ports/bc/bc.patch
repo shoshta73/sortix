@@ -1,0 +1,12 @@
+--- bc.upstream/bc/execute.c
++++ bc/bcexecute.c
+@@ -292,8 +292,7 @@
+ 	  break;
+ 
+ 	case 'X': /* Random function. */
+-	  push_copy (_zero_);
+-	  bc_int2num (&ex_stack->s_num, random());
++	  rt_error ("X not implemented");
+ 	  break;
+ 	}
+ 	break;
