@@ -161,7 +161,7 @@ void Device::Sync()
 	{
 		pthread_mutex_lock(&sync_thread_lock);
 		while ( dirty_block || sync_in_transit )
-			pthread_cond_wait(&sync_thread_cond, &sync_thread_lock);
+			pthread_cond_wait(&sync_thread_idle_cond, &sync_thread_lock);
 		pthread_mutex_unlock(&sync_thread_lock);
 		fsync(fd);
 		return;
