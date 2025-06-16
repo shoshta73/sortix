@@ -1,0 +1,279 @@
+.Dd April 26, 2025
+.Dt FATFS 8
+.Os
+.Sh NAME
+.Nm fatfs
+.Nd fat filesystem driver
+.Sh SYNOPSIS
+.Nm
+.Op Fl bf
+.Op Fl o Ar mount-options
+.Op Fl p Ar path
+.Ar device
+.Ar mountpoint
+.Sh DESCRIPTION
+.Nm
+mounts the FAT filesystem on the
+.Ar device
+for reading and writing at the
+.Ar mountpoint .
+.Nm
+forks and runs in the background once the filesystem has been mounted.
+.Pp
+A compatible FAT filesystem can be created using
+.Xr mkfs.fat 8 ,
+and such filesystems can be checked and repaired using
+.Xr fsck.fat 8 .
+The filesystem label can be set with
+.Xr fatlabel 8 .
+Filesystems can be automatically mounted by
+.Xr init 8
+on boot by creating an entry in
+.Xr fstab 5
+with the
+.Sy fat
+or
+.Sy efi
+type.
+.Xr disked 8
+is typically used for partition and filesystem administration.
+The
+.Sy efi
+filesystem type is the same as the
+.Sy fat
+filesystem, except it uses a different
+.Xr mbr 7
+id and a different
+.Xr guid 7
+guid to identify the the partition as the EFI System Partition.
+.Pp
+The FAT filesystem uses a File Allocation Table to allocate clusters.
+The block device is split into fixed sized clusters.
+The FAT entries are either 12, 16, or 32 bit wide, solely depending on the
+number of clusters and what width is needed.
+Files and directories are stored as a pointer to the first cluster, and the FAT
+is used as a singly linked list to next cluster.
+A backup FAT is commonly formatted in the filesystem for data recovery purposes.
+The FAT filesystem has exactly the same features regardless of the FAT entry
+width.
+.Pp
+The FAT filesystem supports only files and directories.
+Hard links, symbolic links, block devices, sockets, fifos, block devices,
+character devices, and any other special files are not possible.
+Owner and group metadata does not exist.
+The only permission metadata is an owner write bit.
+There are no read and execute permission bits.
+The access timestamp has day precision.
+The modified timestamp has 2 second precision.
+The creation timestamp has 10 ms precision, but is not accessible through
+.Xr stat 2
+and
+.Xr utimens 2 .
+There is no status change timestamp and the modified time is used instead.
+All timestamps store the year as an unsigned 7-bit value since 1980 and will
+overflow in the year 2108.
+Directory entries are assigned a 8.3 short name, with up to 8 uppercase
+characters for the file name and up to 3 uppercase characters for the file
+extension.
+The original name is used as a short name if it already is in the 8.3 format.
+Otherwise a similar short will be used (with a prefix of file name, a
+.Sq ~
+character, numeric digits to disambiguate similar files, and three characters
+from the file extensions), and a long file name entry will be
+added with the original file name.
+Long file names can store up to 255 UTF-16 code units.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl b , \-background
+Run in the background in a subprocess after successfully mounting.
+This is the default behavior.
+.It Fl f , \-foreground
+Run in the foreground and do not detach in a subprocess.
+.It Fl o Ar mount-options
+Mount the filesystem with the following comma-separated
+.Ar mount-options :
+.Bl -tag -width "1234567890"
+.It Sy cache Ns = Ns Ar size
+Sets the filesystem cache to the specified
+.Ar size ,
+which is measured in an optional suffix:
+.Sy %
+for percent of system memory,
+.Sy K
+for KiB,
+.Sy M
+for MiB,
+or
+.Sy G
+for GiB.
+The default is
+.Sy 10%
+of the system memory.
+.It Sy ro
+Mount the filesystem as read-only.
+.It Sy rw
+Mount the filesystem for read and write.
+This option is the default behavior.
+.El
+.It Fl p , \-pretend-mount-path Ns = Ns Ar path
+When answering requests about where the filesystem is mounted, reply with this
+.Pa path
+instead of the actual mountpoint in
+.Xr tcgetblob 2 .
+This behavior is useful for
+.Xr chroot 2
+environments.
+.El
+.Pp
+The following identifiers are available to recognize a filesystem in
+.Xr fstab 5
+in the
+.Ft fs_spec
+field and can be queried with the
+.Xr disked 8
+.Sy id
+command:
+.Bl -tag -width "12345678"
+.It Sy LABEL Ns = Ns Ar label
+Search for a filesystem with this
+.Ar label
+as the volume label.
+The volume label can be changed with
+.Xr fatlabel 8.
+.It Sy SERIAL Ns = Ns Ar serial
+Search for a filesystem with this
+.Xr serial
+number as the volume id in the
+.Sy XXXX-XXXX
+upper-case hexadecimal format.
+.It Sy UUID Ns = Ns Ar uuid
+Search for a filesystem with this
+.Ar uuid ,
+containing the 4 byte file serial number and 8 byte volume label and a trailing
+nul byte.
+This identifier is recommended for filesystem searches to avoid mounting the
+wrong filesystem, although it might not be globally unique.
+Note that if the volume label is changed with
+.Xr fatlabel 8, then
+.Xr fstab 5
+must be updated with the new
+.Sy UUID.
+.El
+.Sh IMPLEMENTATION NOTES
+If
+.Fl f ,
+then
+.Nm
+signals readiness when it has successfully mounted the filesystem.
+.Pp
+FAT is a case insensitive filesystem, but
+.Nm
+implements case sensitivity.
+Short names will always be upper case, but the original case will be preserved
+in the long name.
+.Nm
+allows creating a file as long as its long name is different bytewise from any
+other long name in the directory.
+.Nm
+does not allow opening a file by its short name, unless it has no long name, in
+which case the short name is used as its real name.
+If the requested name is in the 8.3 format, but a file already uses that short
+name, but the long name is not used, then the requested name is used as the long
+name and an unused short name is allocated.
+Other operating systems with case insensitive FAT filesystems will not
+interoperate if such files are created and such files may not be accessible
+except through their assigned short names.
+.Pp
+FAT officially stores timestamps in the local timezone, without storing what
+timezone that is, but
+.Nm
+uses UTC instead to store time losslessly.
+This behavior may cause time differences when interoperating with other
+implementations.
+.Pp
+The Windows FAT filesystem driver limits directories to 65536 entries.
+.Nm
+has no such limitation, except it will only search for up to the ~65536 suffix
+when allocating an unused short name.
+.Pp
+The first cluster of a file is used as its inode number.
+If a zero size file without a first cluster is encountered, it will be allocated
+a first cluster, so it has an unique and permanent inode number.
+.Xr fsck.fat 8
+does not like this behavior and will undo it.
+.Pp
+The filesystem is marked as dirty in FAT entry 1 when mounted.
+This behavior happens even on FAT12, even though it is not an official feature,
+but is done since running
+.Xr fsck.fat 8
+is essential whenever the filesystem is damaged or not cleanly unmounted.
+.Sh ASYNCHRONOUS EVENTS
+.Bl -tag -width "SIGTERM"
+.It Dv SIGTERM
+Request daemon termination.
+.Nm
+will exit after gracefully unmounting the filesystem.
+.El
+.Sh EXIT STATUS
+If
+.Fl b ,
+.Nm
+exits 0 after successfully mounting the filesystem and serving requests in a
+background process.
+.Pp
+If
+.Fl f ,
+.Nm
+signals readiness on the
+.Ev READYFD
+file descriptor when filesystem has been mounted, and continues running in the
+same process.
+.Pp
+.Nm
+runs as a
+.Xr daemon 7
+until stopped by
+.Dv SIGTERM
+or until the filesystem is unmounted with
+.Xr unmount 8
+or
+.Xr unmount 2 ,
+after which
+.Nm
+exits 0 if the filesystem was cleanly unmounted.
+.Pp
+.Nm
+exits non-zero on fatal errors.
+.Sh EXAMPLES
+.Bd -literal
+$ mkfs.fat /dev/foo0
+$ fatfs /dev/foo0 /mnt
+$ echo bar > /mnt/bar
+$ unmount /mnt
+$ fsck.fat /dev/foo0
+.Ed
+.Sh SEE ALSO
+.Xr fstab 5 ,
+.Xr disked 8 ,
+.Xr fatlabel 8 ,
+.Xr fsck.fat 8 ,
+.Xr init 8 ,
+.Xr lsblk 8 ,
+.Xr mkfs.fat 8 ,
+.Xr unmount 8
+.Sh BUGS
+.Xr fsync 2
+does not sync the inode data contents, but only its metadata.
+.Nm
+will sync in the background, but this fact cannot be observed yet.
+To reliably sync, unmount the filesystem.
+.Pp
+libmount uses the volume label in the first sector rather than the volume label
+in the root directory.
+.Pp
+Timestamps store years as an unsigned 7-bit value since 1980 and will overflow
+in the year 2108.
+.Pp
+Reading a directory takes O(n^2) quadratic time due to limitations in the
+user-space filesystem protocol.

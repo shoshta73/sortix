@@ -32,6 +32,7 @@
 #include <mount/blockdevice.h>
 #include <mount/ext2.h>
 #include <mount/extended.h>
+#include <mount/fat.h>
 #include <mount/filesystem.h>
 #include <mount/harddisk.h>
 #include <mount/iso9660.h>
@@ -61,6 +62,7 @@ static const struct filesystem_handler* filesystem_handlers[] =
 	// TODO: Applications should search for ISO 9660 filesystems only on the
 	//       root block device even if there's a MBR/GPT.
 	&iso9660_handler,
+	&fat_handler,
 	NULL,
 };
 

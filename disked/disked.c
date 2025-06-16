@@ -49,6 +49,7 @@
 #include <mount/blockdevice.h>
 #include <mount/devices.h>
 #include <mount/ext2.h>
+#include <mount/fat.h>
 #include <mount/filesystem.h>
 #include <mount/gpt.h>
 #include <mount/harddisk.h>
@@ -1860,9 +1861,9 @@ static void on_mkpart(size_t argc, char** argv)
 		bool is_gpt = current_pt_type == PARTITION_TABLE_TYPE_GPT;
 		const char* question = "Format a filesystem? (no/ext2)";
 		if ( is_mbr )
-			question = "Format a filesystem? (no/ext2/extended)";
+			question = "Format a filesystem? (no/ext2/extended/efi/fat)";
 		else if ( is_gpt )
-			question = "Format a filesystem? (no/ext2/biosboot)";
+			question = "Format a filesystem? (no/ext2/biosboot/efi/fat)";
 		if ( 5 <= argc )
 			strlcpy(fstype, argv[4], sizeof(fstype));
 		else
@@ -1870,7 +1871,11 @@ static void on_mkpart(size_t argc, char** argv)
 		if ( strcmp(fstype, "no") != 0 &&
 		     strcmp(fstype, "ext2") != 0 &&
 		     (!is_mbr || strcmp(fstype, "extended") != 0) &&
-		     (!is_gpt || strcmp(fstype, "biosboot") != 0) )
+		     (!is_gpt || strcmp(fstype, "biosboot") != 0) &&
+		     strcmp(fstype, "efi") != 0 && strcmp(fstype, "efi12") != 0 &&
+		     strcmp(fstype, "efi16") != 0 && strcmp(fstype, "efi32") != 0 &&
+		     strcmp(fstype, "fat") != 0 && strcmp(fstype, "fat12") != 0 &&
+		     strcmp(fstype, "fat16") != 0 && strcmp(fstype, "fat32") != 0 )
 		{
 			command_errorx("%s: %s: Invalid filesystem choice: %s",
 			               argv[0], device_name(current_hd->path), fstype);
@@ -1892,11 +1897,20 @@ static void on_mkpart(size_t argc, char** argv)
 	if ( argc < 5 )
 		printf("\n");
 	char mountpoint[256] = "";
-	bool mountable = !strcmp(fstype, "ext2");
+	// TODO: Get this information from libmount.
+	bool mountable = !strcmp(fstype, "ext2") ||
+	                 !strcmp(fstype, "fat") || !strcmp(fstype, "fat12") ||
+	                 !strcmp(fstype, "fat16") || !strcmp(fstype, "fat32") ||
+	                 !strcmp(fstype, "efi") || !strcmp(fstype, "efi12") ||
+	                 !strcmp(fstype, "efi16") || !strcmp(fstype, "efi32");
 	while ( mountable )
 	{
 		const char* def = "no";
-		if ( !has_mountpoint("/") )
+		if ( !strncmp(fstype, "fat", strlen("fat")) )
+			def = "no";
+		else if ( !strncmp(fstype, "efi", strlen("efi")) )
+			def = !has_mountpoint("/boot/efi") ? "/boot/efi" : "no";
+		else if ( !has_mountpoint("/") )
 			def = "/";
 		else if ( !has_mountpoint("/home") )
 			def = "/home";
@@ -2091,6 +2105,10 @@ static void on_mkpart(size_t argc, char** argv)
 			p.system_id = 0x83;
 		else if ( !strcmp(fstype, "extended") )
 			p.system_id = 0x05;
+		else if ( !strncmp(fstype, "efi", strlen("efi")) )
+			p.system_id = 0xEF;
+		else if ( !strncmp(fstype, "fat", strlen("fat")) )
+			p.system_id = 0x0C;
 		else
 			p.system_id = 0x83;
 		p.end_head = 0; // TODO: This.
@@ -2127,6 +2145,10 @@ static void on_mkpart(size_t argc, char** argv)
 		const char* type_guid_str = "0FC63DAF-8483-4772-8E79-3D69D8477DE4";
 		if ( !strcmp(fstype, "biosboot") )
 			type_guid_str = BIOSBOOT_GPT_TYPE_GUID;
+		else if ( !strncmp(fstype, "efi", strlen("efi")) )
+			type_guid_str = ESP_GPT_TYPE_GUID;
+		else if ( !strncmp(fstype, "fat", strlen("fat")) )
+			type_guid_str = BDP_GPT_TYPE_GUID;
 		guid_from_string(p.partition_type_guid, type_guid_str);
 		arc4random_buf(p.unique_partition_guid, sizeof(p.unique_partition_guid));
 		off_t pstart = hole->start + start;
@@ -2275,6 +2297,67 @@ static void on_mkpart(size_t argc, char** argv)
 		{
 			command_errorx("%s: %s: Failed to scan expected ext2 filesystem",
 			               argv[0], device_name(p->path));
+			return;
+		}
+	}
+	if ( !strncmp(fstype, "efi", strlen("efi")) ||
+	     !strncmp(fstype, "fat", strlen("fat")) )
+	{
+		printf("(Formatting %s as %s...)\n", device_name(p->path), fstype);
+		// TODO: Run this in its own foreground process group so ^C works.
+		pid_t child_pid = fork();
+		if ( child_pid < 0 )
+		{
+			command_error("%s: fork", argv[0]);
+			return;
+		}
+		const char* fat_width = fstype + 3;
+		const char* mkfs_argv[] =
+		{
+			"mkfs.fat",
+			fat_width[0] ? "-F" : NULL,
+			fat_width[0] ? fat_width : NULL,
+			p->path,
+			NULL
+		};
+		int mkfs_argc = 0;
+		for ( size_t i = 0; i < sizeof(mkfs_argv) / sizeof(mkfs_argv[0]); i++ )
+		{
+				if ( mkfs_argv[i] )
+					mkfs_argv[mkfs_argc++] = mkfs_argv[i];
+		}
+		mkfs_argv[mkfs_argc] = NULL;
+		if ( child_pid == 0 )
+		{
+			execvp(mkfs_argv[0], (char* const*) mkfs_argv);
+			warn("%s", mkfs_argv[0]);
+			_exit(127);
+		}
+		int status;
+		waitpid(child_pid, &status, 0);
+		if ( WIFEXITED(status) && WEXITSTATUS(status) == 127 )
+		{
+			command_errorx("%s: Failed to format filesystem (%s is not installed)",
+			               argv[0], mkfs_argv[0]);
+			return;
+		}
+		else if ( WIFEXITED(status) && WEXITSTATUS(status) != 0 )
+		{
+			command_errorx("%s: Failed to format filesystem", argv[0]);
+			return;
+		}
+		else if ( WIFSIGNALED(status) )
+		{
+			command_errorx("%s: Failed to format filesystem (%s)",
+			               argv[0], strsignal(WTERMSIG(status)));
+			return;
+		}
+		printf("(Formatted %s as %s)\n", device_name(p->path), fstype);
+		scan_partition(p);
+		if ( !p->bdev.fs )
+		{
+			command_errorx("%s: %s: Failed to scan expected %s filesystem",
+			               argv[0], device_name(p->path), fstype);
 			return;
 		}
 	}

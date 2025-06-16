@@ -20,6 +20,7 @@ display \
 dnsconfig \
 editor \
 ext \
+fat \
 games \
 hostname \
 ifconfig \

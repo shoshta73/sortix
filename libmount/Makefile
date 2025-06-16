@@ -17,6 +17,7 @@ devices.o \
 crc32.o \
 ext2.o \
 extended.o \
+fat.o \
 filesystem.o \
 gpt.o \
 harddisk.o \

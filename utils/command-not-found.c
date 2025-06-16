@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2021, 2025 Jonas 'Sortie' Termansen.
  * Copyright (c) 2021 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -79,6 +79,7 @@ struct command commands[] =
 	{LOGOUT, "logout", NULL, suggest_logout},
 
 	{MOUNT, "extfs", "system", NULL},
+	{MOUNT, "fatfs", "system", NULL},
 	{MOUNT, "iso9660fs", "system", NULL},
 	{MOUNT, "mount", NULL, NULL},
 

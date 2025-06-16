@@ -4250,7 +4250,9 @@ static bool fsck(struct filesystem* fs)
 	if ( pid == 0 )
 	{
 		uninstall_signal_handler();
-		execlp(fs->fsck, fs->fsck, "-fp", "--", bdev_path, (const char*) NULL);
+		// TODO: Move to libmount abstraction.
+		const char* options = !strcmp(fs->fstype_name, "ext2") ? "-fp" : "-p";
+		execlp(fs->fsck, fs->fsck, options, "--", bdev_path, (const char*) NULL);
 		warning("%s: Failed to load filesystem checker: %s: %m",
 		        bdev_path, fs->fsck);
 		_exit(127);

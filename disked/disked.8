@@ -132,8 +132,22 @@ from a root filesystem on a GPT partition.
 (mbr only) Create an extended partition, which can contain an arbitrary amount
 logical partitions.
 You can only have a single extended partition.
+.It Sy efi
+Format an EFI system partition using the FAT filesystem.
+Optionally it can be suffixed with
+.Sy 12 , 16 ,
+or
+.Sy 32
+to force a particular File Allocation Table (FAT) width.
 .It Sy ext2
 Format an ext2 filesystem.
+.It Sy fat
+Format a FAT filesystem.
+Optionally it can be suffixed with
+.Sy 12 , 16 ,
+or
+.Sy 32
+to force a particular File Allocation Table (FAT) width.
 .It Sy no
 Use the existing disk data.
 .El
@@ -247,6 +261,7 @@ rw,cache=2%             # read-write, use 2% of memory as cache
 .Xr gpt 7 ,
 .Xr mbr 7 ,
 .Xr extfs 8 ,
+.Xr fatfs 8 ,
 .Xr fsck 8 ,
 .Xr init 8 ,
 .Xr iso9660fs 8
