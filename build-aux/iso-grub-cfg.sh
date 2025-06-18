@@ -354,31 +354,31 @@ esac
 cat << EOF
   hook_kernel_pre
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot /$kernel \$console --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers \$kernel_options \$chain "\$@"
+  multiboot2 /$kernel \$console --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers \$kernel_options \$chain "\$@"
   echo done
   hook_kernel_post
   # TODO: Injecting configuration doesn't work for mounted cdroms.
   if ! \$enable_dhclient; then
     echo -n "Disabling dhclient ... "
-    module /boot/grub/init/furthermore --create-to /etc/init/network
-    module /boot/grub/init/network-no-dhclient --append-to /etc/init/network
+    module2 /boot/grub/init/furthermore --create-to /etc/init/network
+    module2 /boot/grub/init/network-no-dhclient --append-to /etc/init/network
     echo done
   fi
   if \$enable_ntpd; then
     echo -n "Enabling ntpd ... "
-    module /boot/grub/init/local-ntpd --append-to /etc/init/local
-    module /boot/grub/init/furthermore --create-to /etc/init/time
-    module /boot/grub/init/local-ntpd --append-to /etc/init/time
+    module2 /boot/grub/init/local-ntpd --append-to /etc/init/local
+    module2 /boot/grub/init/furthermore --create-to /etc/init/time
+    module2 /boot/grub/init/local-ntpd --append-to /etc/init/time
     echo done
   fi
   if \$enable_sshd; then
     echo -n "Enabling sshd ... "
-    module /boot/grub/init/local-sshd --append-to /etc/init/local
+    module2 /boot/grub/init/local-sshd --append-to /etc/init/local
     echo done
   fi
   if [ \$no_random_seed != --no-random-seed ]; then
     echo -n "Loading /boot/random.seed (256) ... "
-    module /boot/random.seed --random-seed
+    module2 /boot/random.seed --random-seed
     echo done
   fi
 EOF
@@ -387,14 +387,14 @@ for initrd in $initrds; do
     cat << EOF
   if \$enable_src; then
     echo -n "Loading /$initrd ($(human_size $initrd)) ... "
-    module /$initrd
+    module2 /$initrd
     echo done
   fi
 EOF
   else
     cat << EOF
   echo -n "Loading /$initrd ($(human_size $initrd)) ... "
-  module /$initrd
+  module2 /$initrd
   echo done
 EOF
   fi
@@ -417,12 +417,12 @@ for port in $ports; do
   cat << EOF
   if \$tix_$(portvar "$port"); then
     echo -n "Loading /$tix ($(human_size $tix)) ... "
-    module --nounzip /$tix --to /$tix
+    module2 --nounzip /$tix --to /$tix
     echo done
   fi
   if \$port_$(portvar "$port"); then
     echo -n "Loading /$tix ($(human_size $tix)) ... "
-    module /$tix
+    module2 /$tix
     echo done
   fi
 EOF

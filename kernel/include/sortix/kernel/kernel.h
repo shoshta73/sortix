@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,5 +23,19 @@
 #include <sortix/kernel/decl.h>
 #include <sortix/kernel/log.h>
 #include <sortix/kernel/panic.h>
+
+struct multiboot_info;
+struct multiboot2_info;
+
+namespace Sortix {
+
+struct boot_info
+{
+	// TODO: After releasing Sortix 1.1, remove multiboot 1 support.
+	struct multiboot_info* multiboot;
+	struct multiboot2_info* multiboot2;
+};
+
+} // namespace Sortix
 
 #endif

@@ -69,6 +69,37 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add multiboot2 support
+The
+.Xr kernel 7
+is switched from the multiboot 1 specification to the multiboot 2 specification
+as the boot protocol.
+This new boot protocol provides important information such as the EFI pointer
+that would not otherwise be available, and is much more extensible.
+.Pp
+Multiboot 1 continues to be implemented for backwards compatibility with the 1.0
+stable release, and will be removed after the next stable release.
+This backwards compatibility is required because
+.Xr sysmerge 8
+on the 1.0 release does not implement the
+.Pa /sysmerge/libexec/sysmerge/grub
+protocol that would've made it multiboot 2 aware, and it instead unconditionally
+boots the new kernel as if it was a multiboot 1 kernel.
+.Pp
+The
+.Pa /etc/default/grub.d/10_sortix
+script in the GRUB port has been updated to use multiboot 2 instead.
+Installations using the provided bootloader require no further actions.
+Installations manually using
+.Pa /etc/default/grub.d/10_sortix.include
+will be automatically migrated.
+Installations manually using a copy of
+.Pa /etc/default/grub.d/10_sortix.cache
+will need to switch to the newer
+.Pa /etc/default/grub.d/10_sortix.include
+mechanism.
+Installations otherwise using a manually supplied bootloader are not supported
+and will need to migrate to multiboot 2 as of the next stable release.
 .Ss Add sockatmark(2)
 The
 .Xr sockatmark 2

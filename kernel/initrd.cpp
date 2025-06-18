@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,6 +48,7 @@
 
 #include "initrd.h"
 #include "multiboot.h"
+#include "multiboot2.h"
 
 namespace Sortix {
 
@@ -318,36 +319,34 @@ static void ExtractTo(Ref<Descriptor> desc,
 	}
 }
 
-static void ExtractModule(struct multiboot_mod_list* module,
+static void ExtractModule(addr_t phys_from,
+                          size_t size,
+                          const char* cmdline,
                           Ref<Descriptor> desc,
                           struct initrd_context* ctx)
 {
-	size_t mod_size = module->mod_end - module->mod_start;
-	const char* cmdline = (const char*) (uintptr_t) module->cmdline;
-
 	// Ignore the random seed.
 	if ( !strcmp(cmdline, "--random-seed") )
 		return;
 
 	// Allocate the needed kernel virtual address space.
 	addralloc_t initrd_addr_alloc;
-	if ( !AllocateKernelAddress(&initrd_addr_alloc, mod_size) )
+	if ( !AllocateKernelAddress(&initrd_addr_alloc, size) )
 		PanicF("Failed to allocate kernel address space for the initrd");
 
 	// Map the physical frames onto our address space.
-	addr_t physfrom = module->mod_start;
-	addr_t mapat = initrd_addr_alloc.from;
-	for ( size_t i = 0; i < mod_size; i += Page::Size() )
+	addr_t map_at = initrd_addr_alloc.from;
+	for ( size_t i = 0; i < size; i += Page::Size() )
 	{
-		if ( !Memory::Map(physfrom + i, mapat + i, PROT_KREAD | PROT_KWRITE) )
+		if ( !Memory::Map(phys_from + i, map_at + i, PROT_KREAD | PROT_KWRITE) )
 			PanicF("Unable to map the initrd into virtual memory");
 	}
 	Memory::Flush();
 
 	ctx->initrd = (uint8_t*) initrd_addr_alloc.from;
-	ctx->initrd_size = mod_size;
-	ctx->initrd_unmap_start = module->mod_start;
-	ctx->initrd_unmap_end = Page::AlignDown(module->mod_end);
+	ctx->initrd_size = size;
+	ctx->initrd_unmap_start = phys_from;
+	ctx->initrd_unmap_end = Page::AlignDown(phys_from + size);
 
 	const unsigned char xz_magic[] = { 0xFD, '7', 'z', 'X', 'Z', 0x00 };
 	const unsigned char bzip2_magic[] = { 'B', 'Z' };
@@ -382,26 +381,59 @@ static void ExtractModule(struct multiboot_mod_list* module,
 		Panic("Bootloader failed to decompress a bzip2 initrd, "
 		      "or try the --to <path> option");
 	else
-		Panic("Unsupported initrd format, or try the --to <path> option");
+		PanicF("Unsupported initrd format, or try the --to <path> option");
 
 	// Unmap the pages and return the physical frames for reallocation.
-	for ( size_t i = 0; i < mod_size; i += Page::Size() )
-		UnmapInitrdPage(ctx, mapat + i);
+	for ( size_t i = 0; i < size; i += Page::Size() )
+		UnmapInitrdPage(ctx, map_at + i);
 	Memory::Flush();
 
 	// Free the used virtual address space.
 	FreeKernelAddress(&initrd_addr_alloc);
 }
 
-void ExtractModules(struct multiboot_info* bootinfo, Ref<Descriptor> root)
+void ExtractModules(struct boot_info* boot_info, Ref<Descriptor> root)
 {
-	struct multiboot_mod_list* modules =
-		(struct multiboot_mod_list*) (uintptr_t) bootinfo->mods_addr;
 	struct initrd_context ctx;
 	memset(&ctx, 0, sizeof(ctx));
 	SetupKernelIOCtx(&ctx.ioctx);
-	for ( uint32_t i = 0; i < bootinfo->mods_count; i++ )
-		ExtractModule(&modules[i], root, &ctx);
+	bool any = false;
+
+	if ( boot_info->multiboot2 )
+	{
+		struct multiboot2_info* multiboot2 = boot_info->multiboot2;
+		struct multiboot2_tag* tag = multiboot2_tag_begin(multiboot2);
+		while ( tag )
+		{
+			if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
+			{
+				struct multiboot2_tag_module* module =
+					(struct multiboot2_tag_module*) tag;
+				ExtractModule(module->mod_start,
+				              module->mod_end - module->mod_start,
+				              module->cmdline, root, &ctx);
+				any = true;
+			}
+			tag = multiboot2_tag_next(tag);
+		}
+	}
+	else if ( boot_info->multiboot )
+	{
+		struct multiboot_info* multiboot = boot_info->multiboot;
+		struct multiboot_mod_list* modules =
+			(struct multiboot_mod_list*) (uintptr_t) multiboot->mods_addr;
+		for ( uint32_t i = 0; i < multiboot->mods_count; i++ )
+		{
+			ExtractModule(modules[i].mod_start,
+			              modules[i].mod_end - modules[i].mod_start,
+			              (const char*) (uintptr_t) modules[i].cmdline,
+			              root, &ctx);
+			any = true;
+		}
+	}
+
+	if ( !any )
+		Panic("No initrd was loaded");
 }
 
 } // namespace Sortix

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2024-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,9 +28,9 @@
 
 #include <sortix/limits.h>
 
-typedef struct multiboot_info multiboot_info_t;
-
 namespace Sortix {
+
+struct boot_info;
 
 class TextBuffer;
 class TextBufferHandle;
@@ -129,7 +129,7 @@ inline size_t PrintFV(const char* format, va_list list)
 	return (size_t) result;
 }
 
-void Init(multiboot_info_t* bootinfo);
+void Init(struct boot_info* boot_info);
 void Center(const char* string);
 void BeginReplace();
 void CancelReplace();

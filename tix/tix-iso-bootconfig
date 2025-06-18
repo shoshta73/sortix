@@ -233,7 +233,8 @@ EOF
    printf 'function hook_initrd_post {\n'
    printf '  echo -n "Loading /boot/liveconfig.tar.xz (%s) ... "\n' \
            "$(human_size "$directory/boot/liveconfig.tar.xz")"
-   printf '  module /boot/liveconfig.tar.xz\n'
+   # TODO: Temporarily figure out if multiboot 1 or 2.
+   printf '  module2 /boot/liveconfig.tar.xz\n'
    printf '  echo done\n'
    printf '}\n'
  fi

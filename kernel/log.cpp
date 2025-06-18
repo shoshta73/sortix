@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,7 @@
 #include "com.h"
 #include "lfbtextbuffer.h"
 #include "multiboot.h"
+#include "multiboot2.h"
 #include "textterminal.h"
 #include "vgatextbuffer.h"
 
@@ -149,41 +150,72 @@ static bool EmergencyTextTermSync(void* user)
 	return ((TextTerminal*) user)->EmergencySync();
 }
 
-void Init(multiboot_info_t* bootinfo)
+void Init(struct boot_info* boot_info)
 {
-	(void) bootinfo;
-
 	const char* oom_msg = "Out of memory setting up kernel log.";
+
+	addr_t framebuffer_addr = 0x0;
+	uint32_t framebuffer_width = 0;
+	uint32_t framebuffer_height = 0;
+	uint32_t framebuffer_pitch = 0;
+	uint8_t framebuffer_bpp = 0;
+	uint8_t framebuffer_type = 0;
+
+	if ( boot_info->multiboot &&
+	     (boot_info->multiboot->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) &&
+	     boot_info->multiboot->framebuffer_type !=
+	     MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT )
+	{
+		framebuffer_type = boot_info->multiboot->framebuffer_type;
+		framebuffer_addr = boot_info->multiboot->framebuffer_addr;
+		framebuffer_width = boot_info->multiboot->framebuffer_width;
+		framebuffer_height = boot_info->multiboot->framebuffer_height;
+		framebuffer_pitch = boot_info->multiboot->framebuffer_pitch;
+		framebuffer_bpp = boot_info->multiboot->framebuffer_bpp;
+	}
+
+	if ( boot_info->multiboot2 )
+	{
+		struct multiboot2_tag_framebuffer* fbinfo =
+			(struct multiboot2_tag_framebuffer*)
+			multiboot2_tag_lookup(boot_info->multiboot2,
+			                      MULTIBOOT2_TAG_TYPE_FRAMEBUFFER);
+		if ( fbinfo )
+		{
+			framebuffer_type = fbinfo->common.framebuffer_type;
+			framebuffer_addr = fbinfo->common.framebuffer_addr;
+			framebuffer_width = fbinfo->common.framebuffer_width;
+			framebuffer_height = fbinfo->common.framebuffer_height;
+			framebuffer_pitch = fbinfo->common.framebuffer_pitch;
+			framebuffer_bpp = fbinfo->common.framebuffer_bpp;
+		}
+	}
 
 	// Create the backend text buffer.
 	TextBuffer* textbuf;
-	if ( (bootinfo->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) &&
-	     bootinfo->framebuffer_type != MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT )
+	if ( framebuffer_bpp )
 	{
-		assert(bootinfo->framebuffer_type == MULTIBOOT_FRAMEBUFFER_TYPE_RGB);
-		assert(bootinfo->framebuffer_bpp == 24 ||
-		       bootinfo->framebuffer_bpp == 32);
-		assert(0 < bootinfo->framebuffer_width);
-		assert(0 < bootinfo->framebuffer_height);
+		assert(framebuffer_type == MULTIBOOT2_FRAMEBUFFER_TYPE_RGB);
+		assert(framebuffer_bpp == 24 || framebuffer_bpp == 32);
+		assert(0 < framebuffer_width);
+		assert(0 < framebuffer_height);
 		pcibar_t fakebar;
-		fakebar.addr_raw = bootinfo->framebuffer_addr;
-		fakebar.size_raw = (uint64_t) bootinfo->framebuffer_pitch * bootinfo->framebuffer_height;
+		fakebar.addr_raw = framebuffer_addr;
+		fakebar.size_raw = (uint64_t) framebuffer_pitch * framebuffer_height;
 		fakebar.addr_raw |= PCIBAR_TYPE_64BIT;
 		addralloc_t fb_alloc;
 		if ( !MapPCIBAR(&fb_alloc, fakebar, Memory::PAT_WC) )
 			Panic("Framebuffer setup failure.");
 		uint8_t* lfb = (uint8_t*) fb_alloc.from;
-		uint32_t lfbformat = bootinfo->framebuffer_bpp;
-		size_t scansize = bootinfo->framebuffer_pitch;
-		textbuf = CreateLFBTextBuffer(lfb, lfbformat, bootinfo->framebuffer_width,
-		                              bootinfo->framebuffer_height, scansize);
+		textbuf = CreateLFBTextBuffer(lfb, framebuffer_bpp, framebuffer_width,
+		                              framebuffer_height, framebuffer_pitch);
 		if ( !textbuf )
 			Panic(oom_msg);
 		fallback_framebuffer = lfb;
-		fallback_framebuffer_bpp = lfbformat;
-		fallback_framebuffer_width = bootinfo->framebuffer_width;
-		fallback_framebuffer_height = bootinfo->framebuffer_height;
-		fallback_framebuffer_pitch = bootinfo->framebuffer_pitch;
+		fallback_framebuffer_bpp = framebuffer_bpp;
+		fallback_framebuffer_width = framebuffer_width;
+		fallback_framebuffer_height = framebuffer_height;
+		fallback_framebuffer_pitch = framebuffer_pitch;
 	}
 	else
 	{

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2014-2015, 2017, 2022-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2012, 2014-2015, 2017, 2022-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,6 +32,7 @@
 #include <sortix/kernel/syscall.h>
 
 #include "multiboot.h"
+#include "multiboot2.h"
 #include "memorymanagement.h"
 #include "msr.h"
 
@@ -84,28 +85,24 @@ static bool CheckUsedString(addr_t test,
 	return CheckUsedRange(test, (addr_t) string, size, dist_ptr);
 }
 
-static bool CheckUsedRanges(multiboot_info_t* bootinfo,
-                            addr_t test,
-                            size_t* dist_ptr)
+static bool CheckUsedRangesMultiboot(struct multiboot_info* multiboot,
+                                     addr_t test,
+                                     size_t* dist_ptr)
 {
-	addr_t kernel_end = (addr_t) &end;
-	if ( CheckUsedRange(test, 0, kernel_end, dist_ptr) )
+	if ( CheckUsedRange(test, (addr_t) multiboot, sizeof(*multiboot), dist_ptr) )
 		return true;
 
-	if ( CheckUsedRange(test, (addr_t) bootinfo, sizeof(*bootinfo), dist_ptr) )
-		return true;
-
-	const char* cmdline = (const char*) (uintptr_t) bootinfo->cmdline;
+	const char* cmdline = (const char*) (uintptr_t) multiboot->cmdline;
 	if ( CheckUsedString(test, cmdline, dist_ptr) )
 		return true;
 
-	size_t mods_size = bootinfo->mods_count * sizeof(struct multiboot_mod_list);
-	if ( CheckUsedRange(test, bootinfo->mods_addr, mods_size, dist_ptr) )
+	size_t mods_size = multiboot->mods_count * sizeof(struct multiboot_mod_list);
+	if ( CheckUsedRange(test, multiboot->mods_addr, mods_size, dist_ptr) )
 		return true;
 
 	struct multiboot_mod_list* modules =
-		(struct multiboot_mod_list*) (uintptr_t) bootinfo->mods_addr;
-	for ( uint32_t i = 0; i < bootinfo->mods_count; i++ )
+		(struct multiboot_mod_list*) (uintptr_t) multiboot->mods_addr;
+	for ( uint32_t i = 0; i < multiboot->mods_count; i++ )
 	{
 		struct multiboot_mod_list* module = &modules[i];
 		assert(module->mod_start <= module->mod_end);
@@ -117,18 +114,144 @@ static bool CheckUsedRanges(multiboot_info_t* bootinfo,
 			return true;
 	}
 
-	if ( CheckUsedRange(test, bootinfo->mmap_addr, bootinfo->mmap_length,
+	if ( CheckUsedRange(test, multiboot->mmap_addr, multiboot->mmap_length,
 	                      dist_ptr) )
 		return true;
 
 	return false;
 }
 
-void Init(multiboot_info_t* bootinfo)
+static bool CheckUsedRangesMultiboot2(struct multiboot2_info* multiboot2,
+                                      addr_t test,
+                                      size_t* dist_ptr)
 {
-	if ( !(bootinfo->flags & MULTIBOOT_INFO_MEM_MAP) )
+	if ( CheckUsedRange(test, (addr_t) multiboot2, multiboot2->total_size,
+	                    dist_ptr) )
+		return true;
+
+	struct multiboot2_tag* tag = multiboot2_tag_begin(multiboot2);
+	while ( tag )
+	{
+		if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
+		{
+			struct multiboot2_tag_module* module =
+				(struct multiboot2_tag_module*) tag;
+			assert(module->mod_start <= module->mod_end);
+			size_t mod_size = module->mod_end - module->mod_start;
+			if ( CheckUsedRange(test, module->mod_start, mod_size, dist_ptr) )
+				return true;
+		}
+		tag = multiboot2_tag_next(tag);
+	}
+
+	return false;
+}
+
+static bool CheckUsedRanges(struct boot_info* boot_info,
+                            addr_t test,
+                            size_t* dist_ptr)
+{
+	addr_t kernel_end = (addr_t) &end;
+	if ( CheckUsedRange(test, 0, kernel_end, dist_ptr) )
+		return true;
+
+	if ( CheckUsedRange(test, (addr_t) boot_info, sizeof(*boot_info), dist_ptr) )
+		return true;
+
+	if ( boot_info->multiboot &&
+	     CheckUsedRangesMultiboot(boot_info->multiboot, test, dist_ptr) )
+		return true;
+
+	if ( boot_info->multiboot2 &&
+	     CheckUsedRangesMultiboot2(boot_info->multiboot2, test, dist_ptr) )
+		return true;
+
+	return false;
+}
+
+static void OnMemoryRegion(struct boot_info* boot_info,
+                           uint64_t addr,
+                           uint64_t size,
+                           uint32_t type)
+{
+	// Check that we can use this kind of RAM.
+	if ( type != 1 )
+		return;
+
+	// Truncate the memory area if needed.
+#if defined(__i386__)
+	if ( 0xFFFFFFFFULL < addr )
+		return;
+	if ( 0xFFFFFFFFULL < addr + size )
+		size = 0x100000000ULL - addr;
+#endif
+
+	// Properly page align the entry if needed.
+	// TODO: Is the bootloader required to page align this? This could be
+	//       raw BIOS data that might not be page aligned? But that would
+	//       be a silly computer.
+	addr_t base_unaligned = (addr_t) addr;
+	addr_t base = Page::AlignUp(base_unaligned);
+	if ( size < base - base_unaligned )
+		return;
+	size_t length_unaligned = size - (base - base_unaligned);
+	size_t length = Page::AlignDown(length_unaligned);
+	if ( !length )
+		return;
+
+	// Count the amount of usable RAM.
+	Page::totalmem += length;
+
+	// Give all the physical memory to the physical memory allocator
+	// but make sure not to give it things we already use.
+	addr_t processed = base;
+	while ( processed < base + length )
+	{
+		size_t distance = base + length - processed;
+		if ( !CheckUsedRanges(boot_info, processed, &distance) )
+			Page::InitPushRegion(processed, distance);
+		processed += distance;
+	}
+}
+
+static void InitMultiboot(struct boot_info* boot_info)
+{
+	struct multiboot_info* multiboot = boot_info->multiboot;
+
+	if ( !(multiboot->flags & MULTIBOOT_INFO_MEM_MAP) )
 		Panic("The memory map flag was't set in the multiboot structure.");
 
+	typedef const multiboot_memory_map_t* mmap_t;
+
+	// Loop over every detected memory region.
+	for ( mmap_t mmap = (mmap_t) (addr_t) multiboot->mmap_addr;
+	      (addr_t) mmap < multiboot->mmap_addr + multiboot->mmap_length;
+	      mmap = (mmap_t) ((addr_t) mmap + mmap->size + sizeof(mmap->size)) )
+	{
+		Random::Mix(Random::SOURCE_WEAK, mmap, sizeof(*mmap));
+		OnMemoryRegion(boot_info, mmap->addr, mmap->len, mmap->type);
+	}
+}
+
+static void InitMultiboot2(struct boot_info* boot_info)
+{
+	struct multiboot2_tag_mmap* mmap = (struct multiboot2_tag_mmap*)
+		multiboot2_tag_lookup(boot_info->multiboot2, MULTIBOOT2_TAG_TYPE_MMAP);
+	if ( !mmap )
+		Panic("The memory map wasn't in the multiboot2 structure");
+	size_t count = (mmap->size - sizeof(*mmap)) / mmap->entry_size;
+	for ( size_t i = 0; i < count; i++ )
+	{
+		uintptr_t ptr = (uintptr_t) mmap->entries;
+		ptr += i * mmap->entry_size;
+		struct multiboot2_mmap_entry* entry =
+			(struct multiboot2_mmap_entry*) ptr;
+		OnMemoryRegion(boot_info, entry->addr, entry->len, entry->type);
+	}
+}
+
+void Init(struct boot_info* boot_info)
+{
 	// If supported, setup the Page Attribute Table feature that allows
 	// us to control the memory type (caching) of memory more precisely.
 	if ( IsPATSupported() )
@@ -151,56 +274,13 @@ void Init(multiboot_info_t* bootinfo)
 		PAT2PMLFlags[PAT_UCM] = PML_NOCACHE;
 	}
 
-	typedef const multiboot_memory_map_t* mmap_t;
-
-	// Loop over every detected memory region.
-	for ( mmap_t mmap = (mmap_t) (addr_t) bootinfo->mmap_addr;
-	      (addr_t) mmap < bootinfo->mmap_addr + bootinfo->mmap_length;
-	      mmap = (mmap_t) ((addr_t) mmap + mmap->size + sizeof(mmap->size)) )
-	{
-		Random::Mix(Random::SOURCE_WEAK, mmap, sizeof(*mmap));
-
-		// Check that we can use this kind of RAM.
-		if ( mmap->type != 1 )
-			continue;
-
-		// Truncate the memory area if needed.
-		uint64_t mmap_addr = mmap->addr;
-		uint64_t mmap_len = mmap->len;
-#if defined(__i386__)
-		if ( 0xFFFFFFFFULL < mmap_addr )
-			continue;
-		if ( 0xFFFFFFFFULL < mmap_addr + mmap_len )
-			mmap_len = 0x100000000ULL - mmap_addr;
-#endif
-
-		// Properly page align the entry if needed.
-		// TODO: Is the bootloader required to page align this? This could be
-		//       raw BIOS data that might not be page aligned? But that would
-		//       be a silly computer.
-		addr_t base_unaligned = (addr_t) mmap_addr;
-		addr_t base = Page::AlignUp(base_unaligned);
-		if ( mmap_len < base - base_unaligned )
-			continue;
-		size_t length_unaligned = mmap_len - (base - base_unaligned);
-		size_t length = Page::AlignDown(length_unaligned);
-		if ( !length )
-			continue;
-
-		// Count the amount of usable RAM.
-		Page::totalmem += length;
-
-		// Give all the physical memory to the physical memory allocator
-		// but make sure not to give it things we already use.
-		addr_t processed = base;
-		while ( processed < base + length )
-		{
-			size_t distance = base + length - processed;
-			if ( !CheckUsedRanges(bootinfo, processed, &distance) )
-				Page::InitPushRegion(processed, distance);
-			processed += distance;
-		}
-	}
+	// TODO: This assumes the multiboot structures are accessible. That
+	//       assumption is wrong in general and we should map them ourselves in
+	//       manner that cannot fail.
+	if ( boot_info->multiboot )
+		InitMultiboot(boot_info);
+	else if ( boot_info->multiboot2 )
+		InitMultiboot2(boot_info);
 
 	// Prepare the non-forkable kernel PMLs such that forking the kernel address
 	// space will always keep the kernel mapped.
