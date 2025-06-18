@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, 2016-2017, 2021-2022, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -347,7 +347,7 @@ ssize_t StreamSocket::readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt)
 	ScopedLock lock(&socket_lock);
 	if ( !is_connected )
 		return errno = ENOTCONN, -1;
-	return outgoing.readv(ctx, iov, iovcnt);
+	return incoming.readv(ctx, iov, iovcnt);
 }
 
 ssize_t StreamSocket::write(ioctx_t* ctx, const uint8_t* buf, size_t count)
