@@ -332,23 +332,25 @@ desired_version() {(
       stamp="$stamp.$VERSION_2.$SHA256SUM_2"
     fi
   fi
-  stamp="$stamp.$(cat "$port.port" | sha256sum | grep -Eo '^[^ ]*')"
-  if [ -f "$port.patch" ]; then
-    stamp="$stamp.$(cat "$port.patch" | sha256sum | grep -Eo '^[^ ]*')"
-  fi
-  if [ -f "$port.execpatch" ]; then
-    stamp="$stamp.$(cat "$port.execpatch" | sha256sum | grep -Eo '^[^ ]*')"
-  fi
-  if [ -f "$port.rmpatch" ]; then
-    stamp="$stamp.$(cat "$port.rmpatch" | sha256sum | grep -Eo '^[^ ]*')"
-  fi
-  if [ -f "$port.post-install" ]; then
-    stamp="$stamp.$(cat "$port.post-install" | sha256sum | grep -Eo '^[^ ]*')"
-  fi
   DEVELOPMENT=$(tix-vars -d false "$port.port" DEVELOPMENT)
   if [ "$DEVELOPMENT" = true ]; then
     stamp="$stamp.development"
+  else
+    stamp="$stamp.$(cat "$port.port" | sha256sum | grep -Eo '^[^ ]*')"
+    if [ -f "$port.patch" ]; then
+      stamp="$stamp.$(cat "$port.patch" | sha256sum | grep -Eo '^[^ ]*')"
+    fi
+    if [ -f "$port.execpatch" ]; then
+      stamp="$stamp.$(cat "$port.execpatch" | sha256sum | grep -Eo '^[^ ]*')"
+    fi
+    if [ -f "$port.rmpatch" ]; then
+      stamp="$stamp.$(cat "$port.rmpatch" | sha256sum | grep -Eo '^[^ ]*')"
+    fi
+    if [ -f "$port.post-install" ]; then
+      stamp="$stamp.$(cat "$port.post-install" | sha256sum | grep -Eo '^[^ ]*')"
+    fi
   fi
+
   echo "$stamp"
 )}
 
