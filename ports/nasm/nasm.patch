@@ -1,39 +1,7 @@
-diff -Paur --no-dereference -- nasm.upstream/doc/Makefile nasm/doc/Makefile
---- nasm.upstream/doc/Makefile
-+++ nasm/doc/Makefile
-@@ -7,8 +7,8 @@
- top_srcdir	= ..
- srcdir		= .
- 
--prefix		= /usr/local
--exec_prefix	= ${prefix}
-+prefix		= 
-+exec_prefix	= 
- bindir		= ${exec_prefix}/bin
- mandir		= ${datarootdir}/man
- docdir		= ${datarootdir}/doc/${PACKAGE}
-@@ -16,7 +16,7 @@
- infodir		= ${datarootdir}/info
- datarootdir	= ${prefix}/share
- 
--INSTALL		= /bin/install -c
-+INSTALL		= /usr/bin/install -c
- INSTALL_PROGRAM	= ${INSTALL}
- INSTALL_DATA	= ${INSTALL} -m 644
- 
-@@ -24,7 +24,7 @@
- 
- PDFOPT		= 
- 
--MKDIR_P		= /bin/mkdir -p
-+MKDIR_P		= /usr/bin/mkdir -p
- RM_F		= rm -f
- RM_RF		= rm -rf
- CP_F		= cp -f
 diff -Paur --no-dereference -- nasm.upstream/include/compiler.h nasm/include/compiler.h
 --- nasm.upstream/include/compiler.h
 +++ nasm/include/compiler.h
-@@ -412,4 +412,9 @@
+@@ -414,4 +414,9 @@
  # define default case BOGUS_CASE: default
  #endif
  
