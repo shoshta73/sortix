@@ -237,17 +237,20 @@ static struct sockaddr_un* import_addr(ioctx_t* ctx,
 	size_t path_offset = offsetof(struct sockaddr_un, sun_path);
 	if ( addrsize < path_offset )
 		return errno = EINVAL, (struct sockaddr_un*) NULL;
-	size_t path_len = path_offset - addrsize;
+	size_t path_len = addrsize - path_offset;
 	struct sockaddr_un* addr = (struct sockaddr_un*) malloc(addrsize);
 	if ( !addr )
 		return NULL;
 	if ( !ctx->copy_from_src(addr, user_addr, addrsize) )
 		return free(addr), (struct sockaddr_un*) NULL;
+	if ( 4096 < path_len )
+		return errno = ENAMETOOLONG, (struct sockaddr_un*) NULL;
 	if ( addr->sun_family != AF_UNIX )
 		return free(addr), errno = EAFNOSUPPORT, (struct sockaddr_un*) NULL;
+	const char* path = (const char*) addr + path_offset;
 	bool found_nul = false;
 	for ( size_t i = 0; !found_nul && i < path_len; i++ )
-		if ( addr->sun_path[i] == '\0' )
+		if ( path[i] == '\0' )
 			found_nul = true;
 	if ( !found_nul )
 		return free(addr), errno = EINVAL, (struct sockaddr_un*) NULL;
@@ -492,7 +495,10 @@ Manager::~Manager()
 static int CompareAddress(const struct sockaddr_un* a,
                           const struct sockaddr_un* b)
 {
-	return strcmp(a->sun_path, b->sun_path);
+	size_t path_offset = offsetof(struct sockaddr_un, sun_path);
+	const char* a_path = (const char*) a + path_offset;
+	const char* b_path = (const char*) b + path_offset;
+	return strcmp(a_path, b_path);
 }
 
 StreamSocket* Manager::LookupServer(struct sockaddr_un* address)
