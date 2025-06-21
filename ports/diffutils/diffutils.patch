@@ -1,0 +1,27 @@
+diff -Paur --no-dereference -- diffutils.upstream/configure diffutils/configure
+--- diffutils.upstream/configure
++++ diffutils/configure
+@@ -46249,10 +46249,7 @@
+      esac
+      if test "$cross_compiling" = yes
+ then :
+-  { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: error: in '$ac_pwd':" >&5
+-printf '%s\n' "$as_me: error: in '$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See 'config.log' for more details" "$LINENO" 5; }
++  # PATCH: Assume the best when cross-compiling.
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -46593,10 +46590,7 @@
+      esac
+      if test "$cross_compiling" = yes
+ then :
+-  { { printf '%s\n' "$as_me:${as_lineno-$LINENO}: error: in '$ac_pwd':" >&5
+-printf '%s\n' "$as_me: error: in '$ac_pwd':" >&2;}
+-as_fn_error $? "cannot run test program while cross compiling
+-See 'config.log' for more details" "$LINENO" 5; }
++  # PATCH: Assume the best when cross-compiling.
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
