@@ -236,7 +236,7 @@ static void checklist_read(struct checklist*** ptr,
 	{
 		if ( allow_missing )
 			return;
-		err(1, "malloc");
+		err(1, "%s", path);
 	}
 	struct stat st;
 	fstat(fileno(fp), &st);
