@@ -948,7 +948,7 @@ static void Compile(struct metainfo* minfo)
 	const char* build_system =
 		metainfo_get(minfo, "BUILD_SYSTEM", "pkg.build-system");
 	if ( !build_system )
-		errx(1, "%s: pkg.build-system was not found", minfo->package_info_path);
+		errx(1, "%s: BUILD_SYSTEM was not found", minfo->package_info_path);
 
 	if ( !strcmp(build_system, "none") )
 		return;
