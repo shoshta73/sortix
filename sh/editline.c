@@ -168,8 +168,7 @@ void edit_line_type_use_record(struct edit_line* edit_state, const char* record)
 		record_offset += num_bytes;
 	}
 
-	// TODO: Avoid multiplication overflow.
-	wchar_t* line = (wchar_t*) malloc(sizeof(wchar_t) * line_length);
+	wchar_t* line = calloc(line_length, sizeof(wchar_t));
 	assert(line);
 	size_t line_used;
 
