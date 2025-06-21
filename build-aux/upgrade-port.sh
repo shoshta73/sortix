@@ -73,6 +73,7 @@ case "$LATEST" in
 *.tar.gz) COMPRESSION=tar.gz;;
 *.tar.bz2) COMPRESSION=tar.bz2;;
 *.tar.xz) COMPRESSION=tar.xz;;
+*.tgz) COMPRESSION=tar.gz;;
 esac
 NEW_VERSION="$(echo "$LATEST" | sed -E "s,$RELEASE_SEARCH_REGEX,\1,")"
 
