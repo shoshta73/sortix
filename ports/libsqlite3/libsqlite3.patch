@@ -43,7 +43,20 @@ diff -Paur --no-dereference -- libsqlite3.upstream/shell.c libsqlite3/shell.c
 diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.c
 --- libsqlite3.upstream/sqlite3.c
 +++ libsqlite3/sqlite3.c
-@@ -15572,6 +15572,9 @@
+@@ -11155,6 +11155,12 @@
+ # endif
+ #endif
+ 
++/* PATCH: Sortix MAP_SHARED isn't fully implemented yet. */
++#ifdef __sortix__
++# undef SQLITE_OMIT_WAL
++# define SQLITE_OMIT_WAL 1
++#endif
++
+ #if 0
+ }  /* End of the 'extern "C"' block */
+ #endif
+@@ -15572,6 +15578,9 @@
  
  /* Maximum pathname length.  Note: FILENAME_MAX defined by stdio.h
  */
@@ -53,7 +66,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  #ifndef SQLITE_MAX_PATHLEN
  # define SQLITE_MAX_PATHLEN FILENAME_MAX
  #endif
-@@ -38464,6 +38467,45 @@
+@@ -38464,6 +38473,45 @@
  # include <sys/param.h>
  #endif /* SQLITE_ENABLE_LOCKING_STYLE */
  
@@ -99,7 +112,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  /*
  ** Try to determine if gethostuuid() is available based on standard
  ** macros.  This might sometimes compute the wrong value for some
-@@ -39931,6 +39973,7 @@
+@@ -39931,6 +39979,7 @@
  
    /* Otherwise see if some other process holds it.
    */
@@ -107,7 +120,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  #ifndef __DJGPP__
    if( !reserved && !pFile->pInode->bProcessLock ){
      struct flock lock;
-@@ -39946,6 +39989,7 @@
+@@ -39946,6 +39995,7 @@
      }
    }
  #endif
@@ -115,7 +128,7 @@ diff -Paur --no-dereference -- libsqlite3.upstream/sqlite3.c libsqlite3/sqlite3.
  
    sqlite3_mutex_leave(pFile->pInode->pLockMutex);
    OSTRACE(("TEST WR-LOCK %d %d %d (unix)\n", pFile->h, rc, reserved));
-@@ -40698,11 +40742,15 @@
+@@ -40698,11 +40748,15 @@
    if( pFile->eFileLock > NO_LOCK ){
      pFile->eFileLock = eFileLock;
      /* Always update the timestamp on the old file */
