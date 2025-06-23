@@ -1,0 +1,334 @@
+diff -Paur --no-dereference -- libicu.upstream/source/Makefile.in libicu/source/Makefile.in
+--- libicu.upstream/source/Makefile.in
++++ libicu/source/Makefile.in
+@@ -150,6 +150,7 @@
+ 	@echo "building tools/escapesrc (Needed for this platform with NEED_ESCAPING)"
+ 	@(cd tools/escapesrc && $(MAKE) RECURSIVE=YES $$local_target) || exit
+ endif
++	# PATCH: Fix distclean failing if directories don't have a Makefile.
+ 	@dot_seen=no; \
+ 	target=`echo $@ | sed s/-recursive//`; \
+ 	list='$(LOCAL_SUBDIRS)'; for subdir in $$list; do \
+@@ -160,7 +161,7 @@
+ 	  else \
+ 	    local_target="$$target"; \
+ 	  fi; \
+-	  (cd $$subdir && $(MAKE) RECURSIVE=YES $$local_target) || exit; \
++	  (cd $$subdir && $(MAKE) $$local_target) || { if [ $$local_target != distclean ]; then exit 1; fi; } ; \
+ 	done; \
+ 	if test "$$dot_seen" = "no"; then \
+ 	  $(MAKE) "$$target-local" || exit; \
+@@ -181,27 +182,18 @@
+ 	$(INSTALL_DATA) $(ALL_PKGCONFIG_FILES) $(DESTDIR)$(libdir)/pkgconfig/
+ 
+ install-icu: $(INSTALLED_BUILT_FILES)
+-	@$(MKINSTALLDIRS) $(DESTDIR)$(pkgdatadir)/config
+-	@$(MKINSTALLDIRS) $(DESTDIR)$(pkglibdir)
++	@$(MKINSTALLDIRS) $(DESTDIR)$(pkgdatadir)
+ 	@$(MKINSTALLDIRS) $(DESTDIR)$(bindir)
+ 	@$(MKINSTALLDIRS) $(DESTDIR)$(sbindir)
+-	$(INSTALL_DATA) @platform_make_fragment@ $(DESTDIR)$(pkgdatadir)/config/@platform_make_fragment_name@
+-	$(INSTALL_SCRIPT) $(top_srcdir)/mkinstalldirs $(DESTDIR)$(pkgdatadir)/mkinstalldirs
+-	$(INSTALL_SCRIPT) $(top_srcdir)/install-sh $(DESTDIR)$(pkgdatadir)/install-sh
++	# PATCH: Don't install files that reinvent pkg-config, mkdir, and install.
+ 	@$(MKINSTALLDIRS) $(DESTDIR)$(libdir)/pkgconfig
+ 	$(INSTALL_DATA) $(ALL_PKGCONFIG_FILES) $(DESTDIR)$(libdir)/pkgconfig/
+ 	$(INSTALL_DATA) $(top_srcdir)/../LICENSE $(DESTDIR)$(pkgdatadir)/LICENSE
+ ifeq ($(INSTALL_ICU_CONFIG),true)
+ 	$(INSTALL_SCRIPT) $(top_builddir)/config/icu-config $(DESTDIR)$(bindir)/icu-config
+ endif
+-	$(INSTALL_DATA) $(top_builddir)/config/Makefile.inc $(DESTDIR)$(pkglibdir)/Makefile.inc
+-	$(INSTALL_DATA) $(top_builddir)/config/pkgdata.inc $(DESTDIR)$(pkglibdir)/pkgdata.inc
+-#	@echo icuinfo.xml is built after make check.
+-#	-$(INSTALL_DATA) $(top_builddir)/config/icuinfo.xml $(DESTDIR)$(pkglibdir)/icuinfo.xml
+-	cd $(DESTDIR)$(pkglibdir)/..; \
+-	    $(RMV) current && ln -s $(VERSION) current; \
+-	    $(RM) Makefile.inc && ln -s current/Makefile.inc Makefile.inc; \
+-	    $(RM) pkgdata.inc && ln -s current/pkgdata.inc pkgdata.inc
++	# PATCH: pkglibdir contains build information, which is a terrible idea and
++	#        design, and pkg-config must be used instead.
+ 
+ ifeq ($(DOXYGEN),)
+ install-doc:
+@@ -231,6 +223,10 @@
+ 	$(RMV) $(top_builddir)/config/Makefile.inc $(top_builddir)/config/pkgdata.inc $(top_builddir)/config/icu-config $(top_builddir)/config/icu.pc $(ALL_PKGCONFIG_FILES)
+ 	$(RMV) config.cache config.log config.status $(top_builddir)/config/icucross.mk $(top_builddir)/config/icucross.inc autom4te.cache uconfig.h.prepend
+ 	$(RMV) Makefile config/Makefile icudefs.mk $(LIBDIR) $(BINDIR)
++	# PATCH: distclean doesn't clean up everything properly.
++	$(RMV) test/testdata/rules.mk
++	find . -name pkgdataMakefile -delete
++	find . -name Makefile -exec sh -c 'test -e $$1.in' sh '{}' ';' -delete
+ 	-$(RMV) dist
+ 
+ check-local: xcheck-local
+diff -Paur --no-dereference -- libicu.upstream/source/common/umapfile.cpp libicu/source/common/umapfile.cpp
+--- libicu.upstream/source/common/umapfile.cpp
++++ libicu/source/common/umapfile.cpp
+@@ -223,7 +223,8 @@
+         }
+ 
+         /* get a view of the mapping */
+-#if U_PLATFORM != U_PF_HPUX
++        // PATCH: Sortix doesn't have full MAP_SHARED yet.
++#if U_PLATFORM != U_PF_HPUX && (!defined(__sortix__) || defined(__SORTIX_HAS_WORKING_MAP_SHARED__))
+         data=mmap(nullptr, length, PROT_READ, MAP_SHARED, fd, 0);
+ #else
+         data=mmap(nullptr, length, PROT_READ, MAP_PRIVATE, fd, 0);
+diff -Paur --no-dereference -- libicu.upstream/source/common/umutex.h libicu/source/common/umutex.h
+--- libicu.upstream/source/common/umutex.h
++++ libicu/source/common/umutex.h
+@@ -25,6 +25,49 @@
+ #include <mutex>
+ #include <type_traits>
+ 
++// PATCH: Sortix libstdc++ doesn't have working threading primitives at the
++//        moment for some reason, roll some quick fallbacks using pthreads.
++#if defined(__sortix__) && !defined(_GLIBCXX_HAS_GTHREADS)
++#include <pthread.h>
++namespace std {
++class mutex {
++public:
++    inline mutex() { }
++    inline ~mutex() { }
++    inline void lock() {
++        pthread_mutex_lock(&mtx);
++    }
++    inline bool trylock() {
++        return !pthread_mutex_trylock(&mtx);
++    }
++    inline void unlock() {
++        pthread_mutex_unlock(&mtx);
++    }
++
++public:
++    pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
++  
++};
++class condition_variable {
++public:
++    inline condition_variable() { }
++    inline ~condition_variable() { }
++    void notify_one() noexcept {
++        pthread_cond_signal(&cond);
++    }
++    void notify_all() noexcept {
++        pthread_cond_broadcast(&cond);
++    }
++    void wait(unique_lock<mutex>& lock) {
++        pthread_cond_wait(&cond, &lock.mutex()->mtx);
++    }
++
++private:
++    pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
++};
++}
++#endif
++
+ #include "unicode/utypes.h"
+ #include "unicode/uclean.h"
+ #include "unicode/uobject.h"
+diff -Paur --no-dereference -- libicu.upstream/source/configure libicu/source/configure
+--- libicu.upstream/source/configure
++++ libicu/source/configure
+@@ -5111,22 +5111,34 @@
+ esac
+ fi
+ 
++# PATCH: libicu has an unique cross compilation method where it is supposed to
++#        to be pointed to an existing build tree for the build machine. However,
++#        all other ports either needs no tricks, or just relies on the same
++#        version already being installed in the PATH. Rather than adding special
++#        support to tix(8) for one package, it was possible to more or less
++#        switch libicu to the USE_BOOTSTRAP model.
++if test "X$cross_buildroot" = "X"; then
++    if test "$cross_compiling" = "yes"; then
++        # Detect where the temporary bootstrap libicu is installed.
++        icuinfo=$(which icuinfo 2>/dev/null)
++        if [ "X$icuinfo" != X ]; then
++           cross_buildroot=$(dirname "$(dirname "$icuinfo")")
++           # The build tree merges bin and sbin and cross_buildroot relies on
++           # that, so merge them back after they are split in installation.
++           for program in $(ls "$cross_buildroot/sbin"); do
++             ln -sf "../sbin/$program" "$cross_buildroot/bin/$program"
++           done
++        fi
++    fi
++fi
+ 
+ if test "X$cross_buildroot" = "X"; then
+     if test "$cross_compiling" = "yes"; then
+         as_fn_error $? "Error! Cross compiling but no --with-cross-build option specified - please supply the path to an executable ICU's build root" "$LINENO" 5
+ 	    fi
+ else
+-    if test -f "${cross_buildroot}/config/icucross.mk"; then
+         { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: Using cross buildroot: $cross_buildroot" >&5
+ printf "%s\n" "Using cross buildroot: $cross_buildroot" >&6; }
+-    else
+-        if test -d "${cross_buildroot}"; then
+-            as_fn_error $? "${cross_buildroot}/config/icucross.mk not found. Please build ICU in ${cross_buildroot} first." "$LINENO" 5
+-        else
+-            as_fn_error $? "No such directory ${cross_buildroot} supplied as the argument to --with-cross-build. Use an absolute path." "$LINENO" 5
+-        fi
+-    fi
+ fi
+ 
+ 
+@@ -5884,6 +5896,8 @@
+ *-dec-osf*) icu_cv_host_frag=mh-alpha-osf ;;
+ *-*-nto*)	icu_cv_host_frag=mh-qnx ;;
+ *-ncr-*)	icu_cv_host_frag=mh-mpras ;;
++# PATCH: Unfortunately libicu doesn't handle unknown systems.
++*-*-sortix)	icu_cv_host_frag=mh-linux ;;
+ *) 		icu_cv_host_frag=mh-unknown ;;
+ esac
+ 
+@@ -6015,7 +6029,13 @@
+ 	     *) ;;
+     esac
+ else case e in #(
+-  e) enabled=yes; ENABLE_SHARED=YES
++  e)
++  # PATCH: Unfortunately libicu doesn't seem to properly detect if shared
++  #        libraries works. Manually force static libraries only.
++  case "${host}" in
++  *-*-sortix*) ;;
++  *) enabled=yes; ENABLE_SHARED=YES ;;
++  esac
+  ;;
+ esac
+ fi
+@@ -6036,6 +6056,14 @@
+ 	     no) ;;
+ 	     *) ;;
+     esac
++else case e in #(
++  e)
++  case "${host}" in
++  *-*-sortix*) enabled=yes; ENABLE_STATIC=YES ;;
++  *) ;;
++  esac
++ ;;
++esac
+ fi
+ 
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: result: $enabled" >&5
+diff -Paur --no-dereference -- libicu.upstream/source/data/Makefile.in libicu/source/data/Makefile.in
+--- libicu.upstream/source/data/Makefile.in
++++ libicu/source/data/Makefile.in
+@@ -163,6 +163,7 @@
+ else
+ 	$(INSTALL_DATA) $(ICUDATA_SOURCE_ARCHIVE) $(OUTDIR)
+ endif
++	mkdir -p out/tmp
+ 	echo timestamp > $@
+ 
+ ## Install ICU data.
+@@ -229,9 +230,12 @@
+ 
+ ifeq ($(ICUDATA_SOURCE_ARCHIVE),)
+ build-local: $(SO_VERSION_DATA) $(ICUDATA_ALL_OUTPUT_FILES) $(PKGDATA_LIST)
++	# PATCH: Nothing creates this output directory. Is this path even tested?
++	mkdir -p out/tmp
+ 	echo timestamp > $@
+ else
+ build-local: $(SO_VERSION_DATA) $(PKGDATA_LIST)
++	mkdir -p out/tmp
+ 	echo timestamp > $@
+ $(PKGDATA_LIST): $(SRCLISTDEPS) $(ICUDATA_SOURCE_ARCHIVE)
+ ifneq ($(ICUDATA_SOURCE_IS_NATIVE_TARGET),YES)
+@@ -240,6 +244,7 @@
+ 	@-$(RMV) $@
+ 	$(INVOKE) $(TOOLBINDIR)/icupkg -d $(BUILDDIR) --list -x \* $(ICUDATA_SOURCE_ARCHIVE) -o $@
+ else
++	mkdir -p out/tmp
+ 	@echo "$@" > $@
+ endif
+ endif
+@@ -356,6 +361,7 @@
+ $(OUTTMPDIR)/icudata390.lst: $(SRCLISTDEPS)
+ 	@echo "generating $@ (list of 390 data files)"
+ 	@-$(RMV) $@
++	@mkdir -p out/tmp
+ 	@for file in $(ALLFILES390); do \
+ 	  echo $$file >> $@; \
+ 	done;
+diff -Paur --no-dereference -- libicu.upstream/source/icudefs.mk.in libicu/source/icudefs.mk.in
+--- libicu.upstream/source/icudefs.mk.in
++++ libicu/source/icudefs.mk.in
+@@ -299,7 +299,7 @@
+ 
+ # Current full path directory for cross compilation
+ ifneq ($(strip $(cross_buildroot)),)
+-include $(cross_buildroot)/config/icucross.inc
++# PATCH: icucross.inc only defines CURR_FULL_DIR that we already got.
+ endif
+ 
+ # Platform-specific setup
+@@ -319,7 +319,13 @@
+ # some imported things from the cross env
+ TOOLEXEEXT = $(EXEEXT)
+ ifneq ($(strip $(cross_buildroot)),)
+-include $(cross_buildroot)/config/icucross.mk
++# PATCH: Cut the weird dependency on icucross.mk inside the cross build root
++#        and just inline the logic here, and invoke using libicu from PATH.
++TOOLEXEEXT=
++TOOLBINDIR=$(cross_buildroot)/bin
++TOOLLIBDIR=$(cross_buildroot)/lib
++INVOKE=LD_LIBRARY_PATH=$(TOOLLIBDIR):$$LD_LIBRARY_PATH
++PKGDATA_INVOKE=LD_LIBRARY_PATH=$(TOOLLIBDIR):$$LD_LIBRARY_PATH
+ else
+ cross_buildroot = $(top_builddir)
+ endif
+diff -Paur --no-dereference -- libicu.upstream/source/io/ufile.cpp libicu/source/io/ufile.cpp
+--- libicu.upstream/source/io/ufile.cpp
++++ libicu/source/io/ufile.cpp
+@@ -20,6 +20,9 @@
+ ******************************************************************************
+ */
+ 
++// PATCH: libicu doesn't seem to define the feature macro needed to get fileno.
++#define _ALL_SOURCE
++
+ #include "unicode/platform.h"
+ #if U_PLATFORM == U_PF_CYGWIN && defined(__STRICT_ANSI__)
+ /* GCC on cygwin (not msys2) with -std=c++11 or newer has stopped defining fileno,
+@@ -40,6 +43,7 @@
+ 
+ #if !UCONFIG_NO_CONVERSION
+ 
++#include <stdio.h>
+ #include <stdlib.h>
+ 
+ #include "ufile.h"
+diff -Paur --no-dereference -- libicu.upstream/source/tools/pkgdata/pkgdata.cpp libicu/source/tools/pkgdata/pkgdata.cpp
+--- libicu.upstream/source/tools/pkgdata/pkgdata.cpp
++++ libicu/source/tools/pkgdata/pkgdata.cpp
+@@ -1269,9 +1269,13 @@
+                     buffer[bufferLength-1] = 0;
+                 }
+ 
++                // PATCH: data/Makefile fails to create the directories because
++				//        CURR_TREE and friends aren't set for some reason when
++				//        --with-data-packaging=files.
+                 auto ret = snprintf(cmd,
+                         sizeof(cmd),
+-                        "%s %s%s%s %s%s%s",
++                        "mkdir -p $(dirname %s%s%s) && %s %s%s%s %s%s%s",
++                        installDir, PKGDATA_FILE_SEP_STRING, buffer,
+                         pkgDataFlags[INSTALL_CMD],
+                         srcDir, PKGDATA_FILE_SEP_STRING, buffer,
+                         installDir, PKGDATA_FILE_SEP_STRING, buffer);
+diff -Paur --no-dereference -- libicu.upstream/source/tools/toolutil/package.cpp libicu/source/tools/toolutil/package.cpp
+--- libicu.upstream/source/tools/toolutil/package.cpp
++++ libicu/source/tools/toolutil/package.cpp
+@@ -1289,8 +1289,8 @@
+   Item* newItems = static_cast<Item*>(uprv_malloc(max * sizeof(items[0])));
+   Item *oldItems = items;
+   if(newItems == nullptr) {
+-    fprintf(stderr, "icupkg: Out of memory trying to allocate %lu bytes for %d items\n",
+-        max * sizeof(items[0]), max);
++    fprintf(stderr, "icupkg: Out of memory trying to allocate %zu bytes for %d items\n",
++        (size_t)(max * sizeof(items[0])), max);
+     exit(U_MEMORY_ALLOCATION_ERROR);
+   }
+   if(items && itemCount>0) {

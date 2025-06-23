@@ -217,7 +217,7 @@ elif $network_upgrade; then
 elif $source_upgrade; then
   memory=512
 else
-  memory=1280
+  memory=1408
 fi
 
 if [ -z "$qemu" ]; then

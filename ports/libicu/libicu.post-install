@@ -1,0 +1,9 @@
+#!/bin/sh
+# --disable-tools fails since the native build needs the tools, and it still
+# builds uconv regardless, so it's easier clean up programs (that aren't needed
+# for now) during the post-installation step.
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
+rm -rf "$TIX_INSTALL_DIR$EXEC_PREFIX/bin"
+rm -rf "$TIX_INSTALL_DIR$EXEC_PREFIX/sbin"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/man"
