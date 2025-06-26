@@ -3,7 +3,7 @@ diff -Paur --no-dereference -- m4.upstream/lib/freadahead.c m4/lib/freadahead.c
 +++ m4/lib/freadahead.c
 @@ -30,6 +30,10 @@
  /* This file is not used on systems that have the __freadahead function,
-    namely musl libc.  */
+    namely musl libc, Haiku >= hrev58760.  */
  
 +#if defined(__sortix__)
 +#include <FILE.h>
@@ -68,7 +68,7 @@ diff -Paur --no-dereference -- m4.upstream/lib/spawn_faction_addopen.c m4/lib/sp
 diff -Paur --no-dereference -- m4.upstream/lib/spawni.c m4/lib/spawni.c
 --- m4.upstream/lib/spawni.c
 +++ m4/lib/spawni.c
-@@ -808,16 +808,20 @@
+@@ -951,16 +951,20 @@
      }
  #endif
  
@@ -89,3 +89,15 @@ diff -Paur --no-dereference -- m4.upstream/lib/spawni.c m4/lib/spawni.c
  
    /* Execute the file actions.  */
    if (file_actions != NULL)
+diff -Paur --no-dereference -- m4.upstream/lib/getlocalename_l-unsafe.c m4/lib/getlocalename_l-unsafe.c
+--- m4.upstream/lib/getlocalename_l-unsafe.c
++++ m4/lib/getlocalename_l-unsafe.c
+@@ -579,6 +579,8 @@
+ #elif HAVE_NAMELESS_LOCALES
+       /* OpenBSD >= 6.2, AIX >= 7.1 */
+       return get_locale_t_name_unsafe (category, locale);
++#elif defined __sortix__
++      return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+ #elif defined __OpenBSD__ && HAVE_FAKE_LOCALES
+       /* OpenBSD >= 6.2 has only fake locales.  */
+       if (locale == (locale_t) 2)
