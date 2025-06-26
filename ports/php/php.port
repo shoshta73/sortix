@@ -1,0 +1,26 @@
+NAME=php
+BUILD_LIBRARIES='libbz2 libcurl libcurses libffi libfreetype libgmp libiconv libicu libintl libjpeg libpng libreadline libsqlite3 libssl libstdc++ libxml2 libz liblzma? libpcre?'
+# TODO: Upgrade to a newer version.
+VERSION=8.4.8
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.xz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=aa6a4d330b47eacd83e351658ba8c47747a1e4356456219cfb6d75e7838da091
+UPSTREAM_SITE=https://www.php.net/distributions
+UPSTREAM_ARCHIVE=$ARCHIVE
+RELEASE_SEARCH_PAGE=https://www.php.net/downloads.php
+LICENSE=PHP-3.0
+USE_BOOTSTRAP=true # php uses php to build phar
+BOOTSTRAP_BUILD_SYSTEM=configure
+BOOTSTRAP_CONFIGURE_ARGS='--with-layout=GNU --disable-cgi --disable-phpdbg --disable-all --enable-phar --enable-xml --with-libxml'
+BOOTSTRAP_MAKE_VARS='V=1'
+BUILD_SYSTEM=configure
+# TODO: display_errors is on, display_startup_errors is on, both should be off in production
+# TODO: expose_php is on, which is fine enough, but think about it
+# TODO: max_input_time might be wise to restrict to 60 s like debian.
+# TODO: exception_ignore_args might also be hardened.
+# TODO: php session save path
+# TODO: sun_path does not contain a nul byte in the length in all cases
+CONFIGURE_ARGS='--with-layout=GNU --enable-all --enable-phar -disable-mbregex --disable-opcache --disable-sysvmsg --disable-shmop --disable-sysvmsg --disable-sysvsem --disable-sysvshm --disable-cgi --disable-phpdbg --without-odbcver --without-adabas --without-enchant --without-ibm-db2 --without-ldap --without-libedit --without-password-argon2 --without-pdo-dblib --without-pdo-firebird --without-pdo-odbc --without-pdo-pgsql --without-pgsql --without-sapdb --without-snmp --without-sodium --without-solid --without-tidy --without-xsl --without-zip --with-freetype --with-jpeg --without-custom-odbc --without-iodbc --without-pear --without-unixODBC --without-empress --without-empress-bcs --without-esoob --without-dbmaker --enable-fpm --with-fpm-user=_php-fpm --with-fpm-group=_php-fpm --with-mysql-sock=/var/run/mysqld/mysqld.sock'
+MAKE_VARS='V=1'
+# TODO: RUNTIME_PACKAGES=libicu

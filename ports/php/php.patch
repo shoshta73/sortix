@@ -1,0 +1,1934 @@
+diff -Paur --no-dereference -- php.upstream/Zend/zend_cpuinfo.h php/Zend/zend_cpuinfo.h
+--- php.upstream/Zend/zend_cpuinfo.h
++++ php/Zend/zend_cpuinfo.h
+@@ -21,6 +21,11 @@
+ 
+ #include "zend.h"
+ 
++/* PATCH: Support for Sortix 1.0 gcc 5.2.0. */
++#if defined(__GNUC__) && __GNUC__ < 6
++#define __builtin_cpu_supports(x) 0
++#endif
++
+ #define ZEND_CPU_EBX_MASK     (1<<30)
+ #define ZEND_CPU_EDX_MASK     (1U<<31)
+ 
+diff -Paur --no-dereference -- php.upstream/Zend/zend_signal.c php/Zend/zend_signal.c
+--- php.upstream/Zend/zend_signal.c
++++ php/Zend/zend_signal.c
+@@ -64,7 +64,7 @@
+ static void zend_signal_handler(int signo, siginfo_t *siginfo, void *context);
+ static zend_result zend_signal_register(int signo, void (*handler)(int, siginfo_t*, void*));
+ 
+-#if defined(__CYGWIN__) || defined(__PASE__)
++#if defined(__CYGWIN__) || defined(__PASE__) || !defined(SIGPROF)
+ /* Matches zend_execute_API.c; these platforms don't support ITIMER_PROF. */
+ #define TIMEOUT_SIG SIGALRM
+ #else
+diff -Paur --no-dereference -- php.upstream/build/Makefile.global php/build/Makefile.global
+--- php.upstream/build/Makefile.global
++++ php/build/Makefile.global
+@@ -1,3 +1,6 @@
++# PATCH: Respect DESTDIR.
++INSTALL_ROOT = $(DESTDIR)
++
+ mkinstalldirs = $(top_srcdir)/build/shtool mkdir -p
+ INSTALL = $(top_srcdir)/build/shtool install -c
+ INSTALL_DATA = $(INSTALL) -m 644
+@@ -138,6 +141,8 @@
+ 	if test "$(srcdir)" != "$(builddir)"; then \
+ 		rm -f ext/phar/phar/phar.inc; \
+ 	fi
++	# PATCH: Fix distclean not fully cleaning up.
++	rm -f config.nice sapi/phpdbg/phpdbg sapi/fpm/www.conf 
+ 
+ prof-gen:
+ 	CCACHE_DISABLE=1 $(MAKE) PROF_FLAGS=-fprofile-generate all
+diff -Paur --no-dereference -- php.upstream/configure php/configure
+--- php.upstream/configure
++++ php/configure
+@@ -4605,13 +4605,7 @@
+ case $target_os in *\ *) target_os=`echo "$target_os" | sed 's/ /-/g'`;; esac
+ 
+ 
+-# The aliases save the names the user supplied, while $host etc.
+-# will get canonicalized.
+-test -n "$target_alias" &&
+-  test "$program_prefix$program_suffix$program_transform_name" = \
+-    NONENONEs,x,x, &&
+-  program_prefix=${target_alias}-
+-
++# PATCH: Don't add a program prefix when cross-compiling.
+         if test -z "$host_alias" && test -n "$host"; then
+     host_alias=$host
+   fi
+@@ -6985,7 +6979,7 @@
+ printf "%s\n" "no" >&6; }
+ fi
+ 
+-as_fn_append CPPFLAGS " -D_GNU_SOURCE"
++as_fn_append CPPFLAGS " -D_GNU_SOURCE -D_ALL_SOURCE"
+ 
+ 
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for pthreads_cflags" >&5
+@@ -15974,6 +15968,9 @@
+ /* end confdefs.h.  */
+ 
+   #include <immintrin.h>
++  #if defined(__GNUC__) && __GNUC__ < 6
++  #error "sortix gcc 5.2.0 has binutils 2.24 which is too old for avx512"
++  #endif
+   int main(void) {
+     __m512i mask = _mm512_set1_epi32(0x1);
+     char out[32];
+@@ -16015,6 +16012,9 @@
+ /* end confdefs.h.  */
+ 
+   #include <immintrin.h>
++  #if defined(__GNUC__) && __GNUC__ < 6
++  #error "sortix gcc 5.2.0 has binutils 2.24 which is too old for avx512"
++  #endif
+   int main(void) {
+     __m512i mask = _mm512_set1_epi32(0x1);
+     char out[32];
+@@ -17134,7 +17134,8 @@
+   *linux*|*midipix) :
+     php_cv_func_getaddrinfo=yes ;; #(
+   *) :
+-    php_cv_func_getaddrinfo=no ;;
++    # PATCH: Assume the best when cross-compiling to unknown systems.
++    php_cv_func_getaddrinfo=yes ;;
+ esac
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+@@ -22974,20 +22975,21 @@
+ 
+ if test "$PHP_ZLIB" != "no"; then
+ 
++# PATCH: Support older Sortix libz.
+ pkg_failed=no
+-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for zlib >= 1.2.11" >&5
+-printf %s "checking for zlib >= 1.2.11... " >&6; }
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for zlib >= 1.2.8" >&5
++printf %s "checking for zlib >= 1.2.8... " >&6; }
+ 
+ if test -n "$ZLIB_CFLAGS"; then
+     pkg_cv_ZLIB_CFLAGS="$ZLIB_CFLAGS"
+  elif test -n "$PKG_CONFIG"; then
+     if test -n "$PKG_CONFIG" && \
+-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.11\""; } >&5
+-  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.11") 2>&5
++    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.8\""; } >&5
++  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.8") 2>&5
+   ac_status=$?
+   printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+   test $ac_status = 0; }; then
+-  pkg_cv_ZLIB_CFLAGS=`$PKG_CONFIG --cflags "zlib >= 1.2.11" 2>/dev/null`
++  pkg_cv_ZLIB_CFLAGS=`$PKG_CONFIG --cflags "zlib >= 1.2.8" 2>/dev/null`
+ 		      test "x$?" != "x0" && pkg_failed=yes
+ else
+   pkg_failed=yes
+@@ -22999,12 +23001,12 @@
+     pkg_cv_ZLIB_LIBS="$ZLIB_LIBS"
+  elif test -n "$PKG_CONFIG"; then
+     if test -n "$PKG_CONFIG" && \
+-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.11\""; } >&5
+-  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.11") 2>&5
++    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.8\""; } >&5
++  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.8") 2>&5
+   ac_status=$?
+   printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+   test $ac_status = 0; }; then
+-  pkg_cv_ZLIB_LIBS=`$PKG_CONFIG --libs "zlib >= 1.2.11" 2>/dev/null`
++  pkg_cv_ZLIB_LIBS=`$PKG_CONFIG --libs "zlib >= 1.2.8" 2>/dev/null`
+ 		      test "x$?" != "x0" && pkg_failed=yes
+ else
+   pkg_failed=yes
+@@ -23025,14 +23027,14 @@
+         _pkg_short_errors_supported=no
+ fi
+         if test $_pkg_short_errors_supported = yes; then
+-	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib >= 1.2.11" 2>&1`
++	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib >= 1.2.8" 2>&1`
+         else
+-	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib >= 1.2.11" 2>&1`
++	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib >= 1.2.8" 2>&1`
+         fi
+ 	# Put the nasty error message in config.log where it belongs
+ 	echo "$ZLIB_PKG_ERRORS" >&5
+ 
+-	as_fn_error $? "Package requirements (zlib >= 1.2.11) were not met:
++	as_fn_error $? "Package requirements (zlib >= 1.2.8) were not met:
+ 
+ $ZLIB_PKG_ERRORS
+ 
+@@ -23830,8 +23832,9 @@
+ 
+ 
+ 
+-
+-if test "$PHP_BZ2" != "no"; then
++# PATCH: Do not go poking outside of the sysroot. This does not work with
++#        cross-compilation and pkg-config must be used instead.
++if false; then
+   if test -r $PHP_BZ2/include/bzlib.h
+ then :
+   BZIP_DIR=$PHP_BZ2
+@@ -35295,19 +35298,19 @@
+ 
+ 
+ pkg_failed=no
+-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for zlib >= 1.2.11" >&5
+-printf %s "checking for zlib >= 1.2.11... " >&6; }
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for zlib >= 1.2.8" >&5
++printf %s "checking for zlib >= 1.2.8... " >&6; }
+ 
+ if test -n "$ZLIB_CFLAGS"; then
+     pkg_cv_ZLIB_CFLAGS="$ZLIB_CFLAGS"
+  elif test -n "$PKG_CONFIG"; then
+     if test -n "$PKG_CONFIG" && \
+-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.11\""; } >&5
+-  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.11") 2>&5
++    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.8\""; } >&5
++  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.8") 2>&5
+   ac_status=$?
+   printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+   test $ac_status = 0; }; then
+-  pkg_cv_ZLIB_CFLAGS=`$PKG_CONFIG --cflags "zlib >= 1.2.11" 2>/dev/null`
++  pkg_cv_ZLIB_CFLAGS=`$PKG_CONFIG --cflags "zlib >= 1.2.8" 2>/dev/null`
+ 		      test "x$?" != "x0" && pkg_failed=yes
+ else
+   pkg_failed=yes
+@@ -35319,12 +35322,12 @@
+     pkg_cv_ZLIB_LIBS="$ZLIB_LIBS"
+  elif test -n "$PKG_CONFIG"; then
+     if test -n "$PKG_CONFIG" && \
+-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.11\""; } >&5
+-  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.11") 2>&5
++    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.8\""; } >&5
++  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.8") 2>&5
+   ac_status=$?
+   printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+   test $ac_status = 0; }; then
+-  pkg_cv_ZLIB_LIBS=`$PKG_CONFIG --libs "zlib >= 1.2.11" 2>/dev/null`
++  pkg_cv_ZLIB_LIBS=`$PKG_CONFIG --libs "zlib >= 1.2.8" 2>/dev/null`
+ 		      test "x$?" != "x0" && pkg_failed=yes
+ else
+   pkg_failed=yes
+@@ -35345,14 +35348,14 @@
+         _pkg_short_errors_supported=no
+ fi
+         if test $_pkg_short_errors_supported = yes; then
+-	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib >= 1.2.11" 2>&1`
++	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib >= 1.2.8" 2>&1`
+         else
+-	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib >= 1.2.11" 2>&1`
++	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib >= 1.2.8" 2>&1`
+         fi
+ 	# Put the nasty error message in config.log where it belongs
+ 	echo "$ZLIB_PKG_ERRORS" >&5
+ 
+-	as_fn_error $? "Package requirements (zlib >= 1.2.11) were not met:
++	as_fn_error $? "Package requirements (zlib >= 1.2.8) were not met:
+ 
+ $ZLIB_PKG_ERRORS
+ 
+@@ -39166,23 +39169,11 @@
+ 
+ 
+ if test "$PHP_GETTEXT" != "no"; then
+-  for i in $PHP_GETTEXT /usr/local /usr; do
+-    if test -r $i/include/libintl.h
+-then :
+-  GETTEXT_DIR=$i; break;
+-fi
+-  done
+-
+-  if ${GETTEXT_DIR:+false} :
+-then :
+-  as_fn_error $? "Cannot locate header file libintl.h" "$LINENO" 5
+-fi
+-
+-  GETTEXT_LIBDIR=$GETTEXT_DIR/$PHP_LIBDIR
+-  GETTEXT_INCDIR=$GETTEXT_DIR/include
++  GETTEXT_LIBDIR=
++  GETTEXT_INCDIR=
+ 
+   O_LDFLAGS=$LDFLAGS
+-  LDFLAGS="$LDFLAGS -L$GETTEXT_LIBDIR"
++  LDFLAGS="$LDFLAGS"
+   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for bindtextdomain in -lintl" >&5
+ printf %s "checking for bindtextdomain in -lintl... " >&6; }
+ if test ${ac_cv_lib_intl_bindtextdomain+y}
+@@ -41016,8 +41007,12 @@
+ 
+ 
+ 
++# PATCH: Bypass poorly implemented libiconv detection logic.
++if [ "$host_os" = sortix ]; then
++LIBS="$LIBS -liconv"
++fi
+ 
+-if test "$PHP_ICONV" != "no"; then
++if false; then
+ 
+   found_iconv=no
+   unset ICONV_DIR
+@@ -42199,6 +42194,7 @@
+   test $ac_status = 0; }; then
+   pkg_cv_ICU_LIBS=`$PKG_CONFIG --libs "icu-uc >= 50.1 icu-io icu-i18n" 2>/dev/null`
+ 		      test "x$?" != "x0" && pkg_failed=yes
++  pkg_cv_ICU_LIBS="$pkg_cv_ICU_LIBS -lstdc++ -lsupc++"
+ else
+   pkg_failed=yes
+ fi
+@@ -56469,12 +56465,8 @@
+ then :
+     { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for pg_config" >&5
+ printf %s "checking for pg_config... " >&6; }
+-  for i in $pgsql_dir $pgsql_dir/bin /usr/local/pgsql/bin /usr/local/bin /usr/bin ""; do
+-    if test -x $i/pg_config
+-then :
+-  PG_CONFIG="$i/pg_config"; break;
+-fi
+-  done
++  # PATCH: Do not use foo-config.
++  PG_CONFIG=FALSE
+ 
+   if ${PG_CONFIG:+false} :
+ then :
+@@ -61437,11 +61429,7 @@
+ int
+ main (void)
+ {
+-
+-      char buf[64];
+-      return !ttyname_r(0, buf, 64);
+-
+-  ;
++  /* PATCH: stdin might not be a tty */ 
+   return 0;
+ }
+ _ACEOF
+@@ -61893,49 +61881,6 @@
+ fi
+ 
+ if test "$PHP_READLINE" && test "$PHP_READLINE" != "no"; then
+-  for i in $PHP_READLINE /usr/local /usr; do
+-    if test -f $i/include/readline/readline.h
+-then :
+-  READLINE_DIR=$i; break;
+-fi
+-  done
+-
+-  if ${READLINE_DIR:+false} :
+-then :
+-  as_fn_error $? "Please reinstall readline - I cannot find readline.h" "$LINENO" 5
+-fi
+-
+-
+-for include_path in $READLINE_DIR/include; do
+-  if test "$include_path" != "/usr/include"
+-then :
+-
+-
+-  if test -z "$include_path" || echo "$include_path" | grep '^/' >/dev/null ; then
+-    ai_p=$include_path
+-  else
+-
+-    ep_dir=$(echo $include_path|$SED 's%/*[^/][^/]*/*$%%')
+-
+-    ep_realdir=$(cd "$ep_dir" && pwd)
+-    ai_p="$ep_realdir"/$(basename "$include_path")
+-  fi
+-
+-
+-
+-  unique=$(echo $ai_p|$SED 's/[^a-zA-Z0-9]/_/g')
+-
+-  cmd="echo $ac_n \"\$INCLUDEPATH$unique$ac_c\""
+-  if test -n "$unique" && test "$(eval $cmd)" = "" ; then
+-    eval "INCLUDEPATH$unique=set"
+-    INCLUDES="$INCLUDES -I$ai_p"
+-  fi
+-
+-
+-fi
+-done
+-
+-
+   PHP_READLINE_LIBS=""
+   { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for tgetent in -lncurses" >&5
+ printf %s "checking for tgetent in -lncurses... " >&6; }
+@@ -64839,7 +64784,7 @@
+ 
+ if test "$cross_compiling" = yes
+ then :
+-  php_cv_func_pwrite=no
++  php_cv_func_pwrite=yes
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -64881,7 +64826,7 @@
+ 
+ if test "$cross_compiling" = yes
+ then :
+-  php_cv_func_pwrite=no
++  php_cv_func_pwrite=yes
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -64959,7 +64904,7 @@
+ echo test > conftest_pread
+ if test "$cross_compiling" = yes
+ then :
+-  php_cv_func_pread=no
++  php_cv_func_pread=yes
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -65002,7 +64947,7 @@
+ echo test > conftest_pread
+ if test "$cross_compiling" = yes
+ then :
+-  php_cv_func_pread=no
++  php_cv_func_pread=yes
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -66611,7 +66556,7 @@
+     if test "x$PHP_SNMP" = xyes
+ then :
+   # Extract the first word of "net-snmp-config", so it can be a program name with args.
+-set dummy net-snmp-config; ac_word=$2
++set dummy false; ac_word=$2
+ { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
+ printf %s "checking for $ac_word... " >&6; }
+ if test ${ac_cv_path_SNMP_CONFIG+y}
+@@ -70303,13 +70248,7 @@
+ 
+ if test "x$cross_compiling" = xyes
+ then :
+-  case $host_alias in #(
+-  *linux*) :
+     printf "%s\n" "#define HAVE_FNMATCH 1" >>confdefs.h
+- ;; #(
+-  *) :
+-     ;;
+-esac
+ else case e in #(
+   e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for working POSIX fnmatch" >&5
+ printf %s "checking for working POSIX fnmatch... " >&6; }
+@@ -70323,7 +70262,8 @@
+    # Thanks to John Oleynick, François Pinard, and Paul Eggert for this test.
+    if test "$cross_compiling" = yes
+ then :
+-  ac_cv_func_fnmatch_works=cross
++  # PATCH: Still assume the best. You should've denylisted known bad systems.
++  ac_cv_func_fnmatch_works=yes
+ else case e in #(
+   e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+ /* end confdefs.h.  */
+@@ -80475,19 +80415,19 @@
+ else case e in #(
+   e)
+ pkg_failed=no
+-{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for zlib >= 1.2.11" >&5
+-printf %s "checking for zlib >= 1.2.11... " >&6; }
++{ printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for zlib >= 1.2.8" >&5
++printf %s "checking for zlib >= 1.2.8... " >&6; }
+ 
+ if test -n "$ZLIB_CFLAGS"; then
+     pkg_cv_ZLIB_CFLAGS="$ZLIB_CFLAGS"
+  elif test -n "$PKG_CONFIG"; then
+     if test -n "$PKG_CONFIG" && \
+-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.11\""; } >&5
+-  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.11") 2>&5
++    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.8\""; } >&5
++  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.8") 2>&5
+   ac_status=$?
+   printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+   test $ac_status = 0; }; then
+-  pkg_cv_ZLIB_CFLAGS=`$PKG_CONFIG --cflags "zlib >= 1.2.11" 2>/dev/null`
++  pkg_cv_ZLIB_CFLAGS=`$PKG_CONFIG --cflags "zlib >= 1.2.8" 2>/dev/null`
+ 		      test "x$?" != "x0" && pkg_failed=yes
+ else
+   pkg_failed=yes
+@@ -80499,12 +80439,12 @@
+     pkg_cv_ZLIB_LIBS="$ZLIB_LIBS"
+  elif test -n "$PKG_CONFIG"; then
+     if test -n "$PKG_CONFIG" && \
+-    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.11\""; } >&5
+-  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.11") 2>&5
++    { { printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$PKG_CONFIG --exists --print-errors \"zlib >= 1.2.8\""; } >&5
++  ($PKG_CONFIG --exists --print-errors "zlib >= 1.2.8") 2>&5
+   ac_status=$?
+   printf "%s\n" "$as_me:${as_lineno-$LINENO}: \$? = $ac_status" >&5
+   test $ac_status = 0; }; then
+-  pkg_cv_ZLIB_LIBS=`$PKG_CONFIG --libs "zlib >= 1.2.11" 2>/dev/null`
++  pkg_cv_ZLIB_LIBS=`$PKG_CONFIG --libs "zlib >= 1.2.8" 2>/dev/null`
+ 		      test "x$?" != "x0" && pkg_failed=yes
+ else
+   pkg_failed=yes
+@@ -80525,14 +80465,14 @@
+         _pkg_short_errors_supported=no
+ fi
+         if test $_pkg_short_errors_supported = yes; then
+-	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib >= 1.2.11" 2>&1`
++	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --short-errors --print-errors --cflags --libs "zlib >= 1.2.8" 2>&1`
+         else
+-	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib >= 1.2.11" 2>&1`
++	        ZLIB_PKG_ERRORS=`$PKG_CONFIG --print-errors --cflags --libs "zlib >= 1.2.8" 2>&1`
+         fi
+ 	# Put the nasty error message in config.log where it belongs
+ 	echo "$ZLIB_PKG_ERRORS" >&5
+ 
+-	as_fn_error $? "Package requirements (zlib >= 1.2.11) were not met:
++	as_fn_error $? "Package requirements (zlib >= 1.2.8) were not met:
+ 
+ $ZLIB_PKG_ERRORS
+ 
+@@ -92463,7 +92403,12 @@
+ fi;
+ 
+ all_targets="\$(OVERALL_TARGET) \$(PHP_MODULES) \$(PHP_ZEND_EX) \$(PHP_BINARIES) $pharcmd"
++# PATCH: Don't install includes and build files when php is static.
++if [ $enable_shared = yes ]; then
+ install_targets="$install_sapi $install_modules $install_binaries install-build install-headers install-programs $install_pear $pharcmd_install"
++else
++install_targets="$install_sapi $install_binaries install-programs $install_pear $pharcmd_install"
++fi
+ 
+ 
+   PHP_VAR_SUBST="$PHP_VAR_SUBST all_targets"
+@@ -93050,6 +92995,8 @@
+ builddir = $abs_builddir
+ top_srcdir = $abs_srcdir
+ top_builddir = $abs_builddir
++# PATCH: Let the makefile know if we're cross-compiling.
++cross_compiling = $cross_compiling
+ EOF
+   for i in $PHP_VAR_SUBST; do
+     eval echo "$i = \$$i" >> Makefile
+@@ -93059,11 +93006,7 @@
+ 
+ 
+ 
+-  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: patching main/php_config.h.in" >&5
+-printf "%s\n" "$as_me: patching main/php_config.h.in" >&6;}
+-
+-  $SED -e 's/^#undef PACKAGE_[^ ]*/\/\* & \*\//g' < $srcdir/main/php_config.h.in \
+-    > $srcdir/main/php_config.h.in.tmp && mv $srcdir/main/php_config.h.in.tmp $srcdir/main/php_config.h.in
++# PATCH: Don't rewrite main/php_config.h.in as it is a source file.
+ 
+ 
+ : "${CONFIG_STATUS=./config.status}"
+diff -Paur --no-dereference -- php.upstream/ext/date/lib/parse_date.c php/ext/date/lib/parse_date.c
+--- php.upstream/ext/date/lib/parse_date.c
++++ php/ext/date/lib/parse_date.c
+@@ -24,6 +24,8 @@
+  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+  * THE SOFTWARE.
+  */
++/* PATCH: Work around a cc1 compiler crash during the 1.0 -> 1.1 bootstrap. */
++#pragma GCC optimize ("-O0")
+ 
+ #include "timelib.h"
+ #include "timelib_private.h"
+diff -Paur --no-dereference -- php.upstream/ext/dom/lexbor/lexbor/core/base.h php/ext/dom/lexbor/lexbor/core/base.h
+--- php.upstream/ext/dom/lexbor/lexbor/core/base.h
++++ php/ext/dom/lexbor/lexbor/core/base.h
+@@ -18,7 +18,6 @@
+ #include <stddef.h>
+ #include <stdio.h>
+ #include <stdarg.h>
+-#include <memory.h>
+ #include <limits.h>
+ #include <string.h>
+ 
+diff -Paur --no-dereference -- php.upstream/ext/ffi/ffi.c php/ext/ffi/ffi.c
+--- php.upstream/ext/ffi/ffi.c
++++ php/ext/ffi/ffi.c
+@@ -40,7 +40,7 @@
+ #include "win32/winutil.h"
+ #define GET_DL_ERROR()  php_win_err()
+ #else
+-#include <sys/param.h>
++/* PATCH: Remove needless non-standard header inclusion. */
+ #define GET_DL_ERROR()  DL_ERROR()
+ #endif
+ #endif
+diff -Paur --no-dereference -- php.upstream/ext/fileinfo/libmagic/file.h php/ext/fileinfo/libmagic/file.h
+--- php.upstream/ext/fileinfo/libmagic/file.h
++++ php/ext/fileinfo/libmagic/file.h
+@@ -79,9 +79,6 @@
+ #include <fcntl.h>	/* For open and flags */
+ 
+ #include <sys/types.h>
+-#ifndef WIN32
+-#include <sys/param.h>
+-#endif
+ /* Do this here and now, because struct stat gets re-defined on solaris */
+ #include <sys/stat.h>
+ #include <stdarg.h>
+diff -Paur --no-dereference -- php.upstream/ext/iconv/iconv.c php/ext/iconv/iconv.c
+--- php.upstream/ext/iconv/iconv.c
++++ php/ext/iconv/iconv.c
+@@ -39,10 +39,6 @@
+ #include <gnu/libc-version.h>
+ #endif
+ 
+-#ifdef HAVE_LIBICONV
+-#undef iconv
+-#endif
+-
+ #if defined(__NetBSD__)
+ // unfortunately, netbsd has still the old non posix conformant signature
+ // libiconv tends to match the eventual system's iconv too.
+diff -Paur --no-dereference -- php.upstream/ext/mysqlnd/mysqlnd_auth.c php/ext/mysqlnd/mysqlnd_auth.c
+--- php.upstream/ext/mysqlnd/mysqlnd_auth.c
++++ php/ext/mysqlnd/mysqlnd_auth.c
+@@ -848,13 +848,13 @@
+ 
+ 			if (! PACKET_WRITE(conn, &pk_req_packet)) {
+ 				DBG_ERR_FMT("Error while sending public key request packet");
+-				php_error(E_WARNING, "Error while sending public key request packet. PID=%d", getpid());
++				php_error(E_WARNING, "Error while sending public key request packet. PID=%jd", (intmax_t) getpid());
+ 				SET_CONNECTION_STATE(&conn->state, CONN_QUIT_SENT);
+ 				break;
+ 			}
+ 			if (FAIL == PACKET_READ(conn, &pk_resp_packet) || NULL == pk_resp_packet.public_key) {
+ 				DBG_ERR_FMT("Error while receiving public key");
+-				php_error(E_WARNING, "Error while receiving public key. PID=%d", getpid());
++				php_error(E_WARNING, "Error while receiving public key. PID=%jd", (intmax_t) getpid());
+ 				SET_CONNECTION_STATE(&conn->state, CONN_QUIT_SENT);
+ 				break;
+ 			}
+@@ -1144,13 +1144,13 @@
+ 
+ 			if (! PACKET_WRITE(conn, &req_packet)) {
+ 				DBG_ERR_FMT("Error while sending public key request packet");
+-				php_error(E_WARNING, "Error while sending public key request packet. PID=%d", getpid());
++				php_error(E_WARNING, "Error while sending public key request packet. PID=%jd", (intmax_t) getpid());
+ 				SET_CONNECTION_STATE(&conn->state, CONN_QUIT_SENT);
+ 				break;
+ 			}
+ 			if (FAIL == PACKET_READ(conn, &pk_resp_packet) || NULL == pk_resp_packet.public_key) {
+ 				DBG_ERR_FMT("Error while receiving public key");
+-				php_error(E_WARNING, "Error while receiving public key. PID=%d", getpid());
++				php_error(E_WARNING, "Error while receiving public key. PID=%jd", (intmax_t) getpid());
+ 				SET_CONNECTION_STATE(&conn->state, CONN_QUIT_SENT);
+ 				break;
+ 			}
+diff -Paur --no-dereference -- php.upstream/ext/mysqlnd/mysqlnd_commands.c php/ext/mysqlnd/mysqlnd_commands.c
+--- php.upstream/ext/mysqlnd/mysqlnd_commands.c
++++ php/ext/mysqlnd/mysqlnd_commands.c
+@@ -595,7 +595,7 @@
+ 
+ 	if (FAIL == PACKET_READ(conn, &greet_packet)) {
+ 		DBG_ERR("Error while reading greeting packet");
+-		php_error_docref(NULL, E_WARNING, "Error while reading greeting packet. PID=%d", getpid());
++		php_error_docref(NULL, E_WARNING, "Error while reading greeting packet. PID=%jd", (intmax_t)getpid());
+ 		goto err;
+ 	} else if (greet_packet.error_no) {
+ 		DBG_ERR_FMT("errorno=%u error=%s", greet_packet.error_no, greet_packet.error);
+diff -Paur --no-dereference -- php.upstream/ext/mysqlnd/mysqlnd_connection.c php/ext/mysqlnd/mysqlnd_connection.c
+--- php.upstream/ext/mysqlnd/mysqlnd_connection.c
++++ php/ext/mysqlnd/mysqlnd_connection.c
+@@ -1316,7 +1316,7 @@
+ 		*/
+ 		if (!conn->error_info->error_no) {
+ 			DBG_ERR_FMT("Serious error. %s::%u", __FILE__, __LINE__);
+-			php_error_docref(NULL, E_WARNING, "Serious error. PID=%d", getpid());
++			php_error_docref(NULL, E_WARNING, "Serious error. PID=%jd", (intmax_t) getpid());
+ 			SET_CONNECTION_STATE(&conn->state, CONN_QUIT_SENT);
+ 			conn->m->send_close(conn);
+ 		} else {
+diff -Paur --no-dereference -- php.upstream/ext/mysqlnd/mysqlnd_wireprotocol.c php/ext/mysqlnd/mysqlnd_wireprotocol.c
+--- php.upstream/ext/mysqlnd/mysqlnd_wireprotocol.c
++++ php/ext/mysqlnd/mysqlnd_wireprotocol.c
+@@ -2501,7 +2501,7 @@
+ 	if (! PACKET_WRITE(payload_decoder_factory->conn, &cmd_packet)) {
+ 		if (!silent && error_info->error_no != CR_SERVER_GONE_ERROR) {
+ 			DBG_ERR_FMT("Error while sending %s packet", mysqlnd_command_to_text[command]);
+-			php_error(E_WARNING, "Error while sending %s packet. PID=%d", mysqlnd_command_to_text[command], getpid());
++			php_error(E_WARNING, "Error while sending %s packet. PID=%jd", mysqlnd_command_to_text[command], (intmax_t) getpid());
+ 		}
+ 		connection_state->m->set(connection_state, CONN_QUIT_SENT);
+ 		send_close(send_close_ctx);
+@@ -2642,7 +2642,7 @@
+ 			break;
+ 	}
+ 	if (!silent && error_info->error_no == CR_MALFORMED_PACKET) {
+-		php_error_docref(NULL, E_WARNING, "Error while reading %s's response packet. PID=%d", mysqlnd_command_to_text[command], getpid());
++		php_error_docref(NULL, E_WARNING, "Error while reading %s's response packet. PID=%jd", mysqlnd_command_to_text[command], (intmax_t) getpid());
+ 	}
+ 	DBG_INF(ret == PASS ? "PASS":"FAIL");
+ 	DBG_RETURN(ret);
+diff -Paur --no-dereference -- php.upstream/ext/openssl/openssl.c php/ext/openssl/openssl.c
+--- php.upstream/ext/openssl/openssl.c
++++ php/ext/openssl/openssl.c
+@@ -828,8 +828,10 @@
+ 	** the value of timezone - 3600 seconds. Otherwise, we need to overcorrect and
+ 	** set the adjustment to the main timezone + 3600 seconds.
+ 	*/
++#if !defined(__sortix__) || defined(__SORTIX_HAS_TIMEZONE__)
+ 	gmadjust = -(thetime.tm_isdst ? (long)timezone - 3600 : (long)timezone);
+ #endif
++#endif
+ 	ret += gmadjust;
+ 
+ 	efree(strbuf);
+diff -Paur --no-dereference -- php.upstream/ext/pcntl/pcntl.stub.php php/ext/pcntl/pcntl.stub.php
+--- php.upstream/ext/pcntl/pcntl.stub.php
++++ php/ext/pcntl/pcntl.stub.php
+@@ -271,11 +271,13 @@
+  * @cvalue LONG_CONST(SIGVTALRM)
+  */
+ const SIGVTALRM = UNKNOWN;
++#ifdef SIGPROF
+ /**
+  * @var int
+  * @cvalue LONG_CONST(SIGPROF)
+  */
+ const SIGPROF = UNKNOWN;
++#endif
+ /**
+  * @var int
+  * @cvalue LONG_CONST(SIGWINCH)
+diff -Paur --no-dereference -- php.upstream/ext/pcntl/pcntl_arginfo.h php/ext/pcntl/pcntl_arginfo.h
+--- php.upstream/ext/pcntl/pcntl_arginfo.h
++++ php/ext/pcntl/pcntl_arginfo.h
+@@ -378,7 +378,9 @@
+ 	REGISTER_LONG_CONSTANT("SIGXCPU", LONG_CONST(SIGXCPU), CONST_PERSISTENT);
+ 	REGISTER_LONG_CONSTANT("SIGXFSZ", LONG_CONST(SIGXFSZ), CONST_PERSISTENT);
+ 	REGISTER_LONG_CONSTANT("SIGVTALRM", LONG_CONST(SIGVTALRM), CONST_PERSISTENT);
++#if defined(SIGPROF)
+ 	REGISTER_LONG_CONSTANT("SIGPROF", LONG_CONST(SIGPROF), CONST_PERSISTENT);
++#endif
+ 	REGISTER_LONG_CONSTANT("SIGWINCH", LONG_CONST(SIGWINCH), CONST_PERSISTENT);
+ #if defined(SIGPOLL)
+ 	REGISTER_LONG_CONSTANT("SIGPOLL", LONG_CONST(SIGPOLL), CONST_PERSISTENT);
+diff -Paur --no-dereference -- php.upstream/ext/phar/Makefile.frag php/ext/phar/Makefile.frag
+--- php.upstream/ext/phar/Makefile.frag
++++ php/ext/phar/Makefile.frag
+@@ -9,6 +9,11 @@
+ pharcmd: $(builddir)/phar.php $(builddir)/phar.phar
+ 
+ PHP_PHARCMD_SETTINGS = -n -d 'open_basedir=' -d 'output_buffering=0' -d 'memory_limit=-1' -d phar.readonly=0
++
++# Cross-compile using a local php that is the same version.
++ifeq ($(cross_compiling),yes)
++PHP_PHARCMD_EXECUTABLE=php
++else
+ PHP_PHARCMD_EXECUTABLE = ` \
+ 	if test -x "$(top_builddir)/$(SAPI_CLI_PATH)"; then \
+ 		$(top_srcdir)/build/shtool echo -n -- "$(top_builddir)/$(SAPI_CLI_PATH) -n"; \
+@@ -23,14 +28,15 @@
+ 	else \
+ 		$(top_srcdir)/build/shtool echo -n -- "$(PHP_EXECUTABLE)"; \
+ 	fi;`
+-PHP_PHARCMD_BANG = `$(top_srcdir)/build/shtool echo -n -- "$(INSTALL_ROOT)$(bindir)/$(program_prefix)php$(program_suffix)$(EXEEXT)";`
++endif
++PHP_PHARCMD_BANG = `$(top_srcdir)/build/shtool echo -n -- "$(bindir)/$(program_prefix)php$(program_suffix)$(EXEEXT)";`
+ 
+ $(builddir)/phar/phar.inc: $(srcdir)/phar/phar.inc
+ 	-@test -d $(builddir)/phar || mkdir $(builddir)/phar
+ 	-@test -f $(builddir)/phar/phar.inc || cp $(srcdir)/phar/phar.inc $(builddir)/phar/phar.inc
+ 
+-TEST_PHP_EXECUTABLE = $(shell $(PHP_EXECUTABLE) -v 2>&1)
+-TEST_PHP_EXECUTABLE_RES = $(shell echo "$(TEST_PHP_EXECUTABLE)" | grep -c 'Exec format error')
++# Generate phar regardless of cross-compilation.
++TEST_PHP_EXECUTABLE_RES=0
+ 
+ $(builddir)/phar.php: $(srcdir)/build_precommand.php $(srcdir)/phar/*.inc $(srcdir)/phar/*.php $(SAPI_CLI_PATH)
+ 	-@(echo "Generating phar.php"; \
+@@ -59,7 +65,6 @@
+ 		$(LN_S) -f $(program_prefix)phar$(program_suffix).phar $(INSTALL_ROOT)$(bindir)/$(program_prefix)phar$(program_suffix); \
+ 		$(mkinstalldirs) $(INSTALL_ROOT)$(mandir)/man1; \
+ 		$(INSTALL_DATA) $(builddir)/phar.1 $(INSTALL_ROOT)$(mandir)/man1/$(program_prefix)phar$(program_suffix).1; \
+-		$(INSTALL_DATA) $(builddir)/phar.phar.1 $(INSTALL_ROOT)$(mandir)/man1/$(program_prefix)phar$(program_suffix).phar.1; \
+ 	else \
+ 		echo "Skipping install-pharcmd during cross compilation"; \
+ 	fi)
+diff -Paur --no-dereference -- php.upstream/ext/phar/func_interceptors.c php/ext/phar/func_interceptors.c
+--- php.upstream/ext/phar/func_interceptors.c
++++ php/ext/phar/func_interceptors.c
+@@ -349,6 +349,7 @@
+ 			wmask=S_IWGRP;
+ 			xmask=S_IXGRP;
+ 		} else {
++#if !defined(__sortix__) || defined(__SORTIX_HAS_GETGROUPS__)
+ 			int   groups, n, i;
+ 			gid_t *gids;
+ 
+@@ -366,6 +367,7 @@
+ 				}
+ 				efree(gids);
+ 			}
++#endif
+ 		}
+ 	}
+ 
+diff -Paur --no-dereference -- php.upstream/ext/posix/posix.c php/ext/posix/posix.c
+--- php.upstream/ext/posix/posix.c
++++ php/ext/posix/posix.c
+@@ -265,9 +265,14 @@
+ /* }}} */
+ 
+ /* {{{ Get current process group id (POSIX.1, 4.3.1) */
++/* PATCH: Use standard getpgid instead. */
++static pid_t php_getpgrp(void)
++{
++	return getpgid(0);
++}
+ PHP_FUNCTION(posix_getpgrp)
+ {
+-	PHP_POSIX_RETURN_LONG_FUNC(getpgrp);
++	PHP_POSIX_RETURN_LONG_FUNC(php_getpgrp);
+ }
+ /* }}} */
+ 
+diff -Paur --no-dereference -- php.upstream/ext/soap/php_encoding.c php/ext/soap/php_encoding.c
+--- php.upstream/ext/soap/php_encoding.c
++++ php/ext/soap/php_encoding.c
+@@ -2953,6 +2953,9 @@
+ # if defined(__CYGWIN__) || (defined(PHP_WIN32) && defined(_MSC_VER) && _MSC_VER >= 1900)
+ 		snprintf(tzbuf, sizeof(tzbuf), "%c%02d:%02d", ((ta->tm_isdst ? _timezone - 3600:_timezone)>0)?'-':'+', abs((ta->tm_isdst ? _timezone - 3600 : _timezone) / 3600), abs(((ta->tm_isdst ? _timezone - 3600 : _timezone) % 3600) / 60));
+ # else
++#if defined(__sortix__) && !defined(__SORTIX_HAS_TIMEZONE__)
++		int timezone = 0;
++#endif
+ 		snprintf(tzbuf, sizeof(tzbuf), "%c%02d:%02d", ((ta->tm_isdst ? timezone - 3600:timezone)>0)?'-':'+', abs((ta->tm_isdst ? timezone - 3600 : timezone) / 3600), abs(((ta->tm_isdst ? timezone - 3600 : timezone) % 3600) / 60));
+ # endif
+ #endif
+diff -Paur --no-dereference -- php.upstream/ext/sockets/multicast.c php/ext/sockets/multicast.c
+--- php.upstream/ext/sockets/multicast.c
++++ php/ext/sockets/multicast.c
+@@ -149,6 +149,8 @@
+ #endif
+ 
+ 	switch (optname) {
++/* PATCH: Make non-standard features optional. */
++#ifdef IP_ADD_MEMBERSHIP
+ 	case PHP_MCAST_JOIN_GROUP:
+ 		mcast_req_fun = &php_mcast_join;
+ 		goto mcast_req_fun;
+@@ -175,6 +177,7 @@
+ 				glen, if_index);
+ 			break;
+ 		}
++#endif
+ 
+ #ifdef HAS_MCAST_EXT
+ 	case PHP_MCAST_BLOCK_SOURCE:
+@@ -245,8 +248,10 @@
+ 	int				retval;
+ 
+ 	switch (optname) {
++#ifdef IP_ADD_MEMBERSHIP
+ 	case PHP_MCAST_JOIN_GROUP:
+ 	case PHP_MCAST_LEAVE_GROUP:
++#endif
+ #ifdef HAS_MCAST_EXT
+ 	case PHP_MCAST_BLOCK_SOURCE:
+ 	case PHP_MCAST_UNBLOCK_SOURCE:
+@@ -259,6 +264,7 @@
+ 			return SUCCESS;
+ 		}
+ 
++#ifdef IP_MULTICAST_IF
+ 	case IP_MULTICAST_IF:
+ 		if (php_get_if_index_from_zval(arg4, &if_index) == FAILURE) {
+ 			return FAILURE;
+@@ -283,6 +289,7 @@
+ 			return FAILURE;
+ 		}
+ 		ipv4_mcast_ttl_lback = (unsigned char) Z_LVAL_P(arg4);
++#endif
+ ipv4_loop_ttl:
+ 		opt_ptr = &ipv4_mcast_ttl_lback;
+ 		optlen	= sizeof(ipv4_mcast_ttl_lback);
+@@ -313,8 +320,10 @@
+ 	int				retval;
+ 
+ 	switch (optname) {
++#ifdef IP_ADD_MEMBERSHIP
+ 	case PHP_MCAST_JOIN_GROUP:
+ 	case PHP_MCAST_LEAVE_GROUP:
++#endif
+ #ifdef HAS_MCAST_EXT
+ 	case PHP_MCAST_BLOCK_SOURCE:
+ 	case PHP_MCAST_UNBLOCK_SOURCE:
+@@ -455,6 +464,7 @@
+ 			join ? MCAST_JOIN_GROUP : MCAST_LEAVE_GROUP, (char*)&greq,
+ 			sizeof(greq));
+ #else
++#ifdef IP_ADD_MEMBERSHIP
+ 	if (sock->type == AF_INET) {
+ 		struct ip_mreq mreq;
+ 		struct in_addr addr;
+@@ -490,7 +500,9 @@
+ 				sizeof(mreq));
+ 	}
+ #endif
+-	else {
++	else
++#endif
++    {
+ 		zend_value_error("Option %s is inapplicable to this socket type",
+ 			join ? "MCAST_JOIN_GROUP" : "MCAST_LEAVE_GROUP");
+ 		return -2;
+@@ -709,6 +721,11 @@
+ 
+ zend_result php_if_index_to_addr4(unsigned if_index, php_socket *php_sock, struct in_addr *out_addr)
+ {
++#ifndef SIOCGIFADDR
++	php_error_docref(NULL, E_WARNING,
++		"Failed obtaining address for interface %u: Missing SIOCGIFADDR", if_index);
++	return FAILURE;
++#else
+ 	struct ifreq if_req;
+ 
+ 	if (if_index == 0) {
+@@ -742,10 +759,16 @@
+ 	memcpy(out_addr, &((struct sockaddr_in *) &if_req.ifr_addr)->sin_addr,
+ 		sizeof *out_addr);
+ 	return SUCCESS;
++#endif
+ }
+ 
+ zend_result php_add4_to_if_index(struct in_addr *addr, php_socket *php_sock, unsigned *if_index)
+ {
++#ifndef SIOCGIFCONF
++	php_error_docref(NULL, E_WARNING,
++		"Cannot php_add4_to_if_index: Missing SIOCGIFCONF");
++	return FAILURE;
++#else
+ 	struct ifconf	if_conf = {0};
+ 	char			*buf = NULL,
+ 					*p;
+@@ -835,5 +858,6 @@
+ 	if (buf != NULL)
+ 		efree(buf);
+ 	return FAILURE;
++#endif
+ }
+ #endif
+diff -Paur --no-dereference -- php.upstream/ext/sockets/sockaddr_conv.c php/ext/sockets/sockaddr_conv.c
+--- php.upstream/ext/sockets/sockaddr_conv.c
++++ php/ext/sockets/sockaddr_conv.c
+@@ -26,6 +26,7 @@
+ 		memcpy(&(sin6->sin6_addr.s6_addr), &(tmp.s6_addr), sizeof(struct in6_addr));
+ 	} else {
+ #ifdef HAVE_GETADDRINFO
++		int errcode;
+ 
+ 		memset(&hints, 0, sizeof(struct addrinfo));
+ 		hints.ai_family = AF_INET6;
+@@ -34,13 +35,10 @@
+ #else
+ 		hints.ai_flags = AI_ADDRCONFIG;
+ #endif
+-		getaddrinfo(string, NULL, &hints, &addrinfo);
+-		if (!addrinfo) {
+-#ifdef PHP_WIN32
+-			PHP_SOCKET_ERROR(php_sock, "Host lookup failed", WSAGetLastError());
+-#else
+-			PHP_SOCKET_ERROR(php_sock, "Host lookup failed", (-10000 - h_errno));
+-#endif
++		/* PATCH: Improve getaddrinfo logic. */
++		errcode = getaddrinfo(string, NULL, &hints, &addrinfo);
++		if (errcode) {
++			PHP_SOCKET_ERROR(php_sock, "Host lookup failed", -10000 - errcode);
+ 			return 0;
+ 		}
+ 		if (addrinfo->ai_family != PF_INET6 || addrinfo->ai_addrlen != sizeof(struct sockaddr_in6)) {
+@@ -87,25 +85,34 @@
+ int php_set_inet_addr(struct sockaddr_in *sin, char *string, php_socket *php_sock) /* {{{ */
+ {
+ 	struct in_addr tmp;
+-	struct hostent *host_entry;
++	struct addrinfo hints;
++	struct addrinfo *addrinfo = NULL;
+ 
+ 	if (inet_pton(AF_INET, string, &tmp)) {
+ 		sin->sin_addr.s_addr = tmp.s_addr;
+ 	} else {
+-		if (strlen(string) > MAXFQDNLEN || ! (host_entry = php_network_gethostbyname(string))) {
+-			/* Note: < -10000 indicates a host lookup error */
+-#ifdef PHP_WIN32
+-			PHP_SOCKET_ERROR(php_sock, "Host lookup failed", WSAGetLastError());
++		int errcode;
++
++		memset(&hints, 0, sizeof(struct addrinfo));
++		hints.ai_family = AF_INET6;
++#if HAVE_AI_V4MAPPED
++		hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG;
+ #else
+-			PHP_SOCKET_ERROR(php_sock, "Host lookup failed", (-10000 - h_errno));
++		hints.ai_flags = AI_ADDRCONFIG;
+ #endif
++		errcode = getaddrinfo(string, NULL, &hints, &addrinfo);
++		if (errcode) {
++			PHP_SOCKET_ERROR(php_sock, "Host lookup failed", -10000 - errcode);
+ 			return 0;
+ 		}
+-		if (host_entry->h_addrtype != AF_INET) {
+-			php_error_docref(NULL, E_WARNING, "Host lookup failed: Non AF_INET domain returned on AF_INET socket");
++		if (addrinfo->ai_family != PF_INET6 || addrinfo->ai_addrlen != sizeof(struct sockaddr_in6)) {
++			php_error_docref(NULL, E_WARNING, "Host lookup failed: Non AF_INET6 domain returned on AF_INET6 socket");
++			freeaddrinfo(addrinfo);
+ 			return 0;
+ 		}
+-		memcpy(&(sin->sin_addr.s_addr), host_entry->h_addr_list[0], host_entry->h_length);
++
++		memcpy(&(sin->sin_addr.s_addr), &((struct sockaddr_in*)(addrinfo->ai_addr))->sin_addr.s_addr, sizeof(struct in_addr));
++		freeaddrinfo(addrinfo);
+ 	}
+ 
+ 	return 1;
+diff -Paur --no-dereference -- php.upstream/ext/sockets/sockets.c php/ext/sockets/sockets.c
+--- php.upstream/ext/sockets/sockets.c
++++ php/ext/sockets/sockets.c
+@@ -220,18 +220,9 @@
+ static bool php_open_listen_sock(php_socket *sock, int port, int backlog) /* {{{ */
+ {
+ 	struct sockaddr_in  la = {0};
+-	struct hostent	    *hp;
+ 
+-#ifndef PHP_WIN32
+-	if ((hp = php_network_gethostbyname("0.0.0.0")) == NULL) {
+-#else
+-	if ((hp = php_network_gethostbyname("localhost")) == NULL) {
+-#endif
+-		return 0;
+-	}
+-
+-	memcpy((char *) &la.sin_addr, hp->h_addr, hp->h_length);
+-	la.sin_family = hp->h_addrtype;
++	la.sin_family = AF_INET;
++	la.sin_addr.s_addr = htonl(INADDR_ANY);
+ 	la.sin_port = htons((unsigned short) port);
+ 
+ 	sock->bsd_socket = socket(PF_INET, SOCK_STREAM, 0);
+@@ -1663,6 +1654,7 @@
+ 
+ 	if (level == IPPROTO_IP) {
+ 		switch (optname) {
++#ifdef IP_MULTICAST_IF
+ 		case IP_MULTICAST_IF: {
+ 			struct in_addr if_addr;
+ 			unsigned int if_index;
+@@ -1677,6 +1669,7 @@
+ 				RETURN_FALSE;
+ 			}
+ 		}
++#endif
+ 		}
+ 	}
+ #ifdef HAVE_IPV6
+diff -Paur --no-dereference -- php.upstream/ext/sockets/sockets_arginfo.h php/ext/sockets/sockets_arginfo.h
+--- php.upstream/ext/sockets/sockets_arginfo.h
++++ php/ext/sockets/sockets_arginfo.h
+@@ -559,8 +559,12 @@
+ #endif
+ 	REGISTER_LONG_CONSTANT("PHP_NORMAL_READ", PHP_NORMAL_READ, CONST_PERSISTENT);
+ 	REGISTER_LONG_CONSTANT("PHP_BINARY_READ", PHP_BINARY_READ, CONST_PERSISTENT);
++#if defined(IP_ADD_MEMBERSHIP)
+ 	REGISTER_LONG_CONSTANT("MCAST_JOIN_GROUP", PHP_MCAST_JOIN_GROUP, CONST_PERSISTENT);
++#endif
++#if defined(IP_DROP_MEMBERSHIP)
+ 	REGISTER_LONG_CONSTANT("MCAST_LEAVE_GROUP", PHP_MCAST_LEAVE_GROUP, CONST_PERSISTENT);
++#endif
+ #if defined(HAS_MCAST_EXT)
+ 	REGISTER_LONG_CONSTANT("MCAST_BLOCK_SOURCE", PHP_MCAST_BLOCK_SOURCE, CONST_PERSISTENT);
+ #endif
+@@ -573,9 +577,11 @@
+ #if defined(HAS_MCAST_EXT)
+ 	REGISTER_LONG_CONSTANT("MCAST_LEAVE_SOURCE_GROUP", PHP_MCAST_LEAVE_SOURCE_GROUP, CONST_PERSISTENT);
+ #endif
++#ifdef IP_MULTICAST_IF
+ 	REGISTER_LONG_CONSTANT("IP_MULTICAST_IF", IP_MULTICAST_IF, CONST_PERSISTENT);
+ 	REGISTER_LONG_CONSTANT("IP_MULTICAST_TTL", IP_MULTICAST_TTL, CONST_PERSISTENT);
+ 	REGISTER_LONG_CONSTANT("IP_MULTICAST_LOOP", IP_MULTICAST_LOOP, CONST_PERSISTENT);
++#endif
+ #if defined(IP_BIND_ADDRESS_NO_PORT)
+ 	REGISTER_LONG_CONSTANT("IP_BIND_ADDRESS_NO_PORT", IP_BIND_ADDRESS_NO_PORT, CONST_PERSISTENT);
+ #endif
+diff -Paur --no-dereference -- php.upstream/ext/standard/basic_functions.c php/ext/standard/basic_functions.c
+--- php.upstream/ext/standard/basic_functions.c
++++ php/ext/standard/basic_functions.c
+@@ -127,7 +127,11 @@
+ 	bool calling;
+ } user_tick_function_entry;
+ 
+-#ifdef HAVE_PUTENV
++/* PATCH: putenv is horrible and requires leaks and complexity in libc, and
++          causes all the complexity that php is working around here, which is
++          why Sortix refuses to implement it. Simply replace all this complexity
++          with calls to getenv, setenv, and unsetenv. */
++#if 0
+ typedef struct {
+ 	char *putenv_string;
+ 	char *previous_value;
+@@ -161,7 +165,7 @@
+ };
+ /* }}} */
+ 
+-#ifdef HAVE_PUTENV
++#if 0
+ static void php_putenv_destructor(zval *zv) /* {{{ */
+ {
+ 	putenv_entry *pe = Z_PTR_P(zv);
+@@ -401,7 +405,7 @@
+ 	BG(page_gid) = -1;
+ 	BG(page_inode) = -1;
+ 	BG(page_mtime) = -1;
+-#ifdef HAVE_PUTENV
++#if 0
+ 	zend_hash_init(&BG(putenv_ht), 1, NULL, php_putenv_destructor, 0);
+ #endif
+ 	BG(user_shutdown_function_names) = NULL;
+@@ -432,7 +436,7 @@
+ 		zend_string_release(BG(strtok_string));
+ 		BG(strtok_string) = NULL;
+ 	}
+-#ifdef HAVE_PUTENV
++#if 0
+ 	tsrm_env_lock();
+ 	zend_hash_destroy(&BG(putenv_ht));
+ 	tsrm_env_unlock();
+@@ -725,18 +729,14 @@
+ }
+ /* }}} */
+ 
+-#ifdef HAVE_PUTENV
+ /* {{{ Set the value of an environment variable */
+ PHP_FUNCTION(putenv)
+ {
+ 	char *setting;
+ 	size_t setting_len;
+-	char *p, **env;
+-	putenv_entry pe;
+-#ifdef PHP_WIN32
++	char *p;
++	char *key;
+ 	const char *value = NULL;
+-	int error_code;
+-#endif
+ 
+ 	ZEND_PARSE_PARAMETERS_START(1, 1)
+ 		Z_PARAM_STRING(setting, setting_len)
+@@ -747,98 +747,34 @@
+ 		RETURN_THROWS();
+ 	}
+ 
+-	pe.putenv_string = zend_strndup(setting, setting_len);
+ 	if ((p = strchr(setting, '='))) {
+-		pe.key = zend_string_init(setting, p - setting, 0);
+-#ifdef PHP_WIN32
++		key = zend_strndup(setting, p - setting);
+ 		value = p + 1;
+-#endif
+ 	} else {
+-		pe.key = zend_string_init(setting, setting_len, 0);
++		key = zend_strndup(setting, setting_len);
+ 	}
+ 
+ 	tsrm_env_lock();
+-	zend_hash_del(&BG(putenv_ht), pe.key);
+-
+-	/* find previous value */
+-	pe.previous_value = NULL;
+-	for (env = environ; env != NULL && *env != NULL; env++) {
+-		if (!strncmp(*env, ZSTR_VAL(pe.key), ZSTR_LEN(pe.key))
+-				&& (*env)[ZSTR_LEN(pe.key)] == '=') {	/* found it */
+-#ifdef PHP_WIN32
+-			/* must copy previous value because MSVCRT's putenv can free the string without notice */
+-			pe.previous_value = estrdup(*env);
+-#else
+-			pe.previous_value = *env;
+-#endif
+-			break;
+-		}
+-	}
+ 
+-#ifdef HAVE_UNSETENV
+ 	if (!p) { /* no '=' means we want to unset it */
+-		unsetenv(pe.putenv_string);
++		unsetenv(key);
+ 	}
+-	if (!p || putenv(pe.putenv_string) == 0) { /* success */
+-#else
+-# ifndef PHP_WIN32
+-	if (putenv(pe.putenv_string) == 0) { /* success */
+-# else
+-		wchar_t *keyw, *valw = NULL;
+-
+-		keyw = php_win32_cp_any_to_w(ZSTR_VAL(pe.key));
+-		if (value) {
+-			valw = php_win32_cp_any_to_w(value);
+-		}
+-		/* valw may be NULL, but the failed conversion still needs to be checked. */
+-		if (!keyw || !valw && value) {
+-			tsrm_env_unlock();
+-			free(pe.putenv_string);
+-			zend_string_release(pe.key);
+-			free(keyw);
+-			free(valw);
+-			RETURN_FALSE;
+-		}
+-
+-	error_code = SetEnvironmentVariableW(keyw, valw);
+-
+-	if (error_code != 0
+-# ifndef ZTS
+-	/* We need both SetEnvironmentVariable and _putenv here as some
+-		dependency lib could use either way to read the environment.
+-		Obviously the CRT version will be useful more often. But
+-		generally, doing both brings us on the safe track at least
+-		in NTS build. */
+-	&& _wputenv_s(keyw, valw ? valw : L"") == 0
+-# endif
+-	) { /* success */
+-# endif
+-#endif
+-		zend_hash_add_mem(&BG(putenv_ht), pe.key, &pe, sizeof(putenv_entry));
++	if (!p || setenv(key, value, 1) == 0) { /* success */
+ #ifdef HAVE_TZSET
+-		if (zend_string_equals_literal_ci(pe.key, "TZ")) {
++		if (strcmp(key, "TZ")) {
+ 			tzset();
+ 		}
+ #endif
+ 		tsrm_env_unlock();
+-#ifdef PHP_WIN32
+-		free(keyw);
+-		free(valw);
+-#endif
++		free(key);
+ 		RETURN_TRUE;
+ 	} else {
+ 		tsrm_env_unlock();
+-		free(pe.putenv_string);
+-		zend_string_release(pe.key);
+-#ifdef PHP_WIN32
+-		free(keyw);
+-		free(valw);
+-#endif
++		free(key);
+ 		RETURN_FALSE;
+ 	}
+ }
+ /* }}} */
+-#endif
+ 
+ /* {{{ free_argv()
+    Free the memory allocated to an argv array. */
+diff -Paur --no-dereference -- php.upstream/ext/standard/basic_functions.stub.php php/ext/standard/basic_functions.stub.php
+--- php.upstream/ext/standard/basic_functions.stub.php
++++ php/ext/standard/basic_functions.stub.php
+@@ -1941,9 +1941,7 @@
+  */
+ function getenv(?string $name = null, bool $local_only = false): string|array|false {}
+ 
+-#ifdef HAVE_PUTENV
+ function putenv(string $assignment): bool {}
+-#endif
+ 
+ /**
+  * @param int $rest_index
+diff -Paur --no-dereference -- php.upstream/ext/standard/basic_functions_arginfo.h php/ext/standard/basic_functions_arginfo.h
+--- php.upstream/ext/standard/basic_functions_arginfo.h
++++ php/ext/standard/basic_functions_arginfo.h
+@@ -404,11 +404,9 @@
+ 	ZEND_ARG_TYPE_INFO_WITH_DEFAULT_VALUE(0, local_only, _IS_BOOL, 0, "false")
+ ZEND_END_ARG_INFO()
+ 
+-#if defined(HAVE_PUTENV)
+ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_INFO_EX(arginfo_putenv, 0, 1, _IS_BOOL, 0)
+ 	ZEND_ARG_TYPE_INFO(0, assignment, IS_STRING, 0)
+ ZEND_END_ARG_INFO()
+-#endif
+ 
+ ZEND_BEGIN_ARG_WITH_RETURN_TYPE_MASK_EX(arginfo_getopt, 0, 1, MAY_BE_ARRAY|MAY_BE_FALSE)
+ 	ZEND_ARG_TYPE_INFO(0, short_options, IS_STRING, 0)
+@@ -2395,9 +2393,7 @@
+ ZEND_FUNCTION(ip2long);
+ ZEND_FUNCTION(long2ip);
+ ZEND_FUNCTION(getenv);
+-#if defined(HAVE_PUTENV)
+ ZEND_FUNCTION(putenv);
+-#endif
+ ZEND_FUNCTION(getopt);
+ ZEND_FUNCTION(flush);
+ ZEND_FUNCTION(sleep);
+@@ -2989,9 +2985,7 @@
+ 	ZEND_FE(ip2long, arginfo_ip2long)
+ 	ZEND_FE(long2ip, arginfo_long2ip)
+ 	ZEND_FE(getenv, arginfo_getenv)
+-#if defined(HAVE_PUTENV)
+ 	ZEND_FE(putenv, arginfo_putenv)
+-#endif
+ 	ZEND_FE(getopt, arginfo_getopt)
+ 	ZEND_FE(flush, arginfo_flush)
+ 	ZEND_FE(sleep, arginfo_sleep)
+diff -Paur --no-dereference -- php.upstream/ext/standard/crypt_sha256.c php/ext/standard/crypt_sha256.c
+--- php.upstream/ext/standard/crypt_sha256.c
++++ php/ext/standard/crypt_sha256.c
+@@ -23,7 +23,6 @@
+ #ifdef PHP_WIN32
+ # include <string.h>
+ #else
+-# include <sys/param.h>
+ # include <sys/types.h>
+ # include <string.h>
+ #endif
+diff -Paur --no-dereference -- php.upstream/ext/standard/crypt_sha512.c php/ext/standard/crypt_sha512.c
+--- php.upstream/ext/standard/crypt_sha512.c
++++ php/ext/standard/crypt_sha512.c
+@@ -22,7 +22,6 @@
+ #ifdef PHP_WIN32
+ # include <string.h>
+ #else
+-# include <sys/param.h>
+ # include <sys/types.h>
+ # include <string.h>
+ #endif
+diff -Paur --no-dereference -- php.upstream/ext/standard/dl.c php/ext/standard/dl.c
+--- php.upstream/ext/standard/dl.c
++++ php/ext/standard/dl.c
+@@ -33,7 +33,6 @@
+ #include "win32/winutil.h"
+ #define GET_DL_ERROR()	php_win_err()
+ #else
+-#include <sys/param.h>
+ #define GET_DL_ERROR()	DL_ERROR()
+ #endif
+ #endif /* defined(HAVE_LIBDL) */
+diff -Paur --no-dereference -- php.upstream/ext/standard/dns.c php/ext/standard/dns.c
+--- php.upstream/ext/standard/dns.c
++++ php/ext/standard/dns.c
+@@ -246,9 +246,7 @@
+ {
+ 	char *hostname;
+ 	size_t hostname_len;
+-	struct hostent *hp;
+ 	struct in_addr in;
+-	int i;
+ 	char addr4[INET_ADDRSTRLEN];
+ 
+ 	ZEND_PARSE_PARAMETERS_START(1, 1)
+@@ -261,55 +259,42 @@
+ 		RETURN_FALSE;
+ 	}
+ 
+-	hp = php_network_gethostbyname(hostname);
+-	if (!hp) {
++	/* PATCH: Replace obsolete gethostbyname with getaddrinfo. */
++	struct addrinfo hints = { .ai_family = AF_INET };
++	struct addrinfo *res0 = NULL;
++	int status = getaddrinfo(hostname, NULL, &hints, &res0);
++	if (status) {
+ 		RETURN_FALSE;
+ 	}
+ 
+ 	array_init(return_value);
+ 
+-	for (i = 0;; i++) {
+-		/* On macos h_addr_list entries may be misaligned. */
+-		const char *ipaddr;
+-		struct in_addr *h_addr_entry; /* Don't call this h_addr, it's a macro! */
+-		memcpy(&h_addr_entry, &hp->h_addr_list[i], sizeof(struct in_addr *));
+-		if (!h_addr_entry) {
+-			return;
+-		}
+-
+-		in = *h_addr_entry;
+-		if (!(ipaddr = inet_ntop(AF_INET, &in, addr4, INET_ADDRSTRLEN))) {
+-			/* unlikely regarding (too) long hostname and protocols but checking still */
+-			php_error_docref(NULL, E_WARNING, "Host name to ip failed %s", hostname);
+-			continue;
+-		} else {
+-			add_next_index_string(return_value, ipaddr);
+-		}
+-	}
++	for (struct addrinfo *res = res0; res; res = res->ai_next)
++	{
++		in = *(struct in_addr *)res->ai_addr;
++ 		add_next_index_string(return_value, inet_ntop(AF_INET, &in, addr4, INET_ADDRSTRLEN));
++ 	}
++	freeaddrinfo(res0);
+ }
+ /* }}} */
+ 
+ /* {{{ php_gethostbyname */
+ static zend_string *php_gethostbyname(char *name)
+ {
+-	struct hostent *hp;
+-	struct in_addr *h_addr_0; /* Don't call this h_addr, it's a macro! */
+ 	struct in_addr in;
+ 	char addr4[INET_ADDRSTRLEN];
+ 	const char *address;
+ 
+-	hp = php_network_gethostbyname(name);
+-	if (!hp) {
++	struct addrinfo hints = { .ai_family = AF_INET };
++	struct addrinfo *res0 = NULL;
++	int status = getaddrinfo(name, NULL, &hints, &res0);
++	if (status) {
+ 		return zend_string_init(name, strlen(name), 0);
+ 	}
+ 
+-	/* On macos h_addr_list entries may be misaligned. */
+-	memcpy(&h_addr_0, &hp->h_addr_list[0], sizeof(struct in_addr *));
+-	if (!h_addr_0) {
+-		return zend_string_init(name, strlen(name), 0);
+-	}
++	memcpy(&in.s_addr, res0->ai_addr, sizeof(in.s_addr));
+ 
+-	memcpy(&in.s_addr, h_addr_0, sizeof(in.s_addr));
++	freeaddrinfo(res0);
+ 
+ 	if (!(address = inet_ntop(AF_INET, &in, addr4, INET_ADDRSTRLEN))) {
+ 		return NULL;
+diff -Paur --no-dereference -- php.upstream/ext/standard/filestat.c php/ext/standard/filestat.c
+--- php.upstream/ext/standard/filestat.c
++++ php/ext/standard/filestat.c
+@@ -872,6 +872,7 @@
+ 			wmask=S_IWGRP;
+ 			xmask=S_IXGRP;
+ 		} else {
++#if !defined(__sortix__) || defined(__SORTIX_HAS_GETGROUPS__)
+ 			int   groups, n, i;
+ 			gid_t *gids;
+ 
+@@ -889,6 +890,7 @@
+ 				}
+ 				efree(gids);
+ 			}
++#endif
+ 		}
+ 	}
+ 
+diff -Paur --no-dereference -- php.upstream/ext/standard/ftp_fopen_wrapper.c php/ext/standard/ftp_fopen_wrapper.c
+--- php.upstream/ext/standard/ftp_fopen_wrapper.c
++++ php/ext/standard/ftp_fopen_wrapper.c
+@@ -33,8 +33,6 @@
+ #include <winsock2.h>
+ #define O_RDONLY _O_RDONLY
+ #include "win32/param.h"
+-#else
+-#include <sys/param.h>
+ #endif
+ 
+ #include "php_standard.h"
+diff -Paur --no-dereference -- php.upstream/ext/standard/http_fopen_wrapper.c php/ext/standard/http_fopen_wrapper.c
+--- php.upstream/ext/standard/http_fopen_wrapper.c
++++ php/ext/standard/http_fopen_wrapper.c
+@@ -36,8 +36,6 @@
+ #ifdef PHP_WIN32
+ #define O_RDONLY _O_RDONLY
+ #include "win32/param.h"
+-#else
+-#include <sys/param.h>
+ #endif
+ 
+ #include "php_standard.h"
+diff -Paur --no-dereference -- php.upstream/ext/standard/microtime.c php/ext/standard/microtime.c
+--- php.upstream/ext/standard/microtime.c
++++ php/ext/standard/microtime.c
+@@ -125,7 +125,7 @@
+ #ifdef PHP_WIN32 /* Windows only implements a limited amount of fields from the rusage struct */
+ 	PHP_RUSAGE_PARA(ru_majflt);
+ 	PHP_RUSAGE_PARA(ru_maxrss);
+-#elif !defined(_OSD_POSIX) && !defined(__HAIKU__)
++#elif !defined(_OSD_POSIX) && !defined(__HAIKU__) && !defined(__sortix__)
+ 	PHP_RUSAGE_PARA(ru_oublock);
+ 	PHP_RUSAGE_PARA(ru_inblock);
+ 	PHP_RUSAGE_PARA(ru_msgsnd);
+diff -Paur --no-dereference -- php.upstream/ext/standard/net.c php/ext/standard/net.c
+--- php.upstream/ext/standard/net.c
++++ php/ext/standard/net.c
+@@ -292,8 +292,14 @@
+ 		iface_append_unicast(unicast,
+ 		                     p->ifa_flags,
+ 		                     p->ifa_addr, p->ifa_netmask,
+-		                     (p->ifa_flags & IFF_BROADCAST) ? p->ifa_broadaddr : NULL,
+-					         (p->ifa_flags & IFF_POINTOPOINT) ? p->ifa_dstaddr : NULL);
++#ifdef IFF_BROADCAST
++		                     (p->ifa_flags & IFF_BROADCAST) ? p->ifa_broadaddr :
++#endif
++		                     NULL,
++#ifdef IFF_POINTOPOINT
++					         (p->ifa_flags & IFF_POINTOPOINT) ? p->ifa_dstaddr :
++#endif
++					         NULL);
+ 		status = zend_hash_str_find(Z_ARR_P(iface), "up", sizeof("up") - 1);
+ 		if (!status) {
+ 			add_assoc_bool(iface, "up", ((p->ifa_flags & IFF_UP) != 0));
+diff -Paur --no-dereference -- php.upstream/ext/standard/pack.c php/ext/standard/pack.c
+--- php.upstream/ext/standard/pack.c
++++ php/ext/standard/pack.c
+@@ -25,8 +25,6 @@
+ #ifdef PHP_WIN32
+ #define O_RDONLY _O_RDONLY
+ #include "win32/param.h"
+-#else
+-#include <sys/param.h>
+ #endif
+ #include "pack.h"
+ #ifdef HAVE_PWD_H
+diff -Paur --no-dereference -- php.upstream/ext/standard/php_fopen_wrapper.c php/ext/standard/php_fopen_wrapper.c
+--- php.upstream/ext/standard/php_fopen_wrapper.c
++++ php/ext/standard/php_fopen_wrapper.c
+@@ -317,11 +317,7 @@
+ 			return NULL;
+ 		}
+ 
+-#ifdef HAVE_UNISTD_H
+-		dtablesize = getdtablesize();
+-#else
+ 		dtablesize = INT_MAX;
+-#endif
+ 
+ 		if (fildes_ori < 0 || fildes_ori >= dtablesize) {
+ 			php_stream_wrapper_log_error(wrapper, options,
+diff -Paur --no-dereference -- php.upstream/init/php-fpm php/init/php-fpm
+--- php.upstream/init/php-fpm
++++ php/init/php-fpm
+@@ -0,0 +1 @@
++exec php-fpm -FO
+diff -Paur --no-dereference -- php.upstream/main/fastcgi.c php/main/fastcgi.c
+--- php.upstream/main/fastcgi.c
++++ php/main/fastcgi.c
+@@ -682,21 +682,17 @@
+ 			sa.sa_inet.sin_addr.s_addr = htonl(INADDR_ANY);
+ 		} else {
+ 			if (!inet_pton(AF_INET, host, &sa.sa_inet.sin_addr)) {
+-				struct hostent *hep;
+-
+-				if(strlen(host) > MAXFQDNLEN) {
+-					hep = NULL;
+-				} else {
+-					hep = php_network_gethostbyname(host);
+-				}
+-				if (!hep || hep->h_addrtype != AF_INET || !hep->h_addr_list[0]) {
++				struct addrinfo hints = { .ai_family = AF_INET };
++				struct addrinfo *res0 = NULL;
++				int status = getaddrinfo(host, NULL, &hints, &res0);
++				if (status) {
+ 					fcgi_log(FCGI_ERROR, "Cannot resolve host name '%s'!\n", host);
+-					return -1;
+-				} else if (hep->h_addr_list[1]) {
++				} else if (res0->ai_next) {
+ 					fcgi_log(FCGI_ERROR, "Host '%s' has multiple addresses. You must choose one explicitly!\n", host);
+ 					return -1;
+ 				}
+-				sa.sa_inet.sin_addr.s_addr = ((struct in_addr*)hep->h_addr_list[0])->s_addr;
++				sa.sa_inet.sin_addr.s_addr = ((struct in_addr*)res0->ai_addr)->s_addr;
++				freeaddrinfo(res0);
+ 			}
+ 		}
+ 	} else {
+diff -Paur --no-dereference -- php.upstream/main/fopen_wrappers.c php/main/fopen_wrappers.c
+--- php.upstream/main/fopen_wrappers.c
++++ php/main/fopen_wrappers.c
+@@ -30,8 +30,6 @@
+ #ifdef PHP_WIN32
+ #define O_RDONLY _O_RDONLY
+ #include "win32/param.h"
+-#else
+-#include <sys/param.h>
+ #endif
+ 
+ #include "ext/standard/head.h"
+diff -Paur --no-dereference -- php.upstream/main/network.c php/main/network.c
+--- php.upstream/main/network.c
++++ php/main/network.c
+@@ -28,8 +28,6 @@
+ # include "win32/winutil.h"
+ # define O_RDONLY _O_RDONLY
+ # include "win32/param.h"
+-#else
+-#include <sys/param.h>
+ #endif
+ 
+ #include <sys/types.h>
+@@ -69,6 +67,11 @@
+ #include <sys/un.h>
+ #endif
+ 
++#if defined(__sortix__) && !defined(timercmp)
++#define timercmp(s,t,op) ((s)->tv_sec == (t)->tv_sec ? \
++	(s)->tv_usec op (t)->tv_usec : (s)->tv_sec op (t)->tv_sec)
++#endif
++
+ #include "ext/standard/file.h"
+ 
+ #ifdef PHP_WIN32
+@@ -247,6 +250,8 @@
+ 			errno = E2BIG;
+ 		} else {
+ 			host_info = php_network_gethostbyname(host);
++                       host_info = NULL;
++                       errno = ENOTSUP;
+ 		}
+ 		if (host_info == NULL) {
+ 			if (error_string) {
+@@ -1349,7 +1354,7 @@
+ 
+ PHPAPI struct hostent*	php_network_gethostbyname(const char *name) {
+ #if !defined(HAVE_GETHOSTBYNAME_R)
+-	return gethostbyname(name);
++	return NULL; // PATCH: Only use getaddrinfo.
+ #else
+ 	if (FG(tmp_host_buf)) {
+ 		free(FG(tmp_host_buf));
+diff -Paur --no-dereference -- php.upstream/main/php.h php/main/php.h
+--- php.upstream/main/php.h
++++ php/main/php.h
+@@ -219,7 +219,6 @@
+ #include "win32/param.h"
+ # else
+ #include <pwd.h>
+-#include <sys/param.h>
+ # endif
+ #endif
+ 
+diff -Paur --no-dereference -- php.upstream/main/php_open_temporary_file.c php/main/php_open_temporary_file.c
+--- php.upstream/main/php_open_temporary_file.c
++++ php/main/php_open_temporary_file.c
+@@ -30,7 +30,6 @@
+ #include "win32/param.h"
+ #include "win32/winutil.h"
+ #else
+-#include <sys/param.h>
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <netdb.h>
+@@ -46,10 +45,6 @@
+ #include <sys/file.h>
+ #endif
+ 
+-#if !defined(P_tmpdir)
+-#define P_tmpdir ""
+-#endif
+-
+ /* {{{ php_do_open_temporary_file */
+ 
+ /* Loosely based on a tempnam() implementation by UCLA */
+diff -Paur --no-dereference -- php.upstream/pear/Makefile.frag php/pear/Makefile.frag
+--- php.upstream/pear/Makefile.frag
++++ php/pear/Makefile.frag
+@@ -9,8 +9,24 @@
+ PEAR_SUFFIX = -ds a$(program_suffix)
+ PEAR_INSTALLER_URL = https://pear.php.net/install-pear-nozlib.phar
+ 
++# Cross-compile using a local php that is the same version.
++ifeq ($(cross_compiling),yes)
++PHP_PEAR_EXECUTABLE=php
++else
++PHP_PEAR_EXECUTABLE=$(top_builddir)/sapi/cli/php
++endif
++
+ install-pear-installer: $(SAPI_CLI_PATH)
+-	@$(top_builddir)/sapi/cli/php $(PEAR_INSTALL_FLAGS) pear/install-pear-nozlib.phar -d "$(peardir)" -b "$(bindir)" ${PEAR_PREFIX} ${PEAR_SUFFIX}
++	# PATCH: Respect DESTDIR since INSTALL_ROOT is already set to DESTDIR.
++	# PATCH: Invoke with php from PATH instead of remembering $(PHP_PEAR_EXECUTABLE).
++	# TODO: /etc/pear.conf is installed with the DESTDIR twice, and also
++	#       contains the DESTDIR. Meanwhile this installation dumps a bunch of
++	#       .channels, .depdb, .depdbblock, .filemap, and .lock junk files in the
++	#       prefix (root directory on Sortix). Meanwhile patching this phar file
++	#       is impractical and pear install doesn't seem to download properly.
++	#       Yeah we're gonna --disable-pear for a while, php is too much of a
++	#       mess to package properly with cross-compilation at the moment.
++	INSTALL_ROOT=$(INSTALL_ROOT) $(PHP_PEAR_EXECUTABLE) $(PEAR_INSTALL_FLAGS) pear/install-pear-nozlib.phar -d "$(peardir)" -b "$(bindir)" --php php ${PEAR_PREFIX} ${PEAR_SUFFIX}
+ 
+ install-pear:
+ 	@echo "Installing PEAR environment:      $(INSTALL_ROOT)$(peardir)/"
+@@ -23,7 +39,7 @@
+ 			elif test ! -z "$(FETCH)" && test -x "$(FETCH)"; then \
+ 				"$(FETCH)" -o $(builddir)/ "${PEAR_INSTALLER_URL}"; \
+ 			else \
+-				$(top_builddir)/sapi/cli/php -n $(srcdir)/fetch.php "${PEAR_INSTALLER_URL}" $(builddir)/install-pear-nozlib.phar; \
++				$(PHP_PEAR_EXECUTABLE) -n $(srcdir)/fetch.php "${PEAR_INSTALLER_URL}" $(builddir)/install-pear-nozlib.phar; \
+ 			fi \
+ 		fi \
+ 	fi
+diff -Paur --no-dereference -- php.upstream/sapi/cgi/cgi_main.c php/sapi/cgi/cgi_main.c
+--- php.upstream/sapi/cgi/cgi_main.c
++++ php/sapi/cgi/cgi_main.c
+@@ -2009,7 +2009,7 @@
+ 
+ 			/* Create a process group for us & children */
+ 			setsid();
+-			pgroup = getpgrp();
++			pgroup = getpgid(0);
+ #ifdef DEBUG_FASTCGI
+ 			fprintf(stderr, "Process group %d\n", pgroup);
+ #endif
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/Makefile.frag php/sapi/fpm/Makefile.frag
+--- php.upstream/sapi/fpm/Makefile.frag
++++ php/sapi/fpm/Makefile.frag
+@@ -14,10 +14,19 @@
+ 		echo "Installing PHP FPM defconfig:     skipping"; \
+ 	else \
+ 		echo "Installing PHP FPM defconfig:     $(INSTALL_ROOT)$(sysconfdir)/" && \
+-		$(mkinstalldirs) $(INSTALL_ROOT)$(sysconfdir)/php-fpm.d; \
+-		$(INSTALL_DATA) sapi/fpm/php-fpm.conf $(INSTALL_ROOT)$(sysconfdir)/php-fpm.conf.default; \
+-		$(INSTALL_DATA) sapi/fpm/www.conf $(INSTALL_ROOT)$(sysconfdir)/php-fpm.d/www.conf.default; \
++		$(mkinstalldirs) $(INSTALL_ROOT)$(sysconfdir)/default/php-fpm.d; \
++		$(INSTALL_DATA) sapi/fpm/php-fpm.conf $(INSTALL_ROOT)$(sysconfdir)/default/php-fpm.conf; \
++		$(INSTALL_DATA) sapi/fpm/www.conf $(INSTALL_ROOT)$(sysconfdir)/default/php-fpm.d/www.conf; \
+ 	fi
++	# PATCH: Install files per the Sortix conventions.
++	mkdir -p $(INSTALL_ROOT)$(datarootdir)/init
++	cp init/php-fpm $(INSTALL_ROOT)$(datarootdir)/init/php-fpm
++	mkdir -p '$(INSTALL_ROOT)$(sysconfdir)/default/passwd.d'
++	mkdir -p '$(INSTALL_ROOT)$(sysconfdir)/default/group.d'
++	echo "_php-fpm:x:102:102:_php-fpm:/var/empty:sh" \
++	  > '$(INSTALL_ROOT)$(sysconfdir)/default/passwd.d/php'
++	echo "_php-fpm::102:_php-fpm,_nginx" \
++	  > '$(INSTALL_ROOT)$(sysconfdir)/default/group.d/php'
+ 
+ 	@echo "Installing PHP FPM man page:      $(INSTALL_ROOT)$(mandir)/man8/"
+ 	@$(mkinstalldirs) $(INSTALL_ROOT)$(mandir)/man8
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_children.c php/sapi/fpm/fpm/fpm_children.c
+--- php.upstream/sapi/fpm/fpm/fpm_children.c
++++ php/sapi/fpm/fpm/fpm_children.c
+@@ -272,7 +272,7 @@
+ 			}
+ 		} else if (WIFSTOPPED(status)) {
+ 
+-			zlog(ZLOG_NOTICE, "child %d stopped for tracing", (int) pid);
++			zlog(ZLOG_NOTICE, "child %jd stopped for tracing", (intmax_t) pid);
+ 
+ 			if (child && child->tracer) {
+ 				child->tracer(child);
+@@ -297,9 +297,9 @@
+ 				if (!fpm_pctl_can_spawn_children()) {
+ 					severity = ZLOG_DEBUG;
+ 				}
+-				zlog(severity, "[pool %s] child %d exited %s after %ld.%06d seconds from start", wp->config->name, (int) pid, buf, (long)tv2.tv_sec, (int) tv2.tv_usec);
++				zlog(severity, "[pool %s] child %jd exited %s after %ld.%06d seconds from start", wp->config->name, (intmax_t) pid, buf, (long)tv2.tv_sec, (int) tv2.tv_usec);
+ 			} else {
+-				zlog(ZLOG_DEBUG, "[pool %s] child %d has been killed by the process management after %ld.%06d seconds from start", wp->config->name, (int) pid, (long)tv2.tv_sec, (int) tv2.tv_usec);
++				zlog(ZLOG_DEBUG, "[pool %s] child %jd has been killed by the process management after %ld.%06d seconds from start", wp->config->name, (intmax_t) pid, (long)tv2.tv_sec, (int) tv2.tv_usec);
+ 			}
+ 
+ 			fpm_child_close(child, 1 /* in event_loop */);
+@@ -340,9 +340,9 @@
+ 				}
+ 			}
+ 		} else if (fpm_globals.parent_pid == 1) {
+-			zlog(ZLOG_DEBUG, "unknown child (%d) exited %s - most likely an orphan process (master process is the init process)", pid, buf);
++			zlog(ZLOG_DEBUG, "unknown child (%jd) exited %s - most likely an orphan process (master process is the init process)", (intmax_t) pid, buf);
+ 		} else {
+-			zlog(ZLOG_WARNING, "unknown child (%d) exited %s - potentially a bug or pre exec child (e.g. s6-notifyoncheck)", pid, buf);
++			zlog(ZLOG_WARNING, "unknown child (%jd) exited %s - potentially a bug or pre exec child (e.g. s6-notifyoncheck)", (intmax_t) pid, buf);
+ 		}
+ 	}
+ }
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_conf.c php/sapi/fpm/fpm/fpm_conf.c
+--- php.upstream/sapi/fpm/fpm/fpm_conf.c
++++ php/sapi/fpm/fpm/fpm_conf.c
+@@ -1862,6 +1862,20 @@
+ 			return -1;
+ 		}
+ 
++		/* PATCH: Search /etc/default for packaged default config. */
++		if (access(tmp, F_OK) < 0 && errno == ENOENT) {
++			efree(tmp);
++			if (fpm_globals.prefix == NULL) {
++				spprintf(&tmp, 0, "%s/default/php-fpm.conf", PHP_SYSCONFDIR);
++			} else {
++				spprintf(&tmp, 0, "%s/etc/default/php-fpm.conf", fpm_globals.prefix);
++			}
++			if (!tmp) {
++				zlog(ZLOG_SYSERROR, "spprintf() failed (tmp for fpm_globals.config)");
++				return -1;
++			}
++		}
++
+ 		fpm_globals.config = strdup(tmp);
+ 		efree(tmp);
+ 
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_main.c php/sapi/fpm/fpm/fpm_main.c
+--- php.upstream/sapi/fpm/fpm/fpm_main.c
++++ php/sapi/fpm/fpm/fpm_main.c
+@@ -1842,6 +1842,14 @@
+ 	}
+ 	fpm_is_running = 1;
+ 
++	if (getenv("READYFD")) {
++		int readyfd = atoi(getenv("READYFD"));
++		char c = '\n';
++		write(readyfd, &c, 1);
++		close(readyfd);
++		unsetenv("READYFD");
++	}
++
+ 	fcgi_fd = fpm_run(&max_requests);
+ 	parent = 0;
+ 
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_scoreboard.c php/sapi/fpm/fpm/fpm_scoreboard.c
+--- php.upstream/sapi/fpm/fpm/fpm_scoreboard.c
++++ php/sapi/fpm/fpm/fpm_scoreboard.c
+@@ -85,7 +85,7 @@
+ 	fpm_unlock(scoreboard->lock);
+ #ifdef PHP_FPM_ZLOG_TRACE
+ 	/* this is useful for debugging but currently needs to be hidden as external logger would always log it */
+-	zlog(ZLOG_DEBUG, "scoreboard: for proc %d reader decremented to value %u", getpid(), current_reader_count);
++	zlog(ZLOG_DEBUG, "scoreboard: for proc %jd reader decremented to value %u", (intmax_t) getpid(), current_reader_count);
+ #endif
+ }
+ 
+@@ -115,11 +115,11 @@
+ 		if (scoreboard->reader_count == 0) {
+ 			if (!fpm_spinlock_with_max_retries(&scoreboard->writer_active, FPM_SCOREBOARD_SPINLOCK_MAX_RETRIES)) {
+ 				/* in this case the writer might have crashed so just warn and continue as the lock was acquired */
+-				zlog(ZLOG_WARNING, "scoreboard: writer %d waited too long for another writer to release lock.", getpid());
++				zlog(ZLOG_WARNING, "scoreboard: writer %jd waited too long for another writer to release lock.", (intmax_t) getpid());
+ 			}
+ #ifdef PHP_FPM_ZLOG_TRACE
+ 			else {
+-				zlog(ZLOG_DEBUG, "scoreboard: writer lock acquired by writer %d", getpid());
++				zlog(ZLOG_DEBUG, "scoreboard: writer lock acquired by writer %jd", (intmax_t) getpid());
+ 			}
+ #endif
+ 			fpm_unlock(scoreboard->lock);
+@@ -217,7 +217,7 @@
+ 
+ 	fpm_unlock(scoreboard->writer_active);
+ #ifdef PHP_FPM_ZLOG_TRACE
+-	zlog(ZLOG_DEBUG, "scoreboard: writer lock released by writer %d", getpid());
++	zlog(ZLOG_DEBUG, "scoreboard: writer lock released by writer %jd", (intmax_t) getpid());
+ #endif
+ }
+ /* }}} */
+@@ -298,7 +298,7 @@
+ #endif
+ 			fpm_unlock(s->lock);
+ #ifdef PHP_FPM_ZLOG_TRACE
+-			zlog(ZLOG_DEBUG, "scoreboard: for proc %d reader incremented to value %u", getpid(), current_reader_count);
++			zlog(ZLOG_DEBUG, "scoreboard: for proc %jd reader incremented to value %u", (intmax_t) getpid(), current_reader_count);
+ #endif
+ 			break;
+ 		}
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_shm.c php/sapi/fpm/fpm/fpm_shm.c
+--- php.upstream/sapi/fpm/fpm/fpm_shm.c
++++ php/sapi/fpm/fpm/fpm_shm.c
+@@ -19,7 +19,11 @@
+ {
+ 	void *mem;
+ 
++#if defined(__sortix__) && !defined(__SORTIX_HAS_WORKING_MAP_SHARED__)
++	mem = mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
++#else
+ 	mem = mmap(0, size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
++#endif
+ 
+ #ifdef MAP_FAILED
+ 	if (mem == MAP_FAILED) {
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_trace_pread.c php/sapi/fpm/fpm/fpm_trace_pread.c
+--- php.upstream/sapi/fpm/fpm/fpm_trace_pread.c
++++ php/sapi/fpm/fpm/fpm_trace_pread.c
+@@ -22,7 +22,7 @@
+ int fpm_trace_signal(pid_t pid) /* {{{ */
+ {
+ 	if (0 > fpm_pctl_kill(pid, FPM_PCTL_STOP)) {
+-		zlog(ZLOG_SYSERROR, "failed to send SIGSTOP to %d", pid);
++		zlog(ZLOG_SYSERROR, "failed to send SIGSTOP to %jd", (intmax_t)pid);
+ 		return -1;
+ 	}
+ 	return 0;
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_unix.c php/sapi/fpm/fpm/fpm_unix.c
+--- php.upstream/sapi/fpm/fpm/fpm_unix.c
++++ php/sapi/fpm/fpm/fpm_unix.c
+@@ -481,10 +481,12 @@
+ 			}
+ 		}
+ 		if (wp->set_uid) {
++#if !defined(__sortix__) || defined(__SORTIX_HAS_INITGROUPS__)
+ 			if (0 > initgroups(wp->set_user ? wp->set_user : wp->config->user, wp->set_gid)) {
+ 				zlog(ZLOG_SYSERROR, "[pool %s] failed to initgroups(%s, %d)", wp->config->name, wp->config->user, wp->set_gid);
+ 				return -1;
+ 			}
++#endif
+ 			if (0 > setuid(wp->set_uid)) {
+ 				zlog(ZLOG_SYSERROR, "[pool %s] failed to setuid(%d)", wp->config->name, wp->set_uid);
+ 				return -1;
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/zlog.c php/sapi/fpm/fpm/zlog.c
+--- php.upstream/sapi/fpm/fpm/zlog.c
++++ php/sapi/fpm/fpm/zlog.c
+@@ -178,8 +178,8 @@
+ 		}
+ 		if (zlog_level == ZLOG_DEBUG) {
+ 			if (!fpm_globals.is_child) {
+-				len += snprintf(buf + len, buf_size - len, "%s: pid %d, %s(), line %d: ",
+-						level_names[flags & ZLOG_LEVEL_MASK], getpid(), function, line);
++				len += snprintf(buf + len, buf_size - len, "%s: pid %jd, %s(), line %d: ",
++						level_names[flags & ZLOG_LEVEL_MASK], (intmax_t)getpid(), function, line);
+ 			} else {
+ 				len += snprintf(buf + len, buf_size - len, "%s: %s(), line %d: ",
+ 						level_names[flags & ZLOG_LEVEL_MASK], function, line);
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/php-fpm.conf.in php/sapi/fpm/php-fpm.conf.in
+--- php.upstream/sapi/fpm/php-fpm.conf.in
++++ php/sapi/fpm/php-fpm.conf.in
+@@ -139,4 +139,4 @@
+ ; Relative path can also be used. They will be prefixed by:
+ ;  - the global prefix if it's been set (-p argument)
+ ;  - @prefix@ otherwise
+-include=@php_fpm_sysconfdir@/php-fpm.d/*.conf
++include=@php_fpm_sysconfdir@/default/php-fpm.d/*.conf
+diff -Paur --no-dereference -- php.upstream/sapi/fpm/www.conf.in php/sapi/fpm/www.conf.in
+--- php.upstream/sapi/fpm/www.conf.in
++++ php/sapi/fpm/www.conf.in
+@@ -38,7 +38,8 @@
+ ;                            (IPv6 and IPv4-mapped) on a specific port;
+ ;   '/path/to/unix/socket' - to listen on a unix socket.
+ ; Note: This value is mandatory.
+-listen = 127.0.0.1:9000
++; listen = 127.0.0.1:9000 ; php upstream default
++listen = /var/run/php-fpm
+ 
+ ; Set listen(2) backlog.
+ ; Default Value: 511 (-1 on Linux, FreeBSD and OpenBSD)
+@@ -458,6 +459,8 @@
+ ; Pass environment variables like LD_LIBRARY_PATH. All $VARIABLEs are taken from
+ ; the current environment.
+ ; Default Value: clean env
++env[PATH] = $PATH
++env[SHELL] = $SHELL
+ ;env[HOSTNAME] = $HOSTNAME
+ ;env[PATH] = /usr/local/bin:/usr/bin:/bin
+ ;env[TMP] = /tmp
+diff -Paur --no-dereference -- php.upstream/sapi/phpdbg/phpdbg_prompt.c php/sapi/phpdbg/phpdbg_prompt.c
+--- php.upstream/sapi/phpdbg/phpdbg_prompt.c
++++ php/sapi/phpdbg/phpdbg_prompt.c
+@@ -54,7 +54,6 @@
+ #include "win32/winutil.h"
+ #define GET_DL_ERROR()  php_win_err()
+ #else
+-#include <sys/param.h>
+ #define GET_DL_ERROR()  DL_ERROR()
+ #endif
+ #endif
+diff -Paur --no-dereference -- php.upstream/scripts/Makefile.frag php/scripts/Makefile.frag
+--- php.upstream/scripts/Makefile.frag
++++ php/scripts/Makefile.frag
+@@ -23,8 +23,10 @@
+ 	build/config.guess \
+ 	build/config.sub
+ 
+-bin_SCRIPTS = phpize php-config
+-man_PAGES = phpize php-config
++# PATCH: pkg-config must be used instead of foo-config.
++# PATCH: phpize is not useful when statically linked.
++bin_SCRIPTS =
++man_PAGES =
+ 
+ install-build:
+ 	@echo "Installing build environment:     $(INSTALL_ROOT)$(phpbuilddir)/"
