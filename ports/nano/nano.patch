@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- nano.upstream/configure nano/configure
 --- nano.upstream/configure
 +++ nano/configure
-@@ -52309,7 +52309,8 @@
+@@ -53702,7 +53702,8 @@
    esac
      for ac_exec_ext in '' $ac_executable_extensions; do
    if as_fn_executable_p "$as_dir$ac_word$ac_exec_ext"; then
@@ -14,7 +14,7 @@ diff -Paur --no-dereference -- nano.upstream/configure nano/configure
 diff -Paur --no-dereference -- nano.upstream/src/files.c nano/src/files.c
 --- nano.upstream/src/files.c
 +++ nano/src/files.c
-@@ -1458,8 +1458,10 @@
+@@ -1462,8 +1462,10 @@
  	if (env_dir != NULL)
  		tempdir = check_writable_directory(env_dir);
  
@@ -37,7 +37,7 @@ diff -Paur --no-dereference -- nano.upstream/src/nano.c nano/src/nano.c
  	} else
  		plainname = copy_of(filename);
  
-@@ -2151,8 +2151,7 @@
+@@ -2155,8 +2155,7 @@
  	}
  
  	/* Curses needs TERM; if it is unset, try falling back to a VT220. */
@@ -50,7 +50,7 @@ diff -Paur --no-dereference -- nano.upstream/src/nano.c nano/src/nano.c
 diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
 --- nano.upstream/src/rcfile.c
 +++ nano/src/rcfile.c
-@@ -580,6 +580,11 @@
+@@ -581,6 +581,11 @@
   * null-terminate it, and return a pointer to the succeeding text. */
  char *parse_next_regex(char *ptr)
  {
@@ -62,7 +62,7 @@ diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
  	char *starting_point = ptr;
  
  	if (*(ptr - 1) != '"') {
-@@ -587,11 +592,28 @@
+@@ -588,11 +593,28 @@
  		return NULL;
  	}
  
@@ -95,7 +95,7 @@ diff -Paur --no-dereference -- nano.upstream/src/rcfile.c nano/src/rcfile.c
  
  	if (*ptr == '\0') {
  		jot_error(N_("Regex strings must begin and end with a \" character"));
-@@ -604,7 +626,8 @@
+@@ -605,7 +627,8 @@
  	}
  
  	/* Null-terminate the regex and skip until the next non-blank. */
