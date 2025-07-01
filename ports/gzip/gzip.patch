@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- gzip.upstream/Makefile.in gzip/Makefile.in
 --- gzip.upstream/Makefile.in
 +++ gzip/Makefile.in
-@@ -2499,7 +2499,6 @@
+@@ -2605,7 +2605,6 @@
  .in:
  	$(AM_V_GEN)rm -f $@-t $@ \
  	  && sed \
@@ -9,3 +9,22 @@ diff -Paur --no-dereference -- gzip.upstream/Makefile.in gzip/Makefile.in
  		-e 's|[@]GREP@|$(GREP)|g' \
  		-e "s|'gzip'|$(GZIP_TRANSFORMED)|g" \
  		-e "s|'zdiff'|$(ZDIFF_TRANSFORMED)|g" \
+diff -Paur --no-dereference -- gzip.upstream/lib/utimens.c gzip/lib/utimens.c
+--- gzip.upstream/lib/utimens.c
++++ gzip/lib/utimens.c
+@@ -22,7 +22,6 @@
+ #include <config.h>
+ 
+ #define _GL_UTIMENS_INLINE _GL_EXTERN_INLINE
+-#include "utimens.h"
+ 
+ #include <errno.h>
+ #include <fcntl.h>
+@@ -34,6 +33,7 @@
+ 
+ #include "stat-time.h"
+ #include "timespec.h"
++#include "utimens.h"
+ 
+ /* On native Windows, use SetFileTime; but avoid this when compiling
+    GNU Emacs, which arranges for this in some other way and which
