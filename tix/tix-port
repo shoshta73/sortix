@@ -507,12 +507,11 @@ if { $cache_package || $download_package; } &&
   start=tix-install
 elif $download_package; then
   # TODO: Cache the release information and sha256sum.
-  # TODO: Just build from source if the download failed.
   announce "Downloading $NAME package"
-  tix-fetch --collection="$collection" \
-            -O "$destination" -- \
-            "$NAME.tix.tar.xz" "$NAME.version"
-  if [ "$(cat $destination/$NAME.version)" = "$(desired_version $port)" ]; then
+  if tix-fetch --collection="$collection" \
+               -O "$destination" -- \
+               "$NAME.tix.tar.xz" "$NAME.version" &&
+     [ "$(cat $destination/$NAME.version)" = "$(desired_version $port)" ]; then
     start=tix-install
   fi
 fi
