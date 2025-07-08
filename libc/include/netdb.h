@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,6 +25,11 @@
 #include <sys/__/types.h>
 
 #include <inttypes.h>
+
+/* TODO: Namespace pollution. */
+#if __USE_SORTIX
+#include <sortix/timespec.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,6 +85,16 @@ struct addrinfo
 	struct sockaddr* ai_addr;
 	char* ai_canonname;
 	struct addrinfo* ai_next;
+#if __USE_SORTIX
+	struct timespec ai_ttl;
+	uint16_t ai_dnsclass;
+	uint16_t ai_dnstype;
+#else
+	/* TODO: Better way to reserve space for a struct timespec. */
+	__extension__ struct { __time_t __tv_sec; long __tv_nsec; } __ai_ttl;
+	uint16_t __ai_dnsclass;
+	uint16_t __ai_dnstype;
+#endif
 };
 
 /* TODO: Figure out how this relates to Sortix. */
@@ -92,6 +107,10 @@ struct addrinfo
 #define AI_V4MAPPED (1<<4)
 #define AI_ALL (1<<5)
 #define AI_ADDRCONFIG (1<<6)
+#if __USE_SORTIX
+#define AI_DNS (1<<7)
+#define AI_DNSRAW (1<<8)
+#endif
 
 #define NI_NOFQDN (1<<0)
 #define NI_NUMERICHOST (1<<1)
