@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -399,25 +399,38 @@ int getaddrinfo(const char* restrict node,
 	int socktype = 0;
 	int protocol = 0;
 
+	size_t question_count = 1;
 	if ( hints )
 	{
 		flags = hints->ai_flags;
 		family = hints->ai_family;
 		socktype = hints->ai_socktype;
 		protocol = hints->ai_protocol;
+		if ( flags & AI_DNS )
+		{
+			struct addrinfo* next = hints->ai_next;
+			while ( next )
+			{
+				question_count++;
+				next = next->ai_next;
+			}
+		}
 	}
 
 	// TODO: Implement missing flags.
 	// TODO: Revisit AI_ADDRCONFIG when IPv6 is implemented.
 	int supported = AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV |
-	                AI_CANONNAME | AI_ADDRCONFIG;
+	                AI_CANONNAME | AI_ADDRCONFIG | AI_DNS | AI_DNSRAW;
 	if ( flags & ~supported )
 		return EAI_BADFLAGS;
 
 	// TODO: IPv6 support.
-	if ( family != AF_UNSPEC && family != AF_INET )
-		return EAI_FAMILY;
-	family = AF_INET;
+	if ( !(flags & (AI_DNS | AI_DNSRAW)) )
+	{
+		if ( family != AF_UNSPEC && family != AF_INET )
+			return EAI_FAMILY;
+		family = AF_INET;
+	}
 
 	if ( socktype == 0 )
 		socktype = SOCK_STREAM;
@@ -615,21 +628,36 @@ retry_cname:
 	struct dns_header hdr;
 	hdr.id = id;
 	hdr.flags = DNS_HEADER_FLAGS_RD;
-	hdr.qdcount = 1;
+	hdr.qdcount = question_count;
 	hdr.ancount = 0;
 	hdr.nscount = 0;
 	hdr.arcount = 0;
 	if ( !encode_dns_header(req, &req_size, &hdr) )
 		return close(fd), EAI_OVERFLOW;
 	struct dns_question qs;
-	qs.qtype = 0;
-	if ( family == AF_INET )
-		qs.qtype = DNS_TYPE_A;
-	else if ( family == AF_INET6 )
-		qs.qtype = DNS_TYPE_AAAA;
-	qs.qclass = DNS_CLASS_IN;
-	if ( !encode_dns_question(req, &req_size, node, &qs) )
-		return close(fd), EAI_OVERFLOW;
+	if ( flags & (AI_DNS | AI_DNSRAW) )
+	{
+		const struct addrinfo* next = hints;
+		while ( next )
+		{
+			qs.qclass = next->ai_dnsclass;
+			qs.qtype = next->ai_dnstype;
+			if ( !encode_dns_question(req, &req_size, node, &qs) )
+				return close(fd), EAI_OVERFLOW;
+			next = next->ai_next;
+		}
+	}
+	else
+	{
+		qs.qtype = DNS_QTYPE_ANY;
+		if ( family == AF_INET )
+			qs.qtype = DNS_TYPE_A;
+		else if ( family == AF_INET6 )
+			qs.qtype = DNS_TYPE_AAAA;
+		qs.qclass = DNS_CLASS_IN;
+		if ( !encode_dns_question(req, &req_size, node, &qs) )
+			return close(fd), EAI_OVERFLOW;
+	}
 
 	struct timespec last_sent = timespec_nul();
 	struct timespec timeout = timespec_nul();
@@ -677,6 +705,7 @@ retry_cname:
 
 	// TODO: Return the correct errors below. It may be the best behavior to
 	//       simply drop any responses with errors.
+	// TODO: Return the raw rcode to callers, at least if AI_DNS.
 	uint16_t rcode = hdr.flags & DNS_HEADER_FLAGS_RCODE_MASK;
 	if ( rcode == DNS_HEADER_FLAGS_RCODE_FORMAT )
 		return close(fd), EAI_FAIL;
@@ -714,8 +743,10 @@ retry_cname:
 		if ( !decode_dns_record(resp, &offset, resp_size, name, &rr) )
 			return close(fd), freeaddrinfo(*res_orig), EAI_OVERFLOW;
 		bool match = strcmp(name, target) == 0;
+		struct timespec ttl = timespec_make(rr.ttl_high << 16 | rr.ttl_low, 0);
 		// TODO: Support aliases.
-		if ( rr.class == DNS_CLASS_IN && rr.type == DNS_TYPE_A )
+		if ( !(flags & AI_DNSRAW) &&
+		     rr.class == DNS_CLASS_IN && rr.type == DNS_TYPE_A )
 		{
 			unsigned char ip[4];
 			for ( size_t i = 0; i < 4; i++ )
@@ -729,17 +760,22 @@ retry_cname:
 				memcpy(&sin.sin_addr, ip, sizeof(sin.sin_addr));
 				struct addrinfo templ;
 				memset(&templ, 0, sizeof(templ));
+				templ.ai_flags = AI_DNS;
 				templ.ai_family = sin.sin_family;
 				templ.ai_socktype = socktype;
 				templ.ai_protocol = protocol;
 				templ.ai_addrlen = sizeof(sin);
 				templ.ai_addr = (struct sockaddr*) &sin;
+				templ.ai_ttl = ttl;
+				templ.ai_dnsclass = rr.class;
+				templ.ai_dnstype = rr.type;
 				if ( !linkaddrinfo(&res, &templ) )
 					return close(fd), freeaddrinfo(*res_orig), EAI_MEMORY;
 				any = true;
 			}
 		}
-		else if ( rr.class == DNS_CLASS_IN && rr.type == DNS_TYPE_AAAA )
+		else if ( !(flags & AI_DNSRAW) &&
+		          rr.class == DNS_CLASS_IN && rr.type == DNS_TYPE_AAAA )
 		{
 			unsigned char ip[16];
 			for ( size_t i = 0; i < 16; i++ )
@@ -754,17 +790,21 @@ retry_cname:
 				sin6.sin6_scope_id = 0;
 				struct addrinfo templ;
 				memset(&templ, 0, sizeof(templ));
+				templ.ai_flags = AI_DNS;
 				templ.ai_family = sin6.sin6_family;
 				templ.ai_socktype = socktype;
 				templ.ai_protocol = protocol;
 				templ.ai_addrlen = sizeof(sin6);
 				templ.ai_addr = (struct sockaddr*) &sin6;
+				templ.ai_ttl = ttl;
+				templ.ai_dnsclass = rr.class;
+				templ.ai_dnstype = rr.type;
 				if ( !linkaddrinfo(&res, &templ) )
 					return close(fd), freeaddrinfo(*res_orig), EAI_MEMORY;
 				any = true;
 			}
 		}
-		else if ( rr.type == DNS_TYPE_CNAME )
+		else if ( !(flags & AI_DNSRAW) && rr.type == DNS_TYPE_CNAME )
 		{
 			char cname[DNS_NAME_MAX + 1];
 			if ( !decode_dns_name(resp, &offset, resp_size, cname) )
@@ -775,6 +815,32 @@ retry_cname:
 				memcpy(target, cname, sizeof(target));
 				found_cname = true;
 			}
+		}
+		else if ( flags & (AI_DNS | AI_DNSRAW) )
+		{
+			unsigned char* data = malloc(rr.rdlength);
+			if ( !data )
+				return close(fd), freeaddrinfo(*res_orig), EAI_MEMORY;
+			for ( size_t i = 0; i < rr.rdlength; i++ )
+			{
+				if ( !decode_dns_byte(resp, &offset, resp_size, &data[i]) )
+					return close(fd), freeaddrinfo(*res_orig), EAI_OVERFLOW;
+			}
+			struct addrinfo templ;
+			memset(&templ, 0, sizeof(templ));
+			templ.ai_flags = AI_DNS | AI_DNSRAW;
+			templ.ai_family = AF_UNSPEC;
+			templ.ai_socktype = 0;
+			templ.ai_protocol = 0;
+			templ.ai_addrlen = rr.rdlength;
+			templ.ai_addr = (struct sockaddr*) data;
+			templ.ai_ttl = ttl;
+			templ.ai_dnsclass = rr.class;
+			templ.ai_dnstype = rr.type;
+			if ( !linkaddrinfo(&res, &templ) )
+				return free(data), close(fd), freeaddrinfo(*res_orig),
+			           EAI_MEMORY;
+			free(data);
 		}
 		else
 		{
