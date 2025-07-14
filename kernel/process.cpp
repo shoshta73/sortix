@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1604,7 +1604,7 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 	// Forbid the creation of new threads if init has exited.
 	ScopedLock process_family_lock_lock(&process_family_lock);
 	if ( child_process->init->is_init_exiting )
-		return errno = EPERM, -1;
+		return delete[] newkernelstack, errno = EPERM, -1;
 
 	// If the thread could not be created, make the process commit suicide
 	// in a manner such that we don't wait for its zombie.
@@ -1615,6 +1615,7 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 	{
 		if ( making_process )
 			child_process->AbortConstruction();
+		delete[] newkernelstack;
 		return -1;
 	}
 
@@ -1623,6 +1624,15 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 	thread->kernel_stack_malloced = true;
 	memcpy(&thread->signal_mask, &regs.sigmask, sizeof(sigset_t));
 	memcpy(&thread->signal_stack, &regs.altstack, sizeof(stack_t));
+
+	// TODO: Expose a bit requesting forking control flow.
+	if ( making_process )
+	{
+		thread->signal_count = curthread->signal_count;
+		thread->signal_single_frame = curthread->signal_single_frame;
+		thread->signal_canary = curthread->signal_canary;
+		thread->signal_single = curthread->signal_single;
+	}
 
 	StartKernelThread(thread);
 
