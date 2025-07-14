@@ -644,6 +644,8 @@ int sys_tcgetwincurpos(int fd, struct wincurpos* wcp)
 	return desc->tcgetwincurpos(&ctx, wcp);
 }
 
+// TODO: After releasing Sortix 1.1, remove the tcgetwinsize(2) system call
+//       in favor of using ioctl directly.
 int sys_tcgetwinsize(int fd, struct winsize* ws)
 {
 	return sys_ioctl(fd, TIOCGWINSZ, (uintptr_t) ws);

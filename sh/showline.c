@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,8 @@
  * showline.c
  * Display a line on the terminal.
  */
+
+#include <sys/ioctl.h>
 
 #include <assert.h>
 #include <stdbool.h>
@@ -82,7 +84,7 @@ void show_line_begin(struct show_line* show_state, int out_fd)
 	show_state->out_fd = out_fd;
 	show_state->current_line = NULL;
 	show_state->current_cursor = 0;
-	tcgetwinsize(show_state->out_fd, &show_state->ws);
+	ioctl(show_state->out_fd, TIOCGWINSZ, &show_state->ws);
 	if ( tcgetwincurpos(out_fd, &show_state->wcp_start) == 0 )
 		show_state->wcp_current = show_state->wcp_start;
 	else
@@ -292,7 +294,7 @@ void show_line(struct show_line* show_state, const char* line, size_t cursor)
 
 	// TODO: We don't currently invalidate on SIGWINCH.
 	struct winsize ws;
-	tcgetwinsize(show_state->out_fd, &ws);
+	ioctl(show_state->out_fd, TIOCGWINSZ, &ws);
 	if ( ws.ws_col != show_state->ws.ws_col ||
 	     ws.ws_row != show_state->ws.ws_row )
 	{

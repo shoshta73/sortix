@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2023, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2023, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -113,14 +113,14 @@ int main(int argc, char* argv[])
 	if ( 0 < columns && 0 < rows )
 	{
 		struct winsize ws;
-		if ( tcgetwinsize(tty, &ws) < 0 )
-			err(1, "tcgetwinsize");
+		if ( ioctl(tty, TIOCGWINSZ, &ws) < 0 )
+			err(1, "TIOCGWINSZ");
 		if ( 0 < columns )
 			ws.ws_col = columns;
 		if ( 0 < rows )
 			ws.ws_row = rows;
-		if ( tcsetwinsize(tty, &ws) < 0 )
-			err(1, "tcgetwinsize");
+		if ( ioctl(tty, TIOCSWINSZ, &ws) < 0 )
+			err(1, "TIOCSWINSZ");
 	}
 	if ( 0 <= bits )
 		tio.c_cflag = (tio.c_cflag & ~CREAD) | bits;
@@ -157,8 +157,8 @@ int main(int argc, char* argv[])
 	if ( logo )
 	{
 		struct winsize ws;
-		if ( tcgetwinsize(tty, &ws) < 0 )
-			err(1, "tcgetwinsize");
+		if ( ioctl(tty, TIOCGWINSZ, &ws) < 0 )
+			err(1, "TIOCGWINSZ");
 		printf("\e[37;41m\e[J");
 		const char* string = BRAND_LOGO;
 		while ( *string )

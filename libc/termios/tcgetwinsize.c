@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,13 +17,11 @@
  * Access to terminal resolution.
  */
 
-#include <sys/syscall.h>
+#include <sys/ioctl.h>
 
 #include <termios.h>
 
-DEFN_SYSCALL2(int, sys_tcgetwinsize, SYSCALL_TCGETWINSIZE, int, struct winsize*);
-
 int tcgetwinsize(int fd, struct winsize* ws)
 {
-	return sys_tcgetwinsize(fd, ws);
+	return ioctl(fd, TIOCGWINSZ, ws);
 }

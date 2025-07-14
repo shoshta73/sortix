@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -166,15 +166,9 @@ int main(int argc, char* argv[])
 	setlocale(LC_ALL, "");
 
 	size_t display_columns = 80;
-#if defined(TIOCGWINSZ)
 	struct winsize ws;
 	if ( ioctl(1, TIOCGWINSZ, &ws) == 0 )
 		display_columns = ws.ws_col;
-#elif defined(__sortix__)
-	struct winsize ws;
-	if ( tcgetwinsize(1, &ws) == 0 )
-		display_columns = ws.ws_col;
-#endif
 
 	bool flag_empty = false;
 

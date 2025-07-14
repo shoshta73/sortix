@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
  * Lists directory contents.
  */
 
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -419,7 +420,7 @@ static void show_column(struct record* records, size_t count)
 		struct winsize ws;
 		if ( display_width_env )
 			display_width = strtoul(display_width_env, NULL, 10);
-		else if ( tcgetwinsize(1, &ws) == 0 )
+		else if ( ioctl(1, TIOCGWINSZ, &ws) == 0 )
 			display_width = ws.ws_col;
 	}
 

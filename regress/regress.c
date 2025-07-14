@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
  * Automatically invokes system tests.
  */
 
+#include <sys/ioctl.h>
 #include <sys/wait.h>
 
 #include <dirent.h>
@@ -41,7 +42,7 @@ bool is_usable_terminal(int fd)
 	struct wincurpos wcp;
 	struct winsize ws;
 	return isatty(fd) &&
-	       tcgetwinsize(fd, &ws) == 0 &&
+	       ioctl(fd, TIOCGWINSZ, &ws) == 0 &&
 	       tcgetwincurpos(fd, &wcp) == 0 &&
 	       10 <= ws.ws_col;
 }
@@ -51,7 +52,7 @@ void tenth_last_column(void)
 	struct wincurpos wcp;
 	struct winsize ws;
 	fflush(stdout);
-	tcgetwinsize(1, &ws);
+	ioctl(1, TIOCGWINSZ, &ws);
 	tcgetwincurpos(1, &wcp);
 	if ( wcp.wcp_col - ws.ws_col < 10 )
 		printf("\n");

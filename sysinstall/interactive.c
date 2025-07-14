@@ -69,7 +69,7 @@ void text(const char* str)
 {
 	fflush(stdout);
 	struct winsize ws;
-	if ( tcgetwinsize(1, &ws) < 0 )
+	if ( ioctl(1, TIOCGWINSZ, &ws) < 0 )
 	{
 		if ( errno == ENOTTY )
 		{
@@ -77,7 +77,7 @@ void text(const char* str)
 			fflush(stdout);
 			return;
 		}
-		err(2, "tcgetwinsize");
+		err(2, "TIOCGWINSZ");
 	}
 	size_t columns = ws.ws_col;
 	size_t column = 0;

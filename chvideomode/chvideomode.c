@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2016, 2023, 2025 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -325,7 +325,7 @@ static bool select_mode(struct dispmsg_crtc_mode* modes,
 		fflush(stdout);
 
 		struct winsize ws;
-		if ( tcgetwinsize(1, &ws) != 0 )
+		if ( ioctl(1, TIOCGWINSZ, &ws) != 0 )
 		{
 			ws.ws_col = 80;
 			ws.ws_row = 25;

@@ -17,6 +17,7 @@
  * Disk editor.
  */
 
+#include <sys/ioctl.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -288,7 +289,7 @@ static void text(const char* str)
 	fflush(stdout);
 	struct winsize ws;
 	struct wincurpos wcp;
-	if ( tcgetwinsize(1, &ws) < 0 || tcgetwincurpos(1, &wcp) < 0 )
+	if ( ioctl(1, TIOCGWINSZ, &ws) < 0 || tcgetwincurpos(1, &wcp) < 0 )
 	{
 		printf("%s", str);
 		return;

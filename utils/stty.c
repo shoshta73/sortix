@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, 2020, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2017, 2020, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,8 @@
  * stty.c
  * Display and set terminal settings.
  */
+
+#include <sys/ioctl.h>
 
 #include <ctype.h>
 #include <err.h>
@@ -302,7 +304,7 @@ int main(int argc, char* argv[])
 	ttyname_r(tty, tty_name, sizeof(tty_name));
 
 	struct winsize ws = {0};
-	bool got_ws = tcgetwinsize(tty, &ws) == 0;
+	bool got_ws = ioctl(tty, TIOCGWINSZ, &ws) == 0;
 	bool set_ws = false;
 
 	struct termios tio;
@@ -630,8 +632,8 @@ int main(int argc, char* argv[])
 	if ( tcsetattr(tty, TCSANOW, &tio) < 0 )
 		err(1, "tcsetattr: %s", tty_name);
 
-	if ( set_ws && tcsetwinsize(tty, &ws) < 0 )
-		err(1, "tcsetwinsize: %s", tty_name);
+	if ( set_ws && ioctl(tty, TIOCSWINSZ, &ws) < 0 )
+		err(1, "TIOCSWINSZ: %s", tty_name);
 
 	return 0;
 }

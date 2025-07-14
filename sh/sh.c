@@ -17,6 +17,7 @@
  * Command language interpreter.
  */
 
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 
@@ -98,7 +99,7 @@ void update_env(void)
 {
 	char str[3 * sizeof(size_t)];
 	struct winsize ws;
-	if ( tcgetwinsize(0, &ws) == 0 )
+	if ( ioctl(0, TIOCGWINSZ, &ws) == 0 )
 	{
 		snprintf(str, sizeof(str), "%zu", (size_t) ws.ws_col);
 		setenv("COLUMNS", str, 1);
