@@ -41,6 +41,7 @@
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/memorymanagement.h>
+#include <sortix/kernel/process.h>
 #include <sortix/kernel/string.h>
 #include <sortix/kernel/syscall.h>
 #include <sortix/kernel/vnode.h>
@@ -236,11 +237,19 @@ static void ExtractTarObject(Ref<Descriptor> desc,
 
 static void ExtractTar(Ref<Descriptor> desc, struct initrd_context* ctx)
 {
+	Process* process = CurrentProcess();
+	kthread_mutex_lock(&process->id_lock);
+	mode_t oldmask = process->umask;
+	process->umask = 0000;
+	kthread_mutex_unlock(&process->id_lock);
 	TAR TAR;
 	OpenTar(&TAR, ctx->initrd, ctx->initrd_size);
 	while ( ReadTar(&TAR) )
 		ExtractTarObject(desc, ctx, &TAR);
 	CloseTar(&TAR);
+	kthread_mutex_lock(&process->id_lock);
+	process->umask = oldmask;
+	kthread_mutex_unlock(&process->id_lock);
 }
 
 static int ExtractTo_mkdir(Ref<Descriptor> desc, ioctx_t* ctx,
