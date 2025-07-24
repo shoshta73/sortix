@@ -501,7 +501,6 @@ int getaddrinfo(const char* restrict node,
 
 	if ( (family == AF_UNSPEC || family == AF_INET) )
 	{
-		// POSIX divergence: Use inet_pton instead of inet_addr format.
 		if ( inet_pton(AF_INET, node, &sin.sin_addr) == 1 )
 		{
 			sin.sin_family = AF_INET;
