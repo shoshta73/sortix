@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -172,7 +172,7 @@ int sys_tcflow(int, int);
 int sys_tcflush(int, int);
 int sys_tcgetattr(int, struct termios*);
 ssize_t sys_tcgetblob(int, const char*, void*, size_t);
-int sys_tcgetpgrp(int);
+pid_t sys_tcgetpgrp(int);
 pid_t sys_tcgetsid(int);
 int sys_tcgetwincurpos(int, struct wincurpos*);
 int sys_tcgetwinsize(int, struct winsize*);

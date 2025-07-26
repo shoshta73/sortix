@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021-2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -660,7 +660,7 @@ int sys_tcsetpgrp(int fd, pid_t pgid)
 	return desc->tcsetpgrp(&ctx, pgid);
 }
 
-int sys_tcgetpgrp(int fd)
+pid_t sys_tcgetpgrp(int fd)
 {
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
 	if ( !desc )
