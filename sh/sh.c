@@ -65,7 +65,7 @@ static const char* builtin_commands[] =
 	(const char*) NULL,
 };
 
-static bool foreground_shell;
+static bool job_control;
 static int status = 0;
 static struct edit_line edit_state;
 
@@ -776,6 +776,7 @@ struct execute_result
 struct execute_result execute(char** tokens,
                               size_t tokens_count,
                               bool interactive,
+                              bool foreground,
                               int pipein,
                               int pipeout,
                               pid_t pgid)
@@ -1130,17 +1131,51 @@ struct execute_result execute(char** tokens,
 		internal = false;
 	}
 
-	if ( !internal && (childpid = fork()) < 0 )
+	int foreground_pipe[2];
+	bool has_foreground_pipe = false;
+	if ( !internal && foreground && job_control && pgid == -1 )
 	{
-		error(0, errno, "fork");
-		internal_status = 1;
-		failure = true;
-		internal = true;
-		childpid = getpid();
+		if ( !pipe2(foreground_pipe, O_CLOEXEC) )
+			has_foreground_pipe = true;
+		else
+		{
+			error(0, errno, "pipe2");
+			internal_status = 1;
+			failure = true;
+			internal = true;
+			childpid = getpid();
+		}
+	}
+
+	sigset_t blocked, oldset;
+	sigemptyset(&blocked);
+	sigaddset(&blocked, SIGHUP);
+	sigaddset(&blocked, SIGINT);
+	sigaddset(&blocked, SIGQUIT);
+	sigaddset(&blocked, SIGTSTP);
+	sigaddset(&blocked, SIGTTIN);
+	sigaddset(&blocked, SIGTTOU);
+	sigaddset(&blocked, SIGCHLD);
+	sigaddset(&blocked, SIGTERM);
+
+	if ( !internal )
+	{
+		sigprocmask(SIG_BLOCK, &blocked, &oldset);
+		if ( (childpid = fork()) < 0 )
+		{
+			error(0, errno, "fork");
+			internal_status = 1;
+			failure = true;
+			internal = true;
+			childpid = getpid();
+		}
 	}
 
 	if ( childpid )
 	{
+		if ( !internal )
+			sigprocmask(SIG_SETMASK, &oldset, NULL);
+
 		if ( set_pipein )
 			close(pipein);
 
@@ -1167,15 +1202,18 @@ struct execute_result execute(char** tokens,
 			return result;
 		}
 
-		setpgid(childpid, pgid != -1 ? pgid : childpid);
-		// TODO: This is an inefficient manner to avoid a race condition where
-		//       a pipeline foo | bar is running in its own process group and
-		//       foo is the process group leader that sets itself as the
-		//       foreground process group, but bar dies prior to foo's tcsetpgrp
-		//       call, because then the shell would run tcsetpgrp to take back
-		//       control, and only then would foo do its tcsetpgrp call.
-		while ( interactive && pgid == -1 && tcgetpgrp(0) != childpid )
-			sched_yield();
+		if ( job_control )
+		{
+			setpgid(childpid, pgid != -1 ? pgid : childpid);
+			// Wait for the child to enter the foreground.
+			if ( has_foreground_pipe )
+			{
+				close(foreground_pipe[1]);
+				char c;
+				read(foreground_pipe[0], &c, sizeof(c));
+				close(foreground_pipe[0]);
+			}
+		}
 
 		struct execute_result result;
 		memset(&result, 0, sizeof(result));
@@ -1184,18 +1222,25 @@ struct execute_result execute(char** tokens,
 		return result;
 	}
 
-	signal(SIGHUP, SIG_DFL);
-
+	// Tell the parent when we have successfully entered the foreground.
 	setpgid(0, pgid != -1 ? pgid : 0);
-	if ( interactive && pgid == -1 )
+	if ( has_foreground_pipe )
 	{
-		sigset_t oldset, sigttou;
-		sigemptyset(&sigttou);
-		sigaddset(&sigttou, SIGTTOU);
-		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
+		close(foreground_pipe[0]);
 		tcsetpgrp(0, getpgid(0));
-		sigprocmask(SIG_SETMASK, &oldset, NULL);
+		close(foreground_pipe[1]);
 	}
+
+	signal(SIGHUP, SIG_DFL);
+	signal(SIGINT, SIG_DFL);
+	signal(SIGQUIT, SIG_DFL);
+	signal(SIGTSTP, SIG_DFL);
+	signal(SIGTTIN, SIG_DFL);
+	signal(SIGTTOU, SIG_DFL);
+	signal(SIGCHLD, SIG_DFL);
+	signal(SIGTERM, SIG_DFL);
+
+	sigprocmask(SIG_UNBLOCK, &blocked, NULL);
 
 	if ( pipein != 0 )
 		dup2(pipein, 0);
@@ -1296,6 +1341,26 @@ readcmd:
 		cmdnext = cmdend;
 	}
 
+	bool foreground = true;
+	if ( !strcmp(execmode, "&") )
+		foreground = false;
+	else if ( !strcmp(execmode, "|") )
+	{
+		size_t realcmdend;
+		for ( realcmdend = cmdnext; realcmdend < tokens_count; realcmdend++ )
+		{
+			const char* token = tokens[cmdend];
+			if ( strcmp(token, ";") == 0 ||
+				 strcmp(token, "&") == 0 ||
+				 strcmp(token, "&&") == 0 ||
+				 strcmp(token, "||") == 0 ||
+				 false )
+				break;
+		}
+		foreground = realcmdend < tokens_count &&
+		             strcmp(tokens[realcmdend], "&") != 0;
+	}
+
 	if ( short_circuited_or )
 	{
 		if ( !strcmp(execmode, ";") ||
@@ -1341,6 +1406,7 @@ readcmd:
 		execute(tokens + cmdstart,
 		        cmdend - cmdstart,
 		        interactive,
+		        foreground,
 		        pipein,
 		        pipeout,
 		        pgid);
@@ -2035,7 +2101,7 @@ static int run(FILE* fp,
 	// TODO: The interactive read code should cope when the input is not a
 	//       terminal; it should print the prompt and then read normally without
 	//       any line editing features.
-	if ( !isatty(fileno(fp)) || !foreground_shell )
+	if ( !isatty(fileno(fp)) || !job_control )
 		interactive = false;
 
 	while ( true )
@@ -2113,6 +2179,33 @@ static int top(FILE* fp,
                bool* script_exited,
                int status)
 {
+	int tty_fd = fileno(fp);
+	job_control = interactive && isatty(tty_fd);
+
+	if ( job_control )
+	{
+		// TODO: What happens if sh | sh?
+		pid_t pgid = getpid();
+		if ( getsid(0) != pgid )
+		{
+			while ( tcgetpgrp(tty_fd) != (pgid = getpgid(0)) )
+				kill(-pgid, SIGTTIN);
+			if ( pgid != getpid() )
+				pgid = setpgid(0, 0);
+		}
+		// TODO: Unify signal handling. Should this happen after tcsetpgrp?
+		signal(SIGINT, SIG_IGN); // TODO: Really?
+		signal(SIGQUIT, SIG_IGN); // TODO: Really?
+		signal(SIGTSTP, SIG_IGN);
+		signal(SIGTTIN, SIG_IGN);
+		signal(SIGTTOU, SIG_IGN);
+		// TODO: Ignore SIGTERM per POSIX if interactive.
+		// TODO: Place ourselves back in the original process group upon exit?
+		tcsetpgrp(tty_fd, pgid);
+		struct termios tio; // TODO: Where to use and restore this?
+		tcgetattr(tty_fd, &tio);
+	}
+
 	if ( interactive )
 	{
 		const char* home = getenv("HOME");
@@ -2216,8 +2309,6 @@ static void version(FILE* fp, const char* argv0)
 int main(int argc, char* argv[])
 {
 	setlocale(LC_ALL, "");
-
-	foreground_shell = isatty(0) && tcgetpgrp(0) == getpgid(0);
 
 	// TODO: Canonicalize argv[0] if it contains a slash and isn't absolute?
 
