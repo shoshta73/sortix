@@ -138,6 +138,7 @@ Process::Process()
 	no_zombify = false;
 	limbo = false;
 	is_init_exiting = false;
+	has_run_exec = false;
 	exit_code = -1;
 
 	first_thread = NULL;
@@ -388,15 +389,6 @@ void Process::LastPrayer()
 		zombie->no_zombify = true;
 		zombie->WaitedFor();
 	}
-	// Remove ourself from our process group.
-	if ( group )
-		group->GroupRemoveMember(this);
-	// Remove ourself from our session.
-	if ( session )
-		session->SessionRemoveMember(this);
-	// Remove ourself from our init.
-	if ( init )
-		init->InitRemoveMember(this);
 
 	bool zombify = !no_zombify;
 
@@ -412,6 +404,15 @@ void Process::LastPrayer()
 
 void Process::WaitedFor() // process_family_lock taken
 {
+	// Remove ourself from our process group.
+	if ( group )
+		group->GroupRemoveMember(this);
+	// Remove ourself from our session.
+	if ( session )
+		session->SessionRemoveMember(this);
+	// Remove ourself from our init.
+	if ( init )
+		init->InitRemoveMember(this);
 	parent = NULL;
 	limbo = false;
 	if ( group_first || session_first || init_first )
@@ -1118,6 +1119,10 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 
 	dtable->OnExecute();
 
+	kthread_mutex_lock(&process_family_lock);
+	has_run_exec = true;
+	kthread_mutex_unlock(&process_family_lock);
+
 	return 0;
 }
 
@@ -1691,15 +1696,6 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 	if ( pid < 0 || pgid < 0 )
 		return errno = EINVAL, -1;
 
-	// TODO: Either prevent changing the process group after an exec or provide
-	//       a version of this system call with a flags parameter that lets you
-	//       decide if you want this behavior. This will fix a race condition
-	//       where the shell spawns a child and both parent and child sets the
-	//       process group, but the child sets the process group and execve's
-	//       and the new program image exploits this 'bug' and also changes the
-	//       process group, and then the shell gets around to change the process
-	//       group. This probably unlikely, but correctness over all!
-
 	Process* current_process = CurrentProcess();
 
 	ScopedLock lock(&process_family_lock);
@@ -1714,16 +1710,12 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 
 	// The process must be this one or a direct child.
 	if ( process != current_process && process->parent != current_process )
-		return errno = EPERM, -1;
+		return errno = ESRCH, -1;
 	// The process must be in this session.
 	if ( process->session != current_process->session )
 		return errno = EPERM, -1;
 	// The new group must be in the same session as the process.
 	if ( group->session != process->session )
-		return errno = EPERM, -1;
-	// The process must not be a process group leader.
-	// TODO: Maybe POSIX actually allows this.
-	if ( process->group_first )
 		return errno = EPERM, -1;
 	// The process must not be a session leader.
 	if ( process->session_first )
@@ -1731,6 +1723,9 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 	// The group must either exist or be the process itself.
 	if ( !group->group_first && group != process )
 		return errno = EPERM, -1;
+	// Children must not have run execve.
+	if ( process != current_process && process->has_run_exec )
+		return errno = EACCES, -1;
 
 	// Exit early if this is a noop.
 	if ( process->group == group )
