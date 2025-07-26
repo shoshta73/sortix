@@ -969,6 +969,19 @@ bool TTY::RequireForeground(int sig)
 	return RequireForegroundUnlocked(sig);
 }
 
+static bool IsOrphanedGroup(Process* group) // process_family_lock held
+{
+	// TODO: This can be cached in a more efficient manner.
+	for ( Process* process = group->group_first;
+	      process;
+	      process = process->group_next )
+		if ( !process->parent ||
+		     (process->parent->group != group &&
+		      process->parent->session == process->session) )
+			return false;
+	return true;
+}
+
 bool TTY::RequireForegroundUnlocked(int sig) // process_family_lock held
 {
 	Thread* thread = CurrentThread();
@@ -983,6 +996,13 @@ bool TTY::RequireForegroundUnlocked(int sig) // process_family_lock held
 	if ( process->signal_actions[sig].sa_handler == SIG_IGN )
 		return true;
 	signal_lock.Reset();
+	// TODO: This behavior needs to be refined and os-test'd.
+	if ( IsOrphanedGroup(process->group) )
+	{
+		if ( sig == SIGTTOU )
+			return errno = EIO, false;
+		return true;
+	}
 	process->group->DeliverGroupSignal(sig);
 	errno = EINTR;
 	return false;
