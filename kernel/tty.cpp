@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016, 2021, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2016, 2021, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -157,7 +157,7 @@ TTY::TTY(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group,
 	termlock = KTHREAD_MUTEX_INITIALIZER;
 	datacond = KTHREAD_COND_INITIALIZER;
 	numeofs = 0;
-	foreground_pgid = -1;
+	foreground_pgid = PID_MAX;
 	sid = -1;
 	hungup = false;
 	snprintf(ttyname, sizeof(ttyname), "%s", name);
@@ -294,13 +294,17 @@ int TTY::tcsetpgrp(ioctx_t* /*ctx*/, pid_t pgid)
 	ScopedLock family_lock(&process_family_lock);
 	if ( !RequireForegroundUnlocked(SIGTTOU) )
 		return -1;
+	Process* process = CurrentProcess();
+	if ( sid < 0 || !process->session || process->session->pid != sid )
+		return errno = ENOTTY, -1;
 	if ( pgid <= 0 )
-		return errno = ESRCH, -1;
-	Process* process = CurrentProcess()->GetPTable()->Get(pgid);
-	if ( !process )
-		return errno = ESRCH, -1;
-	if ( !process->group_first )
 		return errno = EINVAL, -1;
+	Process* group = CurrentProcess()->GetPTable()->Get(pgid);
+	if ( !group )
+		return errno = ESRCH, -1;
+	if ( !group->group_first ||
+	     group->group_first->session != process->session )
+		return errno = EPERM, -1;
 	foreground_pgid = pgid;
 	return 0;
 }
@@ -310,6 +314,10 @@ pid_t TTY::tcgetpgrp(ioctx_t* /*ctx*/)
 	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
+	ScopedLock family_lock(&process_family_lock);
+	Process* process = CurrentProcess();
+	if ( sid < 0 || !process->session || process->session->pid != sid )
+		return errno = ENOTTY, -1;
 	return foreground_pgid;
 }
 
@@ -809,6 +817,10 @@ pid_t TTY::tcgetsid(ioctx_t* /*ctx*/)
 	ScopedLock lock(&termlock);
 	if ( hungup )
 		return errno = EIO, -1;
+	ScopedLock family_lock(&process_family_lock);
+	Process* process = CurrentProcess();
+	if ( sid < 0 || !process->session || process->session->pid != sid )
+		return errno = ENOTTY, -1;
 	return sid;
 }
 
@@ -919,7 +931,7 @@ int TTY::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 			// TODO: SIGHUP?
 		}
 		sid = -1;
-		foreground_pgid = -1;
+		foreground_pgid = PID_MAX;
 	}
 	else if ( cmd == TIOCSPTLCK )
 	{

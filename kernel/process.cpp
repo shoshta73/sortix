@@ -448,6 +448,9 @@ void Process::GroupRemoveMember(Process* child) // process_family_lock taken
 	if ( child->group_next )
 		child->group_next->group_prev = child->group_prev;
 	child->group = NULL;
+	// TODO: When process group is empty, inform the controlling terminal, in
+	//       case it's the foreground process group, and it should be set to
+	//       PID_MAX for safety as an invalid value.
 	if ( IsLimboDone() )
 		delete this;
 }
