@@ -95,6 +95,13 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 	assert(shortopts);
 	assert(0 <= optind);
 
+	// See if a argument parsing reset was requested.
+	if ( optind == 0 )
+	{
+		optind = 1;
+		optcurvalid = false;
+	}
+
 	// Verify that the input string was compatible.
 	if ( !is_supported_option_declaration(shortopts) )
 		return errno = EINVAL, -1;
