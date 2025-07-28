@@ -320,8 +320,11 @@ static void wallpaper(struct framebuffer fb)
 	}
 }
 
-static void display_render_exit(struct display* display, struct framebuffer fb)
+static void display_render_message(struct display* display,
+                                   struct framebuffer fb,
+                                   const char* msg)
 {
+	(void) display;
 	for ( int yoff = -1; yoff <= 1; yoff++ )
 	{
 		for ( int xoff = -1; xoff <= 1; xoff++ )
@@ -329,20 +332,20 @@ static void display_render_exit(struct display* display, struct framebuffer fb)
 			struct framebuffer msgfb = fb;
 			int y = (fb.yres - FONT_HEIGHT) / 2 + yoff;
 			msgfb = framebuffer_cut_top_y(msgfb, y);
-			int w = strlen(display->announcement) * (FONT_WIDTH+1);
+			int w = strlen(msg) * (FONT_WIDTH+1);
 			int x = (fb.xres - w) / 2 + xoff;
 			msgfb = framebuffer_cut_left_x(msgfb, x);
-			render_text(msgfb, display->announcement, make_color_a(0, 0, 0, 64));
+			render_text(msgfb, msg, make_color_a(0, 0, 0, 64));
 		}
 	}
 
 	struct framebuffer msgfb = fb;
 	int y = (fb.yres - FONT_HEIGHT) / 2;
 	msgfb = framebuffer_cut_top_y(msgfb, y);
-	int w = strlen(display->announcement) * (FONT_WIDTH+1);
+	int w = strlen(msg) * (FONT_WIDTH+1);
 	int x = (fb.xres - w) / 2;
 	msgfb = framebuffer_cut_left_x(msgfb, x);
-	render_text(msgfb, display->announcement, make_color(255, 255, 255));
+	render_text(msgfb, msg, make_color(255, 255, 255));
 }
 
 void display_composit(struct display* display, struct framebuffer fb)
@@ -367,9 +370,13 @@ void display_composit(struct display* display, struct framebuffer fb)
 
 	if ( display->announcement )
 	{
-		display_render_exit(display, fb);
+		display_render_message(display, fb, display->announcement);
 		return;
 	}
+
+	if ( !display->bottom_window )
+		display_render_message(display, fb,
+			"Press Control + Alt + T to open a new terminal(1)");
 
 	for ( struct window* window = display->bottom_window;
 	      window;
