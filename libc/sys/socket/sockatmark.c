@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,11 +20,9 @@
 #include <sys/socket.h>
 
 #include <errno.h>
-#include <stdio.h>
 
 int sockatmark(int fd)
 {
 	(void) fd;
-	fprintf(stderr, "%s is not implemented yet.\n", __func__);
 	return errno = ENOSYS, -1;
 }
