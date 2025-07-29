@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,12 +19,7 @@
 
 #include <netdb.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-
 void setservent(int stayopen)
 {
 	(void) stayopen;
-	fprintf(stderr, "%s is not implemented, aborting.\n", __func__);
-	abort();
 }

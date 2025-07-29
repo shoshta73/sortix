@@ -117,8 +117,11 @@ struct addrinfo
 #define NI_MAXSERV 32
 
 /* endhostent will not be implemented. */
+__attribute__((__warning__("endnetent() is IPv4-only and does nothing on this system")))
 void endnetent(void);
+__attribute__((__warning__("endprotoent() is not implemented yet")))
 void endprotoent(void);
+__attribute__((__warning__("endservent() is not implemented yet")))
 void endservent(void);
 void freeaddrinfo(struct addrinfo*);
 const char* gai_strerror(int);
@@ -127,18 +130,30 @@ int getaddrinfo(const char* __restrict, const char* __restrict,
 /* gethostent will not be implemented. */
 int getnameinfo(const struct sockaddr* __restrict, socklen_t, char* __restrict,
                 socklen_t, char* __restrict, socklen_t, int);
+__attribute__((__warning__("getnetbyaddr() is IPv4-only and does nothing on this system")))
 struct netent* getnetbyaddr(uint32_t, int);
+__attribute__((__warning__("getnetbyname() is IPv4-only and does nothing on this system")))
 struct netent* getnetbyname(const char*);
+__attribute__((__warning__("getnetent() is IPv4-only and does nothing on this system")))
 struct netent* getnetent(void);
+__attribute__((__warning__("getprotobyname() is not implemented yet")))
 struct protoent* getprotobyname(const char*);
+__attribute__((__warning__("getprotobynumber() is not implemented yet")))
 struct protoent* getprotobynumber(int);
+__attribute__((__warning__("getprotoent() is not implemented yet")))
 struct protoent* getprotoent(void);
+__attribute__((__warning__("getservbyname() is not implemented yet")))
 struct servent* getservbyname(const char*, const char*);
+__attribute__((__warning__("getservbyport() is not implemented yet")))
 struct servent* getservbyport(int, const char*);
+__attribute__((__warning__("getservent() is not implemented yet")))
 struct servent* getservent(void);
 /* sethostent will not be implemented. */
+__attribute__((__warning__("setnetent() is IPv4-only and does nothing on this system")))
 void setnetent(int);
+__attribute__((__warning__("setprotoent() is not implemented yet")))
 void setprotoent(int);
+__attribute__((__warning__("setservent() is not implemented yet")))
 void setservent(int);
 
 #ifdef __cplusplus

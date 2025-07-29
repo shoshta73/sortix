@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,14 +17,11 @@
  * Get protocol entry.
  */
 
+#include <stddef.h>
 #include <netdb.h>
-
-#include <stdio.h>
-#include <stdlib.h>
 
 struct protoent* getprotobynumber(int proto)
 {
 	(void) proto;
-	fprintf(stderr, "%s is not implemented, aborting.\n", __func__);
-	abort();
+	return NULL;
 }
