@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2024-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -67,15 +67,14 @@ extern "C" {
 #define _XOPEN_VERSION 4
 #endif
 
-/* #define _POSIX_ADVISORY_INFO 202405L
-   TODO: Uncomment when posix_fadvise(), posix_fallocate(), posix_madvise(),
-         posix_memalign() has been added. */
-#define _POSIX_ASYNCHRONOUS_IO 202405L
-#define _POSIX_BARRIERS 202405L
+/* TODO: _POSIX_ADVISORY_INFO - Implement posix_fadvise(), posix_fallocate(),
+                                posix_madvise(), and posix_memalign(). */
+/* TODO: _POSIX_ASYNCHRONOUS_IO - Not implemented yet */
+/* TODO: _POSIX_BARRIERS - Not implemented yet */
 /* TODO: _POSIX_CHOWN_RESTRICTED - Decide when security policies are implemented. */
 #define _POSIX_CLOCK_SELECTION 202405L
 #define _POSIX_CPUTIME 202405L
-/* #undef _POSIX_DEVICE_CONTROL - posix_devctl won't be implemented */
+/*#undef _POSIX_DEVICE_CONTROL - posix_devctl won't be implemented */
 #define _POSIX_FSYNC 202405L
 #define _POSIX_IPV6 202405L
 #define _POSIX_JOB_CONTROL 1
@@ -92,8 +91,7 @@ extern "C" {
 #define _POSIX_READER_WRITER_LOCKS 202405L
 #define _POSIX_REALTIME_SIGNALS 202405L
 #define _POSIX_REGEXP 1
-/* #define _POSIX_SAVED_IDS 1
-   TODO: Uncomment when saved ids are implemented. I forgot if they already are. */
+/* TODO: _POSIX_SAVED_IDS 1 - Perhaps saved ids are already implemented. */
 #define _POSIX_SEMAPHORES 202405L
 /*TODO: _POSIX_SHARED_MEMORY_OBJECTS - Research what this is. */
 #define _POSIX_SHELL 1
@@ -115,28 +113,30 @@ extern "C" {
 #define _POSIX_THREADS 202405L
 #define _POSIX_TIMEOUTS 202405L
 #define _POSIX_TIMERS 202405L
-/* TODO: _POSIX_TYPED_MEMORY_OBJECTS - Research what this is. */
-/* TODO: _POSIX_V7_ILP32_OFF32 (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V7_ILP32_OFFBIG (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V7_LP64_OFF64 (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V7_LPBIG_OFFBIG (Obsolescent) - Research what this is. */
-/* TODO: _POSIX_V8_ILP32_OFF32 - Research what this is. */
-/* TODO: _POSIX_V8_ILP32_OFFBIG - Research what this is. */
-/* TODO: _POSIX_V8_LP64_OFF64 - Research what this is. */
-/* TODO: _POSIX_V8_LPBIG_OFFBIG - Research what this is. */
+/*#undef _POSIX_V7_ILP32_OFF32*/
+/*#undef _POSIX_V8_ILP32_OFF32*/
+#if __SIZEOF_LONG__ == 4
+#define _POSIX_V7_ILP32_OFFBIG 1
+#define _POSIX_V8_ILP32_OFFBIG 1
+#elif __SIZEOF_LONG__ == 8
+#define _POSIX_V7_LP64_OFF64 1
+#define _POSIX_V8_LP64_OFF64 1
+#endif
+/*#undef _POSIX_V7_LPBIG_OFFBIG*/
+/*#undef _POSIX_V8_LPBIG_OFFBIG*/
+
 #define _POSIX2_C_BIND _POSIX2_VERSION
 #define _POSIX2_C_DEV _POSIX2_VERSION
 #define _POSIX2_CHAR_TERM 1
 /* TODO: _POSIX2_FORT_RUN - When fortran becomes supported. */
-/* #define _POSIX2_LOCALEDEF 202405L
-   TODO: Uncomment when locales are implemented. */
+/* TODO: _POSIX2_LOCALEDEF 202405L - Implement locales. */
 /* TODO: _POSIX2_SW_DEV - Research what this is. */
-/* #define _POSIX2_UPE 202405L
-   TODO: Uncomment when bg, ex, fc, fg, jobs, more, talk, vi are implemented. */
+/* TODO: _POSIX2_UPE 202405L: Implement bg, ex, fc, fg, jobs, more, talk, vi. */
 /* TODO: _XOPEN_CRYPT - Research what this is. */
 #define _XOPEN_ENH_I18N 1
 #define _XOPEN_REALTIME 1
 #define _XOPEN_REALTIME_THREADS 1
+/* TODO: _XOPEN_SHM - Research what this is. */
 /* TODO: _XOPEN_UNIX - Decide whether we actually support this (probably not),
                        but also whether this header should lie. */
 /* TODO: _XOPEN_UUCP - Research what this is. */
@@ -169,7 +169,7 @@ extern "C" {
 #define _CS_POSIX_V8_THREADS_CFLAGS 13
 #define _CS_POSIX_V8_THREADS_LDFLAGS 14
 #define _CS_POSIX_V8_WIDTH_RESTRICTED_ENVS 15
-#define _CS_V7_ENV 16
+#define _CS_V8_ENV 16
 #define _CS_POSIX_V7_ILP32_OFF32_CFLAGS 17 /* obsolescent */
 #define _CS_POSIX_V7_ILP32_OFF32_LDFLAGS 18 /* obsolescent */
 #define _CS_POSIX_V7_ILP32_OFF32_LIBS 19 /* obsolescent */
@@ -182,8 +182,10 @@ extern "C" {
 #define _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS 26 /* obsolescent */
 #define _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS 27 /* obsolescent */
 #define _CS_POSIX_V7_LPBIG_OFFBIG_LIBS 28 /* obsolescent */
-#define _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS 29 /* obsolescent */
-#define _CS_V6_ENV 30 /* obsolescent */
+#define _CS_POSIX_V7_THREADS_CFLAGS 29 /* obsolescent */
+#define _CS_POSIX_V7_THREADS_LDFLAGS 30 /* obsolescent */
+#define _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS 31 /* obsolescent */
+#define _CS_V7_ENV 32 /* obsolescent */
 
 /* Sortix will not support POSIX advisory locks and doesn't declare:
    F_LOCK
@@ -191,6 +193,7 @@ extern "C" {
    F_TLOCK
    F_UNLOCK */
 
+#define _PC_TEXTDOMAIN_MAX 0
 #define _PC_2_SYMLINKS 1
 #define _PC_ALLOC_SIZE_MIN 2
 #define _PC_ASYNC_IO 3
@@ -213,7 +216,6 @@ extern "C" {
 #define _PC_TIMESTAMP_RESOLUTION 20
 #define _PC_VDISABLE 21
 #define _PC_FALLOC 22
-#define _PC_TEXTDOMAIN_MAX 23
 
 #define _SC_AIO_LISTIO_MAX 0
 #define _SC_AIO_MAX 1
@@ -282,73 +284,61 @@ extern "C" {
 #define _SC_THREADS 64
 #define _SC_TIMEOUTS 65
 #define _SC_TIMERS 66
-#define _SC_TRACE 67
-#define _SC_TRACE_EVENT_FILTER 68
-#define _SC_TRACE_EVENT_NAME_MAX 69
-#define _SC_TRACE_INHERIT 70
-#define _SC_TRACE_LOG 71
-#define _SC_TRACE_NAME_MAX 72
-#define _SC_TRACE_SYS_MAX 73
-#define _SC_TRACE_USER_EVENT_MAX 74
-#define _SC_TYPED_MEMORY_OBJECTS 75
-#define _SC_VERSION 76
-#define _SC_V7_ILP32_OFF32 77
-#define _SC_V7_ILP32_OFFBIG 78
-#define _SC_V7_LP64_OFF64 79
-#define _SC_V7_LPBIG_OFFBIG 80
-#define _SC_V6_ILP32_OFF32 81 /* obsolescent */
-#define _SC_V6_ILP32_OFFBIG 82 /* obsolescent */
-#define _SC_V6_LP64_OFF64 83 /* obsolescent */
-#define _SC_V6_LPBIG_OFFBIG 84 /* obsolescent */
-#define _SC_2_C_BIND 85
-#define _SC_2_C_DEV 86
-#define _SC_2_CHAR_TERM 87
-#define _SC_2_FORT_DEV 88
-#define _SC_2_FORT_RUN 89
-#define _SC_2_LOCALEDEF 90
-#define _SC_2_PBS 91
-#define _SC_2_PBS_ACCOUNTING 92
-#define _SC_2_PBS_CHECKPOINT 93
-#define _SC_2_PBS_LOCATE 94
-#define _SC_2_PBS_MESSAGE 95
-#define _SC_2_PBS_TRACK 96
-#define _SC_2_SW_DEV 97
-#define _SC_2_UPE 98
-#define _SC_2_VERSION 99
-#define _SC_PAGE_SIZE 100
-#define _SC_PAGESIZE 111
-#define _SC_THREAD_DESTRUCTOR_ITERATIONS 112
-#define _SC_THREAD_KEYS_MAX 113
-#define _SC_THREAD_STACK_MIN 114
-#define _SC_THREAD_THREADS_MAX 115
-#define _SC_RE_DUP_MAX 116
-#define _SC_RTSIG_MAX 117
-#define _SC_SEM_NSEMS_MAX 118
-#define _SC_SEM_VALUE_MAX 119
-#define _SC_SIGQUEUE_MAX 120
-#define _SC_STREAM_MAX 121
-#define _SC_SYMLOOP_MAX 122
-#define _SC_TIMER_MAX 123
-#define _SC_TTY_NAME_MAX 124
-#define _SC_TZNAME_MAX 125
-#define _SC_XOPEN_CRYPT 126
-#define _SC_XOPEN_ENH_I18N 127
-#define _SC_XOPEN_REALTIME 128
-#define _SC_XOPEN_REALTIME_THREADS 129
-#define _SC_XOPEN_SHM 130
-#define _SC_XOPEN_STREAMS 131
-#define _SC_XOPEN_UNIX 132
-#define _SC_XOPEN_UUCP 133
-#define _SC_XOPEN_VERSION 134
-#define _SC_NPROCESSORS_CONF 135
-#define _SC_NPROCESSORS_ONLN 136
-#define _SC_NSIG 137
+#define _SC_TYPED_MEMORY_OBJECTS 67
+#define _SC_VERSION 68
+#define _SC_V8_ILP32_OFF32 69
+#define _SC_V8_ILP32_OFFBIG 70
+#define _SC_V8_LP64_OFF64 71
+#define _SC_V8_LPBIG_OFFBIG 72
+#define _SC_V7_ILP32_OFF32 73 /* obsolescent */
+#define _SC_V7_ILP32_OFFBIG 74 /* obsolescent */
+#define _SC_V7_LP64_OFF64 75 /* obsolescent */
+#define _SC_V7_LPBIG_OFFBIG 76 /* obsolescent */
+#define _SC_2_C_BIND 77
+#define _SC_2_C_DEV 78
+#define _SC_2_CHAR_TERM 79
+#define _SC_2_FORT_RUN 80
+#define _SC_2_LOCALEDEF 81
+#define _SC_2_SW_DEV 82
+#define _SC_2_UPE 83
+#define _SC_2_VERSION 84
+#define _SC_PAGESIZE 85
+#define _SC_DEVICE_CONTROL 86
+#define _SC_THREAD_DESTRUCTOR_ITERATIONS 87
+#define _SC_THREAD_KEYS_MAX 88
+#define _SC_THREAD_STACK_MIN 89
+#define _SC_THREAD_THREADS_MAX 90
+#define _SC_RE_DUP_MAX 91
+#define _SC_RTSIG_MAX 92
+#define _SC_SEM_NSEMS_MAX 93
+#define _SC_SEM_VALUE_MAX 94
+#define _SC_SIGQUEUE_MAX 95
+#define _SC_STREAM_MAX 96
+#define _SC_SYMLOOP_MAX 97
+#define _SC_TIMER_MAX 98
+#define _SC_TTY_NAME_MAX 99
+#define _SC_TZNAME_MAX 100
+#define _SC_XOPEN_CRYPT 101
+#define _SC_XOPEN_ENH_I18N 102
+#define _SC_XOPEN_REALTIME 103
+#define _SC_XOPEN_REALTIME_THREADS 104
+#define _SC_XOPEN_SHM 105
+#define _SC_XOPEN_UNIX 106
+#define _SC_XOPEN_UUCP 107
+#define _SC_XOPEN_VERSION 108
+#define _SC_NPROCESSORS_CONF 109
+#define _SC_NPROCESSORS_ONLN 110
+#define _SC_NSIG 111
+
+#define _SC_PAGE_SIZE _SC_PAGESIZE
 
 #define STDIN_FILENO 0
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
 #define _POSIX_VDISABLE '\0'
+
+/* POSIX_CLOSE_RESTART will not be added */
 
 #ifndef __size_t_defined
 #define __size_t_defined
@@ -533,6 +523,7 @@ int unlinkat(int, const char*, int);
 
 /* Functions from POSIX 2024. */
 #if __USE_SORTIX || 202405L <= __USE_POSIX
+/* posix_close will not be implemented */
 pid_t _Fork(void);
 int dup3(int, int, int);
 int getentropy(void*, size_t);
