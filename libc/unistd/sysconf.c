@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,21 +28,350 @@
 
 long sysconf(int name)
 {
-	switch ( name )
+	if ( name == _SC_PAGESIZE )
+		return getpagesize();
+	static int table[] =
 	{
-	case _SC_CLK_TCK: return 1000;
-	case _SC_GETGR_R_SIZE_MAX: return -1;
-	case _SC_GETPW_R_SIZE_MAX: return -1;
-	case _SC_IOV_MAX: return IOV_MAX;
-	case _SC_MONOTONIC_CLOCK: return _POSIX_MONOTONIC_CLOCK;
-	case _SC_NPROCESSORS_CONF: return 1;
-	case _SC_NPROCESSORS_ONLN: return 1;
-	case _SC_OPEN_MAX: return 0x10000;
-	case _SC_PAGESIZE: case _SC_PAGE_SIZE: return getpagesize();
-	case _SC_RTSIG_MAX: return (SIGRTMAX+1) - SIGRTMIN;
-	default:
-		fprintf(stderr, "%s:%u warning: %s(%i) is unsupported\n",
-		        __FILE__, __LINE__, __func__, name);
+#ifdef AIO_LISTIO_MAX
+	[_SC_AIO_LISTIO_MAX] = AIO_LISTIO_MAX,
+#endif
+#ifdef AIO_MAX
+	[_SC_AIO_MAX] = AIO_MAX,
+#endif
+#ifdef AIO_PRIO_DELTA_MAX
+	[_SC_AIO_PRIO_DELTA_MAX] = AIO_PRIO_DELTA_MAX,
+#endif
+#ifdef ARG_MAX
+	[_SC_ARG_MAX] = ARG_MAX,
+#endif
+#ifdef ATEXIT_MAX
+	[_SC_ATEXIT_MAX] = ATEXIT_MAX,
+#endif
+#ifdef BC_BASE_MAX
+	[_SC_BC_BASE_MAX] = BC_BASE_MAX,
+#endif
+#ifdef BC_DIM_MAX
+	[_SC_BC_DIM_MAX] = BC_DIM_MAX,
+#endif
+#ifdef BC_SCALE_MAX
+	[_SC_BC_SCALE_MAX] = BC_SCALE_MAX,
+#endif
+#ifdef BC_STRING_MAX
+	[_SC_BC_STRING_MAX] = BC_STRING_MAX,
+#endif
+#ifdef CHILD_MAX
+	[_SC_CHILD_MAX] = CHILD_MAX,
+#endif
+	// TODO: Obtain this information from the kernel.
+	[_SC_CLK_TCK] = 1000,
+#ifdef COLL_WEIGHTS_MAX
+	[_SC_COLL_WEIGHTS_MAX] = COLL_WEIGHTS_MAX,
+#endif
+#ifdef DELAYTIMER_MAX
+	[_SC_DELAYTIMER_MAX] = DELAYTIMER_MAX,
+#endif
+#ifdef EXPR_NEST_MAX
+	[_SC_EXPR_NEST_MAX] = EXPR_NEST_MAX,
+#endif
+#ifdef HOST_NAME_MAX
+	[_SC_HOST_NAME_MAX] = HOST_NAME_MAX,
+#endif
+#ifdef IOV_MAX
+	[_SC_IOV_MAX] = IOV_MAX,
+#endif
+#ifdef LINE_MAX
+	[_SC_LINE_MAX] = LINE_MAX,
+#endif
+#ifdef LOGIN_NAME_MAX
+	[_SC_LOGIN_NAME_MAX] = LOGIN_NAME_MAX,
+#endif
+#ifdef NGROUPS_MAX
+	[_SC_NGROUPS_MAX] = NGROUPS_MAX,
+#endif
+	[_SC_GETGR_R_SIZE_MAX] = -1,
+	[_SC_GETPW_R_SIZE_MAX] = -1,
+#ifdef MQ_OPEN_MAX
+	[_SC_MQ_OPEN_MAX] = MQ_OPEN_MAX,
+#endif
+#ifdef MQ_PRIO_MAX
+	[_SC_MQ_PRIO_MAX] = MQ_PRIO_MAX,
+#endif
+	// TODO: Obtain this information from the kernel.
+	[_SC_NPROCESSORS_CONF] = 1,
+	// TODO: Obtain this information from the kernel.
+	[_SC_NPROCESSORS_ONLN] = 1,
+	[_SC_NSIG] = NSIG,
+#ifdef OPEN_MAX
+	[_SC_OPEN_MAX] = OPEN_MAX,
+#else
+	// TODO: Even though Sortix has no such limit, a _lot_ of software likes to
+	//       do e.g. closefrom(2) (and other uses too) by iterating up to
+	//       sysconf(_SC_OPEN_MAX). INT_MAX is way too large and will make those
+	//       programs get stuck, so pick another value that's high but not too
+	//       unreasonably file. Potentially we might be able to scale this based
+	//       on the actual file descriptor table size.
+	[_SC_OPEN_MAX] = 0x10000,
+#endif
+#ifdef PAGESIZE
+	[_SC_PAGESIZE] = PAGESIZE,
+#endif
+#ifdef PTHREAD_DESTRUCTOR_ITERATIONS
+	[_SC_THREAD_DESTRUCTOR_ITERATIONS] = PTHREAD_DESTRUCTOR_ITERATIONS,
+#endif
+#ifdef PTHREAD_KEYS_MAX
+	[_SC_THREAD_KEYS_MAX] = PTHREAD_KEYS_MAX,
+#endif
+#ifdef PTHREAD_STACK_MIN
+	[_SC_THREAD_STACK_MIN] = PTHREAD_STACK_MIN,
+#endif
+#ifdef PTHREAD_THREADS_MAX
+	[_SC_THREAD_THREADS_MAX] = PTHREAD_THREADS_MAX,
+#endif
+#ifdef RE_DUP_MAX
+	[_SC_RE_DUP_MAX] = RE_DUP_MAX,
+#endif
+#ifdef RTSIG_MAX
+	[_SC_RTSIG_MAX] = RTSIG_MAX,
+#endif
+#ifdef SEM_NSEMS_MAX
+	[_SC_SEM_NSEMS_MAX] = SEM_NSEMS_MAX,
+#endif
+#ifdef SEM_VALUE_MAX
+	[_SC_SEM_VALUE_MAX] = SEM_VALUE_MAX,
+#endif
+#ifdef SIGQUEUE_MAX
+	[_SC_SIGQUEUE_MAX] = SIGQUEUE_MAX,
+#endif
+#ifdef STREAM_MAX
+	[_SC_STREAM_MAX] = STREAM_MAX,
+#endif
+#ifdef SYMLOOP_MAX
+	[_SC_SYMLOOP_MAX] = SYMLOOP_MAX,
+#endif
+#ifdef TIMER_MAX
+	[_SC_TIMER_MAX] = TIMER_MAX,
+#endif
+#ifdef TTY_NAME_MAX
+	[_SC_TTY_NAME_MAX] = TTY_NAME_MAX,
+#endif
+#ifdef TZNAME_MAX
+	[_SC_TZNAME_MAX] = TZNAME_MAX,
+#endif
+#ifdef _POSIX_ADVISORY_INFO
+	[_SC_ADVISORY_INFO] = _POSIX_ADVISORY_INFO,
+#endif
+#ifdef _POSIX_BARRIERS
+	[_SC_BARRIERS] = _POSIX_BARRIERS,
+#endif
+#ifdef _POSIX_ASYNCHRONOUS_IO
+	[_SC_ASYNCHRONOUS_IO] = _POSIX_ASYNCHRONOUS_IO,
+#endif
+#ifdef _POSIX_CLOCK_SELECTION
+	[_SC_CLOCK_SELECTION] = _POSIX_CLOCK_SELECTION,
+#endif
+#ifdef _POSIX_CPUTIME
+	[_SC_CPUTIME] = _POSIX_CPUTIME,
+#endif
+#ifdef _POSIX_DEVICE_CONTROL
+	[_SC_DEVICE_CONTROL] = _POSIX_DEVICE_CONTROL,
+#endif
+#ifdef _POSIX_FSYNC
+	[_SC_FSYNC] = _POSIX_FSYNC,
+#endif
+#ifdef _POSIX_IPV6
+	[_SC_IPV6] = _POSIX_IPV6,
+#endif
+#ifdef _POSIX_JOB_CONTROL
+	[_SC_JOB_CONTROL] = _POSIX_JOB_CONTROL,
+#endif
+#ifdef _POSIX_MAPPED_FILES
+	[_SC_MAPPED_FILES] = _POSIX_MAPPED_FILES,
+#endif
+#ifdef _POSIX_MEMLOCK
+	[_SC_MEMLOCK] = _POSIX_MEMLOCK,
+#endif
+#ifdef _POSIX_MEMLOCK_RANGE
+	[_SC_MEMLOCK_RANGE] = _POSIX_MEMLOCK_RANGE,
+#endif
+#ifdef _POSIX_MEMORY_PROTECTION
+	[_SC_MEMORY_PROTECTION] = _POSIX_MEMORY_PROTECTION,
+#endif
+#ifdef _POSIX_MESSAGE_PASSING
+	[_SC_MESSAGE_PASSING] = _POSIX_MESSAGE_PASSING,
+#endif
+#ifdef _POSIX_MONOTONIC_CLOCK
+	[_SC_MONOTONIC_CLOCK] = _POSIX_MONOTONIC_CLOCK,
+#endif
+#ifdef _POSIX_PRIORITIZED_IO
+	[_SC_PRIORITIZED_IO] = _POSIX_PRIORITIZED_IO,
+#endif
+#ifdef _POSIX_PRIORITY_SCHEDULING
+	[_SC_PRIORITY_SCHEDULING] = _POSIX_PRIORITY_SCHEDULING,
+#endif
+#ifdef _POSIX_RAW_SOCKETS
+	[_SC_RAW_SOCKETS] = _POSIX_RAW_SOCKETS,
+#endif
+#ifdef _POSIX_READER_WRITER_LOCKS
+	[_SC_READER_WRITER_LOCKS] = _POSIX_READER_WRITER_LOCKS,
+#endif
+#ifdef _POSIX_REALTIME_SIGNALS
+	[_SC_REALTIME_SIGNALS] = _POSIX_REALTIME_SIGNALS,
+#endif
+#ifdef _POSIX_REGEXP
+	[_SC_REGEXP] = _POSIX_REGEXP,
+#endif
+#ifdef _POSIX_SAVED_IDS
+	[_SC_SAVED_IDS] = _POSIX_SAVED_IDS,
+#endif
+#ifdef _POSIX_SEMAPHORES
+	[_SC_SEMAPHORES] = _POSIX_SEMAPHORES,
+#endif
+#ifdef _POSIX_SHARED_MEMORY_OBJECTS
+	[_SC_SHARED_MEMORY_OBJECTS] = _POSIX_SHARED_MEMORY_OBJECTS,
+#endif
+#ifdef _POSIX_SHELL
+	[_SC_SHELL] = _POSIX_SHELL,
+#endif
+#ifdef _POSIX_SPAWN
+	[_SC_SPAWN] = _POSIX_SPAWN,
+#endif
+#ifdef _POSIX_SPIN_LOCKS
+	[_SC_SPIN_LOCKS] = _POSIX_SPIN_LOCKS,
+#endif
+#ifdef _POSIX_SPORADIC_SERVER
+	[_SC_SPORADIC_SERVER] = _POSIX_SPORADIC_SERVER,
+#endif
+#ifdef _POSIX_SS_REPL_MAX
+	[_SC_SS_REPL_MAX] = _POSIX_SS_REPL_MAX,
+#endif
+#ifdef _POSIX_SYNCHRONIZED_IO
+	[_SC_SYNCHRONIZED_IO] = _POSIX_SYNCHRONIZED_IO,
+#endif
+#ifdef _POSIX_THREAD_ATTR_STACKADDR
+	[_SC_THREAD_ATTR_STACKADDR] = _POSIX_THREAD_ATTR_STACKADDR,
+#endif
+#ifdef _POSIX_THREAD_ATTR_STACKSIZE
+	[_SC_THREAD_ATTR_STACKSIZE] = _POSIX_THREAD_ATTR_STACKSIZE,
+#endif
+#ifdef _POSIX_THREAD_CPUTIME
+	[_SC_THREAD_CPUTIME] = _POSIX_THREAD_CPUTIME,
+#endif
+#ifdef _POSIX_THREAD_PRIO_INHERIT
+	[_SC_THREAD_PRIO_INHERIT] = _POSIX_THREAD_PRIO_INHERIT,
+#endif
+#ifdef _POSIX_THREAD_PRIO_PROTECT
+	[_SC_THREAD_PRIO_PROTECT] = _POSIX_THREAD_PRIO_PROTECT,
+#endif
+#ifdef _POSIX_THREAD_PRIORITY_SCHEDULING
+	[_SC_THREAD_PRIORITY_SCHEDULING] = _POSIX_THREAD_PRIORITY_SCHEDULING,
+#endif
+#ifdef _POSIX_THREAD_PROCESS_SHARED
+	[_SC_THREAD_PROCESS_SHARED] = _POSIX_THREAD_PROCESS_SHARED,
+#endif
+#ifdef _POSIX_THREAD_ROBUST_PRIO_INHERIT
+	[_SC_THREAD_ROBUST_PRIO_INHERIT] = _POSIX_THREAD_ROBUST_PRIO_INHERIT,
+#endif
+#ifdef _POSIX_THREAD_ROBUST_PRIO_PROTECT
+	[_SC_THREAD_ROBUST_PRIO_PROTECT] = _POSIX_THREAD_ROBUST_PRIO_PROTECT,
+#endif
+#ifdef _POSIX_THREAD_SAFE_FUNCTIONS
+	[_SC_THREAD_SAFE_FUNCTIONS] = _POSIX_THREAD_SAFE_FUNCTIONS,
+#endif
+#ifdef _POSIX_THREAD_SPORADIC_SERVER
+	[_SC_THREAD_SPORADIC_SERVER] = _POSIX_THREAD_SPORADIC_SERVER,
+#endif
+#ifdef _POSIX_THREADS
+	[_SC_THREADS] = _POSIX_THREADS,
+#endif
+#ifdef _POSIX_TIMEOUTS
+	[_SC_TIMEOUTS] = _POSIX_TIMEOUTS,
+#endif
+#ifdef _POSIX_TIMERS
+	[_SC_TIMERS] = _POSIX_TIMERS,
+#endif
+#ifdef _POSIX_TYPED_MEMORY_OBJECTS
+	[_SC_TYPED_MEMORY_OBJECTS] = _POSIX_TYPED_MEMORY_OBJECTS,
+#endif
+#ifdef _POSIX_VERSION
+	[_SC_VERSION] = _POSIX_VERSION,
+#endif
+#ifdef _POSIX_V8_ILP32_OFF32
+	[_SC_V8_ILP32_OFF32] = _POSIX_V8_ILP32_OFF32,
+#endif
+#ifdef _POSIX_V8_ILP32_OFFBIG
+	[_SC_V8_ILP32_OFFBIG] = _POSIX_V8_ILP32_OFFBIG,
+#endif
+#ifdef _POSIX_V8_LP64_OFF64
+	[_SC_V8_LP64_OFF64] = _POSIX_V8_LP64_OFF64,
+#endif
+#ifdef _POSIX_V8_LPBIG_OFFBIG
+	[_SC_V8_LPBIG_OFFBIG] = _POSIX_V8_LPBIG_OFFBIG,
+#endif
+#ifdef _POSIX_V7_ILP32_OFF32
+	[_SC_V7_ILP32_OFF32] = _POSIX_V7_ILP32_OFF32,
+#endif
+#ifdef _POSIX_V7_ILP32_OFFBIG
+	[_SC_V7_ILP32_OFFBIG] = _POSIX_V7_ILP32_OFFBIG,
+#endif
+#ifdef _POSIX_V7_LP64_OFF64
+	[_SC_V7_LP64_OFF64] = _POSIX_V7_LP64_OFF64,
+#endif
+#ifdef _POSIX_V7_LPBIG_OFFBIG
+	[_SC_V7_LPBIG_OFFBIG] = _POSIX_V7_LPBIG_OFFBIG,
+#endif
+#ifdef _POSIX2_C_BIND
+	[_SC_2_C_BIND] = _POSIX2_C_BIND,
+#endif
+#ifdef _POSIX2_C_DEV
+	[_SC_2_C_DEV] = _POSIX2_C_DEV,
+#endif
+#ifdef _POSIX2_CHAR_TERM
+	[_SC_2_CHAR_TERM] = _POSIX2_CHAR_TERM,
+#endif
+#ifdef _POSIX2_FORT_RUN
+	[_SC_2_FORT_RUN] = _POSIX2_FORT_RUN,
+#endif
+#ifdef _POSIX2_LOCALEDEF
+	[_SC_2_LOCALEDEF] = _POSIX2_LOCALEDEF,
+#endif
+#ifdef _POSIX2_SW_DEV
+	[_SC_2_SW_DEV] = _POSIX2_SW_DEV,
+#endif
+#ifdef _POSIX2_UPE
+	[_SC_2_UPE] = _POSIX2_UPE,
+#endif
+#ifdef _POSIX2_VERSION
+	[_SC_2_VERSION] = _POSIX2_VERSION,
+#endif
+#ifdef _XOPEN_CRYPT
+	[_SC_XOPEN_CRYPT] = _XOPEN_CRYPT,
+#endif
+#ifdef _XOPEN_ENH_I18N
+	[_SC_XOPEN_ENH_I18N] = _XOPEN_ENH_I18N,
+#endif
+#ifdef _XOPEN_REALTIME
+	[_SC_XOPEN_REALTIME] = _XOPEN_REALTIME,
+#endif
+#ifdef _XOPEN_REALTIME_THREADS
+	[_SC_XOPEN_REALTIME_THREADS] = _XOPEN_REALTIME_THREADS,
+#endif
+#ifdef _XOPEN_SHM
+	[_SC_XOPEN_SHM] = _XOPEN_SHM,
+#endif
+#ifdef _XOPEN_UNIX
+	[_SC_XOPEN_UNIX] = _XOPEN_UNIX,
+#endif
+#ifdef _XOPEN_UUCP
+	[_SC_XOPEN_UUCP] = _XOPEN_UUCP,
+#endif
+#ifdef _XOPEN_VERSION
+	[_SC_XOPEN_VERSION] = _XOPEN_VERSION,
+#endif
+	};
+	if ( name < 0 || sizeof(table) / sizeof(table[0]) <= (size_t) name )
 		return errno = EINVAL, -1;
-	}
+	long value = table[name];
+	if ( !value )
+		return -1;
+	return value;
 }
