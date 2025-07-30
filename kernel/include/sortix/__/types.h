@@ -365,7 +365,8 @@ typedef __uintptr_t __timer_t;
 #define __TIMER_UNSIGNED
 #define __TIMER_C(c) __UINTPTR_C(c)
 #define __TIMER_MIN 0
-#define __TIMER_MAX __UINTPTR_MAX
+/* TODO: POSIX conflict. */
+/*#define __TIMER_MAX __UINTPTR_MAX*/
 #define __PRIdTIMER __PRIdPTR
 #define __PRIiTIMER __PRIiPTR
 #define __PRIoTIMER __PRIoPTR

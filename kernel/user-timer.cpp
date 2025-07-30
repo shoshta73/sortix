@@ -24,8 +24,9 @@
 #include <timespec.h>
 
 #include <sortix/clock.h>
-#include <sortix/signal.h>
+#include <sortix/limits.h>
 #include <sortix/sigevent.h>
+#include <sortix/signal.h>
 #include <sortix/time.h>
 #include <sortix/tmns.h>
 
@@ -55,7 +56,7 @@ static bool FetchSigevent(struct sigevent* dst, const struct sigevent* src)
 
 static UserTimer* LookupUserTimer(Process* process, timer_t timerid)
 {
-	if ( PROCESS_TIMER_NUM_MAX <= timerid )
+	if ( TIMER_MAX <= timerid )
 		return errno = EINVAL, (UserTimer*) NULL;
 	UserTimer* user_timer = &process->user_timers[timerid];
 	if ( !user_timer->timer.IsAttached() )
@@ -86,7 +87,7 @@ int sys_timer_create(clockid_t clockid,
 
 	// Allocate a timer for this request.
 	timer_t timerid;
-	for ( timerid = 0; timerid < PROCESS_TIMER_NUM_MAX; timerid++ )
+	for ( timerid = 0; timerid < TIMER_MAX; timerid++ )
 	{
 		Timer* timer = &process->user_timers[timerid].timer;
 		if ( timer->IsAttached() )
@@ -95,7 +96,7 @@ int sys_timer_create(clockid_t clockid,
 		break;
 	}
 
-	if ( PROCESS_TIMER_NUM_MAX <= timerid )
+	if ( TIMER_MAX <= timerid )
 		return -1;
 
 	if ( !CopyToUser(timerid_ptr, &timerid, sizeof(timerid)) )

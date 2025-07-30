@@ -24,6 +24,7 @@
 #include <limits.h>
 #include <string.h>
 
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
 #if !defined(TTY_NAME_MAX)
 #include <sortix/limits.h>
 #endif

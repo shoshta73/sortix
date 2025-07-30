@@ -51,6 +51,7 @@
 #include <time.h>
 #include <timespec.h>
 
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
 #ifndef IOV_MAX
 #include <sortix/limits.h>
 #endif

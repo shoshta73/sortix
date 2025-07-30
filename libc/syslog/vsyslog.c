@@ -26,7 +26,7 @@
 #include <time.h>
 #include <unistd.h>
 
-// TODO: The Sortix <limits.h> doesn't expose this at the moment.
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
 #if !defined(HOST_NAME_MAX) && defined(__sortix__)
 #include <sortix/limits.h>
 #endif

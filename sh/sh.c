@@ -46,7 +46,7 @@
 #include <wchar.h>
 #include <wctype.h>
 
-// Sortix libc doesn't have its own proper <limits.h> at this time.
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
 #if defined(__sortix__)
 #include <sortix/limits.h>
 #endif

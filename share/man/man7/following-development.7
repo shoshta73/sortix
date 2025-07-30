@@ -69,6 +69,16 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add <limits.h>
+GCC needs to be rebuilt to use the new
+.In limits.h
+header in libc.
+.Pp
+Temporarily all source code files also include
+.In sortix/limits.h
+in order to bootstrap from previous compilers without proper
+.In limits.h
+support.
 .Ss Add networked package management
 The
 .Sy system

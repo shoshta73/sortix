@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
 #include <sortix/limits.h>
 
 long sysconf(int name)

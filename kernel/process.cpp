@@ -34,6 +34,7 @@
 #include <sortix/clock.h>
 #include <sortix/fcntl.h>
 #include <sortix/fork.h>
+#include <sortix/limits.h>
 #include <sortix/mman.h>
 #include <sortix/resource.h>
 #include <sortix/signal.h>
@@ -297,7 +298,7 @@ void Process::AfterLastThreadExit()
 
 void Process::DeleteTimers()
 {
-	for ( timer_t i = 0; i < PROCESS_TIMER_NUM_MAX; i++ )
+	for ( timer_t i = 0; i < TIMER_MAX; i++ )
 	{
 		if ( user_timers[i].timer.IsAttached() )
 		{

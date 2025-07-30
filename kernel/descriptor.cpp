@@ -30,6 +30,7 @@
 
 #include <sortix/dirent.h>
 #include <sortix/fcntl.h>
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
 #ifndef IOV_MAX
 #include <sortix/limits.h>
 #endif
@@ -693,7 +694,6 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 	char* filename_mine = NULL;
 
 	size_t symlink_iteration = 0;
-	const size_t MAX_SYMLINK_ITERATION = 20;
 
 	Ref<Descriptor> desc(this);
 	while ( filename[0] )
@@ -734,7 +734,7 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 			if ( (flags & O_NOFOLLOW) && lastelem )
 				return delete[] filename_mine, errno = ELOOP, Ref<Descriptor>();
 
-			if ( symlink_iteration++ == MAX_SYMLINK_ITERATION )
+			if ( symlink_iteration++ == SYMLOOP_MAX )
 				return delete[] filename_mine, errno = ELOOP, Ref<Descriptor>();
 
 			ioctx_t kctx;

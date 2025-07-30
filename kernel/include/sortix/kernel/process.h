@@ -21,6 +21,7 @@
 #define _INCLUDE_SORTIX_KERNEL_PROCESS_H
 
 #include <sortix/fork.h>
+#include <sortix/limits.h>
 #include <sortix/resource.h>
 #include <sortix/sigaction.h>
 #include <sortix/signal.h>
@@ -35,8 +36,6 @@
 #include <sortix/kernel/timer.h>
 #include <sortix/kernel/user-timer.h>
 #include <sortix/kernel/cpu.h>
-
-#define PROCESS_TIMER_NUM_MAX 32
 
 namespace Sortix {
 
@@ -158,7 +157,7 @@ public:
 
 public:
 	kthread_mutex_t user_timers_lock;
-	UserTimer user_timers[PROCESS_TIMER_NUM_MAX];
+	UserTimer user_timers[TIMER_MAX];
 	Timer alarm_timer;
 	Clock execute_clock;
 	Clock system_clock;

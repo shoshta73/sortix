@@ -422,7 +422,7 @@ typedef __timer_t timer_t;
 #define TIMER_C(c) __TIMER_C(c)
 #define TIMER_MIN __TIMER_MIN
 /* TODO: TIMER_MAX here conflicts with POSIX TIMER_MAX in <limits.h>. */
-#define TIMER_MAX __TIMER_MAX
+/*#define TIMER_MAX __TIMER_MAX*/
 #define PRIdTIMER __PRIdTIMER
 #define PRIiTIMER __PRIiTIMER
 #define PRIoTIMER __PRIoTIMER
