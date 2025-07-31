@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- bc.upstream/bc/execute.c bc/bc/execute.c
 --- bc.upstream/bc/execute.c
 +++ bc/bc/execute.c
-@@ -293,7 +293,7 @@
+@@ -294,7 +294,7 @@
  
  	case 'X': /* Random function. */
  	  push_copy (_zero_);
@@ -10,10 +10,22 @@ diff -Paur --no-dereference -- bc.upstream/bc/execute.c bc/bc/execute.c
  	  break;
  	}
  	break;
+diff -Paur --no-dereference -- bc.upstream/bc/main.c bc/bc/main.c
+--- bc.upstream/bc/main.c
++++ bc/bc/main.c
+@@ -87,8 +87,6 @@
+   int long_index;
+   file_node *temp;
+ 
+-  srandom(time(NULL));
+-
+   /* Force getopt to initialize.  Depends on GNU getopt. */
+   optind = 0;
+ 
 diff -Paur --no-dereference -- bc.upstream/configure bc/configure
 --- bc.upstream/configure
 +++ bc/configure
-@@ -5753,14 +5753,14 @@
+@@ -5761,14 +5761,14 @@
  then :
    withval=$with_readline; case $withval in no) ;;
        *) LDSAVE=$LDFLAGS
@@ -31,7 +43,7 @@ diff -Paur --no-dereference -- bc.upstream/configure bc/configure
  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
  
-@@ -5798,7 +5798,7 @@
+@@ -5806,7 +5806,7 @@
  printf "%s\n" "$ac_cv_lib_ncurses_tparm" >&6; }
  if test "x$ac_cv_lib_ncurses_tparm" = xyes
  then :
@@ -40,7 +52,7 @@ diff -Paur --no-dereference -- bc.upstream/configure bc/configure
  else case e in #(
    e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for tgetent in -ltermcap" >&5
  printf %s "checking for tgetent in -ltermcap... " >&6; }
-@@ -5851,7 +5851,7 @@
+@@ -5859,7 +5859,7 @@
  esac
  fi
  
@@ -49,7 +61,7 @@ diff -Paur --no-dereference -- bc.upstream/configure bc/configure
  	 { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for readline in -lreadline" >&5
  printf %s "checking for readline in -lreadline... " >&6; }
  if test ${ac_cv_lib_readline_readline+y}
-@@ -5859,7 +5859,7 @@
+@@ -5867,7 +5867,7 @@
    printf %s "(cached) " >&6
  else case e in #(
    e) ac_check_lib_save_LIBS=$LIBS
