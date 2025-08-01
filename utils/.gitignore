@@ -20,6 +20,7 @@ env
 expr
 false
 find
+getconf
 getty
 halt
 head

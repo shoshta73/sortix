@@ -1,0 +1,113 @@
+.Dd August 1, 2025
+.Dt GETCONF 1
+.Os
+.Sh NAME
+.Nm getconf
+.Nd get POSIX configuration values
+.Sh SYNOPSIS
+.Nm
+.Op Fl alL
+.Op Fl v specification
+.Ar variable
+.Op Ar path
+.Sh DESCRIPTION
+.Nm
+writes the value of the requested POSIX configuration
+.Ar variable
+from either
+.Xr sysconf 3 ,
+.Xr confstr 3 ,
+or
+.In limits.h .
+If a
+.Ar path
+is specified, then
+.Xr pathconf 2
+is used instead to look up the
+.Ar variable.
+.Pp
+If the variable is valid but is not defined on the system, then
+.Sy undefined
+is written instead.
+.Pp
+The
+.Xr sysconf 3
+variables are requested without the
+.Sy _SC_
+prefix.
+The variables starting with
+.Sy _POSIX_
+are requested with the
+.Sy _POSIX_
+prefix.
+.Pp
+The
+.Xr confstr 3
+variables are requested without the
+.Sy _CS_
+prefix.
+.Pp
+The
+.Xr pathconf 2
+variables are requested without the
+.Sy _PC_
+prefix.
+.Pp
+The
+.In limits.h
+definitions for POSIX minimums/maximums in the format
+.Sy _POSIX_*_MIN
+and
+.Sy _POSIX_*_MAX
+can be requested.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl a
+Write all variables in two space-separated columns, the first with the variable
+names and the second with the values.
+The
+.Ar variable
+operand is not parsed.
+.It Fl l
+Write all the variable names that does not require a path.
+.It Fl L
+Write all the variable names that requires a
+.Ar path .
+.It Fl v Ar specification
+Evaluate the variable in this POSIX
+.Ar specification
+compilation environment, one of:
+.Pp
+.Bl -bullet -compact
+.It
+.Sy POSIX_V8_ILP32_OFF32
+.It
+.Sy POSIX_V8_ILP32_OFFBIG
+.It
+.Sy POSIX_V8_LP64_OFF64
+.It
+.Sy POSIX_V8_LPBIG_OFFBIG
+.El
+.Pp
+.Nm
+is only able to evaluate the supported compilation environment on this system.
+The available environments can be determined with the
+.Sy POSIX_V8_WIDTH_RESTRICTED_ENVS
+variable.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit 0 on success and non-zero otherwise.
+.Sh SEE ALSO
+.Xr uname 1 ,
+.Xr pathconf 2 ,
+.Xr confstr 3 ,
+.Xr sysconf 3
+.Sh STANDARDS
+.Nm
+is standardized in
+.St -p1003.1-2008 .
+The
+.Fl alL
+options are extensions.

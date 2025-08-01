@@ -29,6 +29,7 @@ env \
 expr \
 false \
 find \
+getconf \
 head \
 help \
 id \
@@ -77,6 +78,7 @@ $(BINARIES_EXCEPT_INSTALL) \
 xinstall
 
 MANPAGES1=\
+getconf.1 \
 kernelinfo.1 \
 logname.1 \
 nc.1 \
