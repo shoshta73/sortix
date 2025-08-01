@@ -255,6 +255,34 @@ int sys_mkdirat(int dirfd, const char* path, mode_t mode)
 	return ret;
 }
 
+long sys_pathconfat(int dirfd, const char* path, int name, int flags)
+{
+	if ( flags & ~(AT_SYMLINK_NOFOLLOW) )
+		return errno = EINVAL, -1;
+	char* pathcopy = GetStringFromUser(path);
+	if ( !pathcopy )
+		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
+	if ( !from ) { delete[] pathcopy; return -1; }
+	int open_flags = O_READ | O_IS_STAT |
+	                 (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
+	delete[] pathcopy;
+	if ( !desc )
+		return -1;
+	return desc->pathconf(&ctx, name);
+}
+
+long sys_fpathconf(int fd, int name)
+{
+	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
+	if ( !desc )
+		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->pathconf(&ctx, name);
+}
+
 int sys_truncateat(int dirfd, const char* path, off_t length)
 {
 	char* pathcopy = GetStringFromUser(path);

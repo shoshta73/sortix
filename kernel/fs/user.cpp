@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021-2022, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021-2022, 2024-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -206,6 +206,7 @@ public:
 	virtual int chmod(ioctx_t* ctx, mode_t mode);
 	virtual int chown(ioctx_t* ctx, uid_t owner, gid_t group);
 	virtual int truncate(ioctx_t* ctx, off_t length);
+	virtual long pathconf(ioctx_t* ctx, int name);
 	virtual off_t lseek(ioctx_t* ctx, off_t offset, int whence);
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
 	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
@@ -894,6 +895,29 @@ int Unode::truncate(ioctx_t* ctx, off_t length)
 		if ( SendMessage(channel, FSM_REQ_TRUNCATE, &msg, sizeof(msg)) &&
 			 RecvMessage(channel, FSM_RESP_SUCCESS, NULL, 0) )
 			ret = 0;
+		channel->KernelClose();
+	}
+	Signal::UpdateMask(SIG_SETMASK, &oldset, NULL);
+	return ret;
+}
+
+long Unode::pathconf(ioctx_t* ctx, int name)
+{
+	// pathconf(2) isn't allowed to fail with EINTR.
+	sigset_t set, oldset;
+	sigfillset(&set);
+	Signal::UpdateMask(SIG_SETMASK, &set, &oldset);
+	long ret = -1;
+	Channel* channel = server->Connect(ctx);
+	if ( channel )
+	{
+		struct fsm_req_pathconf msg;
+		struct fsm_resp_pathconf resp;
+		msg.ino = ino;
+		msg.name = name;
+		if ( SendMessage(channel, FSM_REQ_PATHCONF, &msg, sizeof(msg)) &&
+			 RecvMessage(channel, FSM_RESP_PATHCONF, &resp, sizeof(resp))  )
+			ret = resp.value;
 		channel->KernelClose();
 	}
 	Signal::UpdateMask(SIG_SETMASK, &oldset, NULL);

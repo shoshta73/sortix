@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,6 +27,7 @@
 #include <limits.h>
 #include <stdint.h>
 #include <string.h>
+#include <unistd.h>
 
 #include <sortix/dirent.h>
 #include <sortix/fcntl.h>
@@ -284,6 +285,125 @@ int Descriptor::truncate(ioctx_t* ctx, off_t length)
 	if ( !(dflags & O_WRITE) )
 		return errno = EBADF, -1;
 	return vnode->truncate(ctx, length);
+}
+
+long Descriptor::pathconf(ioctx_t* ctx, int name)
+{
+	errno = 0;
+	switch ( name )
+	{
+#ifdef MAX_CANON
+	case _PC_MAX_CANON: return MAX_CANON;
+#else
+	case _PC_MAX_CANON: return -1;
+#endif
+#ifdef MAX_INPUT
+	case _PC_MAX_INPUT: return MAX_INPUT;
+#else
+	case _PC_MAX_INPUT: return -1;
+#endif
+#ifdef PATH_MAX
+	case _PC_PATH_MAX: return PATH_MAX;
+#else
+	case _PC_PATH_MAX: return -1;
+#endif
+#ifdef PIPE_BUF
+	case _PC_PIPE_BUF: return PIPE_BUF;
+#else
+	case _PC_PIPE_BUF: return -1;
+#endif
+#ifdef TEXTDOMAIN_MAX
+	case _PC_TEXTDOMAIN_MAX: return TEXTDOMAIN_MAX;
+#else
+	case _PC_TEXTDOMAIN_MAX: return -1;
+#endif
+#ifdef _POSIX_CHOWN_RESTRICTED
+	case _PC_CHOWN_RESTRICTED: return _POSIX_CHOWN_RESTRICTED;
+#else
+	case _PC_CHOWN_RESTRICTED: return -1;
+#endif
+#ifdef _POSIX_NO_TRUNC
+	case _PC_NO_TRUNC: return _POSIX_NO_TRUNC;
+#else
+	case _PC_NO_TRUNC: return -1;
+#endif
+	case _PC_VDISABLE: return _POSIX_VDISABLE;
+	// TODO: These may vary per filesystem when implemented and may want to
+	//       default to on/off.
+#ifdef _POSIX_ASYNC_IOs
+	case _PC_ASYNC_IO: return _POSIX_ASYNC_IO;
+#else
+	case _PC_ASYNC_IO: return -1;
+#endif
+#ifdef _POSIX_FALLOC
+	case _PC_FALLOC: return _POSIX_FALLOC;
+#else
+	case _PC_FALLOC: return -1;
+#endif
+#ifdef _POSIX_PRIO_IO
+	case _PC_PRIO_IO: return _POSIX_PRIO_IO;
+#else
+	case _PC_PRIO_IO: return -1;
+#endif
+#ifdef _POSIX_SYNC_IO
+	case _PC_SYNC_IO: return _POSIX_SYNC_IO;
+#else
+	case _PC_SYNC_IO: return -1;
+#endif
+	}
+
+	long value = vnode->pathconf(ctx, name);
+	if ( !(value < 0 && errno == EINVAL) )
+		return value;
+
+	errno = 0;
+	switch ( name )
+	{
+	case _PC_FILESIZEBITS: return FILESIZEBITS;
+#ifdef LINK_MAX
+	case _PC_LINK_MAX: return LINK_MAX;
+#else
+	case _PC_LINK_MAX: return -1;
+#endif
+#ifdef NAME_MAX
+	case _PC_NAME_MAX: return NAME_MAX;
+#else
+	case _PC_NAME_MAX: return -1;
+#endif
+	case _PC_2_SYMLINKS: return _POSIX2_SYMLINKS;
+#ifdef POSIX_ALLOC_SIZE_MIN
+	case _PC_ALLOC_SIZE_MIN: return POSIX_ALLOC_SIZE_MIN;
+#else
+	case _PC_ALLOC_SIZE_MIN: return -1;
+#endif
+#ifdef POSIX_REC_INCR_XFER_SIZE
+	case _PC_REC_INCR_XFER_SIZE: return POSIX_REC_INCR_XFER_SIZE;
+#else
+	case _PC_REC_INCR_XFER_SIZE: return -1;
+#endif
+#ifdef POSIX_REC_MAX_XFER_SIZE
+	case _PC_REC_MAX_XFER_SIZE: return POSIX_REC_MAX_XFER_SIZE;
+#else
+	case _PC_REC_MAX_XFER_SIZE: return -1;
+#endif
+#ifdef POSIX_REC_MIN_XFER_SIZE
+	case _PC_REC_MIN_XFER_SIZE: return POSIX_REC_MIN_XFER_SIZE;
+#else
+	case _PC_REC_MIN_XFER_SIZE: return -1;
+#endif
+#ifdef POSIX_REC_XFER_ALIGN
+	case _PC_REC_XFER_ALIGN: return POSIX_REC_XFER_ALIGN;
+#else
+	case _PC_REC_XFER_ALIGN: return -1;
+#endif
+#ifdef SYMLINK_MAX
+	case _PC_SYMLINK_MAX: return SYMLINK_MAX;
+#else
+	case _PC_SYMLINK_MAX: return -1;
+#endif
+	case _PC_TIMESTAMP_RESOLUTION: return _POSIX_TIMESTAMP_RESOLUTION;
+	default: return errno = EINVAL, -1;
+	}
 }
 
 off_t Descriptor::lseek(ioctx_t* ctx, off_t offset, int whence)

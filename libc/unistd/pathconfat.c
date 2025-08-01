@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,14 +13,17 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * unistd/pathconf.c
+ * unistd/pathconfat.c
  * Get configurable pathname variables.
  */
 
-#include <fcntl.h>
+#include <sys/syscall.h>
+
 #include <unistd.h>
 
-long pathconf(const char* path, int name)
+DEFN_SYSCALL4(int, sys_pathconfat, SYSCALL_PATHCONFAT, int, const char*, int, int);
+
+long pathconfat(int dirfd, const char* path, int name, int flags)
 {
-	return pathconfat(AT_FDCWD, path, name, 0);
+	return sys_pathconfat(dirfd, path, name, flags);
 }

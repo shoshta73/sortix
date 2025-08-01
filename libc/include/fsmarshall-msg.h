@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -497,7 +497,20 @@ struct fsm_req_shutdown
 	int how;
 };
 
-#define FSM_MSG_NUM 64
+#define FSM_REQ_PATHCONF 64
+struct fsm_req_pathconf
+{
+	ino_t ino;
+	int name;
+};
+
+#define FSM_RESP_PATHCONF 65
+struct fsm_resp_pathconf
+{
+	long value;
+};
+
+#define FSM_MSG_NUM 66
 
 #ifdef __cplusplus
 } /* extern "C" */

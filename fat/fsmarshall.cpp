@@ -161,6 +161,13 @@ bool RespondTCGetBlob(int chl, const void* data, size_t data_size)
 	       RespondData(chl, data, data_size);
 }
 
+bool RespondPathConf(int chl, long value)
+{
+	struct fsm_resp_pathconf body;
+	body.value = value;
+	return RespondMessage(chl, FSM_RESP_PATHCONF, &body, sizeof(body));
+}
+
 Inode* SafeGetInode(Filesystem* fs, ino_t ino)
 {
 	if ( (fat_ino_t) ino != ino )
@@ -664,6 +671,22 @@ void HandleTCGetBlob(int chl, struct fsm_req_tcgetblob* msg, Filesystem* fs)
 	free(name);
 }
 
+void HandlePathConf(int chl, struct fsm_req_pathconf* msg, Filesystem* /*fs*/)
+{
+	long value;
+	switch ( msg->name )
+	{
+	case _PC_FILESIZEBITS: value = 32; break;
+	case _PC_LINK_MAX: value = 1; break;
+	case _PC_NAME_MAX: value = FAT_UTF16_NAME_MAX; break;
+	case _PC_2_SYMLINKS: value = 0; break;
+	case _PC_SYMLINK_MAX: value = 0; break;
+	case _PC_TIMESTAMP_RESOLUTION: value = 1000000000L; break;
+	default: RespondError(chl, EINVAL); return;
+	}
+	RespondPathConf(chl, value);
+}
+
 void HandleIncomingMessage(int chl, struct fsm_msg_header* hdr, Filesystem* fs)
 {
 	request_uid = hdr->uid;
@@ -693,6 +716,7 @@ void HandleIncomingMessage(int chl, struct fsm_msg_header* hdr, Filesystem* fs)
 	handlers[FSM_REQ_UNREF] = (handler_t) HandleUnref;
 	handlers[FSM_REQ_STATVFS] = (handler_t) HandleStatVFS;
 	handlers[FSM_REQ_TCGETBLOB] = (handler_t) HandleTCGetBlob;
+	handlers[FSM_REQ_PATHCONF] = (handler_t) HandlePathConf;
 	if ( FSM_MSG_NUM <= hdr->msgtype || !handlers[hdr->msgtype] )
 	{
 		warn("message type %zu not supported\n", hdr->msgtype);

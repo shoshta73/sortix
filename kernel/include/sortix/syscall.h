@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -192,6 +192,8 @@
 #define SYSCALL_MEMUSAGE 169
 #define SYSCALL_GETINIT 170
 #define SYSCALL_SETINIT 171
-#define SYSCALL_MAX_NUM 172 /* index of highest constant + 1 */
+#define SYSCALL_PATHCONFAT 172
+#define SYSCALL_FPATHCONF 173
+#define SYSCALL_MAX_NUM 174 /* index of highest constant + 1 */
 
 #endif

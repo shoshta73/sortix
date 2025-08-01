@@ -542,6 +542,7 @@ int crypt_checkpass(const char*, const char*);
 int crypt_newhash(const char*, const char*, char*, size_t);
 int execvpe(const char*, char* const [], char* const []);
 char* get_current_dir_name(void);
+long pathconfat(int, const char*, int, int);
 int sethostname(const char*, size_t);
 typedef unsigned int useconds_t;
 int usleep(useconds_t useconds);

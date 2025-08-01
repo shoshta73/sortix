@@ -748,6 +748,7 @@ unistd/lseek.o \
 unistd/memstat.o \
 unistd/mkpartition.o \
 unistd/pathconf.o \
+unistd/pathconfat.o \
 unistd/pipe2.o \
 unistd/pipe.o \
 unistd/pread.o \

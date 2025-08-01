@@ -69,6 +69,14 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add pathconfat(2) and properly implement pathconf(2) and fpathconf(2)
+The
+.Xr pathconfat 2
+and
+.Xr fpathconf 2
+system calls have been added.
+They provide access to filesystem limits.
+This is a minor compatible ABI change.
 .Ss Add <limits.h>
 GCC needs to be rebuilt to use the new
 .In limits.h

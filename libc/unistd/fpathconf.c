@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,18 +17,13 @@
  * Get configurable pathname variables.
  */
 
-#include <errno.h>
-#include <stdio.h>
+#include <sys/syscall.h>
+
 #include <unistd.h>
+
+DEFN_SYSCALL2(long, sys_fpathconf, SYSCALL_FPATHCONF, int, off_t);
 
 long fpathconf(int fd, int name)
 {
-	switch ( name )
-	{
-	case _PC_PATH_MAX: return -1; // Unbounded
-	default:
-		fprintf(stderr, "%s:%u warning: %s(%i, %i) is unsupported\n",
-		        __FILE__, __LINE__, __func__, fd, name);
-		return errno = EINVAL, -1;
-	}
+	return sys_fpathconf(fd, name);
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -249,6 +249,11 @@ int Vnode::chmod(ioctx_t* ctx, mode_t mode)
 int Vnode::chown(ioctx_t* ctx, uid_t owner, gid_t group)
 {
 	return inode->chown(ctx, owner, group);
+}
+
+long Vnode::pathconf(ioctx_t* ctx, int name)
+{
+	return inode->pathconf(ctx, name);
 }
 
 int Vnode::truncate(ioctx_t* ctx, off_t length)

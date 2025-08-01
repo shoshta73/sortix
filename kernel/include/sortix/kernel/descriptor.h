@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,6 +66,7 @@ public:
 	int chmod(ioctx_t* ctx, mode_t mode);
 	int chown(ioctx_t* ctx, uid_t owner, gid_t group);
 	int truncate(ioctx_t* ctx, off_t length);
+	long pathconf(ioctx_t* ctx, int name);
 	off_t lseek(ioctx_t* ctx, off_t offset, int whence);
 	ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
 	ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);

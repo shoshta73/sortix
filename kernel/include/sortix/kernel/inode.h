@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -64,6 +64,7 @@ public:
 	virtual int chmod(ioctx_t* ctx, mode_t mode) = 0;
 	virtual int chown(ioctx_t* ctx, uid_t owner, gid_t group) = 0;
 	virtual int truncate(ioctx_t* ctx, off_t length) = 0;
+	virtual long pathconf(ioctx_t* ctx, int name) = 0;
 	virtual off_t lseek(ioctx_t* ctx, off_t offset, int whence) = 0;
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count) = 0;
 	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov,
@@ -177,6 +178,7 @@ public:
 	virtual int chmod(ioctx_t* ctx, mode_t mode);
 	virtual int chown(ioctx_t* ctx, uid_t owner, gid_t group);
 	virtual int truncate(ioctx_t* ctx, off_t length);
+	virtual long pathconf(ioctx_t* ctx, int name);
 	virtual off_t lseek(ioctx_t* ctx, off_t offset, int whence);
 	virtual ssize_t read(ioctx_t* ctx, uint8_t* buf, size_t count);
 	virtual ssize_t readv(ioctx_t* ctx, const struct iovec* iov, int iovcnt);

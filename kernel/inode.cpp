@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -155,6 +155,11 @@ int AbstractInode::truncate(ioctx_t* /*ctx*/, off_t /*length*/)
 {
 	if ( inode_type == INODE_TYPE_DIR )
 		return errno = EISDIR, -1;
+	return errno = EINVAL, -1;
+}
+
+long AbstractInode::pathconf(ioctx_t* /*ctx*/, int /*name*/)
+{
 	return errno = EINVAL, -1;
 }
 
