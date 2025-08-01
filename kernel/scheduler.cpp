@@ -258,10 +258,6 @@ static void SwitchRegisters(struct interrupt_context* intctx,
 
 	Random::Mix(Random::SOURCE_PREEMPTION, intctx, sizeof(*intctx));
 	SaveInterruptedContext(intctx, &prev->registers);
-	if ( !prev->registers.cr3 )
-		Log::PrintF("Thread %p had cr3=0x%zx\n", prev, prev->registers.cr3);
-	if ( !next->registers.cr3 )
-		Log::PrintF("Thread %p has cr3=0x%zx\n", next, next->registers.cr3);
 	LoadInterruptedContext(intctx, &next->registers);
 
 	current_thread = next;
