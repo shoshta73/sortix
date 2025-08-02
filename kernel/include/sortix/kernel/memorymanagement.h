@@ -101,7 +101,6 @@ bool Map(addr_t physical, addr_t mapto, int prot);
 bool MapPAT(addr_t physical, addr_t mapto, int prot, addr_t mtype);
 addr_t Unmap(addr_t mapto);
 addr_t Physical(addr_t mapto);
-int PageProtection(addr_t mapto);
 bool LookUp(addr_t mapto, addr_t* physical, int* prot);
 int ProvidedProtection(int prot);
 void PageProtect(addr_t mapto, int protection);
