@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,7 +31,7 @@ off_t ftello_unlocked(FILE* fp)
 		return -1;
 	off_t read_ahead = fp->amount_input_buffered - fp->offset_input_buffer;
 	off_t write_behind = fp->amount_output_buffered;
-	if ( offset < read_ahead + write_behind ) // Too much ungetc'ing.
+	if ( offset < read_ahead ) // Too much ungetc'ing.
 		return 0;
 	return offset - read_ahead + write_behind;
 }
