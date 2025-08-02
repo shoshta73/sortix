@@ -203,6 +203,7 @@ install-cross-compiler:
 	PATH="$(PREFIX)/bin:$(PATH)" \
 	$(MAKE) -C ports/gcc/gcc.build install-gcc install-target-libgcc
 	rm -rf ports/gcc/gcc.build
+	ln -sf "$(TARGET)-gcc" "$(PREFIX)/bin/$(TARGET)-cc"
 
 .PHONY: clean-cross-toolchain
 clean-cross-toolchain: clean-sysroot clean-build-tools clean-cross-compiler
