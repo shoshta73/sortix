@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
 	if ( !nl )
 		fputc('\n', fp);
 	fputs("\r\n", fp);
-	if ( feof(fp) || fflush(fp) == EOF )
+	if ( ferror(fp) || fflush(fp) == EOF )
 		err(1, "malloc");
 	fclose(fp);
 

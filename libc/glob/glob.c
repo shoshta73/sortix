@@ -157,6 +157,11 @@ int glob(const char* restrict pattern,
 			char* re = NULL;
 			size_t re_size;
 			FILE* fp = open_memstream(&re, &re_size);
+			if ( !fp )
+			{
+				result = GLOB_NOSPACE;
+				break;
+			}
 			bool escaped = false;
 			fputc('^', fp);
 			// Translate the pattern to an extended regular expression.

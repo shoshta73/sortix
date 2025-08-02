@@ -111,11 +111,12 @@ static char* os_release_eval(const char* string)
 			escaped = false;
 		}
 	}
-	if ( fclose(fp) == EOF )
+	if ( ferror(fp) || fflush(fp) == EOF )
 	{
 		free(result);
-		return NULL;
+		result = NULL;
 	}
+	fclose(fp);
 	return result;
 }
 

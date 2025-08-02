@@ -137,7 +137,7 @@ static char** tokenize(size_t* out_tokens_used, const char* string)
 			invalid = true;
 			break;
 		}
-		if ( fflush(fp) == EOF )
+		if ( ferror(fp) || fflush(fp) == EOF )
 		{
 			fclose(fp);
 			free(token);

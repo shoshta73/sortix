@@ -206,17 +206,18 @@ int execute(const char* const* argv, const char* flags, ...)
 				if ( fwrite(buf, 1, amount, out_fp) != (size_t) amount )
 				{
 					if ( !quiet_stderr )
-						warn("fwrite to memstream");
+						warn("buffering to memstream");
 					success = false;
 					break;
 				}
 			}
-			if ( success && fclose(out_fp) == EOF )
+			if ( success && (ferror(out_fp) || fflush(out_fp) == EOF) )
 			{
 				if ( !quiet_stderr )
-					warn("fclose of memstream");
+					warn("buffering to memstream");
 				success = false;
 			}
+			fclose(out_fp);
 			close(output_pipes[0]);
 			if ( !success )
 			{

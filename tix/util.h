@@ -482,8 +482,9 @@ int variables_parse(string_array_t* sa, const char* line, char** out_ptr)
 	if ( !fp )
 		return -1;
 	int result = variables_parse_fp(sa, line, fp);
-	if ( fclose(fp) == EOF )
+	if ( ferror(fp) || fflush(fp) == EOF )
 		result = -1;
+	fclose(fp);
 	if ( result <= 0 )
 		free(*out_ptr);
 	return result;
