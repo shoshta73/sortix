@@ -1,0 +1,13 @@
+NAME=man
+BUILD_LIBRARIES=libz
+VERSION=1.14.6
+DISTNAME=mandoc-$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=8bf0d570f01e70a6e124884088870cbed7537f36328d512909eb10cd53179d9c
+UPSTREAM_SITE=https://mandoc.bsd.lv/snapshots
+UPSTREAM_ARCHIVE=$ARCHIVE
+BUILD_SYSTEM=configure
+DIRTY_FILE=Makefile.local
+CONFIGURE_ARGS='--with-pager=less --enable-less-T --with-manpath=/share/man --with-manpath-base=/share/man'
+RUNTIME_DEPS=less

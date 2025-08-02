@@ -3,8 +3,10 @@
 RESULT=true
 for MANUAL in $(git ls-files | grep -E '\.[0-9]$' | grep -Ev '^libm/man/'); do
   # TODO: mandoc on Sortix can't parse .Dd dates at the moment.
-  #if ! mandoc -Tlint $MANUAL; then
-  if mandoc -Tlint $MANUAL 2>&1 | grep -Ev "WARNING: cannot parse date"; then
+  # TODO: mandoc really needs a way to turn warnings on/off.
+  # TODO: Ignore warnings with known false positives that we don't know how to
+  #       work around just yet.
+  if mandoc -Tlint $MANUAL 2>&1 | grep -Ev 'WARNING: cannot parse date|STYLE: referenced manual not found|STYLE: consider using OS macro|STYLE: verbatim "--", maybe consider using \\\(em|STYLE: no blank before trailing delimiter|outdated mandoc.db lacks'; then
     RESULT=false
   fi
 done
