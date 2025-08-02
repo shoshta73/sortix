@@ -118,7 +118,8 @@ You need to specify the
 .Ar offset
 into the hole where the partition is created and
 then the
-.Ar length of the partition.
+.Ar length
+of the partition.
 See
 .Sx QUANTITIES
 below on the possible partition offset and length values.
@@ -168,7 +169,7 @@ to set the cache size to N percent of system memory, or other filesystem
 specific values.
 .It Sy mktable Oo mbr "|" gpt Oc
 Create a partition table on the current device of the specified type.
-.It Sy mount Ar partition-index Oo Ar mountpoint Li "|" Sy no Oc Ar options
+.It Sy mount Ar partition-index Oo Ar mountpoint "|" Sy no Oc Ar options
 Mount the partition
 .Ar partition-index
 of the current device on

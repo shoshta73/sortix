@@ -24,17 +24,17 @@ The lines are compared according to the current locale's collating rules.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
-.It Fl c, \-check, \-check=diagnose-first
+.It Fl c , \-check , \-check=diagnose-first
 Check whether the input is already sorted.
 If a line is out of order (or an equal line is found if
 .Fl u ) ,
 write an error describing which line was out of
 order and exit 1.
-.It Fl C, \-check=quiet, \-check=silent
+.It Fl C , \-check=quiet , \-check=silent
 Same as
 .Fl c ,
 but write no error to the standard output about the input being out of order.
-.It Fl m, \-merge
+.It Fl m , \-merge
 Merge the presorted input files into a sorted output.
 .It Fl o Ar path , Fl \-output Ns = Ns Ar path
 After reading the full input; write the output to the file at

@@ -140,10 +140,10 @@ Search for a filesystem with this
 .Ar label
 as the volume label.
 The volume label can be changed with
-.Xr fatlabel 8.
+.Xr fatlabel 8 .
 .It Sy SERIAL Ns = Ns Ar serial
 Search for a filesystem with this
-.Xr serial
+.Ar serial
 number as the volume id in the
 .Sy XXXX-XXXX
 upper-case hexadecimal format.
@@ -155,10 +155,11 @@ nul byte.
 This identifier is recommended for filesystem searches to avoid mounting the
 wrong filesystem, although it might not be globally unique.
 Note that if the volume label is changed with
-.Xr fatlabel 8, then
+.Xr fatlabel 8 ,
+then
 .Xr fstab 5
 must be updated with the new
-.Sy UUID.
+.Sy UUID .
 .El
 .Sh IMPLEMENTATION NOTES
 If

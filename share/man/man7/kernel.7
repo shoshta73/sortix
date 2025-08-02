@@ -50,8 +50,8 @@ The computer is powered off if the
 process exits 0, rebooted if it exits 1,
 halted with an complaint about an
 .Nm init
-fatality if it exits 2, and halted with a complaint about an unexpected exit code
-otherwise.
+fatality if it exits 2, and halted with a complaint about an unexpected exit
+code otherwise.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
@@ -63,7 +63,7 @@ as the console and the session for
 along with options for initializing the terminal.
 The choices are:
 .Bl -tag -width "12345678"
-.It Sy com Ns Ar n Ns Oo , Ns Oo BBBBPN Oc Ns Oo Ns , Ns Ar columns Ns Sy x Ns Ar rows Oc Oc
+.It Sy com Ns Ar n Ns Oo , Ns Oo BBBBPN Oc Ns Oo , Ns Ar columns Ns Sy x Ns Ar rows Oc Oc
 Use the
 .Xr com 4
 serial line; optionally initializing it with the speed
@@ -137,7 +137,7 @@ Set the
 environment variable to the selected
 .Ar terminal .
 This option is useful in combination with selecting a serial line as the
-.Fl \-console.
+.Fl \-console .
 The default
 .Ev TERM
 is
@@ -185,7 +185,8 @@ The bootloader normally loads the random seed from
 .It Fl \-to Ns "=" Ns Ar file
 Write the contents of the module to the specified
 .Ar file ,
-creating it with mode 644 if it doesn't exist, and truncating it if it does exist.
+creating it with mode 644 if it doesn't exist, and truncating it if it does
+exist.
 Non-existent parent directories are created with mode 755 as needed.
 .El
 .Sh SEE ALSO

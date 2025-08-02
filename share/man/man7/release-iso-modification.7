@@ -267,7 +267,7 @@ tix-iso-bootconfig --liveconfig=liveconfig bootconfig
  echo 'set superusers="root"'
  echo "password_pbkdf2 root $(cat liveconfig/etc/grubpw)") |
 cat >> bootconfig/boot/grub/hooks.cfg
-cat > bootconfig/boot/grub/main.cfg << \EOF
+cat > bootconfig/boot/grub/main.cfg << \\EOF
 menu_title="$base_menu_title"
 hook_menu_pre
 menuentry "Sortix $version" --unrestricted {
@@ -465,7 +465,7 @@ file for each network address and hashes it.
 (for host in $network_addresses; do
   for keytype in rsa ecdsa ed25519; do
     printf '%s ' "$host" &&
-    sed -E 's/^([^ ]* [^ ]*).*/\1/' \\
+    sed -E 's/^([^ ]* [^ ]*).*/\\1/' \\
       liveconfig/etc/ssh_host_${keytype}_key.pub
   done
 done) > known_hosts

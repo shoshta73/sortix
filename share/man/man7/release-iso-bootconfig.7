@@ -50,8 +50,8 @@ can use or overwrite as desired:
 .It Pa /boot/grub/grub.cfg
 The GRUB bootloader will load its configuration by loading this file.
 .Pp
-First, this file loads the default bootloader configuration by taking the following
-actions:
+First, this file loads the default bootloader configuration by taking the
+following actions:
 .Pp
 It defines no-operation versions of each of the hook functions defined below.
 .Pp
@@ -258,7 +258,7 @@ The main menu uses this title verbatim, while the other menus will append
 " -
 .Ar menu_name Ns
 " when constructing
-.Sy menu_title.
+.Sy menu_title .
 (Default: "Sortix $version for $machine")
 .It Sy console
 Optionally contains
@@ -614,5 +614,5 @@ See
 .Xr release-iso-modification 7
 for additional examples.
 .Sh SEE ALSO
-.Xr release-iso-bootconfig 7 ,
+.Xr release-iso-modification 7 ,
 .Xr tix-iso-bootconfig 8

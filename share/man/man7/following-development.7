@@ -191,8 +191,8 @@ to the
 environment variable afterwards.
 .Pp
 The new toolchain is not able to build versions before this commit due to bugs
-in the base system and ports that are now compile-time errors. These issues
-are fixed as of this commit.
+in the base system and ports that are now compile-time errors.
+These issues are fixed as of this commit.
 .Pp
 The old toolchain with gcc 5.2.0 and binutils 2.24 remain supported to build the
 base system and selected ports, such that the new version of the operating
@@ -488,15 +488,15 @@ If the new program isn't used, ports may fail to build due to local software not
 being the exact same version
 .Sy ( pkg.use-bootstrap ) ,
 clean or post-install in the wrong subdirectory
-.Sy ( pkg.subdir) ,
+.Sy ( pkg.subdir ) ,
 the
 .Fl \-source-directory
 option not being recognized or failing to locate the source code
-.Sy ( pkg.source-package) ,
+.Sy ( pkg.source-package ) ,
 stopping because
 .Sy pkg.build-system
 isn't set
-.Sy ( pkg.alias-of) ,
+.Sy ( pkg.alias-of ) ,
 or other mysterious circumstances.
 .Ss Add German keyboard layout
 The

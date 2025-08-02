@@ -52,9 +52,9 @@ If the renewal fails, the cache entry is evicted.
 .Pp
 The ARP cache can contain up to 256 entries.
 If the cache is full,
-the least recently used cache entry is evicted when a network address is resolved
-that is not currently in the cache, and the source addresses from received ARP
-messages are not passively added to the cache.
+the least recently used cache entry is evicted when a network address is
+resolved that is not currently in the cache, and the source addresses from
+received ARP messages are not passively added to the cache.
 .Pp
 The ARP cache uses a hash table with 256 entries, using a linked list in case
 of hash collisions.

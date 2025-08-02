@@ -424,7 +424,7 @@ will remove datagrams from the wrong source from the receive queue.
 All other systems will deliver datagrams already present in the receive queue,
 even if from the wrong source, despite the POSIX requirement that
 .Xr connect 2
-"limits the remote sender for subsequent recv() functions".
+.Dq "limits the remote sender for subsequent recv() functions" .
 Software for affected systems must either first empty the receive queue after
 .Xr connect 2 ,
 or use
@@ -525,8 +525,8 @@ succeed and
 .Xr getpeername 2
 will report the loopback address (OpenBSD will report the any address).
 .Pp
-Connecting to port 0 will fail on Sortix, FreeBSD, macOS, Minix, NetBSD, OpenBSD,
-and SunOS; but will succeed on DragonFly, Haiku, GNU/Hurd and Linux.
+Connecting to port 0 will fail on Sortix, FreeBSD, macOS, Minix, NetBSD,
+OpenBSD, and SunOS; but will succeed on DragonFly, Haiku, GNU/Hurd and Linux.
 .Pp
 Sortix's handling of
 .Dv SO_REUSEADDR
