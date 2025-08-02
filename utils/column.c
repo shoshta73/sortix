@@ -19,8 +19,8 @@
 
 #include <sys/ioctl.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -97,7 +97,7 @@ bool append_lines_from_file(FILE* fp,
 			free(string);
 			if ( ferror(fp) )
 			{
-				error(0, errno, "getline: `%s'", fpname);
+				warn("getline: %s", fpname);
 				return false;
 			}
 			return true;
@@ -119,7 +119,7 @@ bool append_lines_from_file(FILE* fp,
 			struct line* new_lines = (struct line*) realloc(*lines_ptr, new_size);
 			if ( !new_lines )
 			{
-				error(0, errno, "realloc lines array");
+				warn("realloc lines array");
 				free(string);
 				return false;
 			}
@@ -193,7 +193,7 @@ int main(int argc, char* argv[])
 					parameter = arg + 1;
 				else if ( i + 1 == argc )
 				{
-					error(0, 0, "option requires an argument -- '%c'", c);
+					warnx("option requires an argument -- '%c'", c);
 					fprintf(stderr, "Try '%s --help' for more information\n", argv0);
 					exit(1);
 				}
@@ -206,9 +206,9 @@ int main(int argc, char* argv[])
 				char* endptr = (char*) parameter;
 				display_columns = (size_t) strtoul((char*) parameter, &endptr, 10);
 				if ( errno == ERANGE )
-					error(1, 0, "option -c `%s' is out of range", parameter);
+					errx(1, "option -c `%s' is out of range", parameter);
 				if  ( *endptr )
-					error(1, 0, "option -c `%s' is invalid", parameter);
+					errx(1, "option -c `%s' is invalid", parameter);
 			} break;
 			case 'e': flag_empty = true; break;
 			default:
@@ -242,7 +242,7 @@ int main(int argc, char* argv[])
 		FILE* fp = fopen(arg, "r");
 		if ( !fp )
 		{
-			error(0, errno, "`%s'", arg);
+			warn("%s", arg);
 			success = false;
 			continue;
 		}
@@ -294,7 +294,7 @@ int main(int argc, char* argv[])
 
 		size_t* column_widths = (size_t*) calloc(columns, sizeof(size_t));
 		if ( !column_widths )
-			error(1, errno, "calloc column widths");
+			err(1, "calloc column widths");
 
 		for ( size_t column = 0; column < columns; column++ )
 		{

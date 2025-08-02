@@ -21,8 +21,8 @@
 #include <sys/wait.h>
 
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -110,7 +110,7 @@ bool get_option_variable(const char* option, char** varptr,
 		return false;
 	if ( *ip + 1 == argc )
 	{
-		fprintf(stderr, "%s: expected operand after `%s'\n", argv0, option);
+		fprintf(stderr, "%s: expected operand after: %s\n", argv0, option);
 		exit(1);
 	}
 	*varptr = strdup(argv[++*ip]), argv[*ip] = NULL;
@@ -189,12 +189,12 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( !testdir_path )
-		error(1, 0, "No test directory was specified and no default available");
+		errx(1, "No test directory was specified and no default available");
 
 	struct dirent** entries;
 	int num_entries = scandir(testdir_path, &entries, no_dot_files, alphasort);
 	if ( num_entries < 0 )
-		error(2, errno, "scandir: `%s'", testdir_path);
+		err(2, "scandir: %s", testdir_path);
 
 	int exit_status = 0;
 	bool use_terminal = is_usable_terminal(1);
@@ -230,11 +230,11 @@ int main(int argc, char* argv[])
 
 		int pipe_fds[2];
 		if ( buffered && pipe(pipe_fds) < 0 )
-			error(1, errno, "pipe");
+			err(1, "pipe");
 
 		pid_t child_pid = fork();
 		if ( child_pid < 0 )
-			error(1, errno, "fork");
+			err(1, "fork");
 
 		if ( !child_pid )
 		{
@@ -265,7 +265,7 @@ int main(int argc, char* argv[])
 
 			char* child_argv[] = { test_path, NULL };
 			execv(child_argv[0], child_argv);
-			error(127, errno, "`%s'", test_path);
+			err(127, "%s", test_path);
 		}
 
 		size_t bytes_read = 0;
@@ -290,7 +290,7 @@ int main(int argc, char* argv[])
 
 		int child_exit_code;
 		if ( waitpid(child_pid, &child_exit_code, 0) < 0 )
-			error(1, errno, "waitpid(%ji)", (intmax_t) child_pid);
+			err(1, "waitpid(%ji)", (intmax_t) child_pid);
 
 		bool success = WIFEXITED(child_exit_code) &&
 		               WEXITSTATUS(child_exit_code) == 0;

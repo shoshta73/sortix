@@ -17,8 +17,8 @@
  * Report or filter out repeated lines in a file
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -38,7 +38,7 @@ char* read_line(FILE* fp, const char* fpname, int delim)
 	{
 		free(line);
 		if ( ferror(fp) )
-			error(0, errno, "read: `%s'", fpname);
+			warn("read: %s", fpname);
 		return NULL;
 	}
 	if ( (unsigned char) line[amount-1] == (unsigned char) delim )
@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
 
 	if ( 4 <= argc )
 	{
-		fprintf(stderr, "%s: extra operand `%s'\n", argv0, argv[3]);
+		fprintf(stderr, "%s: extra operand: %s\n", argv0, argv[3]);
 		fprintf(stderr, "Try `%s --help' for more information.\n", argv0);
 		exit(1);
 	}
@@ -167,10 +167,10 @@ int main(int argc, char* argv[])
 	const char* outname = "<stdout>";
 
 	if ( 3 <= argc && !freopen(outname = argv[2], "w", stdout) )
-		error(1, errno, "`%s'", argv[2]);
+		err(1, "%s", argv[2]);
 
 	if ( 2 <= argc && !freopen(inname = argv[1], "r", stdin) )
-		error(1, errno, "`%s'", argv[1]);
+		err(1, "%s", argv[1]);
 
 	int delim = zero_terminated ? '\0' : '\n';
 

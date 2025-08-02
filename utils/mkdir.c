@@ -20,8 +20,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <inttypes.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -177,7 +177,7 @@ static void make_directory(const char* path,
 				{
 					char* path_copy = strdup(path);
 					if ( !path_copy )
-						error(1, errno, "malloc");
+						err(1, "malloc");
 					char* last_slash = strrchr(path_copy, '/');
 					if ( last_slash )
 					{
@@ -193,7 +193,7 @@ static void make_directory(const char* path,
 					free(path_copy);
 				}
 			}
-			error(1, errno, "cannot create directory `%s'", path);
+			err(1, "cannot create directory: %s", path);
 		}
 		break;
 	}
@@ -250,7 +250,7 @@ int main(int argc, char* argv[])
 				{
 					if ( i + 1 == argc )
 					{
-						error(0, 0, "option requires an argument -- 'm'");
+						warnx("option requires an argument -- 'm'");
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(125);
 					}
@@ -273,7 +273,7 @@ int main(int argc, char* argv[])
 		{
 			if ( i + 1 == argc )
 			{
-				error(0, 0, "option '--modespec' requires an argument");
+				warnx("option '--modespec' requires an argument");
 				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 				exit(125);
 			}
@@ -299,10 +299,10 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 2 )
-		error(1, 0, "missing operand");
+		errx(1, "missing operand");
 
 	if ( modespec && !is_valid_modespec(modespec) )
-		error(1, 0, "invalid mode: `%s'", modespec);
+		errx(1, "invalid mode: %s", modespec);
 
 	for ( int i = 1; i < argc; i++ )
 	{

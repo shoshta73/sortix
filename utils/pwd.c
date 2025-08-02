@@ -17,8 +17,8 @@
  * Prints the current working directory.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -121,12 +121,12 @@ int main(int argc, char* argv[])
 
 	char* pwd = get_current_dir_name();
 	if ( !pwd )
-		error(1, errno, "get_current_dir_name");
+		err(1, "get_current_dir_name");
 
 	printf("%s\n", pwd);
 
 	if ( ferror(stdout) || fflush(stdout) == EOF )
-		error(1, errno, "stdout");
+		err(1, "stdout");
 
 	return 0;
 }

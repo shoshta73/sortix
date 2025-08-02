@@ -17,8 +17,8 @@
  * Write arguments to standard output.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdio.h>
 
 int main(int argc, char* argv[])
@@ -32,7 +32,7 @@ int main(int argc, char* argv[])
 	putchar('\n');
 	if ( ferror(stdout) || fflush(stdout) == EOF )
 	{
-		error(1, errno, "<stdout>");
+		err(1, "<stdout>");
 		return 1;
 	}
 	return 0;

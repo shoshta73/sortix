@@ -21,8 +21,8 @@
 #include <sys/statvfs.h>
 #include <sys/types.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <fstab.h>
 #include <libgen.h>
@@ -214,14 +214,14 @@ static bool df(const char* path, struct df* buf)
 	int canon_fd = open_canonical_directory(path, &canon_fd_path);
 	if ( canon_fd < 0 )
 	{
-		error(0, errno, "%s", path);
+		warn("%s", path);
 		return false;
 	}
 	char* mount_fd_path;
 	int mount_fd =
 		open_mount_directory(canon_fd, canon_fd_path, &mount_fd_path);
 	if ( mount_fd < 0 )
-		error(0, errno, "finding mountpoint: %s", canon_fd_path);
+		warn("finding mountpoint: %s", canon_fd_path);
 	free(canon_fd_path);
 	close(canon_fd);
 	if ( mount_fd < 0 )
@@ -229,7 +229,7 @@ static bool df(const char* path, struct df* buf)
 	struct statvfs stvfs;
 	if ( fstatvfs(mount_fd, &stvfs) < 0 )
 	{
-		error(0, errno, "statvfs: %s", mount_fd_path);
+		warn("statvfs: %s", mount_fd_path);
 		return free(mount_fd_path), close(mount_fd), false;
 	}
 	if ( !(buf->filesystem = atcgetblob(mount_fd, "device-path", NULL)))
@@ -478,7 +478,7 @@ static void display(struct df* dfs,
 				continue;
 			char* entry = column_entry(&dfs[i], column, format);
 			if ( !entry )
-				error(1, errno, "malloc");
+				err(1, "malloc");
 			size_t width = string_display_length(entry);
 			free(entry);
 			if ( column_width[column] < width )
@@ -510,7 +510,7 @@ static void display(struct df* dfs,
 				continue;
 			char* entry = column_entry(&dfs[i], column, format);
 			if ( !entry )
-				error(1, errno, "malloc");
+				err(1, "malloc");
 			display_indent(indention, &position);
 			display_string(entry, &position);
 			indention += column_width[column] + 2;
@@ -546,13 +546,13 @@ static void add_mount(char*** mounts_ptr,
 		char** new_mounts =
 			(char**) reallocarray(*mounts_ptr, new_length, sizeof(char**));
 		if ( !new_mounts )
-			error(1, errno, "malloc");
+			err(1, "malloc");
 		*mounts_ptr = new_mounts;
 		*mounts_length_ptr = new_length;
 	}
 	char* copy = strdup(path);
 	if ( !copy )
-		error(1, errno, "malloc");
+		err(1, "malloc");
 	(*mounts_ptr)[(*mounts_used_ptr)++] = copy;
 }
 
@@ -563,20 +563,20 @@ static bool is_mount(const char* path)
 	{
 		if ( errno == ENOENT )
 			return false;
-		error(0, errno, "%s", path);
+		warn("%s", path);
 		return false;
 	}
 	struct stat fdst;
 	if ( fstat(fd, &fdst) < 0 )
 	{
-		error(0, errno, "%s", path);
+		warn("%s", path);
 		close(fd);
 		return false;
 	}
 	struct stat dotdotst;
 	if ( fstatat(fd, "..", &dotdotst, 0) < 0 )
 	{
-		error(0, errno, "%s/..", path);
+		warn("%s/..", path);
 		close(fd);
 		return false;
 	}
@@ -594,7 +594,7 @@ static void get_mounts(char*** mounts, size_t* mounts_used)
 	if ( !setfsent() )
 	{
 		if ( errno != ENOENT )
-			error(1, errno, "setfstab");
+			err(1, "setfstab");
 		add_mount(mounts, mounts_used, &mounts_length, "/");
 		return;
 	}
@@ -605,7 +605,7 @@ static void get_mounts(char*** mounts, size_t* mounts_used)
 			add_mount(mounts, mounts_used, &mounts_length, fs->fs_file);
 	}
 	if ( errno )
-		error(1, errno, "getfsent");
+		err(1, "getfsent");
 	endfsent();
 }
 
@@ -753,7 +753,7 @@ int main(int argc, char* argv[])
 
 	struct df* dfs = (struct df*) reallocarray(NULL, paths_count + 1, sizeof(struct df));
 	if ( !dfs )
-		error(1, errno, "malloc");
+		err(1, "malloc");
 	for ( size_t i = 0; i < paths_count; i++ )
 	{
 		if ( !df(paths[i], &dfs[i]) )

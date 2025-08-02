@@ -19,8 +19,8 @@
 
 #include <sys/stat.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <libgen.h>
 #include <stdbool.h>
@@ -56,7 +56,7 @@ bool mv(int src_dirfd, const char* src_rel, const char* src_path,
 	}
 	if ( renameat(src_dirfd, src_rel, dst_dirfd, dst_rel) < 0 )
 	{
-		error(0, errno, "renaming `%s' to `%s'", src_path, dst_path);
+		warn("renaming `%s' to `%s'", src_path, dst_path);
 		return false;
 	}
 	return true;
@@ -117,7 +117,7 @@ int main(int argc, char* argv[])
 					target_directory = arg + 1;
 				else if ( i + 1 == argc )
 				{
-					error(0, 0, "option requires an argument -- '%c'", c);
+					warnx("option requires an argument -- '%c'", c);
 					fprintf(stderr, "Try '%s --help' for more information\n", argv0);
 					exit(1);
 				}
@@ -143,7 +143,7 @@ int main(int argc, char* argv[])
 		{
 			if ( i + 1 == argc )
 			{
-				error(0, 0, "option '--target-directory 'requires an argument");
+				warnx("option '--target-directory 'requires an argument");
 				fprintf(stderr, "Try '%s --help' for more information\n", argv0);
 				exit(1);
 			}
@@ -167,12 +167,12 @@ int main(int argc, char* argv[])
 	}
 
 	if ( target_directory && flag_no_target_directory )
-		error(1, 0, "cannot combine --target-directory (-t) and --no-target-directory (-T)");
+		errx(1, "cannot combine --target-directory (-t) and --no-target-directory (-T)");
 
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 2 )
-		error(1, 0, "missing file operand");
+		errx(1, "missing file operand");
 
 	if ( !target_directory && !flag_no_target_directory && argc == 3 )
 	{
@@ -188,10 +188,10 @@ int main(int argc, char* argv[])
 	{
 		const char* src = argv[1];
 		if ( argc < 3 )
-			error(1, 0, "missing destination file operand after `%s'", src);
+			errx(1, "missing destination file operand after: %s", src);
 		const char* dst = argv[2];
 		if ( 3 < argc )
-			error(1, 0, "extra operand `%s'", argv[3]);
+			errx(1, "extra operand: %s", argv[3]);
 		return mv(AT_FDCWD, src, src,
 		          AT_FDCWD, dst, dst,
 		          flags) ? 0 : 1;
@@ -205,10 +205,10 @@ int main(int argc, char* argv[])
 
 	int dst_dirfd = open(target_directory, O_RDONLY | O_DIRECTORY);
 	if ( dst_dirfd < 0 )
-		error(1, errno, "`%s'", target_directory);
+		err(1, "%s", target_directory);
 
 	if ( argc < 2 )
-		error(1, 0, "missing file operand");
+		errx(1, "missing file operand");
 
 	const char* join = "/";
 	if ( strlen(target_directory) &&
@@ -225,7 +225,7 @@ int main(int argc, char* argv[])
 		char* dst_rel = basename_dup(src_path);
 		if ( !dst_rel )
 		{
-			error(0, errno, "strdup");
+			warn("strdup");
 			success = false;
 			continue;
 		}
@@ -233,7 +233,7 @@ int main(int argc, char* argv[])
 		asprintf(&dst_path, "%s%s%s", target_directory, join, dst_rel);
 		if ( !dst_path )
 		{
-			error(0, errno, "asprintf");
+			warn("asprintf");
 			free(dst_rel);
 			success = false;
 			continue;

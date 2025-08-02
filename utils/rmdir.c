@@ -19,8 +19,8 @@
 
 #include <sys/types.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -100,7 +100,7 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 2 )
-		error(1, 0, "missing operand");
+		errx(1, "missing operand");
 
 	for ( int i = 1; i < argc; i++ )
 	{
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
 					fprintf(stderr, "%s: skipping non-empty directory `%s'\n", argv0, arg);
 				continue;
 			}
-			error(1, errno, "cannot remove directory `%s'", arg);
+			err(1, "cannot remove directory: %s", arg);
 		}
 
 		if ( verbose )

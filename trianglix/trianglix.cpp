@@ -28,7 +28,6 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <ioleast.h>
 #include <libgen.h>
@@ -232,7 +231,7 @@ void ExecuteShellCommand(const char* command, int curdirfd)
 	{
 		fchdir(curdirfd);
 		execlp("sh", "sh", "-c", command, (const char*) NULL);
-		error(127, errno, "`%s'", "sh");
+		err(127, "%s", "sh");
 	}
 	unsigned int cur_termmode;
 	gettermmode(0, &cur_termmode);
@@ -363,7 +362,7 @@ class object* directory::open(const char* path)
 	}
 	else
 	{
-		error(0, errno, "canonicalize_file_name_at: %s", path);
+		warn("canonicalize_file_name_at: %s", path);
 		sleep(1);
 	}
 	return NULL;
@@ -1899,7 +1898,7 @@ int main(int argc, char* argv[])
 
 	int kbfd = CreateKeyboardConnection();
 	if ( kbfd < 0 )
-		error(1, 0, "couldn't create keyboard connection");
+		errx(1, "couldn't create keyboard connection");
 
 	int ret = MainLoop(argc, argv, kbfd);
 

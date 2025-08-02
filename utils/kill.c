@@ -20,8 +20,8 @@
 #include <sys/types.h>
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <inttypes.h>
 #include <locale.h>
 #include <signal.h>
@@ -196,7 +196,7 @@ int main(int argc, char* argv[])
 				{
 					if ( i + 1 == argc )
 					{
-						error(0, 0, "option requires an argument -- 's'");
+						warnx("option requires an argument -- 's'");
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(125);
 					}
@@ -219,7 +219,7 @@ int main(int argc, char* argv[])
 		{
 			if ( i + 1 == argc )
 			{
-				error(0, 0, "option '--signal' requires an argument");
+				warnx("option '--signal' requires an argument");
 				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 				exit(125);
 			}
@@ -241,7 +241,7 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( signal && list )
-		error(1, 0, "options --signal and --list are mutually incompatible");
+		errx(1, "options --signal and --list are mutually incompatible");
 
 	if ( list && argc == 1 )
 	{
@@ -284,16 +284,16 @@ int main(int argc, char* argv[])
 			signal = "TERM";
 		int signum = signame_to_signum(signal);
 		if ( signum < 0 )
-			error(1, 0, "invalid signal: %s", signal);
+			errx(1, "invalid signal: %s", signal);
 		int result = 0;
 		for ( int i = 1; i < argc; i++ )
 		{
 			pid_t pid = 0;
 			if ( !parse_pid(&pid, argv[i]) )
-				error(1, 0, "invalid process identifier: %s", argv[i]);
+				errx(1, "invalid process identifier: %s", argv[i]);
 			if ( kill(pid, signum) < 0 )
 			{
-				error(0, errno, "kill: (%" PRIiPID ")", pid);
+				warn("kill: (%" PRIiPID ")", pid);
 				result = 1;
 			}
 		}

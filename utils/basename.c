@@ -17,8 +17,8 @@
  * Strip directory and suffix from filenames.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <libgen.h>
 #include <locale.h>
 #include <stdbool.h>
@@ -108,7 +108,7 @@ int main(int argc, char* argv[])
 				{
 					if ( i + 1 == argc )
 					{
-						error(0, 0, "option requires an argument -- 's'");
+						warnx("option requires an argument -- 's'");
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(1);
 					}
@@ -136,7 +136,7 @@ int main(int argc, char* argv[])
 		{
 			if ( i + 1 == argc )
 			{
-				error(0, 0, "option '--suffix' requires an argument");
+				warnx("option '--suffix' requires an argument");
 				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 				exit(125);
 			}
@@ -157,7 +157,7 @@ int main(int argc, char* argv[])
 
 	if ( argc <= 1 )
 	{
-		error(0, 0, "missing operand");
+		warnx("missing operand");
 		fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 		exit(1);
 	}
@@ -171,7 +171,7 @@ int main(int argc, char* argv[])
 	{
 		if ( 4 <= argc )
 		{
-			error(0, 0, "extra operand `%s'", argv[3]);
+			warnx("extra operand: %s", argv[3]);
 			fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 			exit(1);
 		}

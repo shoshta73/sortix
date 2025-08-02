@@ -20,8 +20,8 @@
 #ifndef TEST_H
 #define TEST_H
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>

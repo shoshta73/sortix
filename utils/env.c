@@ -17,8 +17,8 @@
  * Set the environment for command invocation.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,12 +31,12 @@ void clean_environment(void)
 	{
 		size_t equal_pos = strcspn(environ[0], "=");
 		if ( environ[0][equal_pos] != '=' )
-			error(125, 0, "Bad Environment");
+			errx(125, "Bad Environment");
 		char* key = strndup(environ[0], equal_pos);
 		if ( !key )
-			error(125, errno, "strndup");
+			err(125, "strndup");
 		if ( unsetenv(key) != 0 )
-			error(125, errno, "cannot unset `%s'", key);
+			err(125, "unsetenv failed: %s", key);
 		free(key);
 	}
 }
@@ -103,20 +103,20 @@ int main(int argc, char* argv[])
 				{
 					if ( i + 1 == argc )
 					{
-						error(0, 0, "option requires an argument -- 'u'");
+						warnx("option requires an argument -- 'u'");
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(125);
 					}
 					const char* key = argv[i+1];
 					argv[++i] = NULL;
 					if ( unsetenv(key) != 0 )
-						error(125, errno, "cannot unset `%s'", key);
+						err(125, "unsetenv failed: %s", key);
 				}
 				else
 				{
 					const char* key = arg + 1;
 					if ( unsetenv(key) != 0 )
-						error(125, errno, "cannot unset `%s'", key);
+						err(125, "unsetenv failed: %s", key);
 				}
 				arg = "u";
 				break;
@@ -139,20 +139,20 @@ int main(int argc, char* argv[])
 		{
 			const char* key = arg + strlen("--unset=");
 			if ( unsetenv(key) != 0 )
-				error(125, errno, "cannot unset `%s'", key);
+				err(125, "unsetenv failed: %s", key);
 		}
 		else if ( !strcmp(arg, "--unset") )
 		{
 			if ( i + 1 == argc )
 			{
-				error(0, 0, "option '--unset' requires an argument");
+				warnx("option '--unset' requires an argument");
 				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 				exit(125);
 			}
 			const char* key = argv[i+1];
 			argv[++i] = NULL;
 			if ( unsetenv(key) != 0 )
-				error(125, errno, "cannot unset `%s'", key);
+				err(125, "unsetenv failed: %s", key);
 		}
 		else
 		{
@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
 		const char* key = arg;
 		const char* value = arg + equal_pos + 1;
 		if ( setenv(key, value, 1) != 0 )
-			error(125, errno, "setenv(\"%s\", \"%s\")", key, value);
+			err(125, "setenv(\"%s\", \"%s\")", key, value);
 	}
 
 	compact_arguments(&argc, &argv);
@@ -195,11 +195,11 @@ int main(int argc, char* argv[])
 
 	if ( null_terminate )
 	{
-		error(0, 0, "cannot specify --null (-0) with command");
+		warnx("cannot specify --null (-0) with command");
 		fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 		exit(125);
 	}
 
 	execvp(argv[1], argv + 1);
-	error(errno == ENOENT ? 127 : 126, errno, "%s", argv[1]);
+	err(errno == ENOENT ? 127 : 126, "%s", argv[1]);
 }

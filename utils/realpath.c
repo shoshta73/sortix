@@ -17,8 +17,8 @@
  * Canonicalize filesystem paths.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,7 +96,7 @@ int main(int argc, char* argv[])
 		char* path = realpath(argv[i], NULL);
 		if ( !path )
 		{
-			error(0, errno, "%s", argv[i]);
+			warn("%s", argv[i]);
 			result = 1;
 			continue;
 		}

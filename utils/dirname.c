@@ -17,8 +17,8 @@
  * Strip last component from file name.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <libgen.h>
 #include <locale.h>
 #include <stdbool.h>
@@ -112,7 +112,7 @@ int main(int argc, char* argv[])
 
 	if ( argc <= 1 )
 	{
-		error(0, 0, "missing operand");
+		warnx("missing operand");
 		fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 		exit(1);
 	}

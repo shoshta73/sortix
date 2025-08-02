@@ -22,8 +22,8 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -176,7 +176,7 @@ bool word_count_file(FILE* fp, const char* path, int flags,
 	}
 	if ( ferror(fp) )
 	{
-		error(0, errno, "`%s'", path);
+		warn("%s", path);
 		print_stats(word_count, stdout, flags, path);
 		return false;
 	}
@@ -205,7 +205,7 @@ int word_count_files(int argc, char* argv[], int flags)
 		FILE* fp = fopen(argv[i], "r");
 		if ( !fp )
 		{
-			error(0, errno, "`%s'", argv[i]);
+			warn("%s", argv[i]);
 			struct word_count word_count;
 			memset(&word_count, 0, sizeof(word_count));
 			print_stats(word_count, stdout, flags, argv[i]);

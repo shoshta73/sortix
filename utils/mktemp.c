@@ -17,8 +17,8 @@
  * Create temporary files and directories.
  */
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <limits.h>
 #include <locale.h>
 #include <stdarg.h>
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
 				{
 					if ( i + 1 == argc )
 					{
-						error(0, 0, "option requires an argument -- 'p'");
+						warnx("option requires an argument -- 'p'");
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(125);
 					}
@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
 		{
 			if ( i + 1 == argc )
 			{
-				error(0, 0, "option '--suffix' requires an argument");
+				warnx("option '--suffix' requires an argument");
 				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 				exit(125);
 			}
@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
 		{
 			if ( i + 1 == argc )
 			{
-				error(0, 0, "option '--tmpdir' requires an argument");
+				warnx("option '--tmpdir' requires an argument");
 				fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 				exit(125);
 			}
@@ -185,7 +185,7 @@ int main(int argc, char* argv[])
 
 	if ( 3 <= argc )
 	{
-		error(0, 0, "too many templates");
+		warnx("too many templates");
 		fprintf(stderr, "Try `%s --help' for more information\n", argv0);
 		exit(1);
 	}
@@ -208,13 +208,13 @@ int main(int argc, char* argv[])
 	{
 		templ = join_paths(tmpdir, input_templ);
 		if ( !templ )
-			error(1, errno, "malloc");
+			err(1, "malloc");
 	}
 	else
 	{
 		templ = strdup(input_templ);
 		if ( !templ )
-			error(1, errno, "malloc");
+			err(1, "malloc");
 	}
 
 	size_t suffix_length;
@@ -222,10 +222,10 @@ int main(int argc, char* argv[])
 	{
 		suffix_length = strlen(suffix);
 		if ( INT_MAX < suffix_length )
-			error(1, 0, "suffix is too long");
+			errx(1, "suffix is too long");
 		char* new_templ;
 		if ( asprintf(&new_templ, "%s%s", templ, suffix) < 0 )
-			error(1, errno, "malloc");
+			err(1, "malloc");
 		free(templ);
 		templ = new_templ;
 	}
@@ -246,23 +246,23 @@ int main(int argc, char* argv[])
 		xcount++;
 
 	if ( xcount < 6 )
-		error(1, 0, "too few X's in template `%s'", templ);
+		errx(1, "too few X's in template: %s", templ);
 
 	char* path = strdup(templ);
 	if ( !path )
-		error(1, errno, "strdup");
+		err(1, "strdup");
 	if ( directory )
 	{
 		if ( !mkdtemps(path, suffix_length) )
-			error(1, errno, "%s", templ);
+			err(1, "%s", templ);
 	}
 	else
 	{
 		if ( INT_MAX < suffix_length )
-			error(1, 0, "suffix is too long");
+			errx(1, "suffix is too long");
 		int fd = mkstemps(path, (int) suffix_length);
 		if ( fd < 0 )
-			error(1, errno, "%s", templ);
+			err(1, "%s", templ);
 		close(fd);
 	}
 	puts(path);

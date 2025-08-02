@@ -23,8 +23,8 @@
 #include <sys/types.h>
 
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -172,13 +172,13 @@ bool disk_usage_file_at(int relfd,
 				*result_mode_ptr = S_IFLNK;
 			return true;
 		}
-		return error(0, errno, "cannot access `%s'", path), false;
+		return warn("%s", path), false;
 	}
 
 	struct stat st;
 	if ( fstat(fd, &st) != 0 )
 	{
-		error(0, errno, "stat: `%s'", path);
+		warn("stat: %s", path);
 		close(fd);
 		return false;
 	}
@@ -215,7 +215,7 @@ bool disk_usage_file_at(int relfd,
 	DIR* dir = fdopendir(fd);
 	if ( !dir )
 	{
-		error(0, errno, "fdopendir(%i): `%s'", fd, path);
+		warn("fdopendir(%i): %s", fd, path);
 		close(fd);
 		return false;
 	}
@@ -229,7 +229,7 @@ bool disk_usage_file_at(int relfd,
 		char* new_path = append_to_path(path, entry->d_name);
 		if ( !new_path )
 		{
-			error(0, errno, "malloc: `%s/%s'", path, entry->d_name);
+			warn("malloc");
 			continue;
 		}
 		int new_flags = flags & ~FLAG_IS_OPERAND;
@@ -250,7 +250,7 @@ bool disk_usage_file_at(int relfd,
 
 	if ( errno && errno != ENOTDIR )
 	{
-		error(0, errno, "reading directory `%s'", path);
+		warn("reading directory: %s", path);
 		closedir(dir);
 		return false;
 	}
@@ -395,7 +395,7 @@ int main(int argc, char* argv[])
 				if ( !arg[1] )
 					goto next_is_block_size_operand;
 				if ( !(block_size = parse_block_size(arg+1)) )
-					error(1, 0, "invalid block size `%s'", arg);
+					errx(1, "invalid block size: %s", arg);
 				arg += strlen(arg)-1;
 				break;
 			case 'c': flags |= FLAG_TOTAL; break;
@@ -427,17 +427,17 @@ int main(int argc, char* argv[])
 		{
 		next_is_block_size_operand:
 			if ( i + 1 == argc )
-				error(1, 0, "expected operand after `%s'", arg);
+				errx(1, "expected operand after: %s", arg);
 			const char* block_size_str = argv[++i];
 			argv[i] = NULL;
 			if ( !(block_size = parse_block_size(block_size_str)) )
-				error(1, 0, "invalid block size `%s'", block_size_str);
+				errx(1, "invalid block size: %s", block_size_str);
 		}
 		else if ( string_has_prefix(arg, "--block-size=") )
 		{
 			const char* block_size_str = arg + strlen("--block-size=");
 			if ( !(block_size = parse_block_size(block_size_str)) )
-				error(1, 0, "invalid block size `%s'", block_size_str);
+				errx(1, "invalid block size: %s", block_size_str);
 		}
 		else if ( !strcmp(arg, "--bytes") )
 			flags |= FLAG_APPARENT_SIZE, block_size = 1;

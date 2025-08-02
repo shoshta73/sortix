@@ -18,8 +18,8 @@
  */
 
 #include <ctype.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -235,7 +235,7 @@ int main(int argc, char* argv[])
 
 	if ( argc < 2 )
 	{
-		error(0, errno, "missing operand");
+		warn("missing operand");
 		fprintf(stderr, "Try '%s --help' for more information.\n", argv[0]);
 		exit(1);
 	}
@@ -247,7 +247,7 @@ int main(int argc, char* argv[])
 		const char* arg = argv[i];
 		if ( !is_valid_interval(arg) )
 		{
-			error(0, errno, "invalid sleep interval `%s'", arg);
+			warn("invalid sleep interval: %s", arg);
 			fprintf(stderr, "Try '%s --help' for more information.\n", argv[0]);
 			exit(1);
 		}
@@ -257,7 +257,7 @@ int main(int argc, char* argv[])
 	while ( ts.tv_sec || ts.tv_nsec )
 	{
 		if ( clock_nanosleep(CLOCK_REALTIME, 0, &ts, &ts) != 0 )
-			error(1, errno, "clock_nanosleep");
+			err(1, "clock_nanosleep");
 	}
 
 	return 0;

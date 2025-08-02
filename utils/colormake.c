@@ -20,8 +20,8 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,10 +37,10 @@ int main(int argc, char* argv[])
 	(void) argc;
 	int pipe_fds[2];
 	if ( pipe(pipe_fds) )
-		error(1, errno, "pipe");
+		err(1, "pipe");
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
-		error(1, errno, "fork");
+		err(1, "fork");
 	if ( !child_pid )
 	{
 		dup2(pipe_fds[1], 1);
@@ -51,7 +51,7 @@ int main(int argc, char* argv[])
 		execvp(argv[0],  argv);
 		if ( errno == ENOENT )
 			fprintf(stderr, "It would seem make isn't installed.\n");
-		error(127, errno, "%s", argv[0]);
+		err(127, "%s", argv[0]);
 	}
 	dup2(pipe_fds[0], 0);
 	close(pipe_fds[0]);
@@ -103,6 +103,6 @@ int main(int argc, char* argv[])
 	printf("\e[m");
 	fflush(stdout);
 	if ( ferror(stdin) )
-		error(1, stdin_errno, "stdin");
+		errc(1, stdin_errno, "stdin");
 	return WEXITSTATUS(status);
 }

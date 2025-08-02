@@ -22,8 +22,8 @@
 #include <sys/stat.h>
 
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -54,7 +54,7 @@ bool RemoveRecursively(int dirfd, const char* full, const char* rel,
 	{
 		if ( force && errno == ENOENT )
 			return true;
-		error(0, errno, "cannot remove: %s", full);
+		warn("cannot remove: %s", full);
 		return false;
 	}
 	if ( unlinkat(dirfd, rel, AT_REMOVEDIR) == 0 )
@@ -67,7 +67,7 @@ bool RemoveRecursively(int dirfd, const char* full, const char* rel,
 	{
 		if ( force && errno == ENOENT )
 			return true;
-		error(0, errno, "cannot remove: %s", full);
+		warn("cannot remove: %s", full);
 		return false;
 	}
 	int targetfd = openat(dirfd, rel, O_RDONLY | O_DIRECTORY);
@@ -75,13 +75,13 @@ bool RemoveRecursively(int dirfd, const char* full, const char* rel,
 	{
 		if ( force && errno == ENOENT )
 			return true;
-		error(0, errno, "cannot open: %s", full);
+		warn("cannot open: %s", full);
 		return false;
 	}
 	DIR* dir = fdopendir(targetfd);
 	if ( !dir )
 	{
-		error(0, errno, "fdopendir");
+		warn("fdopendir");
 		close(targetfd);
 		return false;
 	}
@@ -112,7 +112,7 @@ bool RemoveRecursively(int dirfd, const char* full, const char* rel,
 		{
 			if ( !force || errno == ENOENT )
 			{
-				error(0, errno, "cannot remove: %s", full);
+				warn("cannot remove: %s", full);
 				ret = false;
 			}
 		}
@@ -198,7 +198,7 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 2 && !force )
-		error(1, 0, "missing operand");
+		errx(1, "missing operand");
 
 	int flags = (directory ? AT_REMOVEDIR : 0) | AT_REMOVEFILE;
 	int main_ret = 0;
@@ -211,7 +211,7 @@ int main(int argc, char* argv[])
 			{
 				if ( force && errno == ENOENT )
 					continue;
-				error(0, errno, "cannot remove: %s", arg);
+				warn("cannot remove: %s", arg);
 				main_ret = 1;
 				continue;
 			}

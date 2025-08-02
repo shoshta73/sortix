@@ -23,7 +23,6 @@
 #include <assert.h>
 #include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <math.h>
 #include <signal.h>
@@ -1222,7 +1221,7 @@ int main(int argc, char* argv[])
 	if ( !connection && errno == ECONNREFUSED )
 		display_spawn(argc, argv);
 	if ( !connection )
-		error(1, errno, "Could not connect to display server");
+		err(1, "Could not connect to display server");
 
 	display_create_window(connection, WINDOW_ID);
 	display_resize_window(connection, WINDOW_ID, WINDOW_WIDTH, WINDOW_HEIGHT);

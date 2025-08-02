@@ -23,7 +23,6 @@
 #include <display.h>
 #include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <ioleast.h>
@@ -108,7 +107,7 @@ int main(int argc, char* argv[])
 		err(1, "stat: %s", kblayout_path);
 
 	if ( (size_t) kblayout_st.st_size != (uintmax_t) kblayout_st.st_size )
-		error(1, EFBIG, "%s", kblayout_path);
+		errc(1, EFBIG, "%s", kblayout_path);
 
 	size_t kblayout_size = (size_t) kblayout_st.st_size;
 	unsigned char* kblayout = (unsigned char*) malloc(kblayout_size);

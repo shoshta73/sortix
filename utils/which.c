@@ -20,8 +20,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -180,7 +180,7 @@ int main(int argc, char* argv[])
 	compact_arguments(&argc, &argv);
 
 	if ( argc < 2 )
-		error(1, 0, "missing operand");
+		errx(1, "missing operand");
 
 	const char* path = getenv("PATH");
 

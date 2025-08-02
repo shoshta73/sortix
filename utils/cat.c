@@ -19,8 +19,8 @@
 
 #include <sys/stat.h>
 
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -42,13 +42,13 @@ static bool cat_fd(int fd, const char* path)
 		{
 			ssize_t amount = write(1, buffer + so_far, buffer_used - so_far);
 			if ( amount <= 0 )
-				return error(0, errno, "`%s'", "<stdout>"), false;
+				return warn("<stdout>"), false;
 			so_far += amount;
 		}
 	}
 
 	if ( buffer_used < 0 )
-		return error(0, errno, "`%s'", path), false;
+		return warn("%s", path), false;
 
 	return true;
 }
@@ -60,7 +60,7 @@ static bool cat_path(const char* path)
 	int fd = open(path, O_RDONLY);
 	if ( fd < 0 )
 	{
-		error(0, errno, "`%s'", path);
+		warn("%s", path);
 		return false;
 	}
 	bool result = cat_fd(fd, path);

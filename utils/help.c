@@ -21,8 +21,8 @@
 #include <sys/wait.h>
 
 #include <dirent.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,10 +42,10 @@ int main(void)
 	{
 		int pipe_fds[2];
 		if ( pipe(pipe_fds) )
-			error(1, errno, "pipe");
+			err(1, "pipe");
 
 		if ( (child_pid = fork()) < 0 )
-			error(1, errno, "fork");
+			err(1, "fork");
 
 		if ( !child_pid )
 		{
@@ -73,7 +73,7 @@ int main(void)
 		if ( !len ) { path++; continue; }
 		dirname = (char*) malloc((len+1) * sizeof(char));
 		if ( !dirname )
-			error(1, errno, "malloc");
+			err(1, "malloc");
 		memcpy(dirname, path, len * sizeof(char));
 		dirname[len] = '\0';
 		path += len + 1;

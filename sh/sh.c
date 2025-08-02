@@ -26,7 +26,6 @@
 #include <dirent.h>
 #include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <fcntl.h>
 #include <glob.h>
 #include <inttypes.h>
@@ -819,7 +818,7 @@ struct execute_result execute(char** tokens,
 			char* value = token_expand_variables(tokens[i]);
 			if ( !value )
 			{
-				error(0, errno, "variable expansion");
+				warn("variable expansion");
 				failure = true;
 				critical = true;
 				break;
@@ -830,7 +829,7 @@ struct execute_result execute(char** tokens,
 			                value) )
 			{
 				free(value);
-				error(0, errno, "variable expansion");
+				warn("variable expansion");
 				failure = true;
 				critical = true;
 				break;
@@ -844,7 +843,7 @@ struct execute_result execute(char** tokens,
 				                               &expandv_allocated,
 				                               tokens[i]) )
 			{
-				error(0, errno, "variable expansion");
+				warn("variable expansion");
 				failure = true;
 				critical = true;
 				break;
@@ -867,7 +866,7 @@ struct execute_result execute(char** tokens,
 
 			if ( i == expandc )
 			{
-				error(0, errno, "%s: expected argument", type);
+				warn("%s: expected argument", type);
 				failure = true;
 				critical = true;
 				break;
@@ -882,7 +881,7 @@ struct execute_result execute(char** tokens,
 				                         &targets_length,
 				                         expandv[i]) )
 			{
-				error(0, errno, "wildcard expansion");
+				warn("wildcard expansion");
 				failure = true;
 				critical = true;
 				break;
@@ -890,7 +889,7 @@ struct execute_result execute(char** tokens,
 
 			if ( targets_used != 1 )
 			{
-				error(0, 0, "%s: ambiguous redirect: %s", type, expandv[i]);
+				warnx("%s: ambiguous redirect: %s", type, expandv[i]);
 				for ( size_t i = 0; i < targets_used; i++ )
 					free(targets[i]);
 				free(targets);
@@ -903,7 +902,7 @@ struct execute_result execute(char** tokens,
 			free(targets);
 			if ( !target )
 			{
-				error(0, errno, "token finalization");
+				warn("token finalization");
 				failure = true;
 				break;
 			}
@@ -918,7 +917,7 @@ struct execute_result execute(char** tokens,
 
 			if ( fd < 0 )
 			{
-				error(0, errno, "%s", target);
+				warn("%s", target);
 				free(target);
 				failure = true;
 				break;
@@ -944,7 +943,7 @@ struct execute_result execute(char** tokens,
 				                         &argv_allocated,
 				                         expandv[i]) )
 			{
-				error(0, errno, "wildcard expansion");
+				warn("wildcard expansion");
 				failure = true;
 				critical = true;
 				break;
@@ -971,7 +970,7 @@ struct execute_result execute(char** tokens,
 		char* var = token_finalize(varsv[i]);
 		if ( !var )
 		{
-			error(0, errno, "token finalization");
+			warn("token finalization");
 			failure = true;
 			break;
 		}
@@ -984,7 +983,7 @@ struct execute_result execute(char** tokens,
 		char* arg = token_finalize(argv[i]);
 		if ( !arg )
 		{
-			error(0, errno, "token finalization");
+			warn("token finalization");
 			failure = true;
 			break;
 		}
@@ -1015,7 +1014,7 @@ struct execute_result execute(char** tokens,
 			*eq = '=';
 			if ( ret < 0 )
 			{
-				error(0, errno, "setenv");
+				warn("setenv");
 				internal_status = 1;
 			}
 		}
@@ -1029,7 +1028,7 @@ struct execute_result execute(char** tokens,
 		internal_status = 0;
 		if ( perform_chdir(newdir) < 0 )
 		{
-			error(0, errno, "cd: %s", newdir);
+			warn("cd: %s", newdir);
 			internal_status = 1;
 		}
 	}
@@ -1055,13 +1054,13 @@ struct execute_result execute(char** tokens,
 				{
 					if ( setenv(name, argv[1] + eqpos + 1, 1) < 0 )
 					{
-						error(0, errno, "export: setenv");
+						warn("export: setenv");
 						internal_status = 1;
 					}
 				}
 				else
 				{
-					error(0, errno, "export: malloc");
+					warn("export: malloc");
 					internal_status = 1;
 				}
 			}
@@ -1139,7 +1138,7 @@ struct execute_result execute(char** tokens,
 			has_foreground_pipe = true;
 		else
 		{
-			error(0, errno, "pipe2");
+			warn("pipe2");
 			internal_status = 1;
 			failure = true;
 			internal = true;
@@ -1163,7 +1162,7 @@ struct execute_result execute(char** tokens,
 		sigprocmask(SIG_BLOCK, &blocked, &oldset);
 		if ( (childpid = fork()) < 0 )
 		{
-			error(0, errno, "fork");
+			warn("fork");
 			internal_status = 1;
 			failure = true;
 			internal = true;
@@ -1260,7 +1259,7 @@ struct execute_result execute(char** tokens,
 		*eq = '=';
 		if ( ret < 0 )
 		{
-			error(0, errno, "setenv");
+			warn("setenv");
 			status = 1;
 		}
 	}
@@ -1287,7 +1286,7 @@ struct execute_result execute(char** tokens,
 		errno = errno_saved;
 	}
 
-	error(127, errno, "%s", argv[0]);
+	err(127, "%s", argv[0]);
 
 	__builtin_unreachable();
 }
@@ -1386,7 +1385,7 @@ readcmd:
 		int pipes[2];
 		if ( pipe2(pipes, O_CLOEXEC) < 0 )
 		{
-			error(0, errno, "pipe");
+			warn("pipe");
 			if ( !interactive || exit_on_error )
 				*script_exited = true;
 			return status = 1;
@@ -1477,7 +1476,7 @@ readcmd:
 		int exitstatus;
 		if ( waitpid(result.pid, &exitstatus, 0) < 0 )
 		{
-			error(0, errno, "waitpid");
+			warn("waitpid");
 			if ( !interactive || exit_on_error )
 				*script_exited = true;
 			status = 1;
@@ -2009,7 +2008,7 @@ void read_command_non_interactive(struct sh_read_command* sh_read_command,
 	size_t command_length = 1024;
 	char* command = (char*) malloc(command_length + 1);
 	if ( !command )
-		error(64, errno, "malloc");
+		err(64, "malloc");
 	command[0] = '\0';
 
 	while ( true )
@@ -2080,7 +2079,7 @@ void read_command_non_interactive(struct sh_read_command* sh_read_command,
 			size_t new_length = command_length * 2;
 			char* new_command = (char*) realloc(command, new_length + 1);
 			if ( !new_command )
-				error(64, errno, "realloc");
+				err(64, "realloc");
 			command = new_command;
 			command_length  = new_length;
 		}
@@ -2129,7 +2128,7 @@ static int run(FILE* fp,
 
 		if ( sh_read_command.error_condition )
 		{
-			error(0, errno, "read: %s", fp_name);
+			warn("read: %s", fp_name);
 			return *script_exited = true, 2;
 		}
 
@@ -2420,7 +2419,7 @@ int main(int argc, char* argv[])
 	if ( flag_c_first_operand_is_command )
 	{
 		if ( argc <= 1 )
-			error(2, 0, "option -c expects an operand");
+			errx(2, "option -c expects an operand");
 
 		for ( int i = 2; i < argc; i++ )
 		{
@@ -2434,7 +2433,7 @@ int main(int argc, char* argv[])
 
 		FILE* fp = fmemopen((void*) command, command_length, "r");
 		if ( !fp )
-			error(2, errno, "fmemopen");
+			err(2, "fmemopen");
 
 		status = top(fp, "<command-line>", false, flag_e_exit_on_error,
 		             flag_l_login, &script_exited, status);
@@ -2480,7 +2479,7 @@ int main(int argc, char* argv[])
 		const char* path = argv[1];
 		FILE* fp = fopen(path, "r");
 		if ( !fp )
-			error(127, errno, "%s", path);
+			err(127, "%s", path);
 		status = top(fp, path, false, flag_e_exit_on_error, flag_l_login,
 		             &script_exited, status);
 		fclose(fp);
