@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2018, 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2016, 2018, 2021, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <time.h>
 #include <timespec.h>
 #include <unistd.h>
@@ -143,8 +144,9 @@ static uint32_t BlendPixel(uint32_t bg, uint32_t fg)
 
 static bool ForkAndWait()
 {
-	unsigned int old_termmode;
-	gettermmode(0, &old_termmode);
+	struct termios tio;
+	if ( tcgetattr(0, &tio) )
+		return false;
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
 		return false;
@@ -158,7 +160,7 @@ static bool ForkAndWait()
 		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
 		tcsetpgrp(0, getpgid(0));
 		sigprocmask(SIG_SETMASK, &oldset, NULL);
-		settermmode(0, old_termmode);
+		tcsetattr(0, TCSANOW, &tio);
 		return false;
 	}
 	close(0);
@@ -174,12 +176,15 @@ static bool ForkAndWait()
 	sigprocmask(SIG_BLOCK, &sigttou, &oldset);
 	tcsetpgrp(0, getpgid(0));
 	sigprocmask(SIG_SETMASK, &oldset, NULL);
+	tio.c_lflag = ECHO | ECHOE | ECHOK | ICANON | IEXTEN | ISIG;
+	tcsetattr(0, TCSANOW, &tio);
 #if 1 /* Magic to somehow fix a weird keyboard-related bug nortti has. */
-	settermmode(0, TERMMODE_NORMAL | TERMMODE_NONBLOCK);
+	int dflags = fcntl(0, F_GETFL);
+	fcntl(0, F_SETFL, dflags | O_NONBLOCK);
 	char c;
 	while ( 0 <= read(0, &c, sizeof(c)) );
+	fcntl(0, F_SETFL, dflags);
 #endif
-	settermmode(0, TERMMODE_NORMAL);
 	printf("\e[m\e[2J\e[H");
 	fflush(stdout);
 	fsync(0);
@@ -225,28 +230,30 @@ void ExecuteShellCommand(const char* command, int curdirfd)
 {
 	if ( !strcmp(command, "exit") )
 		exit(0);
-	unsigned int old_termmode;
-	gettermmode(0, &old_termmode);
+	struct termios old_tio;
+	tcgetattr(0, &old_tio);
 	if ( ForkAndWait() )
 	{
 		fchdir(curdirfd);
 		execlp("sh", "sh", "-c", command, (const char*) NULL);
 		err(127, "%s", "sh");
 	}
-	unsigned int cur_termmode;
-	gettermmode(0, &cur_termmode);
-	if ( old_termmode == cur_termmode )
+	struct termios cur_tio;
+	tcgetattr(0, &cur_tio);
+	if ( old_tio.c_lflag == cur_tio.c_lflag )
 	{
 		printf("\e[30;47m\e[J");
 		printf("-- Press enter to return to Trianglix --\n");
 		printf("\e[25l");
 		fflush(stdout);
-		settermmode(0, TERMMODE_UNICODE | TERMMODE_UTF8 | TERMMODE_LINEBUFFER);
+		cur_tio.c_lflag = ICANON;
+		tcsetattr(0, TCSANOW, &cur_tio);
 		char line[256];
 		read(0, line, sizeof(line));
 		printf("\e[25h");
 		fflush(stdout);
 	}
+	tcsetattr(0, TCSANOW, &old_tio);
 }
 
 enum object_type

@@ -20,7 +20,6 @@
 
 #include <sys/display.h>
 #include <sys/ioctl.h>
-#include <sys/termmode.h>
 #include <sys/types.h>
 
 #include <ctype.h>
@@ -259,9 +258,13 @@ void password(char* buffer,
               size_t buffer_size,
               const char* question)
 {
-	unsigned int termmode;
-	gettermmode(0, &termmode);
-	settermmode(0, termmode & ~TERMMODE_ECHO);
+	struct termios tio;
+	if ( tcgetattr(0, &tio) < 0 )
+		err(2, "tcgetattr");
+	struct termios tio_pw = tio;
+	tio_pw.c_lflag &= ~(ECHO | ECHOE | ISIG);
+	if ( tcsetattr(0, TCSANOW, &tio_pw) < 0 )
+		err(2, "tcsetattr");
 	printf("\e[1m");
 	fflush(stdout);
 	text(question);
@@ -275,7 +278,8 @@ void password(char* buffer,
 	size_t buffer_length = strlen(buffer);
 	if ( buffer_length && buffer[buffer_length-1] == '\n' )
 		buffer[--buffer_length] = '\0';
-	settermmode(0, termmode);
+	if ( tcsetattr(0, TCSANOW, &tio) < 0 )
+		err(2, "tcsetattr");
 }
 
 static bool has_program(const char* program)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,7 +17,6 @@
  * Password change.
  */
 
-#include <sys/termmode.h>
 #include <sys/types.h>
 
 #include <err.h>
@@ -40,11 +39,15 @@ static void password(char* buffer,
 	bool is_tty = isatty(0);
 	if ( !require_tty && is_tty )
 		errx(1, "Input is not a terminal");
-	unsigned int termmode = 0;
+	struct termios tio = {0};
+	if ( is_tty && tcgetattr(0, &tio) < 0 )
+		err(1, "tcgetattr");
 	if ( is_tty )
 	{
-		gettermmode(0, &termmode);
-		settermmode(0, termmode & ~TERMMODE_ECHO);
+		struct termios tio_pw = tio;
+		tio_pw.c_lflag &= ~(ECHO | ECHOE | ISIG);
+		if ( tcsetattr(0, TCSANOW, &tio_pw) < 0 )
+			err(1, "tcsetattr");
 		if ( whose )
 			printf("%s's ", whose);
 		printf("%s ", question);
@@ -57,7 +60,8 @@ static void password(char* buffer,
 	{
 		fflush(stdin);
 		printf("\n");
-		settermmode(0, termmode);
+		if ( tcsetattr(0, TCSANOW, &tio) < 0 )
+			err(1, "tcsetattr");
 	}
 	size_t buffer_length = strlen(buffer);
 	if ( buffer_length && buffer[buffer_length-1] == '\n' )

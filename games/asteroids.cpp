@@ -18,7 +18,6 @@
  */
 
 #include <sys/keycodes.h>
-#include <sys/termmode.h>
 
 #include <assert.h>
 #include <err.h>

@@ -53,7 +53,7 @@ bool check_real(const char* username, const char* password);
 bool check_begin(struct check* chk,
                  const char* username,
                  const char* password,
-                 bool restrict_termmode);
+                 bool restrict_termios);
 bool check_end(struct check* chk, bool* result, bool try);
 bool check(const char* username, const char* password);
 int graphical(void);

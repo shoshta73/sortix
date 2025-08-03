@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2018, 2022, 2023, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014-2016, 2018, 2021-2025 Jonas 'Sortie' Termansen.
  * Copyright (c) 2023 dzwdz.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -19,7 +19,6 @@
  */
 
 #include <sys/stat.h>
-#include <sys/termmode.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -126,7 +125,7 @@ bool check_real(const char* username, const char* password)
 bool check_begin(struct check* chk,
                  const char* username,
                  const char* password,
-                 bool restrict_termmode)
+                 bool restrict_termios)
 {
 	memset(chk, 0, sizeof(*chk));
 	if ( tcgetattr(0, &chk->tio) )
@@ -149,16 +148,15 @@ bool check_begin(struct check* chk,
 		signal(SIGINT, SIG_DFL);
 		signal(SIGQUIT, SIG_DFL);
 		signal(SIGTERM, SIG_DFL);
-		unsigned int termmode = TERMMODE_UNICODE | TERMMODE_SIGNAL |
-		                        TERMMODE_UTF8 | TERMMODE_LINEBUFFER |
-		                        TERMMODE_ECHO;
-		if ( restrict_termmode )
-			termmode = TERMMODE_SIGNAL;
+		struct termios tio = chk->tio;
+		tio.c_lflag = ISIG | ICANON | ECHO | ECHOE;
+		if ( restrict_termios )
+			tio.c_lflag = ISIG;
 		if ( setpgid(0, 0) < 0 ||
 		     close(pipe_fds[0]) < 0 ||
 		     tcsetpgrp(0, getpgid(0)) ||
 		     sigprocmask(SIG_SETMASK, &chk->oldset, NULL) < 0 ||
-		     settermmode(0, termmode) < 0 ||
+		     tcsetattr(0, TCSANOW, &tio) < 0 ||
 		     !check_real(username, password) ||
 		     write(pipe_fds[1], &success, sizeof(success)) < 0 )
 		{
@@ -294,6 +292,7 @@ bool login(const char* username, const char* session)
 		signal(SIGINT, SIG_DFL);
 		signal(SIGQUIT, SIG_DFL);
 		signal(SIGTERM, SIG_DFL);
+		tio.c_lflag = ECHO | ECHOE | ECHOK | ICANON | IEXTEN | ISIG;
 		(void) (
 		setpgid(0, 0) < 0 ||
 		close(pipe_fds[0]) < 0 ||
@@ -314,7 +313,7 @@ bool login(const char* username, const char* session)
 		setcloexecfrom(3) < 0 ||
 		tcsetpgrp(0, getpgid(0)) ||
 		sigprocmask(SIG_SETMASK, &oldset, NULL) < 0 ||
-		settermmode(0, TERMMODE_NORMAL) < 0 ||
+		tcsetattr(0, TCSANOW, &tio) < 0 ||
 		(session ?
 			execlp(session + (session[0] == '-'), session, (const char*) NULL) < 0
 			:
@@ -465,11 +464,14 @@ void handle_special(enum special_action action)
 
 int textual(void)
 {
-	unsigned int termmode = TERMMODE_UNICODE | TERMMODE_SIGNAL | TERMMODE_UTF8 |
-	                        TERMMODE_LINEBUFFER | TERMMODE_ECHO;
-	if ( settermmode(0, termmode) < 0 )
-		err(2, "settermmode");
-	unsigned int pw_termmode = termmode & ~(TERMMODE_ECHO);
+	struct termios tio;
+	if ( tcgetattr(0, &tio) < 0 )
+		err(2, "tcgetattr");
+	tio.c_lflag = ECHO | ECHOE | ECHOK | ICANON | IEXTEN | ISIG;
+	struct termios tio_pw = tio;
+	tio_pw.c_lflag &= ~(ECHO | ECHOE);
+	if ( tcsetattr(0, TCSANOW, &tio) < 0 )
+		err(2, "tcsetattr");
 
 	char* username = NULL;
 	char* session = NULL;
@@ -507,16 +509,16 @@ int textual(void)
 		}
 		handle_special(action);
 
-		if ( settermmode(0, pw_termmode) < 0 )
-			err(2, "settermmode");
+		if ( tcsetattr(0, TCSANOW, &tio_pw) < 0 )
+			err(2, "tcsetattr");
 		printf("Password (will not echo): ");
 		fflush(stdout);
 		char password[256];
 		errno = 0;
 		bool password_success = read_terminal_line(password, sizeof(password));
 		printf("\n");
-		if ( settermmode(0, termmode) < 0 )
-			err(2, "settermmode");
+		if ( tcsetattr(0, TCSANOW, &tio) < 0 )
+			err(2, "tcsetattr");
 		if ( !password_success )
 		{
 			if ( errno && errno != EINTR )

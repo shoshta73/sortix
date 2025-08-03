@@ -20,7 +20,6 @@
 
 #include <sys/display.h>
 #include <sys/socket.h>
-#include <sys/termmode.h>
 
 #include <assert.h>
 #include <errno.h>
