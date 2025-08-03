@@ -763,6 +763,8 @@ static void InitThread(void* /*user*/)
 	Ref<Descriptor> tty = root->open(&ctx, Log::console_tty, O_READ | O_WRITE);
 	if ( !tty )
 		PanicF("%s: %m", Log::console_tty);
+	if ( root->link(&ctx, "/dev/console", tty) < 0 )
+		PanicF("link: %s -> /dev/console", Log::console_tty);
 	if ( tty->ioctl(&ctx, TIOCSCTTY, 0) < 0 )
 		PanicF("%s: ioctl: TIOCSCTTY: %m", Log::console_tty);
 	tty.Reset();
