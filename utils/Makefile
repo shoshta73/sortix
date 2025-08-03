@@ -64,7 +64,6 @@ touch \
 tr \
 true \
 tty \
-type \
 uname \
 uniq \
 uptime \
