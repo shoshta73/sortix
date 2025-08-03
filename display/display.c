@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2017, 2022-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014-2017, 2022-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,7 @@
 
 #include <err.h>
 #include <locale.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +33,13 @@
 
 uint32_t arrow_buffer[48 * 48];
 struct framebuffer arrow_framebuffer = { 48, arrow_buffer, 48, 48 };
+
+static struct server server;
+
+static void stop_server(void)
+{
+	server_destroy(&server);
+}
 
 static void ready(void)
 {
@@ -71,10 +79,19 @@ int main(int argc, char* argv[])
 	if ( getpgid(0) != getpid() )
 		errx(1, "This program must be run in its own process group");
 
+	if ( atexit(stop_server) != 0 )
+		err(1, "atexit");
+
+	sigset_t sigterm, oldset;
+	sigemptyset(&sigterm);
+	sigaddset(&sigterm, SIGTERM);
+	sigprocmask(SIG_BLOCK, &sigterm, &oldset);
+	struct sigaction sa = { .sa_handler = server_on_sigterm }, old_sa;
+	sigaction(SIGTERM, &sa, &old_sa);
+
 	struct display display;
 	display_initialize(&display);
 
-	struct server server;
 	server_initialize(&server, &display, tty, mouse, socket);
 
 	if ( setenv("DISPLAY_SOCKET", server.server_path, 1) < 0 )
@@ -120,6 +137,11 @@ int main(int argc, char* argv[])
 	free(home_session);
 
 	server_mainloop(&server);
+
+	server_destroy(&server);
+
+	sigaction(SIGTERM, &old_sa, NULL);
+	sigprocmask(SIG_SETMASK, &oldset, NULL);
 
 	return display.exit_code;
 }

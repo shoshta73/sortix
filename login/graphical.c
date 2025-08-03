@@ -24,7 +24,6 @@
 #include <sys/kernelinfo.h>
 #include <sys/ioctl.h>
 #include <sys/ps2mouse.h>
-#include <sys/termmode.h>
 
 #include <assert.h>
 #include <brand.h>
@@ -95,6 +94,7 @@ static char* session = NULL;
 struct glogin
 {
 	struct check chk;
+	int fd_tty;
 	int fd_mouse;
 	struct dispmsg_crtc_mode mode;
 	struct framebuffer wallpaper;
@@ -913,6 +913,8 @@ static void mouse_event(struct glogin* state, unsigned char byte)
 
 void glogin_destroy(struct glogin* state)
 {
+	if ( 0 <= state->fd_tty )
+		close(state->fd_tty);
 	if ( 0 <= state->fd_mouse )
 		close(state->fd_mouse);
 	if ( state->fading_from )
@@ -924,13 +926,21 @@ void glogin_destroy(struct glogin* state)
 bool glogin_init(struct glogin* state)
 {
 	memset(state, 0, sizeof(*state));
+	state->fd_tty = -1;
 	state->fd_mouse = -1;
+    state->fd_tty = open("/dev/tty", O_RDWR | O_NONBLOCK);
+	if ( state->fd_tty < 0 )
+	{
+		glogin_destroy(state);
+		return false;
+	}
 	struct tiocgdisplay display;
 	struct tiocgdisplays gdisplays;
 	memset(&gdisplays, 0, sizeof(gdisplays));
 	gdisplays.count = 1;
 	gdisplays.displays = &display;
-	if ( ioctl(1, TIOCGDISPLAYS, &gdisplays) < 0 || gdisplays.count == 0 )
+	if ( ioctl(state->fd_tty, TIOCGDISPLAYS, &gdisplays) < 0 ||
+	     gdisplays.count == 0 )
 	{
 		glogin_destroy(state);
 		return false;
@@ -956,19 +966,21 @@ bool glogin_init(struct glogin* state)
 		glogin_destroy(state);
 		return false;
 	}
-    state->fd_mouse = open("/dev/mouse", O_RDONLY | O_CLOEXEC);
-	if ( tcgetattr(0, &state->old_tio) < 0 )
+    state->fd_mouse = open("/dev/mouse", O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+	if ( tcgetattr(state->fd_tty, &state->old_tio) < 0 )
 	{
 		warn("tcgetattr");
 		return false;
 	}
 	state->has_old_tio = true;
-	if ( settermmode(0, TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_NONBLOCK) < 0 )
+	struct termios tio = state->old_tio;
+	tio.c_lflag = ISORTIX_KBKEY | ISORTIX_32BIT;
+	if ( tcsetattr(state->fd_tty, TCSANOW, &tio) < 0 )
 	{
-		warn("settermmode");
+		warn("tcsetattr");
 		return false;
 	}
-	fsync(0);
+	fsync(state->fd_tty);
 	arrow_initialize();
 	textbox_initialize(&textbox_username, "Username");
 	textbox_initialize(&textbox_password, "Password");
@@ -1004,7 +1016,7 @@ int glogin_main(struct glogin* state)
 		pfds[1].fd = -1;
 		if ( state->stage != STAGE_CHECKING )
 		{
-			pfds[0].fd = 0;
+			pfds[0].fd = state->fd_tty;
 			pfds[0].events = POLLIN;
 			pfds[0].revents = 0;
 		}
@@ -1042,9 +1054,9 @@ int glogin_main(struct glogin* state)
 		}
 		if ( pfds[0].fd != -1 && pfds[0].revents )
 		{
-			uint32_t codepoint;
-			while ( read(0, &codepoint, sizeof(codepoint)) == sizeof(codepoint) )
-				keyboard_event(state, codepoint);
+			uint32_t cp;
+			while ( read(state->fd_tty, &cp, sizeof(cp)) == sizeof(cp) )
+				keyboard_event(state, cp);
 		}
 		if ( pfds[1].fd != -1 && pfds[1].revents )
 		{

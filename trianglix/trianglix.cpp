@@ -20,7 +20,6 @@
 #include <sys/display.h>
 #include <sys/keycodes.h>
 #include <sys/stat.h>
-#include <sys/termmode.h>
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -1720,7 +1719,12 @@ static void HandleKeyboardEvents(int kbfd, struct Desktop* desktop)
 	uint32_t input[BUFFER_LENGTH];
 	while ( true )
 	{
-		settermmode(kbfd, TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_NONBLOCK);
+		struct termios tio;
+		if ( tcgetattr(kbfd, &tio) < 0 )
+			err(1, "tcgetattr");
+		tio.c_lflag = ISORTIX_KBKEY | ISORTIX_32BIT;
+		if ( tcsetattr(kbfd, TCSANOW, &tio) < 0 )
+			err(1, "tcsetattr");
 		ssize_t num_bytes = read(kbfd, input, sizeof(input));
 		if ( num_bytes < 0 )
 			return;
@@ -1860,16 +1864,6 @@ static int MainLoop(int argc, char* argv[], int kbfd)
 	return 0;
 }
 
-static int CreateKeyboardConnection()
-{
-	int fd = open("/dev/tty", O_RDONLY | O_CLOEXEC);
-	if ( fd < 0 )
-		return -1;
-	if ( settermmode(fd, TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_NONBLOCK) )
-		return close(fd), -1;
-	return fd;
-}
-
 int main(int argc, char* argv[])
 {
 	struct stat st;
@@ -1903,13 +1897,20 @@ int main(int argc, char* argv[])
 
 	memcpy(font + 128 * 16, rune_font, sizeof(rune_font));
 
-	int kbfd = CreateKeyboardConnection();
-	if ( kbfd < 0 )
-		errx(1, "couldn't create keyboard connection");
+	int tty_fd = open("/dev/tty", O_RDONLY | O_CLOEXEC | O_NONBLOCK);
+	if ( tty_fd < 0 )
+		return -1;
+	struct termios saved_tio;
+	if ( tcgetattr(tty_fd, &saved_tio) < 0 )
+		err(1, "tcgetattr");
+	struct termios tio = saved_tio;
+	tio.c_lflag = ISORTIX_KBKEY | ISORTIX_32BIT;
+	if ( tcsetattr(tty_fd, TCSANOW, &tio) < 0 )
+		err(1, "tcsetattr");
 
-	int ret = MainLoop(argc, argv, kbfd);
+	int ret = MainLoop(argc, argv, tty_fd);
 
-	close(kbfd);
+	tcsetattr(tty_fd, TCSANOW, &saved_tio);
 
 	return ret;
 }

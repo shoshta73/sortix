@@ -49,7 +49,13 @@ diff -Paur --no-dereference -- libSDL.upstream/sdl.pc libSDL/sdl.pc
 diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libSDL/src/video/sortix/SDL_dispd.c
 --- libSDL.upstream/src/video/sortix/SDL_dispd.c
 +++ libSDL/src/video/sortix/SDL_dispd.c
-@@ -28,14 +28,11 @@
+@@ -22,20 +22,16 @@
+ #include "SDL_config.h"
+ 
+ #include <sys/keycodes.h>
+-#include <sys/termmode.h>
+ 
+ #include <assert.h>
  #include <stddef.h>
  #include <stdint.h>
  #include <stdio.h>
@@ -66,7 +72,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  #include "SDL_video.h"
  #include "../SDL_sysvideo.h"
  #include "../../events/SDL_sysevents.h"
-@@ -64,30 +61,12 @@
+@@ -64,30 +60,12 @@
  
  static void DispD_DeleteDevice(SDL_VideoDevice *device)
  {
@@ -97,7 +103,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  	SDL_free(device->hidden);
  	SDL_free(device);
  }
-@@ -112,68 +91,20 @@
+@@ -112,68 +90,20 @@
  	}
  	SDL_memset(device->hidden, 0, (sizeof *device->hidden));
  
@@ -177,7 +183,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  	device->hidden->mode_list[0] = &device->hidden->current_mode;
  	device->hidden->mode_list[1] = NULL;
  
-@@ -217,13 +148,8 @@
+@@ -217,13 +147,8 @@
  SDL_Rect **DispD_ListModes(_THIS, SDL_PixelFormat *format, Uint32 flags)
  {
  	// TODO: Return NULL if the format isn't 32-bit supported.
@@ -193,7 +199,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  }
  
  SDL_Surface *DispD_SetVideoMode(_THIS, SDL_Surface *current,
-@@ -234,28 +160,16 @@
+@@ -234,28 +159,16 @@
  
  	bpp = 32;
  
@@ -232,7 +238,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  
  	int y;
  	for ( y = 0; y < height; y++ )
-@@ -270,7 +184,7 @@
+@@ -270,7 +183,7 @@
  	assert(current->format);
  	assert(current->format->BitsPerPixel == 32);
  	current->pitch = pitch;
@@ -241,7 +247,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  	current->pixels = data;
  	current->w = width;
  	current->h = height;
-@@ -291,12 +205,8 @@
+@@ -291,12 +204,8 @@
  
  static void DispD_SetCaption(_THIS, const char *title, const char *icon)
  {
@@ -256,7 +262,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  }
  
  /* We need to wait for vertical retrace on page flipped displays */
-@@ -312,26 +222,13 @@
+@@ -312,26 +221,13 @@
  
  static void DispD_UpdateRects(_THIS, int numrects, SDL_Rect *rects)
  {
@@ -290,7 +296,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  }
  
  int DispD_SetColors(_THIS, int firstcolor, int ncolors, SDL_Color *colors)
-@@ -345,6 +242,7 @@
+@@ -345,6 +241,7 @@
  */
  void DispD_VideoQuit(_THIS)
  {
@@ -298,7 +304,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  	this->screen->pixels = NULL;
  }
  
-@@ -424,7 +322,6 @@
+@@ -424,7 +321,6 @@
  	return 0;
  }
  
@@ -306,7 +312,7 @@ diff -Paur --no-dereference -- libSDL.upstream/src/video/sortix/SDL_dispd.c libS
  static void on_disconnect(void* ctx)
  {
  	struct SDL_PrivateVideoData* hidden = (struct SDL_PrivateVideoData*) ctx;
-@@ -463,48 +360,19 @@
+@@ -463,48 +359,19 @@
  	keysym.unicode = 0;
  	SDL_PrivateKeyboard(kbkey < 0 ? SDL_RELEASED : SDL_PRESSED, &keysym);
  }

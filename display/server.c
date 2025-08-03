@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2023, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2023, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,7 +19,6 @@
 
 #include <sys/ioctl.h>
 #include <sys/socket.h>
-#include <sys/termmode.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 
@@ -49,7 +48,7 @@
 
 static volatile sig_atomic_t got_sigterm;
 
-static void on_sigterm(int signum)
+void server_on_sigterm(int signum)
 {
 	(void) signum;
 	got_sigterm = 1;
@@ -79,21 +78,21 @@ void server_initialize(struct server* server, struct display* display,
                        const char* tty, const char* mouse, const char* socket)
 {
 	memset(server, 0, sizeof(*server));
+	server->initialized = true;
+	server->tty_fd = -1;
+	server->mouse_fd = -1;
+	server->server_fd = -1;
 
 	server->display = display;
 
 	load_font();
 
-	server->tty_fd = 0;
-	if ( tty || !isatty(server->tty_fd) )
-	{
-		tty = tty ? tty : "/dev/tty";
-		server->tty_fd = open(tty, O_RDONLY);
-		if ( server->tty_fd < 0 )
-			err(1, tty);
-		if ( !isatty(server->tty_fd) )
-			err(1, tty);
-	}
+	tty = tty ? tty : "/dev/tty";
+	server->tty_fd = open(tty, O_RDONLY | O_NONBLOCK);
+	if ( server->tty_fd < 0 )
+		err(1, "%s", tty);
+	if ( !isatty(server->tty_fd) )
+		err(1, "%s", tty);
 
 	char tty_name[TTY_NAME_MAX + 1];
 	ttyname_r(server->tty_fd, tty_name, sizeof(tty_name));
@@ -117,16 +116,46 @@ void server_initialize(struct server* server, struct display* display,
 	if ( server->server_fd < 0 )
 		err(1, "open_local_server_socket: %s", server->server_path);
 
-	unsigned int termmode =
-		TERMMODE_KBKEY | TERMMODE_UNICODE | TERMMODE_NONBLOCK;
-	if ( settermmode(server->tty_fd, termmode) < 0 )
-		err(1, "settermmode");
+	if ( tcgetattr(server->tty_fd, &server->tio_saved) < 0 )
+		err(1, "tcgetattr");
+	server->has_tio_saved = true;
+
+	struct termios tio = server->tio_saved;
+	tio.c_lflag = ISORTIX_KBKEY | ISORTIX_32BIT;
+	if ( tcsetattr(server->tty_fd, TCSANOW, &tio) < 0 )
+		err(1, "tcsetattr");
 
 	server->pfds_count = server_pfds_count(server);
 	server->pfds =
 		reallocarray(NULL, sizeof(struct pollfd), server->pfds_count);
 	if ( !server->pfds )
 		err(1, "malloc");
+}
+
+void server_destroy(struct server* server)
+{
+	if ( !server->initialized )
+		return;
+	server->initialized = false;
+	// TODO: disconnect connections.
+	free(server->connections);
+	server->connections = NULL;
+	server->connections_used = 0;
+	server->connections_length = 0;
+	free(server->pfds);
+	server->pfds = NULL;
+	server->pfds_count = 0;
+	if ( server->has_tio_saved )
+		tcsetattr(server->tty_fd, TCSANOW, &server->tio_saved);
+	if ( 0 <= server->tty_fd )
+		close(server->tty_fd);
+	if ( 0 <= server->mouse_fd )
+		close(server->mouse_fd);
+	if ( 0 <= server->server_fd )
+		close(server->server_fd);
+	server->tty_fd = -1;
+	server->mouse_fd = -1;
+	server->server_fd = -1;
 }
 
 bool server_accept(struct server* server)
@@ -309,20 +338,10 @@ void server_poll(struct server* server)
 
 void server_mainloop(struct server* server)
 {
-	sigset_t sigterm, oldset;
-	sigemptyset(&sigterm);
-	sigaddset(&sigterm, SIGTERM);
-	sigprocmask(SIG_BLOCK, &sigterm, &oldset);
-	struct sigaction sa = { .sa_handler = on_sigterm }, old_sa;
-	sigaction(SIGTERM, &sa, &old_sa);
-
 	while ( server->display->running )
 	{
 		display_render(server->display);
 		server_poll(server);
 	}
 	display_render(server->display);
-
-	sigaction(SIGTERM, &old_sa, NULL);
-	sigprocmask(SIG_SETMASK, &oldset, NULL);
 }

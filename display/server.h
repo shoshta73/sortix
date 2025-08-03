@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <termios.h>
 
 struct connection;
 struct display;
@@ -39,10 +40,15 @@ struct server
 	size_t connections_length;
 	struct pollfd* pfds;
 	size_t pfds_count;
+	struct termios tio_saved;
+	bool initialized;
+	bool has_tio_saved;
 };
 
+void server_on_sigterm(int signum);
 void server_initialize(struct server* server, struct display* display,
                        const char* tty, const char* mouse, const char* socket);
+void server_destroy(struct server* server);
 bool server_accept(struct server* server);
 size_t server_pfds_count(const struct server* server);
 void server_poll(struct server* server);
