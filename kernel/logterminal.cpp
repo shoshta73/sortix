@@ -34,7 +34,6 @@
 #include <sortix/signal.h>
 #include <sortix/stat.h>
 #include <sortix/termios.h>
-#include <sortix/termmode.h>
 #include <sortix/winsize.h>
 
 #include <sortix/kernel/inode.h>
@@ -212,7 +211,7 @@ void LogTerminal::OnKeystroke(Keyboard* kb, void* /*user*/)
 		if ( unicode == '\n' )
 			unicode = '\r';
 		bool control = modifiers & (MODIFIER_LCONTROL | MODIFIER_RCONTROL);
-		if ( !(tio.c_lflag & ISORTIX_TERMMODE) && unicode == '\b' )
+		if ( unicode == '\b' )
 			unicode = 127;
 		if ( modifiers & MODIFIER_ALT && !(tio.c_lflag & ISORTIX_KBKEY) )
 			ProcessByte('\e');

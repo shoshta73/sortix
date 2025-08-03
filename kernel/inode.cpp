@@ -504,20 +504,6 @@ pid_t AbstractInode::tcgetpgrp(ioctx_t* /*ctx*/)
 	return errno = ENOTTY, -1;
 }
 
-int AbstractInode::settermmode(ioctx_t* /*ctx*/, unsigned /*mode*/)
-{
-	if ( inode_type == INODE_TYPE_TTY )
-		return errno = EBADF, -1;
-	return errno = ENOTTY, -1;
-}
-
-int AbstractInode::gettermmode(ioctx_t* /*ctx*/, unsigned* /*mode*/)
-{
-	if ( inode_type == INODE_TYPE_TTY )
-		return errno = EBADF, -1;
-	return errno = ENOTTY, -1;
-}
-
 int AbstractInode::poll(ioctx_t* /*ctx*/, PollNode* node)
 {
 	short status = POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM;

@@ -391,16 +391,6 @@ pid_t Vnode::tcgetpgrp(ioctx_t* ctx)
 	return inode->tcgetpgrp(ctx);
 }
 
-int Vnode::settermmode(ioctx_t* ctx, unsigned mode)
-{
-	return inode->settermmode(ctx, mode);
-}
-
-int Vnode::gettermmode(ioctx_t* ctx, unsigned* mode)
-{
-	return inode->gettermmode(ctx, mode);
-}
-
 int Vnode::poll(ioctx_t* ctx, PollNode* node)
 {
 	return inode->poll(ctx, node);

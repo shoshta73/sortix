@@ -91,8 +91,6 @@ public:
 	int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 	int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	pid_t tcgetpgrp(ioctx_t* ctx);
-	int settermmode(ioctx_t* ctx, unsigned mode);
-	int gettermmode(ioctx_t* ctx, unsigned* mode);
 	int poll(ioctx_t* ctx, PollNode* node);
 	int rename_here(ioctx_t* ctx, Ref<Vnode> from, const char* oldname,
 	                const char* newname);

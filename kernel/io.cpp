@@ -636,24 +636,6 @@ int sys_symlinkat(const char* oldpath, int newdirfd, const char* newpath)
 	return ret;
 }
 
-int sys_settermmode(int fd, unsigned mode)
-{
-	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
-	if ( !desc )
-		return -1;
-	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	return desc->settermmode(&ctx, mode);
-}
-
-int sys_gettermmode(int fd, unsigned* mode)
-{
-	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
-	if ( !desc )
-		return -1;
-	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	return desc->gettermmode(&ctx, mode);
-}
-
 int sys_isatty(int fd)
 {
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);

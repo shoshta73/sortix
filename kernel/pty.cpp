@@ -28,7 +28,6 @@
 #include <sortix/ioctl.h>
 #include <sortix/poll.h>
 #include <sortix/stat.h>
-#include <sortix/termmode.h>
 #include <sortix/winsize.h>
 
 #include <sortix/kernel/copy.h>

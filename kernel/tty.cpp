@@ -38,7 +38,6 @@
 #include <sortix/signal.h>
 #include <sortix/stat.h>
 #include <sortix/termios.h>
-#include <sortix/termmode.h>
 #include <sortix/winsize.h>
 
 #include <sortix/kernel/descriptor.h>
@@ -62,19 +61,6 @@
 #define M_CONTROL(x) (128 + CONTROL(x))
 
 namespace Sortix {
-
-static const unsigned int SUPPORTED_TERMMODES = TERMMODE_KBKEY
-                                              | TERMMODE_UNICODE
-                                              | TERMMODE_SIGNAL
-                                              | TERMMODE_UTF8
-                                              | TERMMODE_LINEBUFFER
-                                              | TERMMODE_ECHO
-                                              | TERMMODE_NONBLOCK
-                                              | TERMMODE_TERMIOS
-                                              | TERMMODE_DISABLE
-                                              | TERMMODE_NOOPOST
-                                              | TERMMODE_NOONLCR
-                                              | TERMMODE_OCRNL;
 
 static inline bool IsByteUnescaped(unsigned char byte)
 {
@@ -166,120 +152,6 @@ TTY::TTY(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group,
 
 TTY::~TTY()
 {
-}
-
-int TTY::settermmode(ioctx_t* /*ctx*/, unsigned int termmode)
-{
-	ScopedLock lock(&termlock);
-	if ( hungup )
-		return errno = EIO, -1;
-	if ( !RequireForeground(SIGTTOU) )
-		return -1;
-	if ( termmode & ~SUPPORTED_TERMMODES )
-		return errno = EINVAL, -1;
-	tcflag_t old_cflag = tio.c_cflag;
-	tcflag_t new_cflag = old_cflag;
-	tcflag_t old_lflag = tio.c_lflag;
-	tcflag_t new_lflag = old_lflag;
-	tcflag_t old_oflag = tio.c_oflag;
-	tcflag_t new_oflag = old_oflag;
-	if ( termmode & TERMMODE_KBKEY )
-		new_lflag |= ISORTIX_KBKEY;
-	else
-		new_lflag &= ~ISORTIX_KBKEY;
-	if ( !(termmode & TERMMODE_UNICODE) )
-		new_lflag |= ISORTIX_CHARS_DISABLE;
-	else
-		new_lflag &= ~ISORTIX_CHARS_DISABLE;
-	if ( termmode & TERMMODE_SIGNAL )
-		new_lflag |= ISIG;
-	else
-		new_lflag &= ~ISIG;
-	if ( !(termmode & TERMMODE_UTF8) )
-		new_lflag |= ISORTIX_32BIT;
-	else
-		new_lflag &= ~ISORTIX_32BIT;
-	if ( termmode & TERMMODE_LINEBUFFER )
-		new_lflag |= ICANON;
-	else
-		new_lflag &= ~ICANON;
-	if ( termmode & TERMMODE_ECHO )
-		new_lflag |= ECHO | ECHOE;
-	else
-		new_lflag &= ~(ECHO | ECHOE);
-	if ( termmode & TERMMODE_NONBLOCK )
-		new_lflag |= ISORTIX_NONBLOCK;
-	else
-		new_lflag &= ~ISORTIX_NONBLOCK;
-	if ( !(termmode & TERMMODE_TERMIOS) )
-		new_lflag |= ISORTIX_TERMMODE;
-	else
-		new_lflag &= ~ISORTIX_TERMMODE;
-	if ( !(termmode & TERMMODE_DISABLE) )
-		new_cflag |= CREAD;
-	else
-		new_cflag &= ~CREAD;
-	if ( !(termmode & TERMMODE_NOOPOST) )
-		new_oflag |= OPOST;
-	else
-		new_oflag &= ~OPOST;
-	if ( !(termmode & TERMMODE_NOONLCR) )
-		new_oflag |= ONLCR;
-	else
-		new_oflag &= ~ONLCR;
-	if ( termmode & TERMMODE_OCRNL )
-		new_oflag |= OCRNL;
-	else
-		new_oflag &= ~OCRNL;
-	bool old_no_utf8 = old_lflag & ISORTIX_32BIT;
-	bool new_no_utf8 = new_lflag & ISORTIX_32BIT;
-	struct termios new_tio = tio;
-	new_tio.c_cflag = new_cflag;
-	new_tio.c_lflag = new_lflag;
-	new_tio.c_oflag = new_oflag;
-	if ( !Reconfigure(&new_tio) )
-		return -1;
-	tio = new_tio;
-	if ( old_no_utf8 != new_no_utf8 )
-		memset(&read_ps, 0, sizeof(read_ps));
-	if ( !(tio.c_lflag & ICANON) )
-		CommitLineBuffer();
-	return 0;
-}
-
-int TTY::gettermmode(ioctx_t* ctx, unsigned int* mode)
-{
-	ScopedLock lock(&termlock);
-	if ( hungup )
-		return errno = EIO, -1;
-	unsigned int termmode = 0;
-	if ( tio.c_lflag & ISORTIX_KBKEY )
-		termmode |= TERMMODE_KBKEY;
-	if ( !(tio.c_lflag & ISORTIX_CHARS_DISABLE) )
-		termmode |= TERMMODE_UNICODE;
-	if ( tio.c_lflag & ISIG )
-		termmode |= TERMMODE_SIGNAL;
-	if ( !(tio.c_lflag & ISORTIX_32BIT) )
-		termmode |= TERMMODE_UTF8;
-	if ( tio.c_lflag & ICANON )
-		termmode |= TERMMODE_LINEBUFFER;
-	if ( tio.c_lflag & (ECHO | ECHOE) )
-		termmode |= TERMMODE_ECHO;
-	if ( tio.c_lflag & ISORTIX_NONBLOCK )
-		termmode |= TERMMODE_NONBLOCK;
-	if ( !(tio.c_lflag & ISORTIX_TERMMODE) )
-		termmode |= TERMMODE_TERMIOS;
-	if ( !(tio.c_cflag & CREAD) )
-		termmode |= TERMMODE_DISABLE;
-	if ( !(tio.c_oflag & OPOST) )
-		termmode |= TERMMODE_NOOPOST;
-	if ( !(tio.c_oflag & ONLCR) )
-		termmode |= TERMMODE_NOONLCR;
-	if ( tio.c_oflag & OCRNL )
-		termmode |= TERMMODE_OCRNL;
-	if ( !ctx->copy_to_dest(mode, &termmode, sizeof(termmode)) )
-		return -1;
-	return 0;
 }
 
 int TTY::tcgetwincurpos(ioctx_t* /*ctx*/, struct wincurpos* /*wcp*/)
@@ -420,8 +292,7 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 		return;
 	}
 
-	if ( CheckHandledByte(ICANON, tio.c_cc[VERASE], byte) ||
-	     CheckHandledByte(ICANON | ISORTIX_TERMMODE, '\b', byte) )
+	if ( CheckHandledByte(ICANON, tio.c_cc[VERASE], byte) )
 	{
 		while ( linebuffer.CanBackspace() )
 		{
@@ -490,20 +361,6 @@ void TTY::ProcessByte(unsigned char byte, uint32_t control_unicode)
 		return;
 	}
 
-	if ( CheckHandledByte(ICANON | ISORTIX_TERMMODE, CONTROL('L'), byte) )
-	{
-		while ( linebuffer.CanBackspace() )
-			linebuffer.Backspace();
-		ProcessUnicode(KBKEY_ENCODE(KBKEY_ENTER));
-		ProcessByte('\n');
-		ProcessUnicode(KBKEY_ENCODE(-KBKEY_ENTER));
-		tty_output("\e[H\e[2J");
-		return;
-	}
-
-	if ( tio.c_lflag & ISORTIX_CHARS_DISABLE )
-		return;
-
 	if ( control_unicode &&
 	     !(tio.c_lflag & (ICANON | ISIG)) &&
 	     tio.c_lflag & ISORTIX_KBKEY )
@@ -560,8 +417,6 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 		return -1;
 	size_t sofar = 0;
 	size_t left = count;
-	bool nonblocking = tio.c_lflag & ISORTIX_NONBLOCK ||
-	                   ctx->dflags & O_NONBLOCK;
 	while ( left )
 	{
 		while ( !(linebuffer.CanPop() || numeofs) )
@@ -570,7 +425,7 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 			{
 				if ( sofar )
 					return sofar;
-				if ( nonblocking )
+				if ( ctx->dflags & O_NONBLOCK )
 					return errno = EWOULDBLOCK, -1;
 				if ( !kthread_cond_wait_signal(&datacond, &termlock) )
 					return sofar ? sofar : (errno = EINTR, -1);
@@ -584,7 +439,7 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 					return sofar;
 				if ( 0 < tio.c_cc[VMIN] )
 				{
-					if ( nonblocking )
+					if ( ctx->dflags & O_NONBLOCK )
 						return errno = EWOULDBLOCK, -1;
 					if ( 0 < sofar && 0 < tio.c_cc[VTIME] )
 					{
@@ -601,7 +456,7 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 					if ( sofar || true /* tio.c_cc[VTIME] * 0.1 seconds passed
 					                      since start of read function */ )
 						return sofar;
-					if ( nonblocking )
+					if ( ctx->dflags & O_NONBLOCK )
 						return errno = EWOULDBLOCK, -1;
 					// TODO: Only wait up until tio.c_cc[VTIME] * 0.1 seconds.
 					if ( !kthread_cond_wait_signal(&datacond, &termlock) )
@@ -628,8 +483,6 @@ ssize_t TTY::read(ioctx_t* ctx, uint8_t* userbuf, size_t count)
 				return sofar;
 			linebuffer.Pop();
 			if ( 256 <= codepoint && !(tio.c_lflag & ISORTIX_KBKEY) )
-				continue;
-			if ( codepoint < 256 && tio.c_lflag & ISORTIX_CHARS_DISABLE )
 				continue;
 			if ( codepoint < 256 )
 			{

@@ -102,8 +102,6 @@ public:
 	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg) = 0;
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid) = 0;
 	virtual pid_t tcgetpgrp(ioctx_t* ctx) = 0;
-	virtual int settermmode(ioctx_t* ctx, unsigned mode) = 0;
-	virtual int gettermmode(ioctx_t* ctx, unsigned* mode) = 0;
 	virtual int poll(ioctx_t* ctx, PollNode* node) = 0;
 	virtual int rename_here(ioctx_t* ctx, Ref<Inode> from, const char* oldname,
 	                        const char* newname) = 0;
@@ -213,8 +211,6 @@ public:
 	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	virtual pid_t tcgetpgrp(ioctx_t* ctx);
-	virtual int settermmode(ioctx_t* ctx, unsigned mode);
-	virtual int gettermmode(ioctx_t* ctx, unsigned* mode);
 	virtual int poll(ioctx_t* ctx, PollNode* node);
 	virtual int rename_here(ioctx_t* ctx, Ref<Inode> from, const char* oldname,
 	                        const char* newname);

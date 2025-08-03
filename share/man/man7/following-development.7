@@ -69,6 +69,15 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Remove settermmode(2) and gettermmode(2)
+The settermmode and gettermmode system calls have been replaced with the
+standard
+.Xr tcsetattr 2
+and
+.Xr tcgetattr 2
+system calls.
+.Pp
+This is an incompatible ABI change.
 .Ss Add pathconfat(2) and properly implement pathconf(2) and fpathconf(2)
 The
 .Xr pathconfat 2

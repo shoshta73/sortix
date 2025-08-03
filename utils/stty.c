@@ -83,10 +83,7 @@ static const struct flag lflags[] =
 	{ "iexten", IEXTEN },
 	{ "isig", ISIG },
 	{ "isortix_32bit", ISORTIX_32BIT },
-	{ "isortix_chars_disable", ISORTIX_CHARS_DISABLE },
 	{ "isortix_kbkey", ISORTIX_KBKEY },
-	{ "isortix_nonblock", ISORTIX_NONBLOCK },
-	{ "isortix_termmode", ISORTIX_TERMMODE },
 	{ "noflsh", NOFLSH },
 	{ "tostop", TOSTOP },
 };
@@ -516,8 +513,7 @@ int main(int argc, char* argv[])
 			tio.c_cflag &= ~(CSIZE | CSTOPB | PARENB | PARODD);
 			tio.c_cflag |= CS8;
 			tio.c_lflag &= ~(ECHO | ECHONL | ICANON | IEXTEN | ISIG |
-			                 ISORTIX_TERMMODE | ISORTIX_CHARS_DISABLE |
-			                 ISORTIX_KBKEY | ISORTIX_32BIT | ISORTIX_NONBLOCK);
+			                 ISORTIX_KBKEY | ISORTIX_32BIT);
 			tio.c_cc[VMIN] = 1;
 			tio.c_cc[VTIME] = 0;
 		}

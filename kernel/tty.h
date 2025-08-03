@@ -65,8 +65,6 @@ public:
 	virtual int tcgetwincurpos(ioctx_t* ctx, struct wincurpos* wcp);
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	virtual pid_t tcgetpgrp(ioctx_t* ctx);
-	virtual int settermmode(ioctx_t* ctx, unsigned termmode);
-	virtual int gettermmode(ioctx_t* ctx, unsigned* termmode);
 	virtual int poll(ioctx_t* ctx, PollNode* node);
 	virtual int tcdrain(ioctx_t* ctx);
 	virtual int tcflow(ioctx_t* ctx, int action);

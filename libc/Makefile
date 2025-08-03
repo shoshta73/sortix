@@ -643,8 +643,6 @@ sys/stat/utimens.o \
 sys/statvfs/fstatvfsat.o \
 sys/statvfs/fstatvfs.o \
 sys/statvfs/statvfs.o \
-sys/termmode/gettermmode.o \
-sys/termmode/settermmode.o \
 sys/time/gettimeofday.o \
 sys/times/times.o \
 sys/uio/preadv.o \

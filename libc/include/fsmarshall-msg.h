@@ -273,25 +273,6 @@ struct fsm_resp_tcgetwinsize
 	struct winsize size;
 };
 
-#define FSM_REQ_SETTERMMODE 32
-struct fsm_req_settermmode
-{
-	ino_t ino;
-	unsigned int termmode;
-};
-
-#define FSM_REQ_GETTERMMODE 33
-struct fsm_req_gettermmode
-{
-	ino_t ino;
-};
-
-#define FSM_RESP_GETTERMMODE 34
-struct fsm_resp_gettermmode
-{
-	unsigned int termmode;
-};
-
 #define FSM_REQ_UNLINK 35
 struct fsm_req_unlink
 {

@@ -652,8 +652,7 @@ bool edit_line_history_save(struct edit_line* edit_state, const char* path)
 	return success;
 }
 
-#define SORTIX_LFLAGS (ISORTIX_KBKEY | ISORTIX_CHARS_DISABLE | ISORTIX_32BIT | \
-                       ISORTIX_NONBLOCK | ISORTIX_TERMMODE)
+#define SORTIX_LFLAGS (ISORTIX_KBKEY | ISORTIX_32BIT)
 
 void edit_line(struct edit_line* edit_state)
 {
@@ -689,8 +688,7 @@ void edit_line(struct edit_line* edit_state)
 	}
 
 	memcpy(&tio, &old_tio, sizeof(tio));
-	old_tio.c_lflag &= ~(ISORTIX_KBKEY | ISORTIX_CHARS_DISABLE |
-	                     ISORTIX_32BIT | ISORTIX_NONBLOCK | ISORTIX_TERMMODE);
+	tio.c_lflag &= ~(ISORTIX_KBKEY | ISORTIX_32BIT);
 	tio.c_lflag &= ~(ISIG | ICANON | ECHO | IEXTEN);
 
 	tcsetattr(edit_state->in_fd, TCSANOW, &tio);

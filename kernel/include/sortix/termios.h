@@ -93,13 +93,10 @@
 #define ISIG (1U << 6)
 #define NOFLSH (1U << 7)
 #define TOSTOP (1U << 8)
-/* Transitional compatibility as Sortix switches from termmode to termios. */
+/* Extensions to grant full access to keyboard input. */
 #if __USE_SORTIX
-#define ISORTIX_TERMMODE (1U << 9)
-#define ISORTIX_CHARS_DISABLE (1U << 10)
 #define ISORTIX_KBKEY (1U << 11)
 #define ISORTIX_32BIT (1U << 12)
-#define ISORTIX_NONBLOCK (1U << 13)
 #endif
 
 #define TCSANOW 0

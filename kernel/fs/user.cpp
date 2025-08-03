@@ -242,8 +242,6 @@ public:
 	virtual int ioctl(ioctx_t* ctx, int cmd, uintptr_t arg);
 	virtual int tcsetpgrp(ioctx_t* ctx, pid_t pgid);
 	virtual pid_t tcgetpgrp(ioctx_t* ctx);
-	virtual int settermmode(ioctx_t* ctx, unsigned mode);
-	virtual int gettermmode(ioctx_t* ctx, unsigned* mode);
 	virtual int poll(ioctx_t* ctx, PollNode* node);
 	virtual int rename_here(ioctx_t* ctx, Ref<Inode> from, const char* oldname,
 	                        const char* newname);
@@ -1470,39 +1468,6 @@ pid_t Unode::tcgetpgrp(ioctx_t* ctx)
 	if ( SendMessage(channel, FSM_REQ_TCGETPGRP, &msg, sizeof(msg)) &&
 	     RecvMessage(channel, FSM_RESP_TCGETPGRP, &resp, sizeof(resp)) )
 		ret = resp.pgid;
-	channel->KernelClose();
-	return ret;
-}
-
-int Unode::settermmode(ioctx_t* ctx, unsigned mode)
-{
-	Channel* channel = server->Connect(ctx);
-	if ( !channel )
-		return -1;
-	int ret = -1;
-	struct fsm_req_settermmode msg;
-	msg.ino = ino;
-	msg.termmode = mode;
-	if ( SendMessage(channel, FSM_REQ_SETTERMMODE, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_SUCCESS, NULL, 0) )
-		ret = 0;
-	channel->KernelClose();
-	return ret;
-}
-
-int Unode::gettermmode(ioctx_t* ctx, unsigned* mode)
-{
-	Channel* channel = server->Connect(ctx);
-	if ( !channel )
-		return -1;
-	int ret = -1;
-	struct fsm_req_gettermmode msg;
-	struct fsm_resp_gettermmode resp;
-	msg.ino = ino;
-	if ( SendMessage(channel, FSM_REQ_GETTERMMODE, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_GETTERMMODE, &resp, sizeof(resp)) &&
-	     ctx->copy_to_dest(mode, &resp.termmode, sizeof(*mode)) )
-		ret = 0;
 	channel->KernelClose();
 	return ret;
 }

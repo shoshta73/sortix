@@ -1075,16 +1075,6 @@ pid_t Descriptor::tcgetpgrp(ioctx_t* ctx)
 	return vnode->tcgetpgrp(ctx);
 }
 
-int Descriptor::settermmode(ioctx_t* ctx, unsigned mode)
-{
-	return vnode->settermmode(ctx, mode);
-}
-
-int Descriptor::gettermmode(ioctx_t* ctx, unsigned* mode)
-{
-	return vnode->gettermmode(ctx, mode);
-}
-
 int Descriptor::poll(ioctx_t* ctx, PollNode* node)
 {
 	// TODO: Perhaps deny polling against some kind of events if this
