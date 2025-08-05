@@ -143,6 +143,7 @@ private:
 	                   const void* addr, size_t addrsize);
 	bool CanBind(union udp_sockaddr new_local);
 	bool BindDefault(const union udp_sockaddr* new_local);
+	void DropReceiveQueue(void);
 
 private:
 	kthread_mutex_t socket_lock;
@@ -249,14 +250,7 @@ UDPSocket::~UDPSocket()
 		}
 		bound = false;
 	}
-	// Avoid stack overflow in first_packet recursive destructor.
-	while ( first_packet )
-	{
-		Ref<Packet> next = first_packet->next;
-		first_packet->next.Reset();
-		first_packet = next;
-	}
-	last_packet.Reset();
+	DropReceiveQueue();
 }
 
 Ref<Inode> UDPSocket::accept4(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
@@ -1063,6 +1057,18 @@ int UDPSocket::setsockopt(ioctx_t* ctx, int level, int option_name,
 	return 0;
 }
 
+void UDPSocket::DropReceiveQueue(void)
+{
+	// Avoid stack overflow in first_packet recursive destructor.
+	while ( first_packet )
+	{
+		Ref<Packet> next = first_packet->next;
+		first_packet->next.Reset();
+		first_packet = next;
+	}
+	last_packet.Reset();
+}
+
 int UDPSocket::shutdown(ioctx_t* ctx, int how)
 {
 	(void) ctx;
@@ -1072,16 +1078,8 @@ int UDPSocket::shutdown(ioctx_t* ctx, int how)
 	how_shutdown |= how;
 	// Drop the receive queue if shut down for read.
 	if ( how & SHUT_RD )
-	{
-		// Avoid stack overflow in first_packet recursive destructor.
-		while ( first_packet )
-		{
-			Ref<Packet> next = first_packet->next;
-			first_packet->next.Reset();
-			first_packet = next;
-		}
-		last_packet.Reset();
-	}
+		DropReceiveQueue();
+
 	kthread_cond_broadcast(&receive_cond);
 	poll_channel.Signal(PollEventStatus());
 	return 0;
