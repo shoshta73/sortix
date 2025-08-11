@@ -60,10 +60,7 @@ int main(int argc, char* argv[])
 			if ( needed < 0 )
 			{
 				if ( errno == EINVAL )
-				{
-					warn("%s: No such kernel information", argv[i]);
-					break;
-				}
+					errx(1, "%s: No such kernel information", argv[i]);
 				err(1, "kernelinfo: %s", argv[i]);
 			}
 			if ( 0 < needed )
@@ -74,7 +71,9 @@ int main(int argc, char* argv[])
 					err(1, "malloc");
 				continue;
 			}
-			printf("%s\n", buffer);
+			if ( printf("%s\n", buffer) < 0 )
+				err(1, "stdout");
+
 			break;
 		}
 	}
