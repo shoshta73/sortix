@@ -445,7 +445,7 @@ static bool remove_partition_device(const char* path)
 	return true;
 }
 
-static void remove_partition_devices(const char* path)
+static bool remove_partition_devices(const char* path)
 {
 	const char* name = path;
 	for ( size_t i = 0; path[i]; i++ )
@@ -456,10 +456,17 @@ static void remove_partition_devices(const char* path)
 	if ( !dir_path )
 	{
 		warn("malloc");
-		return; // TODO: Error.
+		return false;
 	}
 	dirname(dir_path);
 	DIR* dir = opendir(dir_path);
+	if ( !dir )
+	{
+		warn("opendir");
+		free(dir_path);
+		return false;
+	}
+	bool is_ok = true;
 	struct dirent* entry;
 	while ( (errno = 0, entry = readdir(dir)) )
 	{
@@ -478,22 +485,25 @@ static void remove_partition_devices(const char* path)
 		     errno != ENOMOUNT )
 		{
 			warn("unmount: %s/%s", dir_path, entry->d_name);
-			// TODO: Warn/error.
+			is_ok = false;
+			break;
 		}
 		if ( unlinkat(dirfd(dir), entry->d_name, 0) < 0 )
 		{
 			warn("unlink: %s/%s", dir_path, entry->d_name);
-			// TODO: Warn/error.
+			is_ok = false;
+			break;
 		}
 		rewinddir(dir);
 	}
 	if ( errno )
 	{
 		warn("readdir: %s", dir_path);
-		// TODO: Error.
+		is_ok = false;
 	}
 	closedir(dir);
 	free(dir_path);
+	return is_ok;
 }
 
 static int harddisk_compare(const void* a_ptr, const void* b_ptr)
@@ -2396,7 +2406,12 @@ static void on_mktable(size_t argc, char** argv)
 		       "Which partition table type? (mbr/gpt)", "gpt");
 		type = type_answer;
 	}
-	remove_partition_devices(current_hd->path);
+	if ( !remove_partition_devices(current_hd->path) )
+	{
+		command_error("%s: %s: Failed to remove partition devices",
+		              argv[0], current_hd->path);
+		return;
+	}
 	int fd = current_hd->fd;
 	const char* name = device_name(current_hd->path);
 	size_t logical_block_size = current_hd->logical_block_size;
@@ -2894,7 +2909,12 @@ static void on_rmtable(size_t argc, char** argv)
 			return;
 		}
 	}
-	remove_partition_devices(current_hd->path);
+	if ( !remove_partition_devices(current_hd->path) )
+	{
+		command_error("%s: %s: Failed to remove partition devices",
+		              argv[0], current_hd->path);
+		return;
+	}
 	// TODO: Assert logical_block_size fits in size_t.
 	size_t block_size = current_hd->logical_block_size;
 	unsigned char* zeroes = (unsigned char*) calloc(1, block_size);
