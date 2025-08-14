@@ -18,8 +18,8 @@
  */
 
 #include <assert.h>
+#include <err.h>
 #include <errno.h>
-#include <error.h>
 #include <getopt.h>
 #include <stdbool.h>
 #include <string.h>
@@ -151,7 +151,7 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 		if ( !option )
 		{
 			if ( !caller_handles_missing_argument && opterr )
-				error(0, 0, "unrecognized option `%s'", arg);
+				warnx("unrecognized option `%s'", arg);
 			return '?';
 		}
 
@@ -169,7 +169,7 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 			if ( caller_handles_missing_argument )
 				return ':';
 			if ( opterr )
-				error(0, 0, "option requires an argument `--%s'", option->name);
+				warnx("option requires an argument `--%s'", option->name);
 			return '?';
 		}
 
@@ -204,7 +204,7 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 	if ( !opt_decl )
 	{
 		if ( !caller_handles_missing_argument && opterr )
-				error(0, 0, "invalid option -- '%c'", short_option);
+				warnx("invalid option -- '%c'", short_option);
 		optopt = short_option;
 		short_option = '?';
 	}
@@ -245,7 +245,7 @@ int getopt_long(int argc, char* const* argv, const char* shortopts,
 			if ( caller_handles_missing_argument )
 				return optopt = short_option, ':';
 			if ( opterr )
-				error(0, 0, "option requires an argument -- '%c'", short_option);
+				warnx("option requires an argument -- '%c'", short_option);
 			return optopt = short_option, '?';
 		}
 	}
