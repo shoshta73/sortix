@@ -1133,7 +1133,7 @@ static bool acquire_lease(const struct interface* interface,
 
 	if ( lease->leased )
 	{
-		memcpy(request->yiaddr, &lease->address, 4);
+		memcpy(request->yiaddr, &lease->address, sizeof(request->yiaddr));
 		request->remote.sin_family = AF_INET;
 		request->remote.sin_addr = lease->server;
 		request->remote.sin_port = htobe16(PORT_DHCP_SERVER);
@@ -1284,8 +1284,10 @@ static void configure_interface(const struct interface* interface,
 			for ( size_t i = 0; i < lease->dns_count; i++ )
 			{
 				dnsconfig.servers[i].family = AF_INET;
-				dnsconfig.servers[i].addrsize = 4;
-				memcpy(&dnsconfig.servers[i].addr, lease->dns[i], 4);
+				dnsconfig.servers[i].addrsize =
+					sizeof(dnsconfig.servers[i].addr.in);
+				memcpy(&dnsconfig.servers[i].addr, lease->dns[i],
+					sizeof(dnsconfig.servers[i].addr.in));
 			}
 		}
 		else if ( config->dns.servers.method == MANUAL )
@@ -1450,7 +1452,7 @@ int main(int argc, char* argv[])
 		if ( info.addrlen != 6 )
 			errx(1, "%s: ioctl: NIOC_GETINFO: Invalid address length", path);
 		memcpy(interface.name, info.name, IF_NAMESIZE);
-		memcpy(&interface.hwaddr, info.addr, 6);
+		memcpy(&interface.hwaddr, info.addr, sizeof(interface.hwaddr));
 		interface.linkid = info.linkid;
 	}
 
