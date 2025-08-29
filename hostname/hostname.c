@@ -18,6 +18,7 @@
  */
 
 #include <err.h>
+#include <getopt.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -30,62 +31,32 @@
 #include <sortix/limits.h>
 #endif
 
-static void compact_arguments(int* argc, char*** argv)
-{
-	for ( int i = 0; i < *argc; i++ )
-	{
-		while ( i < *argc && !(*argv)[i] )
-		{
-			for ( int n = i; n < *argc; n++ )
-				(*argv)[n] = (*argv)[n+1];
-			(*argc)--;
-		}
-	}
-}
-
 int main(int argc, char* argv[])
 {
+	const struct option longopts[] =
+	{
+		{"short", no_argument, NULL, 's'},
+		{0, 0, 0, 0}
+	};
+	const char* opts = "s";
 	bool short_hostname = false;
 
-	const char* argv0 = argv[0];
-	for ( int i = 1; i < argc; i++ )
+	int opt;
+	while ( (opt = getopt_long(argc, argv, opts, longopts, NULL)) != -1 )
 	{
-		const char* arg = argv[i];
-		if ( arg[0] != '-' || !arg[1] )
-			continue;
-		argv[i] = NULL;
-		if ( !strcmp(arg, "--") )
-			break;
-		if ( arg[1] != '-' )
+		switch ( opt )
 		{
-			char c;
-			while ( (c = *++arg) ) switch ( c )
-			{
-			case 's': short_hostname = true; break;
-			default:
-				fprintf(stderr, "%s: unknown option -- '%c'\n", argv0, c);
-				exit(1);
-			}
-		}
-		else if ( !strcmp(arg, "--short") )
-			short_hostname = true;
-		else
-		{
-			fprintf(stderr, "%s: unknown option: %s\n", argv0, arg);
-			exit(1);
+		case 's': short_hostname = true; break;
+		default: return 1;
 		}
 	}
-
-	compact_arguments(&argc, &argv);
-
-	if ( 3 <= argc )
+	if ( argc - optind > 1 )
 		errx(1, "unexpected extra operand");
-
-	if ( argc == 2 )
+	if ( argc - optind == 1 )
 	{
 		if ( short_hostname )
 			errx(1, "the -s option is incompatible with setting hostname");
-		char* hostname = argv[1];
+		char* hostname = argv[optind];
 		if ( sethostname(hostname, strlen(hostname)) < 0 )
 			err(1, "sethostname: %s", hostname);
 		return 0;
