@@ -1,78 +1,520 @@
+diff -Paur --no-dereference -- cut.upstream/cut.1 cut/cut.1
+--- cut.upstream/cut.1
++++ cut/cut.1
+@@ -0,0 +1,184 @@
++.\"	$OpenBSD: cut.1,v 1.28 2022/08/04 15:38:33 schwarze Exp $
++.\"	$NetBSD: cut.1,v 1.6 1995/10/02 20:19:26 jtc Exp $
++.\"
++.\" Copyright (c) 1989, 1990, 1993
++.\"	The Regents of the University of California.  All rights reserved.
++.\"
++.\" This code is derived from software contributed to Berkeley by
++.\" the Institute of Electrical and Electronics Engineers, Inc.
++.\"
++.\" Redistribution and use in source and binary forms, with or without
++.\" modification, are permitted provided that the following conditions
++.\" are met:
++.\" 1. Redistributions of source code must retain the above copyright
++.\"    notice, this list of conditions and the following disclaimer.
++.\" 2. Redistributions in binary form must reproduce the above copyright
++.\"    notice, this list of conditions and the following disclaimer in the
++.\"    documentation and/or other materials provided with the distribution.
++.\" 3. Neither the name of the University nor the names of its contributors
++.\"    may be used to endorse or promote products derived from this software
++.\"    without specific prior written permission.
++.\"
++.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++.\" SUCH DAMAGE.
++.\"
++.\"     @(#)cut.1	8.1 (Berkeley) 6/6/93
++.\"
++.Dd $Mdocdate: August 4 2022 $
++.Dt CUT 1
++.Os
++.Sh NAME
++.Nm cut
++.Nd select portions of each line of a file
++.Sh SYNOPSIS
++.Nm cut
++.Fl b Ar list
++.Op Fl n
++.Op Ar
++.Nm cut
++.Fl c Ar list
++.Op Ar
++.Nm cut
++.Fl f Ar list
++.Op Fl s
++.Op Fl d Ar delim
++.Op Ar
++.Sh DESCRIPTION
++The
++.Nm
++utility selects portions of each line (as specified by
++.Ar list )
++from each
++.Ar file
++and writes them to the standard output.
++If no
++.Ar file
++arguments are specified, or a file argument is a single dash
++.Pq Sq \- ,
++.Nm
++reads from the standard input.
++The items specified by
++.Ar list
++can be in terms of column position or in terms of fields delimited
++by a special character.
++Column and field numbering starts from 1;
++output is in the same order as input, not in the order selected.
++.Pp
++.Ar list
++is a comma or whitespace separated set of numbers and/or
++number ranges.
++Number ranges consist of a number, a dash
++.Pq Sq \- ,
++and a second number
++which select the fields or columns from the first number to the second,
++inclusive.
++Numbers or number ranges may be preceded by a dash, which selects all
++fields or columns from 1 to the first number.
++Numbers or number ranges may be followed by a dash, which selects all
++fields or columns from the last number to the end of the line.
++Numbers and number ranges may be repeated, overlapping, and in any order.
++It is not an error to select fields or columns not present in the
++input line.
++.Pp
++The options are as follows:
++.Bl -tag -width Ds
++.It Fl b Ar list
++The
++.Ar list
++specifies byte positions.
++.It Fl c Ar list
++The
++.Ar list
++specifies character positions.
++.It Fl d Ar delim
++Use the first character of
++.Ar delim
++as the field delimiter character.
++The default is the
++.Aq TAB
++character.
++.It Fl f Ar list
++The
++.Ar list
++specifies fields, separated by the field delimiter character.
++The selected fields are output,
++separated by the field delimiter character.
++.It Fl n
++Do not split multi-byte characters.
++A character is written to standard output if and only if the byte
++position holding its last byte is selected.
++.It Fl s
++Suppresses lines with no field delimiter characters.
++Unless specified, lines with no delimiters are passed through unmodified.
++.El
++.Sh ENVIRONMENT
++.Bl -tag -width LC_CTYPE
++.It Ev LC_CTYPE
++The character encoding
++.Xr locale 1 .
++It decides which byte sequences form characters.
++If unset or set to
++.Qq C ,
++.Qq POSIX ,
++or an unsupported value,
++.Fl c
++does the same as
++.Fl b ,
++.Fl n
++has no effect, and
++.Fl d
++uses the first byte of
++.Ar delim .
++.El
++.Sh EXIT STATUS
++The
++.Nm
++utility exits 0 if all input files are output successfully,
++and >0 if an error occurs.
++.Sh EXAMPLES
++Extract login names and shells from the system
++.Xr passwd 5
++file as
++.Dq name:shell
++pairs:
++.Pp
++.Dl "$ cut -d : -f 1,7 /etc/passwd"
++.Pp
++Show the names and login times of logged in users:
++.Pp
++.Dl "$ who | cut -c 1-8,18-30"
++.Sh SEE ALSO
++.Xr awk 1 ,
++.Xr paste 1
++.Sh STANDARDS
++The
++.Nm
++utility is compliant with the
++.St -p1003.1-2008
++specification.
++.Sh HISTORY
++A
++.Nm
++command first appeared outside Bell Labs in
++.At III
++and has been available since
++.Bx 4.3 Reno .
++.Sh AUTHORS
++.An -nosplit
++The original Bell Labs version was written by
++.An Gottfried W. R. Luderer
++and the
++.Bx
++version by
++.An Adam S. Moskowitz
++and
++.An Marciano Pitargue .
 diff -Paur --no-dereference -- cut.upstream/cut.c cut/cut.c
 --- cut.upstream/cut.c
 +++ cut/cut.c
-@@ -34,7 +34,7 @@
-  */
- 
- #include <ctype.h>
--#include <err.h>
-+#include <error.h>
- #include <errno.h>
- #include <limits.h>
- #include <locale.h>
-@@ -43,6 +43,13 @@
- #include <string.h>
- #include <unistd.h>
- 
-+#define err(eval, ...) error(eval, errno, __VA_ARGS__)
-+#define errx(eval, ...) error(eval, 0, __VA_ARGS__)
-+#define warn(...) error(0, errno, __VA_ARGS__)
-+#define warnx(...) error(0, 0, __VA_ARGS__)
+@@ -0,0 +1,321 @@
++/*	$OpenBSD: cut.c,v 1.28 2023/03/08 04:43:10 guenther Exp $	*/
++/*	$NetBSD: cut.c,v 1.9 1995/09/02 05:59:23 jtc Exp $	*/
 +
-+#define _POSIX2_LINE_MAX 2048
++/*
++ * Copyright (c) 1989, 1993
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * This code is derived from software contributed to Berkeley by
++ * Adam S. Moskowitz of Menlo Consulting and Marciano Pitargue.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
 +
- int	cflag;
- char	dchar;
- int	dflag;
-@@ -65,7 +72,7 @@
- 
- 	dchar = '\t';			/* default delimiter is \t */
- 
--	/* Since we don't support multi-byte characters, the -c and -b 
-+	/* Since we don't support multi-byte characters, the -c and -b
- 	   options are equivalent, and the -n option is meaningless. */
- 	while ((ch = getopt(argc, argv, "b:c:d:f:sn")) != -1)
- 		switch(ch) {
-@@ -187,6 +194,7 @@
- void
- c_cut(FILE *fp, char *fname)
- {
++#include <assert.h>
++#include <ctype.h>
++#include <err.h>
++#include <errno.h>
++#include <limits.h>
++#include <locale.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++char	dchar[5];
++int	dlen;
++
++int	bflag;
++int	cflag;
++int	dflag;
++int	fflag;
++int	nflag;
++int	sflag;
++
++void	b_cut(FILE *, char *);
++void	c_cut(FILE *, char *);
++void	f_cut(FILE *, char *);
++void	get_list(char *);
++void	usage(void);
++
++int
++main(int argc, char *argv[])
++{
++	FILE *fp;
++	void (*fcn)(FILE *, char *);
++	int ch, rval;
++
++	setlocale(LC_CTYPE, "");
++
++	dchar[0] = '\t';		/* default delimiter */
++	dchar[1] = '\0';
++	dlen = 1;
++
++	while ((ch = getopt(argc, argv, "b:c:d:f:sn")) != -1)
++		switch(ch) {
++		case 'b':
++			get_list(optarg);
++			bflag = 1;
++			break;
++		case 'c':
++			get_list(optarg);
++			cflag = 1;
++			break;
++		case 'd':
++			if ((dlen = mblen(optarg, MB_CUR_MAX)) == -1)
++				usage();
++			assert(dlen < (int)sizeof(dchar));
++			(void)memcpy(dchar, optarg, dlen);
++			dchar[dlen] = '\0';
++			dflag = 1;
++			break;
++		case 'f':
++			get_list(optarg);
++			fflag = 1;
++			break;
++		case 'n':
++			nflag = 1;
++			break;
++		case 's':
++			sflag = 1;
++			break;
++		default:
++			usage();
++		}
++	argc -= optind;
++	argv += optind;
++
++	if (bflag + cflag + fflag != 1 ||
++	    (nflag && !bflag) ||
++	    ((dflag || sflag) && !fflag))
++		usage();
++
++	if (MB_CUR_MAX == 1) {
++		nflag = 0;
++		if (cflag) {
++			bflag = 1;
++			cflag = 0;
++		}
++	}
++
++	fcn = fflag ? f_cut : (cflag || nflag) ? c_cut : b_cut;
++
++	rval = 0;
++	if (*argv)
++		for (; *argv; ++argv) {
++			if (strcmp(*argv, "-") == 0)
++				fcn(stdin, "stdin");
++			else {
++				if ((fp = fopen(*argv, "r"))) {
++					fcn(fp, *argv);
++					(void)fclose(fp);
++				} else {
++					rval = 1;
++					warn("%s", *argv);
++				}
++			}
++		}
++	else {
++		fcn(stdin, "stdin");
++	}
++	exit(rval);
++}
++
++int autostart, autostop, maxval;
++
++char positions[_POSIX2_LINE_MAX + 1];
++
++void
++get_list(char *list)
++{
++	int setautostart, start, stop;
++	char *p;
++
++	/*
++	 * set a byte in the positions array to indicate if a field or
++	 * column is to be selected; use +1, it's 1-based, not 0-based.
++	 * This parser is less restrictive than the Draft 9 POSIX spec.
++	 * POSIX doesn't allow lists that aren't in increasing order or
++	 * overlapping lists.  We also handle "-3-5" although there's no
++	 * real reason too.
++	 */
++	while ((p = strsep(&list, ", \t"))) {
++		setautostart = start = stop = 0;
++		if (*p == '-') {
++			++p;
++			setautostart = 1;
++		}
++		if (isdigit((unsigned char)*p)) {
++			start = stop = strtol(p, &p, 10);
++			if (setautostart && start > autostart)
++				autostart = start;
++		}
++		if (*p == '-') {
++			if (isdigit((unsigned char)p[1])) {
++				++p;
++				stop = strtol(p, &p, 10);
++			}
++			if (*p == '-') {
++				++p;
++				if (!autostop || autostop > stop)
++					autostop = stop;
++			}
++		}
++		if (*p != '\0' || !stop || !start)
++			errx(1, "[-bcf] list: illegal list value");
++		if (maxval < stop)
++			maxval = stop;
++		if (start <= stop)
++			memset(positions + start, 1, stop - start + 1);
++	}
++
++	/* overlapping ranges */
++	if (autostop && maxval > autostop)
++		maxval = autostop;
++
++	/* set autostart */
++	if (autostart)
++		memset(positions + 1, '1', autostart);
++}
++
++void
++b_cut(FILE *fp, char *fname)
++{
++	int ch, col;
++	char *pos;
++
 +	(void)fname;
- 	int ch, col;
- 	char *pos;
- 
-@@ -215,13 +223,17 @@
- void
- f_cut(FILE *fp, char *fname)
- {
++	for (;;) {
++		pos = positions + 1;
++		for (col = maxval; col; --col) {
++			if ((ch = getc(fp)) == EOF)
++				return;
++			if (ch == '\n')
++				break;
++			if (*pos++)
++				(void)putchar(ch);
++		}
++		if (ch != '\n') {
++			if (autostop)
++				while ((ch = getc(fp)) != EOF && ch != '\n')
++					(void)putchar(ch);
++			else
++				while ((ch = getc(fp)) != EOF && ch != '\n')
++					;
++		}
++		(void)putchar('\n');
++	}
++}
++
++void
++c_cut(FILE *fp, char *fname)
++{
++	static char	*line = NULL;
++	static size_t	 linesz = 0;
++	ssize_t		 linelen;
++	char		*cp, *pos, *maxpos;
++	int		 len;
++
 +	(void)fname;
- 	int ch, field, isdelim;
- 	char *pos, *p, sep;
- 	int output;
- 	size_t len;
--	char *lbuf, *tbuf;
-+	ssize_t slen;
-+	size_t lbuf_raw_length = 0;
-+	char *lbuf = NULL, *tbuf;
- 
--	for (sep = dchar, tbuf = NULL; (lbuf = fgetln(fp, &len));) {
-+	for (sep = dchar, tbuf = NULL; 0 <= (slen = getline(&lbuf, &lbuf_raw_length, fp));) {
-+		len = slen;
- 		output = 0;
- 		if (lbuf[len - 1] != '\n') {
- 			/* no newline at the end of the last line so add one */
-@@ -272,6 +284,7 @@
- 	}
- 	if (tbuf)
- 		free(tbuf);
-+	free(lbuf);
- }
- 
- void
++	while ((linelen = getline(&line, &linesz, fp)) != -1) {
++		if (line[linelen - 1] == '\n')
++			line[linelen - 1] = '\0';
++
++		cp = line;
++		pos = positions + 1;
++		maxpos = pos + maxval;
++		while(pos < maxpos && *cp != '\0') {
++			len = mblen(cp, MB_CUR_MAX);
++			if (len == -1)
++				len = 1;
++			pos += nflag ? len : 1;
++			if (pos[-1] == '\0')
++				cp += len;
++			else
++				while (len--)
++					putchar(*cp++);
++		}
++		if (autostop)
++			puts(cp);
++		else
++			putchar('\n');
++	}
++}
++
++void
++f_cut(FILE *fp, char *fname)
++{
++	static char	*line = NULL;
++	static size_t	 linesz = 0;
++	ssize_t		 linelen;
++	char		*sp, *ep, *pos, *maxpos;
++	int		 output;
++
++	(void)fname;
++	while ((linelen = getline(&line, &linesz, fp)) != -1) {
++		if (line[linelen - 1] == '\n')
++			line[linelen - 1] = '\0';
++
++		if ((ep = strstr(line, dchar)) == NULL) {
++			if (!sflag)
++				puts(line);
++			continue;
++		}
++
++		pos = positions + 1;
++		maxpos = pos + maxval;
++		output = 0;
++		sp = line;
++		for (;;) {
++			if (*pos++) {
++				if (output)
++					fputs(dchar, stdout);
++				while (sp < ep)
++					putchar(*sp++);
++				output = 1;
++			} else
++				sp = ep;
++			if (*sp == '\0' || pos == maxpos)
++				break;
++			sp += dlen;
++			if ((ep = strstr(sp, dchar)) == NULL)
++				ep = strchr(sp, '\0');
++		}
++		if (autostop)
++			puts(sp);
++		else
++			putchar('\n');
++	}
++}
++
++void
++usage(void)
++{
++	(void)fprintf(stderr,
++	    "usage: cut -b list [-n] [file ...]\n"
++	    "       cut -c list [file ...]\n"
++	    "       cut -f list [-s] [-d delim] [file ...]\n");
++	exit(1);
++}
 diff -Paur --no-dereference -- cut.upstream/Makefile cut/Makefile
 --- cut.upstream/Makefile
 +++ cut/Makefile
-@@ -0,0 +1,25 @@
+@@ -0,0 +1,28 @@
 +include ../../../build-aux/compiler.mak
 +include ../../../build-aux/version.mak
 +include ../../../build-aux/dirs.mak
@@ -84,6 +526,7 @@ diff -Paur --no-dereference -- cut.upstream/Makefile cut/Makefile
 +CPPFLAGS:=$(CPPFLAGS)
 +
 +BINARY:=cut
++MANPAGE=cut.1
 +
 +all: $(BINARY)
 +
@@ -95,6 +538,8 @@ diff -Paur --no-dereference -- cut.upstream/Makefile cut/Makefile
 +install: all
 +	mkdir -p $(DESTDIR)$(BINDIR)
 +	install $(BINARY) $(DESTDIR)$(BINDIR)
++	mkdir -p $(DESTDIR)$(MANDIR)/man1
++	install $(MANPAGE) $(DESTDIR)$(MANDIR)/man1
 +
 +clean:
 +	rm -f $(BINARY)
