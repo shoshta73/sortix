@@ -1,28 +1,3884 @@
+diff -Paur --no-dereference -- ed.upstream/ed.1 ed/ed.1
+--- ed.upstream/ed.1
++++ ed/ed.1
+@@ -0,0 +1,859 @@
++.\"	$OpenBSD: ed.1,v 1.77 2022/06/19 05:49:51 jmc Exp $
++.\"
++.\" Copyright (c) 1993 Andrew Moore, Talke Studio.
++.\" All rights reserved.
++.\"
++.\" Redistribution and use in source and binary forms, with or without
++.\" modification, are permitted provided that the following conditions
++.\" are met:
++.\" 1. Redistributions of source code must retain the above copyright
++.\"    notice, this list of conditions and the following disclaimer.
++.\" 2. Redistributions in binary form must reproduce the above copyright
++.\"    notice, this list of conditions and the following disclaimer in the
++.\"    documentation and/or other materials provided with the distribution.
++.\"
++.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++.\" SUCH DAMAGE.
++.\"
++.Dd $Mdocdate: June 19 2022 $
++.Dt ED 1
++.Os
++.Sh NAME
++.Nm ed
++.Nd text editor
++.Sh SYNOPSIS
++.Nm ed
++.Op Fl
++.Op Fl s
++.Op Fl p Ar string
++.Op Ar file
++.Sh DESCRIPTION
++.Nm
++is a line-oriented text editor.
++It is used to create, display, modify, and otherwise manipulate text files.
++If invoked with a
++.Ar file
++argument, then a copy of
++.Ar file
++is read into the editor's buffer.
++Changes are made to this copy and not directly to
++.Ar file
++itself.
++Upon quitting
++.Nm ed ,
++any changes not explicitly saved with a
++.Ic w
++command are lost.
++.Pp
++Editing is done in two distinct modes:
++.Em command
++and
++.Em input .
++When first invoked,
++.Nm
++is in command mode.
++In this mode, commands are read from the standard input and
++executed to manipulate the contents of the editor buffer.
++.Pp
++A typical command might look like:
++.Pp
++.Dl ,s/old/new/g
++.Pp
++which replaces all occurrences of the string
++.Qq old
++with
++.Qq new .
++.Pp
++When an input command, such as
++.Ic a
++.Pq append ,
++.Ic i
++.Pq insert ,
++or
++.Ic c
++.Pq change
++is given,
++.Nm
++enters input mode.
++This is the primary means of adding text to a file.
++In this mode, no commands are available;
++instead, the standard input is written directly to the editor buffer.
++Lines consist of text up to and including a newline character.
++Input mode is terminated by entering a single period
++.Pq Ql \&.
++on a line.
++.Pp
++All
++.Nm
++commands operate on whole lines or ranges of lines; e.g.,
++the
++.Ic d
++command deletes lines; the
++.Ic m
++command moves lines, and so on.
++It is possible to modify only a portion of a line by means of replacement,
++as in the example above.
++However, even here, the
++.Ic s
++command is applied to whole lines at a time.
++.Pp
++In general,
++.Nm
++commands consist of zero or more line addresses, followed by a single
++character command and possibly additional parameters; i.e.,
++commands have the structure:
++.Pp
++.Sm off
++.D1 Oo Ar address Oo , Ar address Oc Oc Ar command Op Ar parameters
++.Sm on
++.Pp
++The address(es) indicate the line or range of lines to be affected by the
++command.
++If fewer addresses are given than the command accepts, then
++default addresses are supplied.
++.Pp
++Many
++.Nm
++commands and line addresses support basic regular expressions
++.Pq BREs .
++See
++.Xr re_format 7
++for more information on regular expressions.
++.Pp
++The options are as follows:
++.Bl -tag -width "-p string"
++.It Fl
++Same as the
++.Fl s
++option
++.Pq deprecated .
++.It Fl p Ar string
++Specifies a command prompt.
++This may be toggled on and off with the
++.Ic P
++command.
++.It Fl s
++Suppress diagnostics.
++This should be used if
++.Nm
++standard input is from a script.
++.It Ar file
++Specifies the name of a file to read.
++If
++.Ar file
++is prefixed with a
++bang
++.Pq Ql \&! ,
++then it is interpreted as a shell command.
++In this case, what is read is the standard output of
++.Ar file
++executed via
++.Xr sh 1 .
++To read a file whose name begins with a bang, prefix the
++name with a backslash
++.Pq Ql \e .
++The default filename is set to
++.Ar file
++only if it is not prefixed with a bang.
++.El
++.Ss LINE ADDRESSING
++An address represents the number of a line in the buffer.
++.Nm
++maintains a
++.Em current address
++which is typically supplied to commands as the default address
++when none is specified.
++When a file is first read, the current address is set to the last line
++of the file.
++In general, the current address is set to the last line affected by a command.
++.Pp
++A line address is
++constructed from one of the bases in the list below, optionally followed
++by a numeric offset.
++The offset may include any combination of digits, operators (e.g.,
++.Ql + ,
++.Ql - ,
++and
++.Ql ^ ) ,
++and whitespace.
++Addresses are read from left to right, and their values are computed
++relative to the current address.
++.Pp
++One exception to the rule that addresses represent line numbers is the
++address
++.Ad 0
++.Pq zero .
++This means
++.Dq before the first line ,
++and is legal wherever it makes sense.
++.Pp
++An address range is two addresses separated either by a comma or semi-colon.
++The value of the first address in a range cannot exceed the
++value of the second.
++If only one address is given in a range,
++then the second address is set to the given address.
++If an
++.Ar n Ns -tuple
++of addresses is given where
++.Ar n
++\*(Gt 2,
++then the corresponding range is determined by the last two addresses in the
++.Ar n Ns -tuple .
++If only one address is expected, then the last address is used.
++.Pp
++Each address in a comma-delimited range is interpreted relative to the
++current address.
++In a semi-colon-delimited range, the first address is
++used to set the current address, and the second address is interpreted
++relative to the first.
++.Pp
++The following address symbols are recognized:
++.Bl -tag -width Ds
++.It \&.
++The current line
++.Pq address
++in the buffer.
++.It $
++The last line in the buffer.
++.It Ar n
++The
++.Ar n Ns th
++line in the buffer, where
++.Ar n
++is a number in the range
++.Ad [0,$] .
++.It - or ^
++The previous line.
++This is equivalent to
++.Ad \-1
++and may be repeated with cumulative effect.
++.It Xo
++.Pf - Ar n No or\ \&
++.Pf ^ Ar n
++.Xc
++The
++.Ar n Ns th
++previous line, where
++.Ar n
++is a non-negative number.
++.It +
++The next line.
++This is equivalent to
++.Ad +1
++and may be repeated with cumulative effect.
++.It + Ns Ar n
++The
++.Ar n Ns th
++next line, where
++.Ar n
++is a non-negative number.
++.It \&, or %
++The first through last lines in the buffer.
++This is equivalent to the address range
++.Ad 1,$ .
++.It \&;
++The current through last lines in the buffer.
++This is equivalent to the address range
++.Ad .,$ .
++.It / Ns Ar re Ns /
++The next line containing the regular expression
++.Ar re .
++The search wraps to the beginning of the buffer and continues down to the
++current line, if necessary.
++The second slash can be omitted if it ends a line.
++.Qq //
++repeats the last search.
++.It Pf ? Ar re ?
++The previous line containing the regular expression
++.Ar re .
++The search wraps to the end of the buffer and continues up to the
++current line, if necessary.
++The second question mark can be omitted if it ends a line.
++.Qq ??
++repeats the last search.
++.It \&' Ns Ar lc
++The line previously marked by a
++.Ic k
++.Pq mark
++command, where
++.Ar lc
++is a lower case letter.
++.El
++.Ss COMMANDS
++All
++.Nm
++commands are single characters, though some require additional parameters.
++If a command's parameters extend over several lines, then
++each line except for the last must be terminated with a backslash
++.Pq Ql \e .
++.Pp
++In general, at most one command is allowed per line.
++However, most commands accept a print suffix, which is any of
++.Ic p
++.Pq print ,
++.Ic l
++.Pq list ,
++or
++.Ic n
++.Pq enumerate ,
++to print the last line affected by the command.
++.Pp
++.Nm
++recognizes the following commands.
++The commands are shown together with
++the default address or address range supplied if none is specified
++.Pq in parentheses ,
++and other possible arguments on the right.
++.Bl -tag -width Dxxs
++.It (.) Ns Ic a
++Appends text to the buffer after the addressed line.
++Text is entered in input mode.
++The current address is set to last line entered.
++.It (.,.) Ns Ic c
++Changes lines in the buffer.
++The addressed lines are deleted from the buffer,
++and text is appended in their place.
++Text is entered in input mode.
++The current address is set to last line entered.
++.It (.,.) Ns Ic d
++Deletes the addressed lines from the buffer.
++If there is a line after the deleted range, then the current address is set
++to this line.
++Otherwise the current address is set to the line before the deleted range.
++.It Ic e Ar file
++Edits
++.Ar file ,
++and sets the default filename.
++If
++.Ar file
++is not specified, then the default filename is used.
++Any lines in the buffer are deleted before the new file is read.
++The current address is set to the last line read.
++.It Ic e No \&! Ns Ar command
++Edits the standard output of
++.No \&! Ns Ar command ,
++(see
++.Ic \&! Ns Ar command
++below).
++The default filename is unchanged.
++Any lines in the buffer are deleted before the output of
++.Ar command
++is read.
++The current address is set to the last line read.
++.It Ic E Ar file
++Edits
++.Ar file
++unconditionally.
++This is similar to the
++.Ic e
++command, except that unwritten changes are discarded without warning.
++The current address is set to the last line read.
++.It Ic f Ar file
++Sets the default filename to
++.Ar file .
++If
++.Ar file
++is not specified, then the default unescaped filename is printed.
++.Sm off
++.It Xo
++.Pf (1,$) Ic g No /
++.Ar re No / Ar command-list
++.Xc
++.Sm on
++Mark each addressed line matching the regular expression
++.Ar re
++for modification.
++The current address is set to each marked line in turn, and then the
++.Ar command-list
++is executed each time.
++The command-list can change the current line number,
++and it is not changed back after the command-list ended.
++When a marked line is changed, it is unmarked
++and the command-list won't be executed for it any more.
++If no lines were matched,
++the current line number remains unchanged.
++.Pp
++Each command in
++.Ar command-list
++must be on a separate line,
++and every line except for the last must be terminated by a backslash
++.Pq Sq \e .
++Any commands are allowed, except for
++.Ic g ,
++.Ic G ,
++.Ic v ,
++and
++.Ic V .
++An empty
++.Ar command-list
++is equivalent to a
++.Ic p
++command \(em unlike for the
++.Cm G
++command, where an empty command-list does nothing, and unlike an empty
++command, which is equivalent to the command
++.Cm +p .
++If the
++.Ar command-list
++is empty, the trailing slash can be omitted.
++.Sm off
++.It (1,$) Ic G No / Ar re No /
++.Sm on
++Interactively edits the addressed lines matching a regular expression
++.Ar re .
++The trailing slash after
++.Ar re
++can be omitted.
++For each matching line, the line is printed, the current address is set,
++and the user is prompted to enter a
++.Ar command-list .
++At the end of the
++.Ic G
++command, the current address is set to the last line affected by
++.Pq the last
++command-list.
++If no lines were matched,
++the current line number remains unchanged.
++.Pp
++The format of
++.Ar command-list
++is the same as that of the
++.Ic g
++command, but an empty command list does nothing.
++A single
++.Sq &
++repeats the last non-empty command list.
++.It Ic H
++Toggles the printing of error explanations.
++By default, explanations are not printed.
++It is recommended that
++.Nm
++scripts begin with this command to aid in debugging.
++.It Ic h
++Prints an explanation of the last error.
++.It (.) Ns Ic i
++Inserts text in the buffer before the current line.
++Text is entered in input mode.
++The current address is set to the last line entered.
++.It (.,+) Ns Ic j
++Joins the addressed lines.
++The addressed lines are deleted from the buffer and replaced by a single
++line containing their joined text.
++The current address is set to the resultant line.
++.It (.) Ns Ic k Ns Ar lc
++Marks a line with a lower case letter
++.Ar lc .
++The line can then be addressed as
++.Ic ' Ns Ar lc
++(i.e., a single quote followed by
++.Ar lc )
++in subsequent commands.
++The mark is not cleared until the line is deleted or otherwise modified.
++.It (.,.) Ns Ic l
++Prints the addressed lines unambiguously.
++The current address is set to the last line printed.
++.It (.,.) Ns Ic m Ns (.)
++Moves lines in the buffer.
++The addressed lines are moved to after the
++right-hand destination address, which may be the address
++.Ad 0
++.Pq zero .
++The current address is set to the last line moved.
++.It (.,.) Ns Ic n
++Prints the addressed lines along with their line numbers.
++The current address is set to the last line printed.
++.It (.,.) Ns Ic p
++Prints the addressed lines.
++The current address is set to the last line printed.
++.It Ic P
++Toggles the command prompt on and off.
++Unless a prompt was specified with the command-line option
++.Fl p Ar string ,
++the command prompt is by default turned off.
++.It Ic q
++Quits
++.Nm ed .
++.It Ic Q
++Quits
++.Nm
++unconditionally.
++This is similar to the
++.Ic q
++command, except that unwritten changes are discarded without warning.
++.It ($) Ns Ic r Ar file
++Reads
++.Ar file
++to after the addressed line.
++If
++.Ar file
++is not specified, then the default filename is used.
++If there was no default filename prior to the command,
++then the default filename is set to
++.Ar file .
++Otherwise, the default filename is unchanged.
++The current address is set to the last line read.
++.It ($) Ns Ic r No \&! Ns Ar command
++Reads to after the addressed line the standard output of
++.No \&! Ns Ar command ,
++(see
++.Ic \&! Ns Ar command
++below).
++The default filename is unchanged.
++The current address is set to the last line read.
++.Sm off
++.It Xo
++.Pf (.,.) Ic s No / Ar re
++.No / Ar replacement No /\ \&
++.Pf (.,.) Ic s No / Ar re
++.No / Ar replacement No / Ic g\ \&
++.No (.,.) Ic s No / Ar re
++.No / Ar replacement No / Ar n
++.Xc
++.Sm on
++Replaces text in the addressed lines matching a regular expression
++.Ar re
++with
++.Ar replacement .
++By default, only the first match in each line is replaced.
++If the
++.Ic g
++.Pq global
++suffix is given, then every match is replaced.
++The
++.Ar n
++suffix, where
++.Ar n
++is a positive number, causes only the
++.Ar n Ns th
++match to be replaced.
++It is an error if no substitutions are performed on any of the addressed
++lines.
++The current address is set to the last line affected.
++.Pp
++.Ar re
++and
++.Ar replacement
++may be delimited by any character other than space and newline
++(see the
++.Ic s
++command below).
++If one or two of the last delimiters is omitted, then the last line
++affected is printed as though the print suffix
++.Ic p
++were specified.
++.Pp
++An unescaped
++.Ql &
++in
++.Ar replacement
++is replaced by the currently matched text.
++The character sequence
++.Pf \e Ar m ,
++where
++.Ar m
++is a number in the range [1,9], is replaced by the
++.Ar m Ns th
++backreference expression of the matched text.
++If
++.Ar replacement
++consists of a single
++.Ql % ,
++then
++.Ar replacement
++from the last substitution is used.
++Newlines may be embedded in
++.Ar replacement
++if they are escaped with a backslash
++.Pq Ql \e .
++.It (.,.) Ns Ic s
++Repeats the last substitution.
++This form of the
++.Ic s
++command accepts a count suffix
++.Ar n ,
++or any combination of the characters
++.Ic r ,
++.Ic g ,
++and
++.Ic p .
++If a count suffix
++.Ar n
++is given, then only the
++.Ar n Ns th
++match is replaced.
++The
++.Ic r
++suffix causes the regular expression of the last search to be used
++instead of that of the last substitution.
++The
++.Ic g
++suffix toggles the global suffix of the last substitution.
++The
++.Ic p
++suffix toggles the print suffix of the last substitution.
++The current address is set to the last line affected.
++.It (.,.) Ns Ic t Ns (.)
++Copies
++.Pq i.e., transfers
++the addressed lines to after the right-hand destination address,
++which may be the address
++.Ad 0
++.Pq zero .
++The current address is set to the last line copied.
++.It Ic u
++Undoes the last command and restores the current address
++to what it was before the command.
++The global commands
++.Ic g ,
++.Ic G ,
++.Ic v ,
++and
++.Ic V
++are treated as a single command by undo.
++.Ic u
++is its own inverse.
++.Sm off
++.It Xo
++.Pf (1,$) Ic v No / Ar re
++.Pf / Ar command-list
++.Xc
++.Sm on
++The same as the
++.Ic g
++command, except that it applies
++.Ar command-list
++to each of the addressed lines not matching the regular expression
++.Ar re .
++.Sm off
++.It Xo
++.Pf (1,$) Ic V No /
++.Ar re No /
++.Xc
++.Sm on
++The same as the
++.Ic G
++command, except that it interactively edits the addressed lines
++not matching the regular expression
++.Ar re .
++.It (1,$) Ns Ic w Ar file
++Writes the addressed lines to
++.Ar file .
++Any previous contents of
++.Ar file
++are lost without warning.
++If there is no default filename, then the default filename is set to
++.Ar file ,
++otherwise it is unchanged.
++If no filename is specified, then the default filename is used.
++The current address is unchanged.
++.It (1,$) Ns Ic wq Ar file
++Writes the addressed lines to
++.Ar file ,
++and then executes a
++.Ic q
++command.
++.It (1,$) Ns Ic w No \&! Ns Ar command
++Writes the addressed lines to the standard input of
++.No \&! Ns Ar command ,
++(see
++.Ic \&! Ns Ar command
++below).
++The default filename and current address are unchanged.
++.It (1,$) Ns Ic W Ar file
++Appends the addressed lines to the end of
++.Ar file .
++This is similar to the
++.Ic w
++command, except that the previous contents of file are not clobbered.
++The current address is unchanged.
++.It (+) Ns Ic z Ns Ar n
++Scrolls
++.Ar n
++lines at a time starting at addressed line.
++If
++.Ar n
++is not specified, then the current window size is used.
++The current address is set to the last line printed.
++.It ($) Ns Ic =
++Prints the line number of the addressed line.
++.It (+)
++An address without a command prints the addressed line
++and sets the current address to that line.
++If the address is also omitted, it defaults to the next line (+).
++.It Ic \&! Ns Ar command
++Executes
++.Ar command
++via
++.Xr sh 1 .
++If the first character of
++.Ar command
++is
++.Sq !\& ,
++then it is replaced by text of the previous
++.Ic \&! Ns Ar command .
++.Nm
++does not process
++.Ar command
++for
++.Sq \e
++.Pq backslash
++escapes.
++However, an unescaped
++.Sq %
++is replaced by the default filename.
++When the shell returns from execution, a
++.Sq \&!
++is printed to the standard output.
++The current line is unchanged.
++.El
++.Sh ASYNCHRONOUS EVENTS
++.Bl -tag -width "SIGWINCH"
++.It Dv SIGHUP
++If the current buffer has changed since it was last written,
++.Nm
++attempts to write the buffer to the file
++.Pa ed.hup .
++Nothing is written to the currently remembered file, and
++.Nm
++exits.
++.It Dv SIGINT
++When an interrupt occurs,
++.Nm
++prints
++.Sq ?\en
++and returns to command mode.
++If interrupted during text input,
++the text already input is written to the current buffer,
++as if text input had been normally terminated.
++.It Dv SIGQUIT
++This signal is ignored.
++.It Dv SIGWINCH
++The screen is resized.
++.El
++.Sh FILES
++.Bl -tag -width /tmp/ed.* -compact
++.It Pa /tmp/ed.*
++buffer file
++.It Pa ed.hup
++where
++.Nm
++attempts to write the buffer if the terminal hangs up
++.El
++.Sh EXIT STATUS
++.Ex -std ed
++.Sh DIAGNOSTICS
++When an error occurs,
++.Nm
++prints a
++.Sq \&?
++and either returns to command mode or exits if its input is from a script.
++An explanation of the last error can be printed with the
++.Ic h
++.Pq help
++command.
++.Pp
++Since the
++.Ic g
++.Pq global
++command masks any errors from failed searches and substitutions,
++it can be used to perform conditional operations in scripts; e.g.,
++.Pp
++.Dl g/old/s//new/
++.Pp
++replaces any occurrences of
++.Qq old
++with
++.Qq new .
++.Pp
++If the
++.Ic u
++.Pq undo
++command occurs in a global command list,
++then the command list is executed only once.
++.Pp
++If diagnostics are not disabled, attempting to quit
++.Nm
++or edit another file before writing a modified buffer results in an error.
++If the command is entered a second time, it succeeds,
++but any changes to the buffer are lost.
++.Sh SEE ALSO
++.Xr sed 1 ,
++.Xr sh 1 ,
++.Xr vi 1 ,
++.Xr re_format 7
++.Rs
++.\" 4.4BSD USD:9
++.%A B. W. Kernighan
++.%T A Tutorial Introduction to the UNIX Text Editor
++.Re
++.Rs
++.\" 4.4BSD USD:10
++.%A B. W. Kernighan
++.%T Advanced Editing on UNIX
++.Re
++.Rs
++.%A B. W. Kernighan
++.%A P. J. Plauger
++.%B Software Tools in Pascal
++.%O Addison-Wesley
++.%D 1981
++.Re
++.Sh STANDARDS
++The
++.Nm
++utility is compliant with the
++.St -p1003.1-2008
++specification.
++.Pp
++The commands
++.Cm s
++(to repeat the last substitution),
++.Cm W ,
++.Cm wq ,
++and
++.Cm z
++as well as the address specifier
++.Sq %
++are extensions to that specification.
++.Pp
++The
++.St -p1003.1-2008
++specification says the
++.Sq ^
++address specifier is neither required nor prohibited;
++additionally, it says behaviour for the
++.Fl
++option is
++.Dq unspecified .
++.Sh HISTORY
++An
++.Nm
++command appeared in
++.At v1 .
++.Sh CAVEATS
++.Nm
++processes
++.Ar file
++arguments for backslash escapes, i.e., in a filename,
++any characters preceded by a backslash
++.Pq Ql \e
++are interpreted literally.
++.Pp
++If a text
++.Pq non-binary
++file is not terminated by a newline character,
++then
++.Nm
++appends one on reading/writing it.
++In the case of a binary file,
++.Nm
++does not append a newline on reading/writing.
+diff -Paur --no-dereference -- ed.upstream/buf.c ed/buf.c
+--- ed.upstream/buf.c
++++ ed/buf.c
+@@ -0,0 +1,289 @@
++/*	$OpenBSD: buf.c,v 1.25 2024/04/23 13:34:50 jsg Exp $	*/
++/*	$NetBSD: buf.c,v 1.15 1995/04/23 10:07:28 cgd Exp $	*/
++
++/* buf.c: This file contains the scratch-file buffer routines for the
++   ed line editor. */
++/*-
++ * Copyright (c) 1993 Andrew Moore, Talke Studio.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <sys/types.h>
++#include <sys/stat.h>
++
++#include <limits.h>
++#include <regex.h>
++#include <signal.h>
++#include <stdlib.h>
++#include <stdio.h>
++#include <string.h>
++#include <unistd.h>
++
++#include "ed.h"
++
++
++static FILE *sfp;			/* scratch file pointer */
++static off_t sfseek;			/* scratch file position */
++static int seek_write;			/* seek before writing */
++static line_t buffer_head;		/* incore buffer */
++
++/* get_sbuf_line: get a line of text from the scratch file; return pointer
++   to the text */
++char *
++get_sbuf_line(line_t *lp)
++{
++	static char *sfbuf = NULL;	/* buffer */
++	static int sfbufsz = 0;		/* buffer size */
++	int len;
++
++	if (lp == &buffer_head)
++		return NULL;
++	seek_write = 1;				/* force seek on write */
++	/* out of position */
++	if (sfseek != lp->seek) {
++		sfseek = lp->seek;
++		if (fseeko(sfp, sfseek, SEEK_SET) == -1) {
++			perror(NULL);
++			seterrmsg("cannot seek temp file");
++			return NULL;
++		}
++	}
++	len = lp->len;
++	REALLOC(sfbuf, sfbufsz, len + 1, NULL);
++	if (fread(sfbuf, sizeof(char), len, sfp) != (size_t)len) {
++		perror(NULL);
++		seterrmsg("cannot read temp file");
++		return NULL;
++	}
++	sfseek += len;				/* update file position */
++	sfbuf[len] = '\0';
++	return sfbuf;
++}
++
++
++/* put_sbuf_line: write a line of text to the scratch file and add a line node
++   to the editor buffer;  return a pointer to the end of the text */
++char *
++put_sbuf_line(char *cs)
++{
++	line_t *lp;
++	int len;
++	char *s;
++
++	if ((lp = malloc(sizeof(line_t))) == NULL) {
++		perror(NULL);
++		seterrmsg("out of memory");
++		return NULL;
++	}
++	/* assert: cs is '\n' terminated */
++	for (s = cs; *s != '\n'; s++)
++		;
++	if (s - cs >= LINECHARS) {
++		seterrmsg("line too long");
++		free(lp);
++		return NULL;
++	}
++	len = s - cs;
++	/* out of position */
++	if (seek_write) {
++		if (fseek(sfp, 0L, SEEK_END) == -1) {
++			perror(NULL);
++			seterrmsg("cannot seek temp file");
++			free(lp);
++			return NULL;
++		}
++		sfseek = ftello(sfp);
++		seek_write = 0;
++	}
++	/* assert: SPL1() */
++	if (fwrite(cs, sizeof(char), len, sfp) != (size_t)len) {
++		sfseek = -1;
++		perror(NULL);
++		seterrmsg("cannot write temp file");
++		free(lp);
++		return NULL;
++	}
++	lp->len = len;
++	lp->seek  = sfseek;
++	add_line_node(lp);
++	sfseek += len;			/* update file position */
++	return ++s;
++}
++
++
++/* add_line_node: add a line node in the editor buffer after the current line */
++void
++add_line_node(line_t *lp)
++{
++	line_t *cp;
++
++	/* this get_addressed_line_node last! */
++	cp = get_addressed_line_node(current_addr);
++	INSQUE(lp, cp);
++	addr_last++;
++	current_addr++;
++}
++
++
++/* get_line_node_addr: return line number of pointer */
++int
++get_line_node_addr(line_t *lp)
++{
++	line_t *cp = &buffer_head;
++	int n = 0;
++
++	while (cp != lp && (cp = cp->q_forw) != &buffer_head)
++		n++;
++	if (n && cp == &buffer_head) {
++		seterrmsg("invalid address");
++		return ERR;
++	}
++	return n;
++}
++
++
++/* get_addressed_line_node: return pointer to a line node in the editor buffer */
++line_t *
++get_addressed_line_node(int n)
++{
++	static line_t *lp = &buffer_head;
++	static int on = 0;
++
++	SPL1();
++	if (n > on) {
++		if (n <= (on + addr_last) >> 1)
++			for (; on < n; on++)
++				lp = lp->q_forw;
++		else {
++			lp = buffer_head.q_back;
++			for (on = addr_last; on > n; on--)
++				lp = lp->q_back;
++		}
++	} else {
++		if (n >= on >> 1)
++			for (; on > n; on--)
++				lp = lp->q_back;
++		else {
++			lp = &buffer_head;
++			for (on = 0; on < n; on++)
++				lp = lp->q_forw;
++		}
++	}
++	SPL0();
++	return lp;
++}
++
++
++extern int newline_added;
++
++#define SCRATCH_TEMPLATE      "/tmp/ed.XXXXXXXXXX"
++static char sfn[sizeof(SCRATCH_TEMPLATE)+1] = "";	/* scratch file name */
++
++/* open_sbuf: open scratch file */
++int
++open_sbuf(void)
++{
++	int fd = -1;
++
++	isbinary = newline_added = 0;
++	strlcpy(sfn, SCRATCH_TEMPLATE, sizeof sfn);
++	if ((fd = mkstemp(sfn)) == -1 ||
++	    (sfp = fdopen(fd, "w+")) == NULL) {
++		if (fd != -1)
++			close(fd);
++		perror(sfn);
++		seterrmsg("cannot open temp file");
++		return ERR;
++	}
++	return 0;
++}
++
++
++/* close_sbuf: close scratch file */
++int
++close_sbuf(void)
++{
++	if (sfp) {
++		if (fclose(sfp) == EOF) {
++			perror(sfn);
++			seterrmsg("cannot close temp file");
++			return ERR;
++		}
++		sfp = NULL;
++		unlink(sfn);
++	}
++	sfseek = seek_write = 0;
++	return 0;
++}
++
++
++/* quit: remove_lines scratch file and exit */
++void
++quit(int n)
++{
++	if (sfp) {
++		fclose(sfp);
++		unlink(sfn);
++	}
++	exit(n);
++}
++
++
++static unsigned char ctab[256];		/* character translation table */
++
++/* init_buffers: open scratch buffer; initialize line queue */
++void
++init_buffers(void)
++{
++	int i = 0;
++
++	/* Read stdin one character at a time to avoid i/o contention
++	   with shell escapes invoked by nonterminal input, e.g.,
++	   ed - <<EOF
++	   !cat
++	   hello, world
++	   EOF */
++	setvbuf(stdin, NULL, _IONBF, 0);
++	if (open_sbuf() < 0)
++		quit(2);
++	REQUE(&buffer_head, &buffer_head);
++	for (i = 0; i < 256; i++)
++		ctab[i] = i;
++}
++
++
++/* translit_text: translate characters in a string */
++char *
++translit_text(char *s, int len, int from, int to)
++{
++	static int i = 0;
++
++	unsigned char *us;
++
++	ctab[i] = i;			/* restore table to initial state */
++	ctab[i = from] = to;
++	for (us = (unsigned char *) s; len-- > 0; us++)
++		*us = ctab[*us];
++	return s;
++}
+diff -Paur --no-dereference -- ed.upstream/glbl.c ed/glbl.c
+--- ed.upstream/glbl.c
++++ ed/glbl.c
+@@ -0,0 +1,207 @@
++/*	$OpenBSD: glbl.c,v 1.20 2018/06/04 13:26:21 martijn Exp $	*/
++/*	$NetBSD: glbl.c,v 1.2 1995/03/21 09:04:41 cgd Exp $	*/
++
++/* glob.c: This file contains the global command routines for the ed line
++   editor */
++/*-
++ * Copyright (c) 1993 Andrew Moore, Talke Studio.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <sys/ioctl.h>
++#include <sys/wait.h>
++
++#include <regex.h>
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "ed.h"
++
++static int set_active_node(line_t *);
++static line_t *next_active_node(void);
++
++/* build_active_list:  add line matching a pattern to the global-active list */
++int
++build_active_list(int isgcmd)
++{
++	regex_t *pat;
++	line_t *lp;
++	int n;
++	char *s;
++	char delimiter;
++
++	if ((delimiter = *ibufp) == ' ' || delimiter == '\n') {
++		seterrmsg("invalid pattern delimiter");
++		return ERR;
++	} else if ((pat = get_compiled_pattern()) == NULL)
++		return ERR;
++	else if (*ibufp == delimiter)
++		ibufp++;
++	clear_active_list();
++	lp = get_addressed_line_node(first_addr);
++	for (n = first_addr; n <= second_addr; n++, lp = lp->q_forw) {
++		if ((s = get_sbuf_line(lp)) == NULL)
++			return ERR;
++		if (isbinary)
++			NUL_TO_NEWLINE(s, lp->len);
++		if ((!regexec(pat, s, 0, NULL, 0)) == isgcmd &&
++		    set_active_node(lp) < 0)
++			return ERR;
++	}
++	return 0;
++}
++
++
++/* exec_global: apply command list in the command buffer to the active
++   lines in a range; return command status */
++int
++exec_global(int interact, int gflag)
++{
++	static char *ocmd = NULL;
++	static int ocmdsz = 0;
++
++	line_t *lp = NULL;
++	int status;
++	int n;
++	char *cmd = NULL;
++
++	if (!interact) {
++		if (!strcmp(ibufp, "\n"))
++			cmd = "p\n";		/* null cmd-list == `p' */
++		else if ((cmd = get_extended_line(&n, 0)) == NULL)
++			return ERR;
++	}
++	clear_undo_stack();
++	while ((lp = next_active_node()) != NULL) {
++		if ((current_addr = get_line_node_addr(lp)) < 0)
++			return ERR;
++		if (interact) {
++			/* print current_addr; get a command in global syntax */
++			if (display_lines(current_addr, current_addr, gflag) < 0)
++				return ERR;
++			while ((n = get_tty_line()) > 0 &&
++			    ibuf[n - 1] != '\n')
++				clearerr(stdin);
++			if (n < 0)
++				return ERR;
++			else if (n == 0) {
++				seterrmsg("unexpected end-of-file");
++				return ERR;
++			} else if (n == 1 && !strcmp(ibuf, "\n"))
++				continue;
++			else if (n == 2 && !strcmp(ibuf, "&\n")) {
++				if (cmd == NULL) {
++					seterrmsg("no previous command");
++					return ERR;
++				} else cmd = ocmd;
++			} else if ((cmd = get_extended_line(&n, 0)) == NULL)
++				return ERR;
++			else {
++				REALLOC(ocmd, ocmdsz, n + 1, ERR);
++				memcpy(ocmd, cmd, n + 1);
++				cmd = ocmd;
++			}
++
++		}
++		ibufp = cmd;
++		for (; *ibufp;)
++			if ((status = extract_addr_range()) < 0 ||
++			    (status = exec_command()) < 0 ||
++			    (status > 0 && (status = display_lines(
++			    current_addr, current_addr, status)) < 0))
++				return status;
++	}
++	return 0;
++}
++
++
++static line_t **active_list;	/* list of lines active in a global command */
++static int active_last;		/* index of last active line in active_list */
++static int active_size;		/* size of active_list */
++static int active_ptr;		/* active_list index (non-decreasing) */
++static int active_ndx;		/* active_list index (modulo active_last) */
++
++/* set_active_node: add a line node to the global-active list */
++static int
++set_active_node(line_t *lp)
++{
++	if (active_last + 1 > active_size) {
++		int ti = active_size;
++		line_t **ts;
++		SPL1();
++		if ((ts = reallocarray(active_list,
++		    (ti += MINBUFSZ), sizeof(line_t **))) == NULL) {
++			perror(NULL);
++			seterrmsg("out of memory");
++			SPL0();
++			return ERR;
++		}
++		active_size = ti;
++		active_list = ts;
++		SPL0();
++	}
++	active_list[active_last++] = lp;
++	return 0;
++}
++
++
++/* unset_active_nodes: remove a range of lines from the global-active list */
++void
++unset_active_nodes(line_t *np, line_t *mp)
++{
++	line_t *lp;
++	int i;
++
++	for (lp = np; lp != mp; lp = lp->q_forw)
++		for (i = 0; i < active_last; i++)
++			if (active_list[active_ndx] == lp) {
++				active_list[active_ndx] = NULL;
++				active_ndx = INC_MOD(active_ndx, active_last - 1);
++				break;
++			} else	active_ndx = INC_MOD(active_ndx, active_last - 1);
++}
++
++
++/* next_active_node: return the next global-active line node */
++static line_t *
++next_active_node(void)
++{
++	while (active_ptr < active_last && active_list[active_ptr] == NULL)
++		active_ptr++;
++	return (active_ptr < active_last) ? active_list[active_ptr++] : NULL;
++}
++
++
++/* clear_active_list: clear the global-active list */
++void
++clear_active_list(void)
++{
++	SPL1();
++	active_size = active_last = active_ptr = active_ndx = 0;
++	free(active_list);
++	active_list = NULL;
++	SPL0();
++}
+diff -Paur --no-dereference -- ed.upstream/io.c ed/io.c
+--- ed.upstream/io.c
++++ ed/io.c
+@@ -0,0 +1,349 @@
++/*	$OpenBSD: io.c,v 1.26 2024/07/16 05:01:10 deraadt Exp $	*/
++/*	$NetBSD: io.c,v 1.2 1995/03/21 09:04:43 cgd Exp $	*/
++
++/* io.c: This file contains the i/o routines for the ed line editor */
++/*-
++ * Copyright (c) 1993 Andrew Moore, Talke Studio.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <regex.h>
++#include <signal.h>
++#include <errno.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "ed.h"
++
++static int read_stream(FILE *, int);
++static int get_stream_line(FILE *);
++static int write_stream(FILE *, int, int);
++static int put_stream_line(FILE *, char *, int);
++
++extern int scripted;
++
++/* read_file: read a named file/pipe into the buffer; return line count */
++int
++read_file(char *fn, int n)
++{
++	FILE *fp;
++	int size;
++
++
++	fp = (*fn == '!') ? popen(fn + 1, "r") : fopen(strip_escapes(fn), "r");
++	if (fp == NULL) {
++		perror(fn);
++		seterrmsg("cannot open input file");
++		return ERR;
++	} else if ((size = read_stream(fp, n)) < 0)
++		return ERR;
++	 else if ((*fn == '!') ?  pclose(fp) == -1 : fclose(fp) == EOF) {
++		perror(fn);
++		seterrmsg("cannot close input file");
++		return ERR;
++	}
++	if (!scripted)
++		printf("%d\n", size);
++	return current_addr - n;
++}
++
++
++static char *sbuf;		/* file i/o buffer */
++static int sbufsz;		/* file i/o buffer size */
++int newline_added;		/* if set, newline appended to input file */
++
++/* read_stream: read a stream into the editor buffer; return status */
++static int
++read_stream(FILE *fp, int n)
++{
++	line_t *lp = get_addressed_line_node(n);
++	undo_t *up = NULL;
++	unsigned int size = 0;
++	int o_newline_added = newline_added;
++	int o_isbinary = isbinary;
++	int appended = (n == addr_last);
++	int len;
++
++	isbinary = newline_added = 0;
++	for (current_addr = n; (len = get_stream_line(fp)) > 0; size += len) {
++		SPL1();
++		if (put_sbuf_line(sbuf) == NULL) {
++			SPL0();
++			return ERR;
++		}
++		lp = lp->q_forw;
++		if (up)
++			up->t = lp;
++		else if ((up = push_undo_stack(UADD, current_addr,
++		    current_addr)) == NULL) {
++			SPL0();
++			return ERR;
++		}
++		SPL0();
++	}
++	if (len < 0)
++		return ERR;
++	if (appended && size && o_isbinary && o_newline_added)
++		fputs("newline inserted\n", stderr);
++	else if (newline_added && (!appended || (!isbinary && !o_isbinary)))
++		fputs("newline appended\n", stderr);
++	if (isbinary && newline_added && !appended)
++	    	size += 1;
++	if (!size)
++		newline_added = 1;
++	newline_added = appended ? newline_added : o_newline_added;
++	isbinary = isbinary | o_isbinary;
++	return size;
++}
++
++/* get_stream_line: read a line of text from a stream; return line length */
++static int
++get_stream_line(FILE *fp)
++{
++	int c;
++	int i = 0;
++
++	while (((c = getc(fp)) != EOF || (!feof(fp) &&
++	    !ferror(fp))) && c != '\n') {
++		REALLOC(sbuf, sbufsz, i + 1, ERR);
++		if (!(sbuf[i++] = c))
++			isbinary = 1;
++	}
++	REALLOC(sbuf, sbufsz, i + 2, ERR);
++	if (c == '\n')
++		sbuf[i++] = c;
++	else if (ferror(fp)) {
++		perror(NULL);
++		seterrmsg("cannot read input file");
++		return ERR;
++	} else if (i) {
++		sbuf[i++] = '\n';
++		newline_added = 1;
++	}
++	sbuf[i] = '\0';
++	return (isbinary && newline_added && i) ? --i : i;
++}
++
++
++/* write_file: write a range of lines to a named file/pipe; return line count */
++int
++write_file(char *fn, char *mode, int n, int m)
++{
++	FILE *fp;
++	int size;
++
++	fp = (*fn == '!') ? popen(fn+1, "w") : fopen(strip_escapes(fn), mode);
++	if (fp == NULL) {
++		perror(fn);
++		seterrmsg("cannot open output file");
++		return ERR;
++	} else if ((size = write_stream(fp, n, m)) < 0)
++		return ERR;
++	 else if ((*fn == '!') ?  pclose(fp) == -1 : fclose(fp) == EOF) {
++		perror(fn);
++		seterrmsg("cannot close output file");
++		return ERR;
++	}
++	if (!scripted)
++		printf("%d\n", size);
++	return n ? m - n + 1 : 0;
++}
++
++
++/* write_stream: write a range of lines to a stream; return status */
++static int
++write_stream(FILE *fp, int n, int m)
++{
++	line_t *lp = get_addressed_line_node(n);
++	unsigned int size = 0;
++	char *s;
++	int len;
++
++	for (; n && n <= m; n++, lp = lp->q_forw) {
++		if ((s = get_sbuf_line(lp)) == NULL)
++			return ERR;
++		len = lp->len;
++		if (n != addr_last || !isbinary || !newline_added)
++			s[len++] = '\n';
++		if (put_stream_line(fp, s, len) < 0)
++			return ERR;
++		size += len;
++	}
++	return size;
++}
++
++
++/* put_stream_line: write a line of text to a stream; return status */
++static int
++put_stream_line(FILE *fp, char *s, int len)
++{
++	while (len--) {
++		if (fputc(*s, fp) == EOF) {
++			perror(NULL);
++			seterrmsg("cannot write file");
++			return ERR;
++		}
++		s++;
++	}
++	return 0;
++}
++
++/* get_extended_line: get a an extended line from stdin */
++char *
++get_extended_line(int *sizep, int nonl)
++{
++	static char *cvbuf = NULL;		/* buffer */
++	static int cvbufsz = 0;			/* buffer size */
++
++	int l, n;
++	char *t = ibufp;
++
++	while (*t++ != '\n')
++		;
++	if ((l = t - ibufp) < 2 || !has_trailing_escape(ibufp, ibufp + l - 1)) {
++		*sizep = l;
++		return ibufp;
++	}
++	*sizep = -1;
++	REALLOC(cvbuf, cvbufsz, l, NULL);
++	memcpy(cvbuf, ibufp, l);
++	*(cvbuf + --l - 1) = '\n'; 	/* strip trailing esc */
++	if (nonl)
++		l--; 			/* strip newline */
++	for (;;) {
++		if ((n = get_tty_line()) < 0)
++			return NULL;
++		else if (n == 0 || ibuf[n - 1] != '\n') {
++			seterrmsg("unexpected end-of-file");
++			return NULL;
++		}
++		REALLOC(cvbuf, cvbufsz, l + n, NULL);
++		memcpy(cvbuf + l, ibuf, n);
++		l += n;
++		if (n < 2 || !has_trailing_escape(cvbuf, cvbuf + l - 1))
++			break;
++		*(cvbuf + --l - 1) = '\n'; 	/* strip trailing esc */
++		if (nonl) l--; 			/* strip newline */
++	}
++	REALLOC(cvbuf, cvbufsz, l + 1, NULL);
++	cvbuf[l] = '\0';
++	*sizep = l;
++	return cvbuf;
++}
++
++
++/* get_tty_line: read a line of text from stdin; return line length */
++int
++get_tty_line(void)
++{
++	int oi = 0;
++	int i = 0;
++	int c;
++
++	for (;;) {
++		if (sighup)
++			handle_hup();
++		switch (c = getchar()) {
++		default:
++			oi = 0;
++			REALLOC(ibuf, ibufsz, i + 2, ERR);
++			if (!(ibuf[i++] = c)) isbinary = 1;
++			if (c != '\n')
++				continue;
++			lineno++;
++			ibuf[i] = '\0';
++			ibufp = ibuf;
++			return i;
++		case EOF:
++			if (sighup)
++				handle_hup();
++			if (ferror(stdin)) {
++				perror("stdin");
++				seterrmsg("cannot read stdin");
++				clearerr(stdin);
++				ibufp = NULL;
++				return ERR;
++			} else {
++				clearerr(stdin);
++				if (i != oi) {
++					oi = i;
++					continue;
++				} else if (i)
++					ibuf[i] = '\0';
++				ibufp = ibuf;
++				return i;
++			}
++		}
++	}
++}
++
++
++
++#define ESCAPES "\a\b\f\n\r\t\v\\$"
++#define ESCCHARS "abfnrtv\\$"
++
++extern int rows;
++extern int cols;
++
++/* put_tty_line: print text to stdout */
++int
++put_tty_line(char *s, int l, int n, int gflag)
++{
++	int col = 0;
++	char *cp;
++
++	if (gflag & GNP) {
++		printf("%d\t", n);
++		col = 8;
++	}
++	for (; l--; s++) {
++		if ((gflag & GLS) && ++col > cols) {
++			fputs("\\\n", stdout);
++			col = 1;
++		}
++		if (gflag & GLS) {
++			if (31 < *s && *s < 127 && *s != '\\' && *s != '$')
++				putchar(*s);
++			else {
++				putchar('\\');
++				col++;
++				if (*s && (cp = strchr(ESCAPES, *s)) != NULL)
++					putchar(ESCCHARS[cp - ESCAPES]);
++				else {
++					putchar((((unsigned char) *s & 0300) >> 6) + '0');
++					putchar((((unsigned char) *s & 070) >> 3) + '0');
++					putchar(((unsigned char) *s & 07) + '0');
++					col += 2;
++				}
++			}
++
++		} else
++			putchar(*s);
++	}
++	if (gflag & GLS)
++		putchar('$');
++	putchar('\n');
++	return 0;
++}
+diff -Paur --no-dereference -- ed.upstream/re.c ed/re.c
+--- ed.upstream/re.c
++++ ed/re.c
+@@ -0,0 +1,139 @@
++/*	$OpenBSD: re.c,v 1.19 2018/06/19 12:36:18 martijn Exp $	*/
++/*	$NetBSD: re.c,v 1.14 1995/03/21 09:04:48 cgd Exp $	*/
++
++/* re.c: This file contains the regular expression interface routines for
++   the ed line editor. */
++/*-
++ * Copyright (c) 1993 Andrew Moore, Talke Studio.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <regex.h>
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "ed.h"
++
++static char *extract_pattern(int);
++static char *parse_char_class(char *);
++
++extern int patlock;
++
++
++/* get_compiled_pattern: return pointer to compiled pattern from command
++   buffer */
++regex_t *
++get_compiled_pattern(void)
++{
++	static regex_t *exp = NULL;
++	char errbuf[128] = "";
++
++	char *exps;
++	char delimiter;
++	int n;
++
++	if ((delimiter = *ibufp) == ' ') {
++		seterrmsg("invalid pattern delimiter");
++		return NULL;
++	} else if (delimiter == '\n' || *++ibufp == '\n' || *ibufp == delimiter) {
++		if (!exp)
++			seterrmsg("no previous pattern");
++		return exp;
++	} else if ((exps = extract_pattern(delimiter)) == NULL)
++		return NULL;
++	/* buffer alloc'd && not reserved */
++	if (exp && !patlock)
++		regfree(exp);
++	else if ((exp = malloc(sizeof(regex_t))) == NULL) {
++		perror(NULL);
++		seterrmsg("out of memory");
++		return NULL;
++	}
++	patlock = 0;
++	if ((n = regcomp(exp, exps, 0)) != 0) {
++		regerror(n, exp, errbuf, sizeof errbuf);
++		seterrmsg(errbuf);
++		free(exp);
++		return exp = NULL;
++	}
++	return exp;
++}
++
++
++/* extract_pattern: copy a pattern string from the command buffer; return
++   pointer to the copy */
++static char *
++extract_pattern(int delimiter)
++{
++	static char *lhbuf = NULL;	/* buffer */
++	static int lhbufsz = 0;		/* buffer size */
++
++	char *nd;
++	int len;
++
++	for (nd = ibufp; *nd != delimiter && *nd != '\n'; nd++)
++		switch (*nd) {
++		default:
++			break;
++		case '[':
++			if ((nd = parse_char_class(++nd)) == NULL) {
++				seterrmsg("unbalanced brackets ([])");
++				return NULL;
++			}
++			break;
++		case '\\':
++			if (*++nd == '\n') {
++				seterrmsg("trailing backslash (\\)");
++				return NULL;
++			}
++			break;
++		}
++	len = nd - ibufp;
++	REALLOC(lhbuf, lhbufsz, len + 1, NULL);
++	memcpy(lhbuf, ibufp, len);
++	lhbuf[len] = '\0';
++	ibufp = nd;
++	return (isbinary) ? NUL_TO_NEWLINE(lhbuf, len) : lhbuf;
++}
++
++
++/* parse_char_class: expand a POSIX character class */
++static char *
++parse_char_class(char *s)
++{
++	int c, d;
++
++	if (*s == '^')
++		s++;
++	if (*s == ']')
++		s++;
++	for (; *s != ']' && *s != '\n'; s++)
++		if (*s == '[' && ((d = *(s+1)) == '.' || d == ':' || d == '='))
++			for (s++, c = *++s; *s != ']' || c != d; s++)
++				if ((c = *s) == '\n')
++					return NULL;
++	return  (*s == ']') ? s : NULL;
++}
 diff -Paur --no-dereference -- ed.upstream/main.c ed/main.c
 --- ed.upstream/main.c
 +++ ed/main.c
-@@ -60,6 +60,10 @@
- 
- #include "ed.h"
- 
-+#if defined(__sortix__) && !defined(PATH_MAX)
-+#define PATH_MAX 4096
+@@ -0,0 +1,1389 @@
++/*	$OpenBSD: main.c,v 1.70 2024/10/12 07:58:40 jsg Exp $	*/
++/*	$NetBSD: main.c,v 1.3 1995/03/21 09:04:44 cgd Exp $	*/
++
++/* main.c: This file contains the main control and user-interface routines
++   for the ed line editor. */
++/*-
++ * Copyright (c) 1993 Andrew Moore, Talke Studio.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++/*
++ * CREDITS
++ *
++ *	This program is based on the editor algorithm described in
++ *	Brian W. Kernighan and P. J. Plauger's book "Software Tools
++ *	in Pascal," Addison-Wesley, 1981.
++ *
++ *	The buffering algorithm is attributed to Rodney Ruddock of
++ *	the University of Guelph, Guelph, Ontario.
++ *
++ */
++
++#include <sys/ioctl.h>
++#include <sys/stat.h>
++#include <sys/wait.h>
++
++#include <ctype.h>
++#include <err.h>
++#include <errno.h>
++#include <limits.h>
++#include <pwd.h>
++#include <regex.h>
++#include <setjmp.h>
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include "ed.h"
++
++#ifdef __sortix__
++#define PATH_MAX 2048
 +#endif
 +
- void signal_hup(int);
- void signal_int(int);
- void handle_winch(int);
-@@ -129,8 +133,10 @@
- 	int c, n;
- 	int status = 0;
- 
-+#if 0
- 	if (pledge("stdio rpath wpath cpath proc exec tty", NULL) == -1)
- 		err(1, "pledge");
++void signal_hup(int);
++void signal_int(int);
++void handle_winch(int);
++
++static int next_addr(void);
++static int check_addr_range(int, int);
++static int get_matching_node_addr(regex_t *, int);
++static char *get_filename(int);
++static int get_shell_command(void);
++static int append_lines(int);
++static int join_lines(int, int);
++static int move_lines(int);
++static int copy_lines(int);
++static int mark_line_node(line_t *, int);
++static int get_marked_node_addr(int);
++static line_t *dup_line_node(line_t *);
++
++sigjmp_buf env;
++
++/* static buffers */
++static char errmsg[PATH_MAX + 40];	/* error message buffer */
++static char *shcmd;		/* shell command buffer */
++static int shcmdsz;		/* shell command buffer size */
++static int shcmdi;		/* shell command buffer index */
++static char old_filename[PATH_MAX];	/* default filename */
++
++/* global buffers */
++char *ibuf;			/* ed command-line buffer */
++int ibufsz;			/* ed command-line buffer size */
++char *ibufp;			/* pointer to ed command-line buffer */
++
++/* global flags */
++int garrulous = 0;		/* if set, print all error messages */
++int isbinary;			/* if set, buffer contains ASCII NULs */
++int isglobal;			/* if set, doing a global command */
++int modified;			/* if set, buffer modified since last write */
++int scripted = 0;		/* if set, suppress diagnostics */
++int interactive = 0;		/* if set, we are in interactive mode */
++
++volatile sig_atomic_t mutex = 0;  /* if set, signals set flags */
++volatile sig_atomic_t sighup = 0; /* if set, sighup received while mutex set */
++volatile sig_atomic_t sigint = 0; /* if set, sigint received while mutex set */
++
++/* if set, signal handlers are enabled */
++volatile sig_atomic_t sigactive = 0;
++
++int current_addr;		/* current address in editor buffer */
++int addr_last;			/* last address in editor buffer */
++int lineno;			/* script line number */
++static char *prompt;		/* command-line prompt */
++static char *dps = "*";		/* default command-line prompt */
++
++static const char usage[] = "usage: %s [-] [-s] [-p string] [file]\n";
++
++static char *home;		/* home directory */
++
++void
++seterrmsg(char *s)
++{
++	strlcpy(errmsg, s, sizeof(errmsg));
++}
++
++/* ed: line editor */
++int
++main(volatile int argc, char ** volatile argv)
++{
++	int c, n;
++	int status = 0;
++
++	//if (pledge("stdio rpath wpath cpath proc exec tty", NULL) == -1)
++	//	err(1, "pledge");
++
++	home = getenv("HOME");
++
++top:
++	while ((c = getopt(argc, argv, "p:sx")) != -1)
++		switch (c) {
++		case 'p':				/* set prompt */
++			dps = prompt = optarg;
++			break;
++		case 's':				/* run script */
++			scripted = 1;
++			break;
++		case 'x':				/* use crypt */
++			fprintf(stderr, "crypt unavailable\n?\n");
++			break;
++		default:
++			fprintf(stderr, usage, argv[0]);
++			exit(1);
++		}
++	argv += optind;
++	argc -= optind;
++	if (argc && **argv == '-') {
++		scripted = 1;
++		if (argc > 1) {
++			optind = 1;
++			goto top;
++		}
++		argv++;
++		argc--;
++	}
++
++	if (!(interactive = isatty(0))) {
++		struct stat sb;
++
++		/* assert: pipes show up as fifo's when fstat'd */
++		if (fstat(STDIN_FILENO, &sb) || !S_ISFIFO(sb.st_mode)) {
++			if (lseek(STDIN_FILENO, 0, SEEK_CUR)) {
++				interactive = 1;
++				setvbuf(stdout, NULL, _IOLBF, 0);
++			}
++		}
++	}
++
++	/* assert: reliable signals! */
++	if (isatty(STDIN_FILENO)) {
++		handle_winch(SIGWINCH);
++		signal(SIGWINCH, handle_winch);
++	}
++	signal(SIGHUP, signal_hup);
++	//siginterrupt(SIGHUP, 1);
++	signal(SIGQUIT, SIG_IGN);
++	signal(SIGINT, signal_int);
++	if (sigsetjmp(env, 1)) {
++		status = -1;
++		fputs("\n?\n", stdout);
++		seterrmsg("interrupt");
++	} else {
++		init_buffers();
++		sigactive = 1;			/* enable signal handlers */
++		if (argc && **argv) {
++			if (read_file(*argv, 0) < 0 && !interactive)
++				quit(2);
++			else if (**argv != '!')
++				strlcpy(old_filename, *argv,
++				    sizeof old_filename);
++		} else if (argc) {
++			fputs("?\n", stdout);
++			if (**argv == '\0')
++				seterrmsg("invalid filename");
++			if (!interactive)
++				quit(2);
++		}
++	}
++	for (;;) {
++		if (status < 0 && garrulous)
++			fprintf(stderr, "%s\n", errmsg);
++		if (prompt) {
++			fputs(prompt, stdout);
++			fflush(stdout);
++		}
++		if ((n = get_tty_line()) < 0) {
++			status = ERR;
++			continue;
++		} else if (n == 0) {
++			if (modified && !scripted) {
++				fputs("?\n", stdout);
++				seterrmsg("warning: file modified");
++				if (!interactive) {
++					if (garrulous)
++						fprintf(stderr,
++						    "script, line %d: %s\n",
++						    lineno, errmsg);
++					quit(2);
++				}
++				clearerr(stdin);
++				modified = 0;
++				status = EMOD;
++				continue;
++			} else
++				quit(0);
++		} else if (ibuf[n - 1] != '\n') {
++			/* discard line */
++			seterrmsg("unexpected end-of-file");
++			clearerr(stdin);
++			status = ERR;
++			continue;
++		}
++		isglobal = 0;
++		if ((status = extract_addr_range()) >= 0 &&
++		    (status = exec_command()) >= 0)
++			if (!status || (status &&
++			    (status = display_lines(current_addr, current_addr,
++				status)) >= 0))
++				continue;
++		switch (status) {
++		case EOF:
++			quit(0);
++			break;
++		case EMOD:
++			modified = 0;
++			fputs("?\n", stdout);		/* give warning */
++			seterrmsg("warning: file modified");
++			if (!interactive) {
++				if (garrulous)
++					fprintf(stderr,
++					    "script, line %d: %s\n",
++					    lineno, errmsg);
++				quit(2);
++			}
++			break;
++		case FATAL:
++			if (!interactive) {
++				if (garrulous)
++					fprintf(stderr,
++					    "script, line %d: %s\n",
++					    lineno, errmsg);
++			} else if (garrulous)
++				fprintf(stderr, "%s\n", errmsg);
++			quit(3);
++			break;
++		default:
++			fputs("?\n", stdout);
++			if (!interactive) {
++				if (garrulous)
++					fprintf(stderr,
++					    "script, line %d: %s\n",
++					    lineno, errmsg);
++				quit(2);
++			}
++			break;
++		}
++	}
++	/*NOTREACHED*/
++}
++
++int first_addr, second_addr, addr_cnt;
++
++/* extract_addr_range: get line addresses from the command buffer until an
++   illegal address is seen; return status */
++int
++extract_addr_range(void)
++{
++	int addr;
++
++	addr_cnt = 0;
++	first_addr = second_addr = current_addr;
++	while ((addr = next_addr()) >= 0) {
++		addr_cnt++;
++		first_addr = second_addr;
++		second_addr = addr;
++		if (*ibufp != ',' && *ibufp != ';')
++			break;
++		else if (*ibufp++ == ';')
++			current_addr = addr;
++	}
++	if ((addr_cnt = min(addr_cnt, 2)) == 1 || second_addr != addr)
++		first_addr = second_addr;
++	return (addr == ERR) ? ERR : 0;
++}
++
++
++#define	SKIP_BLANKS() \
++	do { \
++		while (isspace((unsigned char)*ibufp) && *ibufp != '\n') \
++			ibufp++; \
++	} while (0)
++
++#define MUST_BE_FIRST() \
++	do { \
++		if (!first) { \
++			seterrmsg("invalid address"); \
++			return ERR; \
++		} \
++	} while (0)
++	
++
++/*  next_addr: return the next line address in the command buffer */
++static int
++next_addr(void)
++{
++	char *hd;
++	int addr = current_addr;
++	int n;
++	int first = 1;
++	int c;
++
++	SKIP_BLANKS();
++	for (hd = ibufp;; first = 0)
++		switch ((c = (unsigned char)*ibufp)) {
++		case '+':
++		case '\t':
++		case ' ':
++		case '-':
++		case '^':
++			ibufp++;
++			SKIP_BLANKS();
++			if (isdigit((unsigned char)*ibufp)) {
++				STRTOI(n, ibufp);
++				addr += (c == '-' || c == '^') ? -n : n;
++			} else if (!isspace(c))
++				addr += (c == '-' || c == '^') ? -1 : 1;
++			break;
++		case '0': case '1': case '2':
++		case '3': case '4': case '5':
++		case '6': case '7': case '8': case '9':
++			MUST_BE_FIRST();
++			STRTOI(addr, ibufp);
++			break;
++		case '.':
++		case '$':
++			MUST_BE_FIRST();
++			ibufp++;
++			addr = (c == '.') ? current_addr : addr_last;
++			break;
++		case '/':
++		case '?':
++			MUST_BE_FIRST();
++			if ((addr = get_matching_node_addr(
++			    get_compiled_pattern(), c == '/')) < 0)
++				return ERR;
++			else if (c == *ibufp)
++				ibufp++;
++			break;
++		case '\'':
++			MUST_BE_FIRST();
++			ibufp++;
++			if ((addr = get_marked_node_addr((unsigned char)*ibufp++)) < 0)
++				return ERR;
++			break;
++		case '%':
++		case ',':
++		case ';':
++			if (first) {
++				ibufp++;
++				addr_cnt++;
++				second_addr = (c == ';') ? current_addr : 1;
++				if ((addr = next_addr()) < 0)
++					addr = addr_last;
++				break;
++			}
++			/* FALLTHROUGH */
++		default:
++			if (ibufp == hd)
++				return EOF;
++			else if (addr < 0 || addr_last < addr) {
++				seterrmsg("invalid address");
++				return ERR;
++			} else
++				return addr;
++		}
++	/* NOTREACHED */
++}
++
++
++/* GET_THIRD_ADDR: get a legal address from the command buffer */
++#define GET_THIRD_ADDR(addr) \
++	do { \
++		int ol1, ol2; \
++		\
++		ol1 = first_addr; \
++		ol2 = second_addr; \
++		if (extract_addr_range() < 0) \
++			return ERR; \
++		else if (addr_cnt == 0) { \
++			seterrmsg("destination expected"); \
++			return ERR; \
++		} else if (second_addr < 0 || addr_last < second_addr) { \
++			seterrmsg("invalid address"); \
++			return ERR; \
++		} \
++		addr = second_addr; \
++		first_addr = ol1; \
++		second_addr = ol2; \
++	} while (0)
++
++
++/* GET_COMMAND_SUFFIX: verify the command suffix in the command buffer */
++#define GET_COMMAND_SUFFIX() \
++	do { \
++		int done = 0; \
++		do { \
++			switch (*ibufp) { \
++			case 'p': \
++				gflag |= GPR; \
++				ibufp++; \
++				break; \
++			case 'l': \
++				gflag |= GLS; \
++				ibufp++; \
++				break; \
++			case 'n': \
++				gflag |= GNP; \
++				ibufp++; \
++				break; \
++			default: \
++				done++; \
++			} \
++		} while (!done); \
++		if (*ibufp++ != '\n') { \
++			seterrmsg("invalid command suffix"); \
++			return ERR; \
++		} \
++	} while (0)
++
++/* sflags */
++#define SGG 001		/* complement previous global substitute suffix */
++#define SGP 002		/* complement previous print suffix */
++#define SGR 004		/* use last regex instead of last pat */
++#define SGF 010		/* repeat last substitution */
++
++int patlock = 0;	/* if set, pattern not freed by get_compiled_pattern() */
++
++volatile sig_atomic_t rows = 22;	/* scroll length: ws_row - 2 */
++volatile sig_atomic_t cols = 72;	/* wrap column */
++
++/* exec_command: execute the next command in command buffer; return print
++   request, if any */
++int
++exec_command(void)
++{
++	extern int u_current_addr;
++	extern int u_addr_last;
++
++	static regex_t *pat = NULL;
++	static int sgflag = 0;
++	static int sgnum = 0;
++
++	regex_t *tpat;
++	char *fnp;
++	int gflag = 0;
++	int sflags = 0;
++	int addr = 0;
++	int n = 0;
++	int c;
++
++	SKIP_BLANKS();
++	switch ((c = (unsigned char)*ibufp++)) {
++	case 'a':
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (append_lines(second_addr) < 0)
++			return ERR;
++		break;
++	case 'c':
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (delete_lines(first_addr, second_addr) < 0 ||
++		    append_lines(current_addr) < 0)
++			return ERR;
++		break;
++	case 'd':
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (delete_lines(first_addr, second_addr) < 0)
++			return ERR;
++		else if ((addr = INC_MOD(current_addr, addr_last)) != 0)
++			current_addr = addr;
++		break;
++	case 'e':
++		if (modified && !scripted)
++			return EMOD;
++		/* FALLTHROUGH */
++	case 'E':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		} else if (!isspace((unsigned char)*ibufp)) {
++			seterrmsg("unexpected command suffix");
++			return ERR;
++		} else if ((fnp = get_filename(1)) == NULL)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (delete_lines(1, addr_last) < 0)
++			return ERR;
++		clear_undo_stack();
++		if (close_sbuf() < 0)
++			return ERR;
++		else if (open_sbuf() < 0)
++			return FATAL;
++		if (read_file(fnp, 0) < 0)
++			return ERR;
++		clear_undo_stack();
++		modified = 0;
++		u_current_addr = u_addr_last = -1;
++		break;
++	case 'f':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		} else if (!isspace((unsigned char)*ibufp)) {
++			seterrmsg("unexpected command suffix");
++			return ERR;
++		} else if ((fnp = get_filename(1)) == NULL)
++			return ERR;
++		else if (*fnp == '!') {
++			seterrmsg("invalid redirection");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		puts(strip_escapes(fnp));
++		break;
++	case 'g':
++	case 'v':
++	case 'G':
++	case 'V':
++		if (isglobal) {
++			seterrmsg("cannot nest global commands");
++			return ERR;
++		} else if (check_addr_range(1, addr_last) < 0)
++			return ERR;
++		else if (build_active_list(c == 'g' || c == 'G') < 0)
++			return ERR;
++		else if ((n = (c == 'G' || c == 'V')))
++			GET_COMMAND_SUFFIX();
++		isglobal++;
++		if (exec_global(n, gflag) < 0)
++			return ERR;
++		break;
++	case 'h':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		if (*errmsg) fprintf(stderr, "%s\n", errmsg);
++		break;
++	case 'H':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		if ((garrulous = 1 - garrulous) && *errmsg)
++			fprintf(stderr, "%s\n", errmsg);
++		break;
++	case 'i':
++		if (second_addr == 0) {
++			second_addr = 1;
++		}
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (append_lines(second_addr - 1) < 0)
++			return ERR;
++		break;
++	case 'j':
++		if (check_addr_range(current_addr, current_addr + 1) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (first_addr != second_addr &&
++		    join_lines(first_addr, second_addr) < 0)
++			return ERR;
++		break;
++	case 'k':
++		c = (unsigned char)*ibufp++;
++		if (second_addr == 0) {
++			seterrmsg("invalid address");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		if (mark_line_node(get_addressed_line_node(second_addr), c) < 0)
++			return ERR;
++		break;
++	case 'l':
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (display_lines(first_addr, second_addr, gflag | GLS) < 0)
++			return ERR;
++		gflag = 0;
++		break;
++	case 'm':
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_THIRD_ADDR(addr);
++		if (first_addr <= addr && addr < second_addr) {
++			seterrmsg("invalid destination");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (move_lines(addr) < 0)
++			return ERR;
++		break;
++	case 'n':
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (display_lines(first_addr, second_addr, gflag | GNP) < 0)
++			return ERR;
++		gflag = 0;
++		break;
++	case 'p':
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (display_lines(first_addr, second_addr, gflag | GPR) < 0)
++			return ERR;
++		gflag = 0;
++		break;
++	case 'P':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		prompt = prompt ? NULL : optarg ? optarg : dps;
++		break;
++	case 'q':
++	case 'Q':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		gflag =  (modified && !scripted && c == 'q') ? EMOD : EOF;
++		break;
++	case 'r':
++		if (!isspace((unsigned char)*ibufp)) {
++			seterrmsg("unexpected command suffix");
++			return ERR;
++		} else if (addr_cnt == 0)
++			second_addr = addr_last;
++		if ((fnp = get_filename(0)) == NULL)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if ((addr = read_file(fnp, second_addr)) < 0)
++			return ERR;
++		else if (addr)
++			modified = 1;
++		break;
++	case 's':
++		do {
++			switch (*ibufp) {
++			case '\n':
++				sflags |=SGF;
++				break;
++			case 'g':
++				sflags |= SGG;
++				ibufp++;
++				break;
++			case 'p':
++				sflags |= SGP;
++				ibufp++;
++				break;
++			case 'r':
++				sflags |= SGR;
++				ibufp++;
++				break;
++			case '0': case '1': case '2': case '3': case '4':
++			case '5': case '6': case '7': case '8': case '9':
++				STRTOI(sgnum, ibufp);
++				sflags |= SGF;
++				sgflag &= ~GSG;		/* override GSG */
++				break;
++			default:
++				if (sflags) {
++					seterrmsg("invalid command suffix");
++					return ERR;
++				}
++			}
++		} while (sflags && *ibufp != '\n');
++		if (sflags && !pat) {
++			seterrmsg("no previous substitution");
++			return ERR;
++		} else if (sflags & SGG)
++			sgnum = 0;		/* override numeric arg */
++		if (*ibufp != '\n' && *(ibufp + 1) == '\n') {
++			seterrmsg("invalid pattern delimiter");
++			return ERR;
++		}
++		tpat = pat;
++		SPL1();
++		if ((!sflags || (sflags & SGR)) &&
++		    (tpat = get_compiled_pattern()) == NULL) {
++		 	SPL0();
++			return ERR;
++		} else if (tpat != pat) {
++			if (pat) {
++				regfree(pat);
++				free(pat);
++			}
++			pat = tpat;
++			patlock = 1;		/* reserve pattern */
++		}
++		SPL0();
++		if (!sflags && extract_subst_tail(&sgflag, &sgnum) < 0)
++			return ERR;
++		else if (isglobal)
++			sgflag |= GLB;
++		else
++			sgflag &= ~GLB;
++		if (sflags & SGG)
++			sgflag ^= GSG;
++		if (sflags & SGP) {
++			sgflag ^= GPR;
++			sgflag &= ~(GLS | GNP);
++		}
++		do {
++			switch (*ibufp) {
++			case 'p':
++				sgflag |= GPR;
++				ibufp++;
++				break;
++			case 'l':
++				sgflag |= GLS;
++				ibufp++;
++				break;
++			case 'n':
++				sgflag |= GNP;
++				ibufp++;
++				break;
++			default:
++				n++;
++			}
++		} while (!n);
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (search_and_replace(pat, sgflag, sgnum) < 0)
++			return ERR;
++		break;
++	case 't':
++		if (check_addr_range(current_addr, current_addr) < 0)
++			return ERR;
++		GET_THIRD_ADDR(addr);
++		GET_COMMAND_SUFFIX();
++		if (!isglobal) clear_undo_stack();
++		if (copy_lines(addr) < 0)
++			return ERR;
++		break;
++	case 'u':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		if (pop_undo_stack() < 0)
++			return ERR;
++		break;
++	case 'w':
++	case 'W':
++		if ((n = *ibufp) == 'q' || n == 'Q') {
++			gflag = EOF;
++			ibufp++;
++		}
++		if (!isspace((unsigned char)*ibufp)) {
++			seterrmsg("unexpected command suffix");
++			return ERR;
++		} else if ((fnp = get_filename(0)) == NULL)
++			return ERR;
++		if (addr_cnt == 0 && !addr_last)
++			first_addr = second_addr = 0;
++		else if (check_addr_range(1, addr_last) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if ((addr = write_file(fnp, (c == 'W') ? "a" : "w",
++		    first_addr, second_addr)) < 0)
++			return ERR;
++		else if (addr == addr_last && *fnp != '!')
++			modified = 0;
++		else if (modified && !scripted && n == 'q')
++			gflag = EMOD;
++		break;
++	case 'x':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		}
++		GET_COMMAND_SUFFIX();
++		seterrmsg("crypt unavailable");
++		return ERR;
++	case 'z':
++		first_addr = 1;
++		if (check_addr_range(first_addr, current_addr + 1) < 0)
++			return ERR;
++		else if ('0' < *ibufp && *ibufp <= '9')
++			STRTOI(rows, ibufp);
++		GET_COMMAND_SUFFIX();
++		if (display_lines(second_addr, min(addr_last,
++		    second_addr + rows), gflag) < 0)
++			return ERR;
++		gflag = 0;
++		break;
++	case '=':
++		GET_COMMAND_SUFFIX();
++		printf("%d\n", addr_cnt ? second_addr : addr_last);
++		break;
++	case '!':
++		if (addr_cnt > 0) {
++			seterrmsg("unexpected address");
++			return ERR;
++		} else if ((sflags = get_shell_command()) < 0)
++			return ERR;
++		GET_COMMAND_SUFFIX();
++		if (sflags) printf("%s\n", shcmd + 1);
++		fflush(NULL); /* flush any buffered I/O */
++		system(shcmd + 1);
++		if (!scripted) printf("!\n");
++		break;
++	case '\n':
++		first_addr = 1;
++		if (check_addr_range(first_addr, current_addr + 1) < 0
++		 || display_lines(second_addr, second_addr, 0) < 0)
++			return ERR;
++		break;
++	default:
++		seterrmsg("unknown command");
++		return ERR;
++	}
++	return gflag;
++}
++
++
++/* check_addr_range: return status of address range check */
++static int
++check_addr_range(int n, int m)
++{
++	if (addr_cnt == 0) {
++		first_addr = n;
++		second_addr = m;
++	}
++	if (first_addr > second_addr || 1 > first_addr ||
++	    second_addr > addr_last) {
++		seterrmsg("invalid address");
++		return ERR;
++	}
++	return 0;
++}
++
++
++/* get_matching_node_addr: return the address of the next line matching a
++   pattern in a given direction.  wrap around begin/end of editor buffer if
++   necessary */
++static int
++get_matching_node_addr(regex_t *pat, int dir)
++{
++	char *s;
++	int n = current_addr;
++	line_t *lp;
++
++	if (!pat) return ERR;
++	do {
++		if ((n = dir ? INC_MOD(n, addr_last) : DEC_MOD(n, addr_last))) {
++			lp = get_addressed_line_node(n);
++			if ((s = get_sbuf_line(lp)) == NULL)
++				return ERR;
++			if (isbinary)
++				NUL_TO_NEWLINE(s, lp->len);
++			if (!regexec(pat, s, 0, NULL, 0))
++				return n;
++		}
++	} while (n != current_addr);
++	seterrmsg("no match");
++	return  ERR;
++}
++
++
++/* get_filename: return pointer to copy of filename in the command buffer */
++static char *
++get_filename(int save)
++{
++	static char filename[PATH_MAX];
++	char *p;
++	int n;
++
++	if (*ibufp != '\n') {
++		SKIP_BLANKS();
++		if (*ibufp == '\n') {
++			seterrmsg("invalid filename");
++			return NULL;
++		} else if ((ibufp = get_extended_line(&n, 1)) == NULL)
++			return NULL;
++		else if (*ibufp == '!') {
++			ibufp++;
++			if ((n = get_shell_command()) < 0)
++				return NULL;
++			if (n) printf("%s\n", shcmd + 1);
++			return shcmd;
++		} else if (n >= PATH_MAX - 1) {
++			seterrmsg("filename too long");
++			return NULL;
++		}
++	} else {
++		if (*old_filename == '\0') {
++			seterrmsg("no current filename");
++			return  NULL;
++		}
++		return old_filename;
++	}
++
++	p = save ? old_filename : *old_filename ? filename : old_filename;
++	for (n = 0; *ibufp != '\n';)
++		p[n++] = *ibufp++;
++	p[n] = '\0';
++	return p;
++}
++
++
++/* get_shell_command: read a shell command from stdin; return substitution
++   status */
++static int
++get_shell_command(void)
++{
++	static char *buf = NULL;
++	static int n = 0;
++
++	char *s;			/* substitution char pointer */
++	int i = 0;
++	int j = 0;
++
++	if ((s = ibufp = get_extended_line(&j, 1)) == NULL)
++		return ERR;
++	REALLOC(buf, n, j + 1, ERR);
++	buf[i++] = '!';			/* prefix command w/ bang */
++	while (*ibufp != '\n')
++		switch (*ibufp) {
++		default:
++			REALLOC(buf, n, i + 2, ERR);
++			buf[i++] = *ibufp;
++			if (*ibufp++ == '\\')
++				buf[i++] = *ibufp++;
++			break;
++		case '!':
++			if (s != ibufp) {
++				REALLOC(buf, n, i + 1, ERR);
++				buf[i++] = *ibufp++;
++			}
++			else if (shcmd == NULL)
++			{
++				seterrmsg("no previous command");
++				return ERR;
++			} else {
++				REALLOC(buf, n, i + shcmdi, ERR);
++				for (s = shcmd + 1; s < shcmd + shcmdi;)
++					buf[i++] = *s++;
++				s = ibufp++;
++			}
++			break;
++		case '%':
++			if (*old_filename  == '\0') {
++				seterrmsg("no current filename");
++				return ERR;
++			}
++			j = strlen(s = strip_escapes(old_filename));
++			REALLOC(buf, n, i + j, ERR);
++			while (j--)
++				buf[i++] = *s++;
++			s = ibufp++;
++			break;
++		}
++	if (i == 1) {
++		seterrmsg("no command");
++		return ERR;
++	}
++	REALLOC(shcmd, shcmdsz, i + 1, ERR);
++	memcpy(shcmd, buf, i);
++	shcmd[shcmdi = i] = '\0';
++	return *s == '!' || *s == '%';
++}
++
++
++/* append_lines: insert text from stdin to after line n; stop when either a
++   single period is read or EOF; return status */
++static int
++append_lines(int n)
++{
++	int l;
++	char *lp = ibuf;
++	char *eot;
++	undo_t *up = NULL;
++
++	for (current_addr = n;;) {
++		if (!isglobal) {
++			if ((l = get_tty_line()) < 0)
++				return ERR;
++			else if (l == 0 || ibuf[l - 1] != '\n') {
++				clearerr(stdin);
++				return  l ? EOF : 0;
++			}
++			lp = ibuf;
++		} else if (*(lp = ibufp) == '\0')
++			return 0;
++		else {
++			while (*ibufp++ != '\n')
++				;
++			l = ibufp - lp;
++		}
++		if (l == 2 && lp[0] == '.' && lp[1] == '\n') {
++			return 0;
++		}
++		eot = lp + l;
++		SPL1();
++		do {
++			if ((lp = put_sbuf_line(lp)) == NULL) {
++				SPL0();
++				return ERR;
++			} else if (up)
++				up->t = get_addressed_line_node(current_addr);
++			else if ((up = push_undo_stack(UADD, current_addr,
++			    current_addr)) == NULL) {
++				SPL0();
++				return ERR;
++			}
++		} while (lp != eot);
++		modified = 1;
++		SPL0();
++	}
++	/* NOTREACHED */
++}
++
++
++/* join_lines: replace a range of lines with the joined text of those lines */
++static int
++join_lines(int from, int to)
++{
++	static char *buf = NULL;
++	static int n;
++
++	char *s;
++	int size = 0;
++	line_t *bp, *ep;
++
++	ep = get_addressed_line_node(INC_MOD(to, addr_last));
++	bp = get_addressed_line_node(from);
++	for (; bp != ep; bp = bp->q_forw) {
++		if ((s = get_sbuf_line(bp)) == NULL)
++			return ERR;
++		REALLOC(buf, n, size + bp->len, ERR);
++		memcpy(buf + size, s, bp->len);
++		size += bp->len;
++	}
++	REALLOC(buf, n, size + 2, ERR);
++	memcpy(buf + size, "\n", 2);
++	if (delete_lines(from, to) < 0)
++		return ERR;
++	current_addr = from - 1;
++	SPL1();
++	if (put_sbuf_line(buf) == NULL ||
++	    push_undo_stack(UADD, current_addr, current_addr) == NULL) {
++		SPL0();
++		return ERR;
++	}
++	modified = 1;
++	SPL0();
++	return 0;
++}
++
++
++/* move_lines: move a range of lines */
++static int
++move_lines(int addr)
++{
++	line_t *b1, *a1, *b2, *a2;
++	int n = INC_MOD(second_addr, addr_last);
++	int p = first_addr - 1;
++	int done = (addr == first_addr - 1 || addr == second_addr);
++
++	SPL1();
++	if (done) {
++		a2 = get_addressed_line_node(n);
++		b2 = get_addressed_line_node(p);
++		current_addr = second_addr;
++	} else if (push_undo_stack(UMOV, p, n) == NULL ||
++	    push_undo_stack(UMOV, addr, INC_MOD(addr, addr_last)) == NULL) {
++		SPL0();
++		return ERR;
++	} else {
++		a1 = get_addressed_line_node(n);
++		if (addr < first_addr) {
++			b1 = get_addressed_line_node(p);
++			b2 = get_addressed_line_node(addr);
++					/* this get_addressed_line_node last! */
++		} else {
++			b2 = get_addressed_line_node(addr);
++			b1 = get_addressed_line_node(p);
++					/* this get_addressed_line_node last! */
++		}
++		a2 = b2->q_forw;
++		REQUE(b2, b1->q_forw);
++		REQUE(a1->q_back, a2);
++		REQUE(b1, a1);
++		current_addr = addr + ((addr < first_addr) ?
++		    second_addr - first_addr + 1 : 0);
++	}
++	if (isglobal)
++		unset_active_nodes(b2->q_forw, a2);
++	modified = 1;
++	SPL0();
++	return 0;
++}
++
++
++/* copy_lines: copy a range of lines; return status */
++static int
++copy_lines(int addr)
++{
++	line_t *lp, *np = get_addressed_line_node(first_addr);
++	undo_t *up = NULL;
++	int n = second_addr - first_addr + 1;
++	int m = 0;
++
++	current_addr = addr;
++	if (first_addr <= addr && addr < second_addr) {
++		n =  addr - first_addr + 1;
++		m = second_addr - addr;
++	}
++	for (; n > 0; n=m, m=0, np = get_addressed_line_node(current_addr + 1))
++		for (; n-- > 0; np = np->q_forw) {
++			SPL1();
++			if ((lp = dup_line_node(np)) == NULL) {
++				SPL0();
++				return ERR;
++			}
++			add_line_node(lp);
++			if (up)
++				up->t = lp;
++			else if ((up = push_undo_stack(UADD, current_addr,
++			    current_addr)) == NULL) {
++				SPL0();
++				return ERR;
++			}
++			modified = 1;
++			SPL0();
++		}
++	return 0;
++}
++
++
++/* delete_lines: delete a range of lines */
++int
++delete_lines(int from, int to)
++{
++	line_t *n, *p;
++
++	SPL1();
++	if (push_undo_stack(UDEL, from, to) == NULL) {
++		SPL0();
++		return ERR;
++	}
++	n = get_addressed_line_node(INC_MOD(to, addr_last));
++	p = get_addressed_line_node(from - 1);
++					/* this get_addressed_line_node last! */
++	if (isglobal)
++		unset_active_nodes(p->q_forw, n);
++	REQUE(p, n);
++	addr_last -= to - from + 1;
++	current_addr = from - 1;
++	modified = 1;
++	SPL0();
++	return 0;
++}
++
++
++/* display_lines: print a range of lines to stdout */
++int
++display_lines(int from, int to, int gflag)
++{
++	line_t *bp;
++	line_t *ep;
++	char *s;
++
++	if (!from) {
++		seterrmsg("invalid address");
++		return ERR;
++	}
++	ep = get_addressed_line_node(INC_MOD(to, addr_last));
++	bp = get_addressed_line_node(from);
++	for (; bp != ep; bp = bp->q_forw) {
++		if ((s = get_sbuf_line(bp)) == NULL)
++			return ERR;
++		if (put_tty_line(s, bp->len, current_addr = from++, gflag) < 0)
++			return ERR;
++	}
++	return 0;
++}
++
++
++#define MAXMARK 26			/* max number of marks */
++
++static line_t *mark[MAXMARK];		/* line markers */
++static int markno;			/* line marker count */
++
++/* mark_line_node: set a line node mark */
++static int
++mark_line_node(line_t *lp, int n)
++{
++	if (!islower(n)) {
++		seterrmsg("invalid mark character");
++		return ERR;
++	} else if (mark[n - 'a'] == NULL)
++		markno++;
++	mark[n - 'a'] = lp;
++	return 0;
++}
++
++
++/* get_marked_node_addr: return address of a marked line */
++static int
++get_marked_node_addr(int n)
++{
++	if (!islower(n)) {
++		seterrmsg("invalid mark character");
++		return ERR;
++	}
++	return get_line_node_addr(mark[n - 'a']);
++}
++
++
++/* unmark_line_node: clear line node mark */
++void
++unmark_line_node(line_t *lp)
++{
++	int i;
++
++	for (i = 0; markno && i < MAXMARK; i++)
++		if (mark[i] == lp) {
++			mark[i] = NULL;
++			markno--;
++		}
++}
++
++
++/* dup_line_node: return a pointer to a copy of a line node */
++static line_t *
++dup_line_node(line_t *lp)
++{
++	line_t *np;
++
++	if ((np = malloc(sizeof(line_t))) == NULL) {
++		perror(NULL);
++		seterrmsg("out of memory");
++		return NULL;
++	}
++	np->seek = lp->seek;
++	np->len = lp->len;
++	return np;
++}
++
++
++/* has_trailing_escape:  return the parity of escapes preceding a character
++   in a string */
++int
++has_trailing_escape(char *s, char *t)
++{
++    return (s == t || *(t - 1) != '\\') ? 0 : !has_trailing_escape(s, t - 1);
++}
++
++
++/* strip_escapes: return copy of escaped string of at most length PATH_MAX */
++char *
++strip_escapes(char *s)
++{
++	static char *file = NULL;
++	static int filesz = 0;
++
++	int i = 0;
++
++	REALLOC(file, filesz, PATH_MAX, NULL);
++	/* assert: no trailing escape */
++	while ((file[i++] = (*s == '\\') ? *++s : *s) != '\0' &&
++	       i < PATH_MAX-1)
++		s++;
++	file[PATH_MAX-1] = '\0';
++	return file;
++}
++
++
++void
++signal_hup(int signo)
++{
++	sighup = 1;
++}
++
++
++void
++signal_int(int signo)
++{
++	if (mutex)
++		sigint = 1;
++	else
++		handle_int(signo);	/* XXX quite unsafe */
++}
++
++
++void
++handle_hup(void)
++{
++	char hup[PATH_MAX];
++
++	signal(SIGHUP, SIG_IGN);
++	sighup = 0;
++	if (addr_last && write_file("ed.hup", "w", 1, addr_last) < 0 &&
++	    home != NULL && home[0] == '/') {
++		if (strlcpy(hup, home, sizeof(hup)) < sizeof(hup) &&
++		    strlcat(hup, "/ed.hup", sizeof(hup)) < sizeof(hup))
++			write_file(hup, "w", 1, addr_last);
++	}
++	exit(2);
++}
++
++
++void
++handle_int(int signo)
++{
++	if (!sigactive)
++		_exit(1);
++	sigint = 0;
++	siglongjmp(env, -1);
++}
++
++
++void
++handle_winch(int signo)
++{
++	int save_errno = errno;
++	struct winsize ws;		/* window size structure */
++
++	if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0) {
++		if (ws.ws_row > 2)
++			rows = ws.ws_row - 2;
++		if (ws.ws_col > 8)
++			cols = ws.ws_col - 8;
++	}
++	errno = save_errno;
++}
+diff -Paur --no-dereference -- ed.upstream/sub.c ed/sub.c
+--- ed.upstream/sub.c
++++ ed/sub.c
+@@ -0,0 +1,268 @@
++/*	$OpenBSD: sub.c,v 1.18 2016/10/11 06:54:05 martijn Exp $	*/
++/*	$NetBSD: sub.c,v 1.4 1995/03/21 09:04:50 cgd Exp $	*/
++
++/* sub.c: This file contains the substitution routines for the ed
++   line editor */
++/*-
++ * Copyright (c) 1993 Andrew Moore, Talke Studio.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <limits.h>
++#include <regex.h>
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "ed.h"
++
++static char *extract_subst_template(void);
++static int substitute_matching_text(regex_t *, line_t *, int, int);
++static int apply_subst_template(char *, regmatch_t *, int, int);
++
++static char *rhbuf;		/* rhs substitution buffer */
++static int rhbufsz;		/* rhs substitution buffer size */
++static int rhbufi;		/* rhs substitution buffer index */
++
++/* extract_subst_tail: extract substitution tail from the command buffer */
++int
++extract_subst_tail(int *flagp, int *np)
++{
++	char delimiter;
++
++	*flagp = *np = 0;
++	if ((delimiter = *ibufp) == '\n') {
++		rhbufi = 0;
++		*flagp = GPR;
++		return 0;
++	} else if (extract_subst_template() == NULL)
++		return  ERR;
++	else if (*ibufp == '\n') {
++		*flagp = GPR;
++		return 0;
++	} else if (*ibufp == delimiter)
++		ibufp++;
++	if ('1' <= *ibufp && *ibufp <= '9') {
++		STRTOI(*np, ibufp);
++		return 0;
++	} else if (*ibufp == 'g') {
++		ibufp++;
++		*flagp = GSG;
++		return 0;
++	}
++	return 0;
++}
++
++
++/* extract_subst_template: return pointer to copy of substitution template
++   in the command buffer */
++static char *
++extract_subst_template(void)
++{
++	int n = 0;
++	int i = 0;
++	char c;
++	char delimiter = *ibufp++;
++
++	if (*ibufp == '%' && *(ibufp + 1) == delimiter) {
++		ibufp++;
++		if (!rhbuf)
++			seterrmsg("no previous substitution");
++		return rhbuf;
++	}
++	while (*ibufp != delimiter) {
++		REALLOC(rhbuf, rhbufsz, i + 2, NULL);
++		if ((c = rhbuf[i++] = *ibufp++) == '\n' && *ibufp == '\0') {
++			i--, ibufp--;
++			break;
++		} else if (c != '\\')
++			;
++		else if ((rhbuf[i++] = *ibufp++) != '\n')
++			;
++		else if (!isglobal) {
++			while ((n = get_tty_line()) == 0 ||
++			    (n > 0 && ibuf[n - 1] != '\n'))
++				clearerr(stdin);
++			if (n < 0)
++				return NULL;
++		}
++	}
++	REALLOC(rhbuf, rhbufsz, i + 1, NULL);
++	rhbuf[rhbufi = i] = '\0';
++	return  rhbuf;
++}
++
++
++static char *rbuf;		/* substitute_matching_text buffer */
++static int rbufsz;		/* substitute_matching_text buffer size */
++
++/* search_and_replace: for each line in a range, change text matching a pattern
++   according to a substitution template; return status  */
++int
++search_and_replace(regex_t *pat, int gflag, int kth)
++{
++	undo_t *up;
++	char *txt;
++	char *eot;
++	int lc;
++	int xa = current_addr;
++	int nsubs = 0;
++	line_t *lp;
++	int len;
++
++	current_addr = first_addr - 1;
++	for (lc = 0; lc <= second_addr - first_addr; lc++) {
++		lp = get_addressed_line_node(++current_addr);
++		if ((len = substitute_matching_text(pat, lp, gflag, kth)) < 0)
++			return ERR;
++		else if (len) {
++			up = NULL;
++			if (delete_lines(current_addr, current_addr) < 0)
++				return ERR;
++			txt = rbuf;
++			eot = rbuf + len;
++			SPL1();
++			do {
++				if ((txt = put_sbuf_line(txt)) == NULL) {
++					SPL0();
++					return ERR;
++				} else if (up)
++					up->t = get_addressed_line_node(current_addr);
++				else if ((up = push_undo_stack(UADD,
++				    current_addr, current_addr)) == NULL) {
++					SPL0();
++					return ERR;
++				}
++			} while (txt != eot);
++			SPL0();
++			nsubs++;
++			xa = current_addr;
++		}
++	}
++	current_addr = xa;
++	if  (nsubs == 0 && !(gflag & GLB)) {
++		seterrmsg("no match");
++		return ERR;
++	} else if ((gflag & (GPR | GLS | GNP)) &&
++	    display_lines(current_addr, current_addr, gflag) < 0)
++		return ERR;
++	return 0;
++}
++
++
++/* substitute_matching_text: replace text matched by a pattern according to
++   a substitution template; return length of rbuf if changed, 0 if unchanged, or
++   ERR on error */
++static int
++substitute_matching_text(regex_t *pat, line_t *lp, int gflag, int kth)
++{
++	int off = 0;
++	int changed = 0;
++	int matchno = 0;
++	int i = 0;
++	int nempty = -1;
++	regmatch_t rm[SE_MAX];
++	char *txt;
++	char *eot, *eom;
++
++	if ((eom = txt = get_sbuf_line(lp)) == NULL)
++		return ERR;
++	if (isbinary)
++		NUL_TO_NEWLINE(txt, lp->len);
++	eot = txt + lp->len;
++	if (!regexec(pat, txt, SE_MAX, rm, 0)) {
++		do {
++/* Don't do a 0-length match directly after a non-0-length */
++			if (rm[0].rm_eo == nempty) {
++				rm[0].rm_so++;
++				rm[0].rm_eo = lp->len;
++				continue;
++			}
++			if (!kth || kth == ++matchno) {
++				changed = 1;
++				i = rm[0].rm_so - (eom - txt);
++				REALLOC(rbuf, rbufsz, off + i, ERR);
++				if (isbinary)
++					NEWLINE_TO_NUL(eom,
++					    rm[0].rm_eo - (eom - txt));
++				memcpy(rbuf + off, eom, i);
++				off += i;
++				if ((off = apply_subst_template(txt, rm, off,
++				    pat->re_nsub)) < 0)
++					return ERR;
++				eom = txt + rm[0].rm_eo;
++				if (kth)
++					break;
++			}
++			if (rm[0].rm_so == rm[0].rm_eo)
++				rm[0].rm_so = rm[0].rm_eo + 1;
++			else
++				nempty = rm[0].rm_so = rm[0].rm_eo;
++			rm[0].rm_eo = lp->len;
++		} while (rm[0].rm_so < lp->len && (gflag & GSG || kth) &&
++		    !regexec(pat, txt, SE_MAX, rm, REG_STARTEND | REG_NOTBOL));
++		i = eot - eom;
++		REALLOC(rbuf, rbufsz, off + i + 2, ERR);
++		if (isbinary)
++			NEWLINE_TO_NUL(eom, i);
++		memcpy(rbuf + off, eom, i);
++		memcpy(rbuf + off + i, "\n", 2);
++	}
++	return changed ? off + i + 1 : 0;
++}
++
++
++/* apply_subst_template: modify text according to a substitution template;
++   return offset to end of modified text */
++static int
++apply_subst_template(char *boln, regmatch_t *rm, int off, int re_nsub)
++{
++	int j = 0;
++	int k = 0;
++	int n;
++	char *sub = rhbuf;
++
++	for (; sub - rhbuf < rhbufi; sub++)
++		if (*sub == '&') {
++			j = rm[0].rm_so;
++			k = rm[0].rm_eo;
++			REALLOC(rbuf, rbufsz, off + k - j, ERR);
++			while (j < k)
++				rbuf[off++] = boln[j++];
++		} else if (*sub == '\\' && '1' <= *++sub && *sub <= '9' &&
++		    (n = *sub - '0') <= re_nsub) {
++			j = rm[n].rm_so;
++			k = rm[n].rm_eo;
++			REALLOC(rbuf, rbufsz, off + k - j, ERR);
++			while (j < k)
++				rbuf[off++] = boln[j++];
++		} else {
++			REALLOC(rbuf, rbufsz, off + 1, ERR);
++			rbuf[off++] = *sub;
++		}
++	REALLOC(rbuf, rbufsz, off + 1, ERR);
++	rbuf[off] = '\0';
++	return off;
++}
+diff -Paur --no-dereference -- ed.upstream/undo.c ed/undo.c
+--- ed.upstream/undo.c
++++ ed/undo.c
+@@ -0,0 +1,146 @@
++/*	$OpenBSD: undo.c,v 1.14 2016/03/22 17:58:28 mmcc Exp $	*/
++/*	$NetBSD: undo.c,v 1.2 1995/03/21 09:04:52 cgd Exp $	*/
++
++/* undo.c: This file contains the undo routines for the ed line editor */
++/*-
++ * Copyright (c) 1993 Andrew Moore, Talke Studio.
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <regex.h>
++#include <signal.h>
++#include <stdio.h>
++#include <stdlib.h>
++
++#include "ed.h"
++
++#define USIZE 100				/* undo stack size */
++static undo_t *ustack = NULL;			/* undo stack */
++static int usize = 0;				/* stack size variable */
++static int u_p = 0;				/* undo stack pointer */
++
++/* push_undo_stack: return pointer to initialized undo node */
++undo_t *
++push_undo_stack(int type, int from, int to)
++{
++	undo_t *t;
++
++	t = ustack;
++	if (u_p < usize ||
++	    (t = reallocarray(ustack, (usize += USIZE), sizeof(undo_t))) != NULL) {
++		ustack = t;
++		ustack[u_p].type = type;
++		ustack[u_p].t = get_addressed_line_node(to);
++		ustack[u_p].h = get_addressed_line_node(from);
++		return ustack + u_p++;
++	}
++	/* out of memory - release undo stack */
++	perror(NULL);
++	seterrmsg("out of memory");
++	clear_undo_stack();
++	free(ustack);
++	ustack = NULL;
++	usize = 0;
++	return NULL;
++}
++
++
++/* USWAP: swap undo nodes */
++#define USWAP(x,y) { \
++	undo_t utmp; \
++	utmp = x, x = y, y = utmp; \
++}
++
++
++int u_current_addr = -1;	/* if >= 0, undo enabled */
++int u_addr_last = -1;		/* if >= 0, undo enabled */
++
++/* pop_undo_stack: undo last change to the editor buffer */
++int
++pop_undo_stack(void)
++{
++	int n;
++	int o_current_addr = current_addr;
++	int o_addr_last = addr_last;
++
++	if (u_current_addr == -1 || u_addr_last == -1) {
++		seterrmsg("nothing to undo");
++		return ERR;
++	} else if (u_p)
++		modified = 1;
++	get_addressed_line_node(0);	/* this get_addressed_line_node last! */
++	SPL1();
++	for (n = u_p; n-- > 0;) {
++		switch(ustack[n].type) {
++		case UADD:
++			REQUE(ustack[n].h->q_back, ustack[n].t->q_forw);
++			break;
++		case UDEL:
++			REQUE(ustack[n].h->q_back, ustack[n].h);
++			REQUE(ustack[n].t, ustack[n].t->q_forw);
++			break;
++		case UMOV:
++		case VMOV:
++			REQUE(ustack[n - 1].h, ustack[n].h->q_forw);
++			REQUE(ustack[n].t->q_back, ustack[n - 1].t);
++			REQUE(ustack[n].h, ustack[n].t);
++			n--;
++			break;
++		default:
++			/*NOTREACHED*/
++			;
++		}
++		ustack[n].type ^= 1;
++	}
++	/* reverse undo stack order */
++	for (n = u_p; n-- > (u_p + 1)/ 2;)
++		USWAP(ustack[n], ustack[u_p - 1 - n]);
++	if (isglobal)
++		clear_active_list();
++	current_addr = u_current_addr, u_current_addr = o_current_addr;
++	addr_last = u_addr_last, u_addr_last = o_addr_last;
++	SPL0();
++	return 0;
++}
++
++
++/* clear_undo_stack: clear the undo stack */
++void
++clear_undo_stack(void)
++{
++	line_t *lp, *ep, *tl;
++
++	while (u_p--)
++		if (ustack[u_p].type == UDEL) {
++			ep = ustack[u_p].t->q_forw;
++			for (lp = ustack[u_p].h; lp != ep; lp = tl) {
++				unmark_line_node(lp);
++				tl = lp->q_forw;
++				free(lp);
++			}
++		}
++	u_p = 0;
++	u_current_addr = current_addr;
++	u_addr_last = addr_last;
++}
+diff -Paur --no-dereference -- ed.upstream/ed.h ed/ed.h
+--- ed.upstream/ed.h
++++ ed/ed.h
+@@ -0,0 +1,199 @@
++/*	$OpenBSD: ed.h,v 1.23 2024/07/16 05:01:10 deraadt Exp $	*/
++/*	$NetBSD: ed.h,v 1.23 1995/03/21 09:04:40 cgd Exp $	*/
++
++/* ed.h: type and constant definitions for the ed editor. */
++/*
++ * Copyright (c) 1993 Andrew Moore
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ *
++ *	@(#)ed.h,v 1.5 1994/02/01 00:34:39 alm Exp
++ */
++
++#include <limits.h>
++#include <regex.h>
++#include <signal.h>
++
++#define ERR		(-2)
++#define EMOD		(-3)
++#define FATAL		(-4)
++
++#define MINBUFSZ 512		/* minimum buffer size - must be > 0 */
++#define SE_MAX 30		/* max subexpressions in a regular expression */
++#define LINECHARS INT_MAX	/* max chars per line */
++
++/* gflags */
++#define GLB 001		/* global command */
++#define GPR 002		/* print after command */
++#define GLS 004		/* list after command */
++#define GNP 010		/* enumerate after command */
++#define GSG 020		/* global substitute */
++
++/* Line node */
++typedef struct	line {
++	struct line	*q_forw;
++	struct line	*q_back;
++	off_t		seek;		/* address of line in scratch buffer */
++	int		len;		/* length of line */
++} line_t;
++
++
++typedef struct undo {
++
++/* type of undo nodes */
++#define UADD	0
++#define UDEL 	1
++#define UMOV	2
++#define VMOV	3
++
++	int type;			/* command type */
++	line_t	*h;			/* head of list */
++	line_t  *t;			/* tail of list */
++} undo_t;
++
++#ifndef max
++# define max(a,b) ((a) > (b) ? (a) : (b))
 +#endif
- 
- 	home = getenv("HOME");
- 
++#ifndef min
++# define min(a,b) ((a) < (b) ? (a) : (b))
++#endif
++
++#define INC_MOD(l, k)	((l) + 1 > (k) ? 0 : (l) + 1)
++#define DEC_MOD(l, k)	((l) - 1 < 0 ? (k) : (l) - 1)
++
++/* SPL1: disable some interrupts (requires reliable signals) */
++#define SPL1() mutex++
++
++/* SPL0: enable all interrupts; check signal flags (requires reliable signals) */
++#define SPL0()						\
++	do {						\
++		if (--mutex == 0) {			\
++			if (sigint)			\
++				handle_int(SIGINT);	\
++		}					\
++	} while (0)
++
++/* STRTOI: convert a string to int */
++#define STRTOI(i, p) { \
++	long l = strtol(p, &p, 10); \
++	if (l <= INT_MIN || l >= INT_MAX) { \
++		seterrmsg("number out of range"); \
++	    	i = 0; \
++		return ERR; \
++	} else \
++		i = (int)l; \
++}
++
++/* REALLOC: assure at least a minimum size for buffer b */
++#define REALLOC(b,n,i,err) \
++if ((i) > (n)) { \
++	int ti = (n); \
++	char *ts; \
++	SPL1(); \
++	if ((ts = realloc((b), ti += max((i), MINBUFSZ))) == NULL) { \
++		perror(NULL); \
++		seterrmsg("out of memory"); \
++		SPL0(); \
++		return err; \
++	} \
++	(n) = ti; \
++	(b) = ts; \
++	SPL0(); \
++}
++
++/* REQUE: link pred before succ */
++#define REQUE(pred, succ) (pred)->q_forw = (succ), (succ)->q_back = (pred)
++
++/* INSQUE: insert elem in circular queue after pred */
++#define INSQUE(elem, pred) \
++{ \
++	REQUE((elem), (pred)->q_forw); \
++	REQUE((pred), elem); \
++}
++
++/* remque: remove_lines elem from circular queue */
++#define REMQUE(elem) REQUE((elem)->q_back, (elem)->q_forw);
++
++/* NUL_TO_NEWLINE: overwrite ASCII NULs with newlines */
++#define NUL_TO_NEWLINE(s, l) translit_text(s, l, '\0', '\n')
++
++/* NEWLINE_TO_NUL: overwrite newlines with ASCII NULs */
++#define NEWLINE_TO_NUL(s, l) translit_text(s, l, '\n', '\0')
++
++/* Local Function Declarations */
++void add_line_node(line_t *);
++int build_active_list(int);
++void clear_active_list(void);
++void clear_undo_stack(void);
++int close_sbuf(void);
++int delete_lines(int, int);
++int display_lines(int, int, int);
++int exec_command(void);
++int exec_global(int, int);
++int extract_addr_range(void);
++int extract_subst_tail(int *, int *);
++line_t *get_addressed_line_node(int);
++regex_t *get_compiled_pattern(void);
++char *get_extended_line(int *, int);
++int get_line_node_addr(line_t *);
++char *get_sbuf_line(line_t *);
++int get_tty_line(void);
++void handle_hup(void);
++void handle_int(int);
++int has_trailing_escape(char *, char *);
++void init_buffers(void);
++int open_sbuf(void);
++int pop_undo_stack(void);
++undo_t *push_undo_stack(int, int, int);
++char *put_sbuf_line(char *);
++int put_tty_line(char *, int, int, int);
++void quit(int);
++int read_file(char *, int);
++int search_and_replace(regex_t *, int, int);
++void seterrmsg(char *);
++char *strip_escapes(char *);
++char *translit_text(char *, int, int, int);
++void unmark_line_node(line_t *);
++void unset_active_nodes(line_t *, line_t *);
++int write_file(char *, char *, int, int);
++
++/* global buffers */
++extern char *ibuf;
++extern char *ibufp;
++extern int ibufsz;
++
++/* global flags */
++extern int isbinary;
++extern int isglobal;
++extern int modified;
++
++extern volatile sig_atomic_t mutex;
++extern volatile sig_atomic_t sighup;
++extern volatile sig_atomic_t sigint;
++
++/* global vars */
++extern int addr_last;
++extern int current_addr;
++extern int first_addr;
++extern int lineno;
++extern int second_addr;
 diff -Paur --no-dereference -- ed.upstream/Makefile ed/Makefile
 --- ed.upstream/Makefile
 +++ ed/Makefile
