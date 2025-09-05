@@ -1,25 +1,25 @@
 diff -Paur --no-dereference -- xz.upstream/configure xz/configure
 --- xz.upstream/configure
 +++ xz/configure
-@@ -17845,7 +17845,7 @@
+@@ -18895,7 +18895,7 @@
  
  
  
 -    use_additional=yes
 +    use_additional=no
  
-   acl_save_prefix="$prefix"
+   acl_saved_prefix="$prefix"
    prefix="$acl_final_prefix"
-@@ -18798,7 +18798,7 @@
+@@ -19932,7 +19932,7 @@
  
  
  
 -    use_additional=yes
 +    use_additional=no
  
-   acl_save_prefix="$prefix"
+   acl_saved_prefix="$prefix"
    prefix="$acl_final_prefix"
-@@ -20750,6 +20750,7 @@
+@@ -22071,6 +22071,7 @@
  
  #if defined(_WIN32) || defined(__CYGWIN__) || defined(__OS2__) \
  		|| defined(__DJGPP__) || defined(__VMS) \
@@ -30,7 +30,7 @@ diff -Paur --no-dereference -- xz.upstream/configure xz/configure
 diff -Paur --no-dereference -- xz.upstream/src/common/tuklib_physmem.c xz/src/common/tuklib_physmem.c
 --- xz.upstream/src/common/tuklib_physmem.c
 +++ xz/src/common/tuklib_physmem.c
-@@ -70,6 +70,11 @@
+@@ -69,6 +69,11 @@
  // This sysinfo() is Linux-specific.
  #elif defined(TUKLIB_PHYSMEM_SYSINFO)
  #	include <sys/sysinfo.h>
@@ -42,7 +42,7 @@ diff -Paur --no-dereference -- xz.upstream/src/common/tuklib_physmem.c xz/src/co
  #endif
  
  
-@@ -228,6 +233,10 @@
+@@ -218,6 +223,10 @@
  	struct sysinfo si;
  	if (sysinfo(&si) == 0)
  		ret = (uint64_t)si.totalram * si.mem_unit;
