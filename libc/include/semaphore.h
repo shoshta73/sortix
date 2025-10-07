@@ -22,7 +22,15 @@
 
 #include <sys/cdefs.h>
 
-#include <time.h>
+#include <sys/__/types.h>
+
+#include <sortix/fcntl.h>
+#include <sortix/timespec.h>
+
+#ifndef __clockid_t_defined
+#define __clockid_t_defined
+typedef __clockid_t clockid_t;
+#endif
 
 #ifdef __cplusplus
 extern "C" {

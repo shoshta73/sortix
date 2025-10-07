@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2021, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,6 +18,7 @@
  */
 
 #include <semaphore.h>
+#include <time.h>
 
 int sem_timedwait(sem_t* restrict sem, const struct timespec* restrict abstime)
 {
