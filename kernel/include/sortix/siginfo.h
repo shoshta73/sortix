@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -86,7 +86,7 @@ typedef struct
 #define SI_QUEUE 32
 #define SI_TIMER 33
 #define SI_ASYNCIO 34
-#define SI_MSGQ 35
+#define SI_MESGQ 35
 
 #ifdef __cplusplus
 } /* extern "C" */
