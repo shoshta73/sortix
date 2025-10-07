@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,7 +65,7 @@
 		#define _POSIX_C_SOURCE 202405L
 	#endif
 	#if !defined(_XOPEN_SOURCE)
-		#define _XOPEN_SOURCE 700
+		#define _XOPEN_SOURCE 800
 	#endif
 	#if !defined(_SORTIX_SOURCE)
 		#define _SORTIX_SOURCE 1
@@ -137,7 +137,9 @@
 
 /* Determine which revision of XSI is used. */
 #if defined(_XOPEN_SOURCE)
-	#if 700 <= _XOPEN_SOURCE - 0
+	#if 800 <= _XOPEN_SOURCE - 0
+		#define __USE_XOPEN 800
+	#elif 700 <= _XOPEN_SOURCE - 0
 		#define __USE_XOPEN 700
 	#elif 600 <= _XOPEN_SOURCE - 0
 		#define __USE_XOPEN 600

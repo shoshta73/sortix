@@ -6,7 +6,7 @@ if [ "$#" = 0 ]; then
   set i686-sortix x86_64-sortix
 fi
 for target; do
-  for feature in "" "-D_POSIX_C_SOURCE=202405L" "-D_XOPEN_SOURCE=800" "-D_SORTIX_SOURCE"; do
+  for feature in "" "-D_POSIX_C_SOURCE=200112L" "-D_POSIX_C_SOURCE=200809L" "-D_POSIX_C_SOURCE=202405L" "-D_XOPEN_SOURCE=600" "-D_XOPEN_SOURCE=700" "-D_XOPEN_SOURCE=800" "-D_SORTIX_SOURCE"; do
     for std in \
       "-ansi -pedantic-errors" \
       "-std=c89 -pedantic-errors" \

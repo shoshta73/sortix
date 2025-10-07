@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,7 +39,7 @@
 extern "C" {
 #endif
 
-#if __USE_SORTIX || 2008 <= __USE_POSIX
+#if __USE_SORTIX || 200112L <= __USE_POSIX
 #ifndef __off_t_defined
 #define __off_t_defined
 typedef __off_t off_t;
@@ -69,7 +69,7 @@ typedef __ssize_t ssize_t;
 typedef struct __FILE FILE;
 #endif
 
-#if __USE_SORTIX || 2008 <= __USE_POSIX
+#if __USE_SORTIX || 200809L <= __USE_POSIX
 typedef off_t fpos_t;
 #else
 typedef __off_t fpos_t;
@@ -240,10 +240,16 @@ int vdprintf(int fildes, const char* __restrict format, __gnuc_va_list ap)
 	__attribute__((__format__ (printf, 2, 0)));
 #endif
 
-/* Functions copied from elsewhere. */
-#if __USE_SORTIX
+/* Functions from POSIX 2024. */
+#if __USE_SORTIX || 202405L <= __USE_POSIX
 int asprintf(char** __restrict, const char* __restrict, ...)
 	__attribute__((__format__ (printf, 2, 3)));
+int vasprintf(char** __restrict, const char* __restrict, __gnuc_va_list)
+	__attribute__((__format__ (printf, 2, 0)));
+#endif
+
+/* Functions copied from elsewhere. */
+#if __USE_SORTIX
 void clearerr_unlocked(FILE* stream);
 int feof_unlocked(FILE* stream);
 int ferror_unlocked(FILE* stream);
@@ -255,8 +261,6 @@ int fputc_unlocked(int c, FILE* stream);
 int fputs_unlocked(const char* __restrict, FILE* __restrict stream);
 size_t fread_unlocked(void* __restrict ptr, size_t size, size_t nitems, FILE* __restrict stream);
 size_t fwrite_unlocked(const void* __restrict ptr, size_t size, size_t nitems, FILE* __restrict stream);
-int vasprintf(char** __restrict, const char* __restrict, __gnuc_va_list)
-	__attribute__((__format__ (printf, 2, 0)));
 #endif
 
 /* Functions that are Sortix extensions. */

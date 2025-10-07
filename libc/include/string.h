@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2017, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2017, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -37,7 +37,7 @@
 #include <stddef.h>
 #endif
 
-#if __USE_SORTIX || 2008 <= __USE_POSIX
+#if __USE_SORTIX || 200809L <= __USE_POSIX
 #ifndef __locale_t_defined
 #define __locale_t_defined
 /* TODO: figure out what this does and typedef it properly. This is just a
@@ -93,7 +93,6 @@ char* strdup(const char*);
 
 /* Functions from POSIX 2001. */
 #if __USE_SORTIX || 200112L <= __USE_POSIX
-char* strerror_l(int, locale_t);
 int strerror_r(int, char*, size_t);
 char* strtok_r(char* __restrict, const char* __restrict, char** __restrict);
 #endif
@@ -103,6 +102,7 @@ char* strtok_r(char* __restrict, const char* __restrict, char** __restrict);
 char* stpcpy(char* __restrict, const char* __restrict);
 char* stpncpy(char* __restrict, const char* __restrict, size_t);
 int strcoll_l(const char*, const char*, locale_t);
+char* strerror_l(int, locale_t);
 char* strndup(const char*, size_t);
 size_t strnlen(const char*, size_t);
 char* strsignal(int signum);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2018, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,7 +42,7 @@ typedef __ino_t ino_t;
 #include <stddef.h>
 #endif
 
-#if __USE_SORTIX
+#if __USE_SORTIX || 202405L <= __USE_POSIX
 #define DT_UNKNOWN __DT_UNKNOWN
 #define DT_BLK __DT_BLK
 #define DT_CHR __DT_CHR

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2015, 2018, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -48,7 +48,7 @@ void rewinddir(DIR*);
 #endif
 
 /* Functions from POSIX 1995. */
-#if 199506L <= __USE_POSIX
+#if 199506L <= __USE_POSIX && __USE_POSIX < 200809L
 /* readdir_r will not be implemented. */
 #endif
 

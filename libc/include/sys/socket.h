@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016, 2017, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -132,6 +132,8 @@ struct linger
 #if __USE_SORTIX
 #define SO_BINDTOINDEX 17
 #define SO_BINDTODEVICE 18
+#endif
+#if __USE_SORTIX || 202405L <= __USE_POSIX
 #define SO_DOMAIN 19
 #define SO_PROTOCOL 20
 #endif

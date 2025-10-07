@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -159,7 +159,10 @@ typedef __uint_fast16_t uint_fast16_t;
 typedef __uint_fast32_t uint_fast32_t;
 typedef __uint_fast64_t uint_fast64_t;
 
+#ifndef __intptr_t_defined
+#define __intptr_t_defined
 typedef __intptr_t intptr_t;
+#endif
 typedef __uintptr_t uintptr_t;
 
 typedef __intmax_t intmax_t;
