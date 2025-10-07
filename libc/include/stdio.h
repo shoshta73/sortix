@@ -76,7 +76,7 @@ typedef __off_t fpos_t;
 #endif
 
 #if __USE_SORTIX || __USE_POSIX
-/* TODO: Implement L_ctermid */
+#define L_ctermid (5 /*/dev/*/ + 32 /*TTY_NAME_MAX*/ + 1)
 /* L_tmpnam will not be implemented. */
 #endif
 
@@ -207,8 +207,8 @@ int putchar_unlocked(int c);
 /* tmpnam will not be implemented. */
 #endif
 
-#if __USE_POSIX
-/* TODO: ctermid */
+#if __USE_SORTIX || __USE_POSIX
+char* ctermid(char*);
 #endif
 
 #if __USE_XOPEN

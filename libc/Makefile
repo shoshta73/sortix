@@ -543,6 +543,7 @@ signal/signal.o \
 signal/sigpending.o \
 signal/sigprocmask.o \
 signal/sigsuspend.o \
+stdio/ctermid.o \
 stdio/fdio_close.o \
 stdio/fdio_install_fd.o \
 stdio/fdio_install_path.o \
