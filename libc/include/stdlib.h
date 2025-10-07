@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,9 @@
 #include <stdint.h>
 #endif
 
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+#include <sortix/fcntl.h>
+#endif
 #include <sortix/wait.h>
 
 #define EXIT_SUCCESS (0)
