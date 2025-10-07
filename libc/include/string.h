@@ -101,8 +101,10 @@ char* strtok_r(char* __restrict, const char* __restrict, char** __restrict);
 #if __USE_SORTIX || 200809L <= __USE_POSIX
 char* stpcpy(char* __restrict, const char* __restrict);
 char* stpncpy(char* __restrict, const char* __restrict, size_t);
+int strcasecmp_l(const char*, const char*, locale_t);
 int strcoll_l(const char*, const char*, locale_t);
 char* strerror_l(int, locale_t);
+int strncasecmp_l(const char*, const char*, size_t, locale_t);
 char* strndup(const char*, size_t);
 size_t strnlen(const char*, size_t);
 char* strsignal(int signum);
@@ -125,10 +127,8 @@ int ffsll(long long int);
 void explicit_bzero(void*, size_t);
 
 void* memrchr(const void*, int, size_t);
-/* TODO: strcasecmp_l */
 char* strchrnul(const char* str, int c);
 char* stresep(char**, const char*, int);
-/* TODO: strncasecmp_l */
 char* strsep(char**, const char*);
 int strverscmp(const char*, const char*);
 int timingsafe_memcmp(const void*, const void*, size_t);

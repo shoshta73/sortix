@@ -599,6 +599,8 @@ stdlib/setenv.o \
 stdlib/system.o \
 stdlib/unlockpt.o \
 stdlib/unsetenv.o \
+string/strcasecmp_l.o \
+string/strncasecmp_l.o \
 sys/display/dispmsg_issue.o \
 sys/dnsconfig/getdnsconfig.o \
 sys/dnsconfig/setdnsconfig.o \
