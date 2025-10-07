@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,17 @@
 #define _INCLUDE_SCHED_H
 
 #include <sys/cdefs.h>
+
+#include <sortix/timespec.h>
+
+struct sched_param
+{
+	int sched_priority;
+	int sched_ss_low_priority;
+	struct timespec sched_ss_repl_period;
+	struct timespec sched_ss_init_budget;
+	int sched_ss_max_repl;
+};
 
 #ifdef __cplusplus
 extern "C" {
