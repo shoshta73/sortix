@@ -396,6 +396,7 @@ ioleast/writeall.o \
 ioleast/writeleast.o \
 langinfo/nl_langinfo_l.o \
 langinfo/nl_langinfo.o \
+locale/getlocalename_l.o \
 locale/localeconv.o \
 locale/setlocale.o \
 memusage/memusage.o \
