@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -263,7 +263,7 @@ int pthread_mutexattr_destroy(pthread_mutexattr_t*);
 /* TODO: pthread_mutexattr_getprotocol */
 /* TODO: pthread_mutexattr_getpshared */
 /* TODO: pthread_mutexattr_getrobust */
-int pthread_mutexattr_gettype(pthread_mutexattr_t* __restrict, int* __restrict);
+int pthread_mutexattr_gettype(const pthread_mutexattr_t* __restrict, int* __restrict);
 int pthread_mutexattr_init(pthread_mutexattr_t*);
 /* TODO: pthread_mutexattr_setprioceiling */
 /* TODO: pthread_mutexattr_setprotocol */
