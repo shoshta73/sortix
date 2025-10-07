@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,9 +20,9 @@
 #include <sys/mman.h>
 #include <sys/syscall.h>
 
-DEFN_SYSCALL3(int, sys_mprotect, SYSCALL_MPROTECT, const void*, size_t, int);
+DEFN_SYSCALL3(int, sys_mprotect, SYSCALL_MPROTECT, void*, size_t, int);
 
-int mprotect(const void* addr, size_t size, int prot)
+int mprotect(void* addr, size_t size, int prot)
 {
 	return sys_mprotect(addr, size, prot);
 }

@@ -123,7 +123,7 @@ int sys_mkdirat(int, const char*, mode_t);
 int sys_mkpartition(int, off_t, off_t, int);
 int sys_mkpty(int*, int*, int);
 void* sys_mmap_wrapper(struct mmap_request*);
-int sys_mprotect(const void*, size_t, int);
+int sys_mprotect(void*, size_t, int);
 int sys_munmap(void*, size_t);
 int sys_openat(int, const char*, int, mode_t);
 long sys_pathconfat(int, const char*, int, int);

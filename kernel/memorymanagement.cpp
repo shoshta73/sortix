@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2015, 2022, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2013, 2015, 2022-2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -439,7 +439,7 @@ void* sys_mmap(void* addr_ptr, size_t size, int prot, int flags, int fd,
 	return (void*) new_segment.addr;
 }
 
-int sys_mprotect(const void* addr_ptr, size_t size, int prot)
+int sys_mprotect(void* addr_ptr, size_t size, int prot)
 {
 	// Verify that that the address is suitable aligned.
 	uintptr_t addr = (uintptr_t) addr_ptr;

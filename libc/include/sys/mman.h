@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -47,7 +47,7 @@ typedef __off_t off_t;
 #endif
 
 void* mmap(void*, size_t, int, int, int, off_t);
-int mprotect(const void*, size_t, int);
+int mprotect(void*, size_t, int);
 int munmap(void*, size_t);
 
 #ifdef __cplusplus
