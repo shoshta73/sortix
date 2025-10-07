@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,9 +24,7 @@
 
 #include <__/endian.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <stdint.h>
 
 /* Constans for each kind of known endian. */
 #define LITTLE_ENDIAN __LITTLE_ENDIAN
@@ -54,12 +52,8 @@ extern "C" {
 #define be64toh(x) __be64toh(x)
 #define le64toh(x) __le64toh(x)
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
-
 /* Sortix specific extensions only available in C++. */
-#if defined(__cplusplus)
+#if defined(__cplusplus) && __USE_SORTIX
 
 /* Create big-endian versions of the stdint.h exact size data types. */
 typedef __big_uint8_t big_uint8_t;
