@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,5 +21,6 @@
 
 int pthread_rwlockattr_destroy(pthread_rwlockattr_t* attr)
 {
+	(void) attr;
 	return 0;
 }

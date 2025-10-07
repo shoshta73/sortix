@@ -466,6 +466,8 @@ pthread/pthread_mutex_timedlock.o \
 pthread/pthread_mutex_trylock.o \
 pthread/pthread_mutex_unlock.o \
 pthread/pthread_once.o \
+pthread/pthread_rwlockattr_init.o \
+pthread/pthread_rwlockattr_destroy.o \
 pthread/pthread_rwlock_clockrdlock.o \
 pthread/pthread_rwlock_clockwrlock.o \
 pthread/pthread_rwlock_destroy.o \
