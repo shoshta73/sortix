@@ -70,8 +70,7 @@ wint_t towlower(wint_t);
 wint_t towupper(wint_t);
 wctype_t wctype(const char *);
 
-/* TODO: These are not implemented in sortix libc yet. */
-#if 0
+#if __USE_SORTIX || 200809L <= __USE_POSIX
 int iswalnum_l(wint_t, locale_t);
 int iswalpha_l(wint_t, locale_t);
 int iswblank_l(wint_t, locale_t);
@@ -85,13 +84,17 @@ int iswpunct_l(wint_t, locale_t);
 int iswspace_l(wint_t, locale_t);
 int iswupper_l(wint_t, locale_t);
 int iswxdigit_l(wint_t, locale_t);
-wint_t towctrans(wint_t, wctrans_t);
-wint_t towctrans_l(wint_t, wctrans_t, locale_t);
 wint_t towlower_l(wint_t, locale_t);
 wint_t towupper_l(wint_t, locale_t);
+wctype_t wctype_l(const char *, locale_t);
+#endif
+
+/* TODO: These are not implemented in sortix libc yet. */
+#if 0
+wint_t towctrans(wint_t, wctrans_t);
+wint_t towctrans_l(wint_t, wctrans_t, locale_t);
 wctrans_t wctrans(const char *);
 wctrans_t wctrans_l(const char *, locale_t);
-wctype_t wctype_l(const char *, locale_t);
 #endif
 
 #ifdef __cplusplus

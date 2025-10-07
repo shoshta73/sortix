@@ -34,36 +34,40 @@ typedef int __locale_t;
 typedef __locale_t locale_t;
 #endif
 
-int isalnum(int c);
-/* TODO: isalnum_l */
-int isalpha(int c);
-/* TODO: isalpha_l */
-int isascii(int c);
-/* TODO: isascii_l */
-int isblank(int c);
-/* TODO: isblank_l */
-int iscntrl(int c);
-/* TODO: iscntrl_l */
-int isdigit(int c);
-/* TODO: isdigit_l */
-int isgraph(int c);
-/* TODO: isgraph_l */
-int islower(int c);
-/* TODO: islower_l */
-int isprint(int c);
-/* TODO: isprint_l */
-int ispunct(int c);
-/* TODO: ispunct_l */
-int isspace(int c);
-/* TODO: isspace_l */
-int isupper(int c);
-/* TODO: isupper_l */
-int isxdigit(int c);
-/* TODO: isxdigit_l */
-int tolower(int c);
-/* TODO: tolower_l */
-int toupper(int c);
-/* TODO: toupper_l */
+int isalnum(int);
+int isalpha(int);
+#if __USE_SORTIX || __USE_POSIX <= 200809L
+int isascii(int);
+#endif
+int isblank(int);
+int iscntrl(int);
+int isdigit(int);
+int isgraph(int);
+int islower(int);
+int isprint(int);
+int ispunct(int);
+int isspace(int);
+int isupper(int);
+int isxdigit(int);
+int tolower(int);
+int toupper(int);
+
+#if __USE_SORTIX || 200809L <= __USE_POSIX
+int isalnum_l(int, locale_t);
+int isalpha_l(int, locale_t);
+int isblank_l(int, locale_t);
+int iscntrl_l(int, locale_t);
+int isdigit_l(int, locale_t);
+int isgraph_l(int, locale_t);
+int islower_l(int, locale_t);
+int isprint_l(int, locale_t);
+int ispunct_l(int, locale_t);
+int isspace_l(int, locale_t);
+int isupper_l(int, locale_t);
+int isxdigit_l(int, locale_t);
+int tolower_l(int, locale_t);
+int toupper_l(int, locale_t);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

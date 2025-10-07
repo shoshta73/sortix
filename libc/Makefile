@@ -335,6 +335,20 @@ blf/blowfish.o \
 $(CPUDIR)/fork.o \
 $(CPUDIR)/setjmp.o \
 $(CPUDIR)/syscall.o \
+ctype/isalnum_l.o \
+ctype/isalpha_l.o \
+ctype/isblank_l.o \
+ctype/iscntrl_l.o \
+ctype/isdigit_l.o \
+ctype/isgraph_l.o \
+ctype/islower_l.o \
+ctype/isprint_l.o \
+ctype/ispunct_l.o \
+ctype/isspace_l.o \
+ctype/isupper_l.o \
+ctype/isxdigit_l.o \
+ctype/tolower_l.o \
+ctype/toupper_l.o \
 dirent/closedir.o \
 dirent/dscandir_r.o \
 dirent/fdopendir.o \
@@ -783,6 +797,22 @@ unistd/unlink.o \
 unistd/usleep.o \
 unistd/write.o \
 utime/utime.o \
+wctype/iswalnum_l.o \
+wctype/iswalpha_l.o \
+wctype/iswblank_l.o \
+wctype/iswcntrl_l.o \
+wctype/iswctype_l.o \
+wctype/iswdigit_l.o \
+wctype/iswgraph_l.o \
+wctype/iswlower_l.o \
+wctype/iswprint_l.o \
+wctype/iswpunct_l.o \
+wctype/iswspace_l.o \
+wctype/iswupper_l.o \
+wctype/iswxdigit_l.o \
+wctype/towlower_l.o \
+wctype/towupper_l.o \
+wctype/wctype_l.o \
 
 OBJS=\
 $(FREEOBJS) \
