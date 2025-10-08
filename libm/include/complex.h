@@ -18,6 +18,18 @@
 #define _Complex_I 1.0fi
 #define I _Complex_I
 
+#if __USE_SORTIX || 202405L <= __USE_POSIX || 2011 <= __USE_C
+#ifdef _Imaginary_I
+#define CMPLX(x, y) ((double complex)((double)(x) + _Imaginary_I * (double)(y)))
+#define CMPLXF(x, y) ((float complex)((float)(x) + _Imaginary_I * (float)(y)))
+#define CMPLXL(x, y) ((long double complex)((long double)(x) + _Imaginary_I * (long double)(y)))
+#else
+#define CMPLX(x, y) (__builtin_complex((double)(x), (double)(y)))
+#define CMPLXF(x, y) (__builtin_complex((float)(x), (float)(y)))
+#define CMPLXL(x, y) (__builtin_complex((long double)(x), (long double)(y)))
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
