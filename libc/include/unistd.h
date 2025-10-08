@@ -413,7 +413,7 @@ gid_t getgid(void);
 /* TODO: int getgroups(int, gid_t []); */
 char* getlogin(void);
 pid_t getpgid(pid_t);
-/* TODO: pid_t getpgrp(void); */
+pid_t getpgrp(void);
 pid_t getpid(void);
 pid_t getppid(void);
 uid_t getuid(void);

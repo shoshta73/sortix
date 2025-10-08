@@ -753,6 +753,7 @@ unistd/getlogin.o \
 unistd/getlogin_r.o \
 unistd/getpagesize.o \
 unistd/getpgid.o \
+unistd/getpgrp.o \
 unistd/getpid.o \
 unistd/getppid.o \
 unistd/getsid.o \
