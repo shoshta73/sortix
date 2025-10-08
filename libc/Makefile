@@ -799,6 +799,10 @@ unistd/unlink.o \
 unistd/usleep.o \
 unistd/write.o \
 utime/utime.o \
+wchar/wcscasecmp_l.o \
+wchar/wcscoll_l.o \
+wchar/wcsncasecmp_l.o \
+wchar/wcsxfrm_l.o \
 wctype/iswalnum_l.o \
 wctype/iswalpha_l.o \
 wctype/iswblank_l.o \
