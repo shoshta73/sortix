@@ -711,6 +711,7 @@ time/timer_delete.o \
 time/timer_getoverrun.o \
 time/timer_gettime.o \
 time/timer_settime.o \
+time/timespec_get.o \
 time/tzset.o \
 unistd/access.o \
 unistd/alarmns.o \

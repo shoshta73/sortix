@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,10 +23,6 @@
 #include <sys/cdefs.h>
 
 #include <sys/__/types.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #ifndef __clock_t_defined
 #define __clock_t_defined
@@ -79,16 +75,10 @@ struct tm
 	int tm_isdst;
 };
 
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 #include <sortix/timespec.h>
 #include <sortix/itimerspec.h>
 #if __USE_SORTIX
 #include <sortix/tmns.h>
-#endif
-#ifdef __cplusplus
-extern "C" {
 #endif
 
 #ifndef NULL
@@ -97,12 +87,13 @@ extern "C" {
 #endif
 
 #define CLOCKS_PER_SEC 1000000l
-
-#ifdef __cplusplus
-} /* extern "C" */
+#if __USE__SORTIX || 202405L <= __USE_POSIX || __USE_C <= 2011
+#define TIME_UTC 1
 #endif
+
 #include <sortix/clock.h>
 #include <sortix/time.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -156,6 +147,10 @@ void tzset(void);
 
 /* TODO: This is some _MISC_SOURCE thing according to GNU, but I like it. */
 time_t timegm(struct tm*);
+
+#if __USE__SORTIX || 202405L <= __USE_POSIX || __USE_C <= 2011
+int timespec_get(struct timespec*, int);
+#endif
 
 #if __USE_SORTIX
 int clock_gettimeres(clockid_t, struct timespec*, struct timespec*);
