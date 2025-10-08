@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@
 
 #include <sys/__/types.h>
 
-#include <sortix/fcntl.h>
+#include <sortix/open.h>
 #include <sortix/timespec.h>
 
 #ifndef __clockid_t_defined

@@ -31,7 +31,7 @@
 #endif
 
 #if __USE_SORTIX || 202405L <= __USE_POSIX
-#include <sortix/fcntl.h>
+#include <sortix/open.h>
 #endif
 #include <sortix/wait.h>
 

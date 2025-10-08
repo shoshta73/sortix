@@ -153,7 +153,7 @@ extern "C" {
 #include <stddef.h>
 #endif
 
-#include <sortix/fcntl.h>
+#include <sortix/open.h>
 
 #define _CS_PATH 0
 #define _CS_POSIX_V8_ILP32_OFF32_CFLAGS 1

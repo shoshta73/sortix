@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2018, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,17 +27,6 @@
 #include <sortix/fcntl.h>
 #include <sortix/seek.h>
 #include <sortix/mode.h>
-
-/* The kernel would like to simply deal with one bit for each base access mode,
-   but using the traditional names O_RDONLY, O_WRONLY and O_RDWR for this would
-   be weird, so it uses O_READ and O_WRITE bits instead. However, we provide the
-   traditional names here instead to remain compatible. */
-#define O_RDONLY O_READ
-#define O_WRONLY O_WRITE
-#define O_RDWR (O_READ | O_WRITE)
-
-/* Backwards compatibility with existing systems that call it O_CREAT. */
-#define O_CREAT O_CREATE
 
 /* TODO: POSIX_FADV_* missing here */
 

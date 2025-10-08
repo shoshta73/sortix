@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * sortix/fcntl.h
- * Declares various constants related to opening files.
+ * Declares various constants related to fcntl.
  */
 
 #ifndef _INCLUDE_SORTIX_FCNTL_H
@@ -22,33 +22,7 @@
 
 #include <sys/cdefs.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* Remember to update the flag classifications at the top of descriptor.cpp if
-   you add new flags here. */
-#define O_READ (1<<0)
-#define O_WRITE (1<<1)
-#define O_EXEC (1<<2)
-#define O_APPEND (1<<3)
-#define O_CLOEXEC (1<<4)
-#define O_CREATE (1<<5)
-#define O_DIRECTORY (1<<6)
-#define O_EXCL (1<<7)
-#define O_TRUNC (1<<8)
-#define O_CLOFORK (1<<9)
-#define O_SEARCH (1<<10)
-#define O_NONBLOCK (1<<11)
-#define O_NOFOLLOW (1<<12)
-#define O_SYMLINK_NOFOLLOW (1<<13)
-#define O_NOCTTY (1<<14)
-#define O_TTY_INIT (1<<15)
-#ifdef __is_sortix_kernel
-#define O_IS_STAT (1<<30)
-#endif
-
-#define O_ACCMODE (O_READ | O_WRITE | O_EXEC | O_SEARCH)
+#include <sortix/open.h>
 
 #define FD_CLOEXEC (1<<0)
 #define FD_CLOFORK (1<<1)
@@ -113,9 +87,5 @@ extern "C" {
 #define AT_SYMLINK_NOFOLLOW (1<<2)
 #define AT_REMOVEFILE (1<<3)
 #define AT_SYMLINK_FOLLOW (1<<4)
-
-#ifdef __cplusplus
-} /* extern "C" */
-#endif
 
 #endif
