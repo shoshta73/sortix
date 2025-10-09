@@ -40,10 +40,7 @@
 #if __USE_SORTIX || 200809L <= __USE_POSIX
 #ifndef __locale_t_defined
 #define __locale_t_defined
-/* TODO: figure out what this does and typedef it properly. This is just a
-         temporary assignment. */
-typedef int __locale_t;
-typedef __locale_t locale_t;
+typedef struct __locale* locale_t;
 #endif
 #endif
 

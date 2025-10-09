@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2015, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2015, 2017, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -57,24 +57,36 @@ struct lconv
 
 #define LC_COLLATE 0
 #define LC_CTYPE 1
+#if __USE_SORTIX || __USE_POSIX
 #define LC_MESSAGES 2
+#endif
 #define LC_MONETARY 3
 #define LC_NUMERIC 4
 #define LC_TIME 5
 #define LC_ALL 6
-#define LC_NUM_CATEGORIES LC_ALL
 
 #if __USE_SORTIX || __USE_POSIX
-#define LC_GLOBAL_LOCALE ((locale_t) -1)
+#define LC_COLLATE_MASK (1 << LC_COLLATE)
+#define LC_CTYPE_MASK (1 << LC_CTYPE)
+#define LC_MESSAGES_MASK (1 << LC_MESSAGES)
+#define LC_MONETARY_MASK (1 << LC_MONETARY)
+#define LC_NUMERIC_MASK (1 << LC_NUMERIC)
+#define LC_TIME_MASK (1 << LC_TIME)
+#define LC_ALL_MASK ((1 << LC_ALL) - 1)
+#define LC_GLOBAL_LOCALE (&__global_locale)
+#endif
+
+#if defined(__is_sortix_libc)
+struct __locale
+{
+	char* current[LC_ALL];
+};
 #endif
 
 #if __USE_SORTIX || __USE_POSIX
 #ifndef __locale_t_defined
 #define __locale_t_defined
-/* TODO: figure out what this does and typedef it properly. This is just a
-         temporary assignment. */
-typedef int __locale_t;
-typedef __locale_t locale_t;
+typedef struct __locale* locale_t;
 #endif
 #endif
 
@@ -82,8 +94,19 @@ typedef __locale_t locale_t;
 extern "C" {
 #endif
 
-char* setlocale(int category, const char* locale);
+extern struct __locale __global_locale;
+extern __thread struct __locale* __locale;
+
+char* setlocale(int, const char*);
 struct lconv* localeconv(void);
+
+#if __USE_SORTIX || 200809L <= __USE_POSIX
+locale_t duplocale(locale_t);
+void freelocale(locale_t);
+locale_t newlocale(int, const char*, locale_t);
+locale_t uselocale(locale_t);
+#endif
+
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 const char* getlocalename_l(int, locale_t);
 #endif

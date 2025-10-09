@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,10 +28,7 @@ extern "C" {
 
 #ifndef __locale_t_defined
 #define __locale_t_defined
-/* TODO: figure out what this does and typedef it properly. This is just a
-         temporary assignment. */
-typedef int __locale_t;
-typedef __locale_t locale_t;
+typedef struct __locale* locale_t;
 #endif
 
 int isalnum(int);

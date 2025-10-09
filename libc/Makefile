@@ -410,9 +410,15 @@ ioleast/writeall.o \
 ioleast/writeleast.o \
 langinfo/nl_langinfo_l.o \
 langinfo/nl_langinfo.o \
+locale/__global_locale.o \
+locale/__locale.o \
+locale/duplocale.o \
+locale/freelocale.o \
 locale/getlocalename_l.o \
 locale/localeconv.o \
+locale/newlocale.o \
 locale/setlocale.o \
+locale/uselocale.o \
 memusage/memusage.o \
 msr/rdmsr.o \
 msr/wrmsr.o \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,10 +20,7 @@
 #include <assert.h>
 #include <locale.h>
 
-extern char* __current_locales[LC_NUM_CATEGORIES];
-
 const char* getlocalename_l(int cat, locale_t locale)
 {
-	assert(locale == LC_GLOBAL_LOCALE);
-	return __current_locales[cat] ? __current_locales[cat] : (char*) "C";
+	return locale->current[cat] ? locale->current[cat] : (char*) "C";
 }

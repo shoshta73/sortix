@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015, 2024, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,26 +13,16 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * locale/setlocale.c
- * Set program locale.
+ * locale/freelocale.c
+ * Free locale object.
  */
 
-#include <errno.h>
 #include <locale.h>
+#include <stdlib.h>
 
-char* setlocale(int category, const char* locale)
+void freelocale(locale_t locale)
 {
-	if ( category < 0 || LC_ALL < category )
-		return errno = EINVAL, (char*) NULL;
-	if ( locale )
-	{
-		int category_mask = category == LC_ALL ? LC_ALL_MASK : (1 << category);
-		if ( !newlocale(category_mask, locale, LC_GLOBAL_LOCALE) )
-			return NULL;
-	}
-	// TODO: Encode a string with all individual categories if LC_ALL.
-	if ( category == LC_ALL )
-		category = LC_COLLATE;
-	char* result = LC_GLOBAL_LOCALE->current[category];
-	return result ? result : (char*) "C";
+	for ( int i = 0; i < LC_ALL; i++ )
+		free(locale->current[i]);
+	free(locale);
 }
