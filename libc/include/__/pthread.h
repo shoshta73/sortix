@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2017, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -66,6 +66,12 @@ typedef struct
 } __pthread_mutex_t;
 #endif
 
+#define __PTHREAD_MUTEX_INITIALIZER { 0, __PTHREAD_MUTEX_DEFAULT, 0, 0 }
+#define __PTHREAD_NORMAL_MUTEX_INITIALIZER_NP \
+        { 0, __PTHREAD_MUTEX_NORMAL, 0, 0 }
+#define __PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP \
+        { 0, __PTHREAD_MUTEX_RECURSIVE, 0, 0 }
+
 #if defined(__is_sortix_libc)
 typedef struct
 {
@@ -77,6 +83,10 @@ typedef struct
 	int __pthread_type;
 } __pthread_mutexattr_t;
 #endif
+
+#define __PTHREAD_MUTEX_NORMAL 0
+#define __PTHREAD_MUTEX_RECURSIVE 1
+#define __PTHREAD_MUTEX_DEFAULT __PTHREAD_MUTEX_NORMAL
 
 #if defined(__is_sortix_libc)
 typedef struct
@@ -95,6 +105,9 @@ typedef struct
 	__clockid_t __pthread_clock;
 } __pthread_cond_t;
 #endif
+
+#define __PTHREAD_COND_INITIALIZER { __PTHREAD_NORMAL_MUTEX_INITIALIZER_NP, \
+                                     NULL, NULL, CLOCK_REALTIME }
 
 #if defined(__is_sortix_libc)
 typedef struct
@@ -122,6 +135,8 @@ typedef struct
 } __pthread_once_t;
 #endif
 
+#define __PTHREAD_ONCE_INIT { __PTHREAD_NORMAL_MUTEX_INITIALIZER_NP, 0 }
+
 #if defined(__is_sortix_libc)
 typedef struct
 {
@@ -145,6 +160,10 @@ typedef struct
 	unsigned long __pthread_pending_writers;
 } __pthread_rwlock_t;
 #endif
+
+#define __PTHREAD_RWLOCK_INITIALIZER { __PTHREAD_COND_INITIALIZER, \
+                                       __PTHREAD_COND_INITIALIZER, \
+                                       __PTHREAD_MUTEX_INITIALIZER, 0, 0, 0, 0 }
 
 #if defined(__is_sortix_libc)
 typedef struct
