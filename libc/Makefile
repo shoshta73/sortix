@@ -174,6 +174,7 @@ stdlib/bsearch.o \
 stdlib/calloc.o \
 stdlib/div.o \
 stdlib/free.o \
+stdlib/getsubopt.o \
 stdlib/labs.o \
 stdlib/ldiv.o \
 stdlib/llabs.o \

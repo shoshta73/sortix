@@ -177,7 +177,6 @@ extern struct quick_exit_handler* __quick_exit_handler_stack;
 long a64l(const char* s);
 double drand48(void);
 double erand48(unsigned short [3]);
-int getsubopt(char**, char* const *, char**);
 char* initstate(unsigned, char*, size_t);
 long jrand48(unsigned short [3]);
 char* l64a(long);
@@ -199,6 +198,10 @@ void srandom(unsigned);
 int grantpt(int);
 int unlockpt(int);
 char* ptsname(int);
+#endif
+
+#if __USE_SORTIX || 420 <= __USE_XOPEN || 199506L <= __USE_POSIX
+int getsubopt(char**, char* const*, char**);
 #endif
 
 #if __USE_SORTIX || 600 <= __USE_XOPEN
