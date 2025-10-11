@@ -141,6 +141,12 @@ unsigned long long strtoull(const char* __restrict, char** __restrict, int);
 long long strtoll(const char* __restrict, char** __restrict, int);
 #endif
 
+/* Functions from C11 and C++11 */
+#if __USE_SORTIX || 202405L <= __USE_POSIX || 2011 <= __USE_C || 201103L <= __cplusplus
+int at_quick_exit(void (*)(void));
+void quick_exit(int) __attribute__ ((__noreturn__));
+#endif
+
 /* Functions from POSIX 2024. */
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 int mkostemp(char*, int);
@@ -158,6 +164,12 @@ struct exit_handler
 	struct exit_handler* next;
 };
 extern struct exit_handler* __exit_handler_stack;
+struct quick_exit_handler
+{
+	void (*hook)(void);
+	struct quick_exit_handler* next;
+};
+extern struct quick_exit_handler* __quick_exit_handler_stack;
 #endif
 
 /* TODO: These are not implemented in sortix libc yet. */

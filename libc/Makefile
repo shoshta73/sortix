@@ -583,6 +583,7 @@ stdio/vfprintf.o \
 stdio/vprintf.o \
 stdio/vscanf.o \
 stdlib/atexit.o \
+stdlib/at_quick_exit.o \
 stdlib/canonicalize_file_name_at.o \
 stdlib/canonicalize_file_name.o \
 stdlib/clearenv.o \
@@ -600,6 +601,7 @@ stdlib/on_exit.o \
 stdlib/posix_openpt.o \
 stdlib/ptsname.o \
 stdlib/ptsname_r.o \
+stdlib/quick_exit.o \
 stdlib/rand.o \
 stdlib/realpath.o \
 stdlib/setenv.o \

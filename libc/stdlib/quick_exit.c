@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,8 +13,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * stdlib/exit.c
- * Terminates the current process.
+ * stdlib/quick_exit.c
+ * Terminates the current process but only runs at_quick_exit handlers.
  */
 
 #include <dirent.h>
@@ -26,32 +26,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-struct exit_handler* __exit_handler_stack = NULL;
+struct quick_exit_handler* __quick_exit_handler_stack = NULL;
 
-pthread_mutex_t __exit_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-bool __currently_exiting = false;
+extern pthread_mutex_t __exit_lock;
+extern bool __currently_exiting;
 
-static FILE* volatile dummy_file = NULL; // volatile due to constant folding bug
-weak_alias(dummy_file, __stdin_used);
-weak_alias(dummy_file, __stdout_used);
-
-DIR* __first_dir = NULL;
-pthread_mutex_t __first_dir_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-FILE* __first_file = NULL;
-pthread_mutex_t __first_file_lock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
-
-static void exit_file(FILE* fp)
-{
-	if ( !fp )
-		return;
-	flockfile(fp);
-	if ( fp->fflush_indirect )
-		fp->fflush_indirect(fp);
-	if ( fp->close_func )
-		fp->close_func(fp->user);
-}
-
-void exit(int status)
+void quick_exit(int status)
 {
 	// It's undefined behavior to call this function more than once: If more
 	// than one thread calls the function we'll wait until the process dies.
@@ -63,18 +43,11 @@ void exit(int status)
 		_exit(status);
 	__currently_exiting = true;
 
-	while ( __exit_handler_stack )
+	while ( __quick_exit_handler_stack )
 	{
-		__exit_handler_stack->hook(status, __exit_handler_stack->param);
-		__exit_handler_stack = __exit_handler_stack->next;
+		__quick_exit_handler_stack->hook();
+		__quick_exit_handler_stack = __quick_exit_handler_stack->next;
 	}
-
-	pthread_mutex_lock(&__first_file_lock);
-
-	exit_file(__stdin_used);
-	exit_file(__stdout_used);
-	for ( FILE* fp = __first_file; fp; fp = fp->next )
-		exit_file(fp);
 
 	_exit(status);
 }

@@ -13,8 +13,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * stdlib/on_exit.c
- * Hooks that are called upon process exit.
+ * stdlib/at_quick_exit.c
+ * Hooks that are called upon quick_exit.
  */
 
 #include <pthread.h>
@@ -22,17 +22,16 @@
 
 extern pthread_mutex_t __exit_lock;
 
-int on_exit(void (*hook)(int, void*), void* param)
+int at_quick_exit(void (*hook)(void))
 {
 	pthread_mutex_lock(&__exit_lock);
-	struct exit_handler* handler =
-		(struct exit_handler*) malloc(sizeof(struct exit_handler));
+	struct quick_exit_handler* handler =
+		(struct quick_exit_handler*) malloc(sizeof(struct quick_exit_handler));
 	if ( !handler )
 		return pthread_mutex_unlock(&__exit_lock), -1;
 	handler->hook = hook;
-	handler->param = param;
-	handler->next = __exit_handler_stack;
-	__exit_handler_stack = handler;
+	handler->next = __quick_exit_handler_stack;
+	__quick_exit_handler_stack = handler;
 	pthread_mutex_unlock(&__exit_lock);
 	return 0;
 }
