@@ -21,7 +21,6 @@
 
 #include <errno.h>
 #include <limits.h>
-#include <stdint.h>
 #include <stdio.h>
 
 size_t fread_unlocked(void* ptr,
@@ -55,9 +54,9 @@ size_t fread_unlocked(void* ptr,
 				request = SSIZE_MAX;
 			ssize_t amount = fp->read_func(fp->user, buf + sofar, request);
 			if ( amount < 0 )
-				return fp->flags |= _FILE_STATUS_ERROR, sofar / num_elements;
+				return fp->flags |= _FILE_STATUS_ERROR, sofar / element_size;
 			if ( amount == 0 )
-				return fp->flags |= _FILE_STATUS_EOF, sofar / num_elements;
+				return fp->flags |= _FILE_STATUS_EOF, sofar / element_size;
 			sofar += amount;
 		}
 		return sofar / element_size;
