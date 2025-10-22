@@ -310,7 +310,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
    return 0;
  }
  _ACEOF
-@@ -61893,49 +61881,6 @@
+@@ -61893,50 +61881,9 @@
  fi
  
  if test "$PHP_READLINE" && test "$PHP_READLINE" != "no"; then
@@ -357,10 +357,97 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
 -done
 -
 -
-   PHP_READLINE_LIBS=""
+-  PHP_READLINE_LIBS=""
++  # PATCH: Just use pkg-config instead of poking in directories in a manner that
++  # is not safe for cross-compilation and causes other issues.
++  PHP_READLINE_LIBS=`${PKG_CONFIG-pkg-config} --libs readline`
    { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for tgetent in -lncurses" >&5
  printf %s "checking for tgetent in -lncurses... " >&6; }
-@@ -64839,7 +64784,7 @@
+ if test ${ac_cv_lib_ncurses_tgetent+y}
+@@ -62006,7 +61953,7 @@
+   esac
+ 
+ 
+-    PHP_READLINE_LIBS="$PHP_READLINE_LIBS -lncurses"
++    #PHP_READLINE_LIBS="$PHP_READLINE_LIBS -lncurses"
+ 
+ else case e in #(
+   e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for tgetent in -ltermcap" >&5
+@@ -62078,7 +62025,7 @@
+   esac
+ 
+ 
+-      PHP_READLINE_LIBS="$PHP_READLINE_LIBS -ltermcap"
++      #PHP_READLINE_LIBS="$PHP_READLINE_LIBS -ltermcap"
+ 
+ fi
+ 
+@@ -62089,7 +62036,7 @@
+ 
+ 
+   save_old_LDFLAGS=$LDFLAGS
+-  ac_stuff="-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
++  ac_stuff= #"-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
+ 
+   save_ext_shared=$ext_shared
+   ext_shared=yes
+@@ -62253,7 +62200,7 @@
+ 
+   if test "$ext_shared" = "yes"; then
+     READLINE_SHARED_LIBADD="-lreadline $READLINE_SHARED_LIBADD"
+-    if test -n "$READLINE_DIR/$PHP_LIBDIR"; then
++    if test -n "$READLINE_DIR/$PHP_LIBDIR" && false; then
+ 
+   if test "$READLINE_DIR/$PHP_LIBDIR" != "/usr/$PHP_LIBDIR" && test "$READLINE_DIR/$PHP_LIBDIR" != "/usr/lib"; then
+ 
+@@ -62296,7 +62243,7 @@
+   else
+ 
+ 
+-  if test -n "$READLINE_DIR/$PHP_LIBDIR"; then
++  if test -n "$READLINE_DIR/$PHP_LIBDIR" && false; then
+ 
+   if test "$READLINE_DIR/$PHP_LIBDIR" != "/usr/$PHP_LIBDIR" && test "$READLINE_DIR/$PHP_LIBDIR" != "/usr/lib"; then
+ 
+@@ -62363,7 +62310,7 @@
+ 
+ 
+   save_old_LDFLAGS=$LDFLAGS
+-  ac_stuff="-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
++  ac_stuff= #"-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
+ 
+   save_ext_shared=$ext_shared
+   ext_shared=yes
+@@ -62539,7 +62486,7 @@
+ 
+ 
+   save_old_LDFLAGS=$LDFLAGS
+-  ac_stuff="-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
++  ac_stuff= #"-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
+ 
+   save_ext_shared=$ext_shared
+   ext_shared=yes
+@@ -62715,7 +62662,7 @@
+ 
+ 
+   save_old_LDFLAGS=$LDFLAGS
+-  ac_stuff="-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
++  ac_stuff= #"-L$READLINE_DIR/$PHP_LIBDIR $PHP_READLINE_LIBS"
+ 
+   save_ext_shared=$ext_shared
+   ext_shared=yes
+@@ -62893,8 +62840,8 @@
+   LDFLAGS_SAVE=$LDFLAGS
+   LIBS_SAVE=$LIBS
+   CFLAGS="$CFLAGS $INCLUDES"
+-  LDFLAGS="$LDFLAGS -L$READLINE_DIR/$PHP_LIBDIR"
+-  LIBS="$LIBS -lreadline"
++  LDFLAGS="$LDFLAGS"
++  LIBS="$LIBS $PHP_READLINE_LIBS"
+ 
+       ac_fn_check_decl "$LINENO" "rl_pending_input" "ac_cv_have_decl_rl_pending_input" "
+       #include <stdio.h>
+@@ -64839,7 +64786,7 @@
  
  if test "$cross_compiling" = yes
  then :
@@ -369,7 +456,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  else case e in #(
    e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
-@@ -64881,7 +64826,7 @@
+@@ -64881,7 +64828,7 @@
  
  if test "$cross_compiling" = yes
  then :
@@ -378,7 +465,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  else case e in #(
    e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
-@@ -64959,7 +64904,7 @@
+@@ -64959,7 +64906,7 @@
  echo test > conftest_pread
  if test "$cross_compiling" = yes
  then :
@@ -387,7 +474,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  else case e in #(
    e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
-@@ -65002,7 +64947,7 @@
+@@ -65002,7 +64949,7 @@
  echo test > conftest_pread
  if test "$cross_compiling" = yes
  then :
@@ -396,7 +483,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  else case e in #(
    e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
-@@ -66611,7 +66556,7 @@
+@@ -66611,7 +66558,7 @@
      if test "x$PHP_SNMP" = xyes
  then :
    # Extract the first word of "net-snmp-config", so it can be a program name with args.
@@ -405,7 +492,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for $ac_word" >&5
  printf %s "checking for $ac_word... " >&6; }
  if test ${ac_cv_path_SNMP_CONFIG+y}
-@@ -70303,13 +70248,7 @@
+@@ -70303,13 +70250,7 @@
  
  if test "x$cross_compiling" = xyes
  then :
@@ -419,7 +506,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  else case e in #(
    e) { printf "%s\n" "$as_me:${as_lineno-$LINENO}: checking for working POSIX fnmatch" >&5
  printf %s "checking for working POSIX fnmatch... " >&6; }
-@@ -70323,7 +70262,8 @@
+@@ -70323,7 +70264,8 @@
     # Thanks to John Oleynick, François Pinard, and Paul Eggert for this test.
     if test "$cross_compiling" = yes
  then :
@@ -429,7 +516,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  else case e in #(
    e) cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
-@@ -80475,19 +80415,19 @@
+@@ -80475,19 +80417,19 @@
  else case e in #(
    e)
  pkg_failed=no
@@ -454,7 +541,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  		      test "x$?" != "x0" && pkg_failed=yes
  else
    pkg_failed=yes
-@@ -80499,12 +80439,12 @@
+@@ -80499,12 +80441,12 @@
      pkg_cv_ZLIB_LIBS="$ZLIB_LIBS"
   elif test -n "$PKG_CONFIG"; then
      if test -n "$PKG_CONFIG" && \
@@ -470,7 +557,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  		      test "x$?" != "x0" && pkg_failed=yes
  else
    pkg_failed=yes
-@@ -80525,14 +80465,14 @@
+@@ -80525,14 +80467,14 @@
          _pkg_short_errors_supported=no
  fi
          if test $_pkg_short_errors_supported = yes; then
@@ -488,7 +575,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  
  $ZLIB_PKG_ERRORS
  
-@@ -92463,7 +92403,12 @@
+@@ -92463,7 +92405,12 @@
  fi;
  
  all_targets="\$(OVERALL_TARGET) \$(PHP_MODULES) \$(PHP_ZEND_EX) \$(PHP_BINARIES) $pharcmd"
@@ -501,7 +588,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  
  
    PHP_VAR_SUBST="$PHP_VAR_SUBST all_targets"
-@@ -93050,6 +92995,8 @@
+@@ -93050,6 +92997,8 @@
  builddir = $abs_builddir
  top_srcdir = $abs_srcdir
  top_builddir = $abs_builddir
@@ -510,7 +597,7 @@ diff -Paur --no-dereference -- php.upstream/configure php/configure
  EOF
    for i in $PHP_VAR_SUBST; do
      eval echo "$i = \$$i" >> Makefile
-@@ -93059,11 +93006,7 @@
+@@ -93059,11 +93008,7 @@
  
  
  
