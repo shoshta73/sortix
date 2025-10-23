@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017, 2018, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2018, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -767,7 +767,6 @@ bool TCPSocket::CanBind(union tcp_sockaddr new_local) // tcp_lock taken
 		      socket;
 		      socket = socket->next_socket )
 		{
-			// TODO: os-test how SO_REUSEADDR works for TCP.
 			if ( new_local.in.sin_addr.s_addr == htobe32(INADDR_ANY) &&
 			     !(reuseaddr && socket->reuseaddr) )
 				return errno = EADDRINUSE, false;
@@ -775,7 +774,10 @@ bool TCPSocket::CanBind(union tcp_sockaddr new_local) // tcp_lock taken
 			     !(reuseaddr && socket->reuseaddr) )
 				return errno = EADDRINUSE, false;
 			if ( new_local.in.sin_addr.s_addr ==
-			     socket->local.in.sin_addr.s_addr )
+			     socket->local.in.sin_addr.s_addr &&
+			     (!(reuseaddr && socket->reuseaddr) ||
+			      socket->state == TCP_STATE_CLOSED ||
+			      socket->state == TCP_STATE_LISTEN) )
 				return errno = EADDRINUSE, false;
 		}
 	}
@@ -798,7 +800,10 @@ bool TCPSocket::CanBind(union tcp_sockaddr new_local) // tcp_lock taken
 			             sizeof(in6addr_any)) &&
 			     !(reuseaddr && socket->reuseaddr) )
 			if ( !memcmp(&new_local.in6.sin6_addr, &socket->local.in6.sin6_addr,
-			             sizeof(new_local.in6.sin6_addr)) )
+			             sizeof(new_local.in6.sin6_addr)) &&
+			     (!(reuseaddr && socket->reuseaddr) ||
+			      socket->state == TCP_STATE_CLOSED ||
+			      socket->state == TCP_STATE_LISTEN) )
 				return errno = EADDRINUSE, false;
 		}
 	}
@@ -1262,6 +1267,7 @@ void TCPSocket::ProcessPacket(Ref<Packet> pkt,
 		socket->local = *pkt_dst;
 		socket->remoted = true;
 		socket->bound = true;
+		socket->reuseaddr = reuseaddr;
 		if ( af == AF_INET )
 		{
 			uint16_t port = be16toh(socket->local.in.sin_port);
