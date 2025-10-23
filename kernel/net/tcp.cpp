@@ -593,6 +593,8 @@ void TCPSocket::Disconnect() // tcp_lock taken
 			SetTimer();
 		}
 	}
+	else
+		Destroy();
 }
 
 void TCPSocket::Fail(int error)
