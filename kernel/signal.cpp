@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -284,32 +284,31 @@ int sys_sigsuspend(const sigset_t* set)
 
 int sys_kill(pid_t pid, int signum)
 {
-	// Protect the kernel process.
-	if ( !pid )
-		return errno = EPERM, -1;
-
-	// TODO: Implement that pid == -1 means all processes!
-	bool process_group = pid < 0 ? (pid = -pid, true) : false;
+	Process* process = CurrentProcess();
 
 	ScopedLock lock(&process_family_lock);
 
-	Process* process = CurrentProcess()->GetPTable()->Get(pid);
-	if ( !process )
+	if ( !pid )
+		pid = -(process->group ? process->group->pid : process->pid);
+
+	// TODO: Implement that pid == -1 means all processes! Note that pid == 0
+	//       still means the process group in init.
+	bool process_group = pid < 0 ? (pid = -pid, true) : false;
+
+	Process* other = process->GetPTable()->Get(pid);
+	if ( !other )
 		return errno = ESRCH, -1;
 
 	// TODO: Protect init?
 	// TODO: Check for permission.
 	// TODO: Check for zombies.
 
-	if ( process_group )
-	{
-		if ( !process->DeliverGroupSignal(signum) && errno != ESIGPENDING )
-			return -1;
+	if ( (process_group ?
+	      !other->DeliverGroupSignal(signum) :
+	      !other->DeliverSignal(signum)) &&
+	     errno != ESIGPENDING )
 		return errno = 0, 0;
-	}
 
-	if ( !process->DeliverSignal(signum) && errno != ESIGPENDING )
-		return -1;
 	return errno = 0, 0;
 }
 
