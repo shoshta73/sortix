@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -229,4 +229,22 @@ int pthread_create(pthread_t* restrict thread_ptr,
 	*thread_ptr = thread;
 
 	return 0;
+}
+
+extern pthread_mutex_t __exit_lock;
+extern pthread_mutex_t __first_file_lock;
+
+void __pthread_mutex_lock_if_threaded(pthread_mutex_t* mutex)
+{
+	pthread_mutex_lock(mutex);
+}
+
+void __lock_exit_lock(void)
+{
+	pthread_mutex_lock(&__exit_lock);
+}
+
+void __lock_first_file_lock(void)
+{
+	pthread_mutex_lock(&__first_file_lock);
 }

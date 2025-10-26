@@ -114,6 +114,7 @@ stdio/fgetc_unlocked.o \
 stdio/fgets.o \
 stdio/fgets_unlocked.o \
 stdio/fileno_unlocked.o \
+stdio/__first_file_lock.o \
 stdio/flockfile.o \
 stdio/fmemopen.o \
 stdio/fnewfile.o \
@@ -589,6 +590,7 @@ stdlib/at_quick_exit.o \
 stdlib/canonicalize_file_name_at.o \
 stdlib/canonicalize_file_name.o \
 stdlib/clearenv.o \
+stdlib/__exit_lock.o \
 stdlib/_Exit.o \
 stdlib/exit.o \
 stdlib/getenv.o \

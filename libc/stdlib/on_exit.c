@@ -22,6 +22,8 @@
 
 extern pthread_mutex_t __exit_lock;
 
+struct exit_handler* __exit_handler_stack = NULL;
+
 int on_exit(void (*hook)(int, void*), void* param)
 {
 	pthread_mutex_lock(&__exit_lock);
@@ -35,4 +37,13 @@ int on_exit(void (*hook)(int, void*), void* param)
 	__exit_handler_stack = handler;
 	pthread_mutex_unlock(&__exit_lock);
 	return 0;
+}
+
+void __on_exit_execute(int status)
+{
+	while ( __exit_handler_stack )
+	{
+		__exit_handler_stack->hook(status, __exit_handler_stack->param);
+		__exit_handler_stack = __exit_handler_stack->next;
+	}
 }
