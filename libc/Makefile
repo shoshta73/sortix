@@ -11,7 +11,7 @@ CPUDIR:=$(CPU)
 CPPINCLUDES=-Iinclude
 CPPFLAGS=-D__is_sortix_libc $(CPPINCLUDES)
 FLAGS=-Wall -Wextra -ffreestanding $(OPTLEVEL)
-CFLAGS=-std=gnu11 -Wstrict-prototypes -Werror=implicit-function-declaration
+CFLAGS=-std=gnu11 -Wstrict-prototypes -Werror=implicit-function-declaration -Wno-prio-ctor-dtor
 CXXFLAGS=-std=gnu++11 -fno-exceptions -fno-rtti -fcheck-new
 ASFLAGS=
 
@@ -42,6 +42,8 @@ dirent/dirfd.o \
 dirent/versionsort.o \
 dirent/versionsort_r.o \
 errno/errno.o \
+errno/program_invocation_name.o \
+errno/program_invocation_short_name.o \
 fnmatch/fnmatch.o \
 inttypes/imaxabs.o \
 inttypes/imaxdiv.o \
@@ -400,7 +402,6 @@ grp/opengr.o \
 grp/setgrent.o \
 ifaddrs/freeifaddrs.o \
 ifaddrs/getifaddrs.o \
-init/init.o \
 ioleast/preadall.o \
 ioleast/preadleast.o \
 ioleast/pwriteall.o \

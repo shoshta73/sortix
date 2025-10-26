@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,16 +32,16 @@ __start:
 	pushq %rbp # rbp=0
 	movq %rsp, %rbp
 
+	# Initialize global variables.
+	movq (%rsi), %rax # argv[0]
+	movq %rax, program_invocation_name
 	movq %rcx, environ # envp
 
-	# Initialize the standard library.
+	# Run the global constructors.
 	subq $8, %rsp
 	pushq %rsi
 	pushq %rdi
 	pushq %rcx
-	call initialize_standard_library
-
-	# Run the global constructors.
 	call _init
 
 	# Run main

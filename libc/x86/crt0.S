@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,6 +32,9 @@ __start:
 	pushl %ebp # rbp=0
 	movl %esp, %ebp
 
+	# Initialize global variables.
+	movl (%ebx), %edx # argv[0]
+	movl %edx, program_invocation_name
 	movl %ecx, environ # envp
 
 	# Arguments for main
@@ -39,14 +42,6 @@ __start:
 	push %ecx # envp (to main)
 	push %ebx # argv (to main)
 	push %eax # argc (to main)
-	subl $4, %esp
-	push %ecx # envp (to initialize_standard_library)
-	push %ebx # argv (to initialize_standard_library)
-	push %eax # argc (to initialize_standard_library)
-
-	# Initialize the standard library.
-	call initialize_standard_library
-	addl $16, %esp
 
 	# Run the global constructors.
 	call _init
