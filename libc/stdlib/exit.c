@@ -28,6 +28,21 @@
 
 void _fini(void);
 
+__attribute__((weak)) __attribute__((visibility("hidden")))
+extern void (*__fini_array_start)(void);
+__attribute__((weak)) __attribute__((visibility("hidden")))
+extern void (*__fini_array_end)(void);
+
+static void __fini_array(void)
+{
+	void (**fini)(void) = &__fini_array_end;
+	while ( fini > &__fini_array_start )
+	{
+		fini--;
+		(*fini)();
+	}
+}
+
 bool __currently_exiting = false;
 FILE* __first_file = NULL;
 
@@ -76,6 +91,7 @@ void exit(int status)
 	__on_exit_execute(status);
 
 	// Run the global destructors.
+	__fini_array();
 	_fini();
 
 	// Flush all the remaining FILE objects.

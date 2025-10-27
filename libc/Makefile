@@ -839,6 +839,7 @@ OBJS=\
 $(FREEOBJS) \
 $(HOSTEDOBJS) \
 
+# TODO: After releasing Sortix 1.1, remove crt0.o.
 CRTOBJ=\
 crt0.o \
 crt1.o \
@@ -901,11 +902,12 @@ libpthread.a:
 librt.a:
 	$(AR) rcs $@
 
-crt0.o: $(CPUDIR)/crt0.o
-	ln -f $< $@
-
-crt1.o: crt0.o
+# TODO: After releasing Sortix 1.1, remove crt0.o.
+crt0.o: crt1.o
 	cp $< $@
+
+crt1.o: $(CPUDIR)/crt1.o
+	ln -f $< $@
 
 crti.o: $(CPUDIR)/crti.o
 	ln -f $< $@

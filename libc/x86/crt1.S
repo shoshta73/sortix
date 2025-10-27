@@ -21,11 +21,8 @@
 .section .text
 
 .global _start
-.global __start
 .type _start, @function
-.type __start, @function
 _start:
-__start:
 	# Set up end of the stack frame linked list.
 	xorl %ebp, %ebp
 	pushl %ebp # rip=0
@@ -45,6 +42,14 @@ __start:
 
 	# Run the global constructors.
 	call _init
+	mov $__init_array_start, %ebx
+.Lnext:
+	cmp $__init_array_end, %ebx
+	jae .Ldone
+	call *(%ebx)
+	add $4, %ebx
+	jmp .Lnext
+.Ldone:
 
 	# Run main
 	call main
@@ -54,4 +59,3 @@ __start:
 	push %eax
 	call exit
 .size _start, .-_start
-.size __start, .-__start

@@ -69,6 +69,29 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add .init_array support and rename crt0.o to crt1.o
+The compiler now uses the
+.Sy ".init_array"
+ABI and links with
+.Pa crt1.o
+instead of
+.Pa crt0.o .
+.Pp
+This change is not fully backwards compatible.
+Although Sortix 1.0 contains
+.Pa crt1.o ,
+it does not support the
+.Sy ".init_array"
+ABI.
+If you need to compile versions before and after this change, then configure
+GCC with
+.Fl \-disable-initfini-array
+to explicitly turn off the support for now.
+.Pp
+The compiler should be recompiled, but recompilation is optional for now, as the
+old toolchain remains supported until the next release cycle begins, where
+.Pa crt0.o
+will be removed.
 .Ss Remove settermmode(2) and gettermmode(2)
 The settermmode and gettermmode system calls have been replaced with the
 standard

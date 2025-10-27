@@ -21,11 +21,8 @@
 .section .text
 
 .global _start
-.global __start
 .type _start, @function
-.type __start, @function
 _start:
-__start:
 	# Set up end of the stack frame linked list.
 	xorl %ebp, %ebp
 	pushq %rbp # rip=0
@@ -43,6 +40,14 @@ __start:
 	pushq %rdi
 	pushq %rcx
 	call _init
+	mov $__init_array_start, %rbx
+.Lnext:
+	cmp $__init_array_end, %rbx
+	jae .Ldone
+	call *(%rbx)
+	add $8, %rbx
+	jmp .Lnext
+.Ldone:
 
 	# Run main
 	popq %rdx # Note! envp is now %rdx (previously %rcx)
@@ -55,4 +60,9 @@ __start:
 	movl %eax, %edi
 	call exit
 .size _start, .-_start
-.size __start, .-__start
+.section bss
+	.align 8
+	.weak __init_array_end
+	.weak __init_array_start
+	.hidden __init_array_end
+	.hidden __init_array_start

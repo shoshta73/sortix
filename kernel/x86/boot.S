@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2015, 2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2015, 2016, 2018, 2025 Jonas 'Sortie' Termansen.
  * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -49,11 +49,8 @@ nullpage: .global nullpage
 
 .section .text
 .global _start
-.global __start
 .type _start, @function
-.type __start, @function
 _start:
-__start:
 	# Clear the direction flag.
 	cld
 
@@ -180,7 +177,6 @@ __start:
 
 	jmp HaltKernel
 .size _start, . - _start
-.size __start, . - __start
 
 .global HaltKernel
 .type HaltKernel, @function

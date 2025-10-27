@@ -103,7 +103,7 @@ diff -Paur --no-dereference -- gcc.upstream/gcc/config/sortix.h gcc/gcc/config/s
 +
 +/* Objects automatically prepended to the link command line. */
 +#undef  STARTFILE_SPEC
-+#define STARTFILE_SPEC "crt0.o%s crti.o%s crtbegin.o%s"
++#define STARTFILE_SPEC "crt1.o%s crti.o%s crtbegin.o%s"
 +
 +/* Objects automatically appended to the link link command line. */
 +#undef  ENDFILE_SPEC
@@ -148,7 +148,7 @@ diff -Paur --no-dereference -- gcc.upstream/gcc/config/sortix.h gcc/gcc/config/s
 diff -Paur --no-dereference -- gcc.upstream/gcc/config.gcc gcc/gcc/config.gcc
 --- gcc.upstream/gcc/config.gcc
 +++ gcc/gcc/config.gcc
-@@ -970,6 +970,14 @@
+@@ -970,6 +970,15 @@
        ;;
    esac
    ;;
@@ -159,11 +159,12 @@ diff -Paur --no-dereference -- gcc.upstream/gcc/config.gcc gcc/gcc/config.gcc
 +  default_use_cxa_atexit=no
 +  native_system_header_dir=/include
 +  thread_file=posix
++  gcc_cv_initfini_array=yes
 +  ;;
  *-*-netbsd*)
    tm_p_file="${tm_p_file} netbsd-protos.h"
    tmake_file="t-netbsd t-slibgcc"
-@@ -2080,6 +2088,14 @@
+@@ -2080,6 +2089,14 @@
  	done
  	TM_MULTILIB_CONFIG=`echo $TM_MULTILIB_CONFIG | sed 's/^,//'`
  	;;
