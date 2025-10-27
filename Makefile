@@ -196,6 +196,7 @@ install-cross-compiler:
 	  $(CROSS_COMPILER_WITH_SYSROOT) \
 	  --enable-languages=c,c++ \
 	  --with-system-zlib \
+	  --disable-tm-clone-registry \
 	  --without-libiconv-prefix \
 	  --without-libintl-prefix
 	PATH="$(PREFIX)/bin:$(PATH)" \

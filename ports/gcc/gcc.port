@@ -13,7 +13,7 @@ BUILD_SYSTEM=configure
 CONFIGURE_WITH_SYSROOT=true
 CONFIGURE_WITH_SYSROOT_LD_BUG=true
 CONFIGURE_WITH_BUILD_SYSROOT=true
-CONFIGURE_ARGS='--enable-languages=c,c++ --with-system-zlib --without-libiconv-prefix --without-libintl-prefix'
+CONFIGURE_ARGS='--enable-languages=c,c++ --with-system-zlib --disable-tm-clone-registry --without-libiconv-prefix --without-libintl-prefix'
 CONFIGURE_USE_BUILD_DIRECTORY=true
 # TODO: The configure subdirs use <sys/param.h> for this for some reason?
 MAKE_VARS=ac_cv_c_bigendian=no
