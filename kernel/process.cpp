@@ -921,7 +921,7 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 	if ( Page::Size() < aux.tls_mem_align )
 		return errno = EINVAL, -1;
 	if ( !aux.uthread_align )
-		aux.uthread_align = 1;
+		aux.uthread_align = alignof(struct uthread);
 	if ( Page::Size() < aux.uthread_align )
 		return errno = EINVAL, -1;
 	if ( aux.uthread_size < sizeof(struct uthread) )
