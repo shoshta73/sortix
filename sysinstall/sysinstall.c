@@ -1252,7 +1252,7 @@ int main(void)
 		// TODO: Preserve mode/ownership/timestamps?
 		execute((const char*[]) { "cp", "-RTP", etc, "etc", NULL }, "_e");
 		// TODO: Auto detect appropriate bcrypt rounds and set up etc/login.conf
-		//       and use those below instead of blowfish,a.
+		//       and use those below instead of bcrypt,a.
 		if ( access_or_die("boot/random.seed", F_OK) < 0 )
 		{
 			printf(" - Creating random seed...\n");
@@ -1381,7 +1381,7 @@ int main(void)
 				continue;
 		}
 		char hash[128];
-		if ( crypt_newhash(first, "blowfish,a", hash, sizeof(hash)) < 0 )
+		if ( crypt_newhash(first, "bcrypt,a", hash, sizeof(hash)) < 0 )
 		{
 			explicit_bzero(first, sizeof(first));
 			warn("crypt_newhash");
@@ -1518,7 +1518,7 @@ int main(void)
 			break;
 		}
 		char hash[128];
-		if ( crypt_newhash(first, "blowfish,a", hash, sizeof(hash)) < 0 )
+		if ( crypt_newhash(first, "bcrypt,a", hash, sizeof(hash)) < 0 )
 		{
 			explicit_bzero(first, sizeof(first));
 			warn("crypt_newhash");

@@ -70,7 +70,7 @@ static void password(char* buffer,
 
 int main(int argc, char* argv[])
 {
-	const char* cipher = "blowfish,a";
+	const char* cipher = "bcrypt,a";
 	bool hash_password = false;
 
 	int opt;
