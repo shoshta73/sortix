@@ -4,6 +4,7 @@
  * Copyright (c) 1996, David Mazieres <dm@uun.org>
  * Copyright (c) 2008, Damien Miller <djm@openbsd.org>
  * Copyright (c) 2013, Markus Friedl <markus@openbsd.org>
+ * Copyright (c) 2014, Theo de Raadt <deraadt@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,7 +19,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $OpenBSD: chacha_private.h,v 1.2 2013/10/04 07:02:27 djm Exp $ */
+/* $OpenBSD: chacha_private.h,v 1.3 2022/02/28 21:56:29 dtucker Exp $ */
 
 /* Based on:
  * chacha-merged.c version 20080118
@@ -26,7 +27,7 @@
  * Public domain.
  */
 
-/* Adapted for Sortix libc by Jonas 'Sortie' Termansen in 2014, 2015. */
+/* Adapted for Sortix libc by Jonas 'Sortie' Termansen in 2014, 2015, 2025. */
 
 #include <assert.h>
 #include <endian.h>
@@ -150,6 +151,8 @@ void chacha_keystream(struct chacha* ctx,
 #define KEYSZ 32
 #define IVSZ 8
 
+#define REKEY_BASE	(1024*1024) /* NB. should be a power of 2 */
+
 #ifndef __is_sortix_libk
 static pthread_mutex_t arc4random_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
@@ -240,7 +243,11 @@ void arc4random_buf(void* buffer_ptr, size_t size)
 			rs_have = 0;
 			memset(rs_buf, 0, sizeof(rs_buf));
 
-			rs_count = 1600000;
+			/* rekey interval should not be predictable */
+			uint32_t rekey_fuzz = 0;
+			chacha_keystream(&rs_chacha, (unsigned char*) &rekey_fuzz,
+			                 sizeof(rekey_fuzz));
+			rs_count = REKEY_BASE + (rekey_fuzz % REKEY_BASE);
 		}
 
 		if ( rs_have == 0 )
