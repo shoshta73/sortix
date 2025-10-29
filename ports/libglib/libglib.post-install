@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
+tix-eradicate-libtool-la
+rm -f "$TIX_INSTALL_DIR$EXEC_PREFIX/lib/charset.alias"

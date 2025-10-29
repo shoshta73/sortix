@@ -10,3 +10,4 @@ UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--without-libiconv-prefix --without-libintl-prefix'
 MAKE_VARS='V=1'
+POST_INSTALL=../bison.post-install

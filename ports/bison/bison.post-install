@@ -1,0 +1,4 @@
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
+rm -f "$TIX_INSTALL_DIR$EXEC_PREFIX/lib/charset.alias"

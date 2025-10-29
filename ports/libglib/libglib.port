@@ -18,5 +18,5 @@ LICENSE=LGPL-2.1-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS=--disable-gtk-doc
 MAKE_VARS='V=1'
-POST_INSTALL=tix-eradicate-libtool-la
+POST_INSTALL=../libglib.post-install
 RELEASE_SEARCH_PAGE=https://download.gnome.org/sources/glib/cache.json
