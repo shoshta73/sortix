@@ -10,3 +10,4 @@ UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS=--disable-shared
+POST_INSTALL=../libreadline.post-install

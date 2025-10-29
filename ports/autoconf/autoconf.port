@@ -10,3 +10,4 @@ UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_VARS='M4=m4 PERL=/bin/perl'
+POST_INSTALL=../autoconf.post-install

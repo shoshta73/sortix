@@ -10,4 +10,4 @@ UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=LGPL-3.0-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_USE_BUILD_DIRECTORY=true
-POST_INSTALL=tix-eradicate-libtool-la
+POST_INSTALL=../libmpfr.post-install

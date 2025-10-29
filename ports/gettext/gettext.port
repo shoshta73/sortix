@@ -14,4 +14,4 @@ LICENSE=GPL-3.0-or-later
 SUBDIR=gettext-tools
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--with-installed-libtextstyle --with-installed-csharp-dll --disable-csharp'
-POST_INSTALL=tix-eradicate-libtool-la
+POST_INSTALL=../../gettext.post-install

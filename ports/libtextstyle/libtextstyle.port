@@ -6,4 +6,4 @@ SUBDIR=libtextstyle
 BUILD_SYSTEM=configure
 # gettext-tools doesn't try to -lcurses when detecting libtextstyle
 CONFIGURE_ARGS=--disable-curses
-POST_INSTALL=tix-eradicate-libtool-la
+POST_INSTALL=../../../libtextstyle/libtextstyle.post-install

@@ -10,4 +10,4 @@ UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--without-libiconv-prefix --without-libintl-prefix'
 MAKE_VARS='V=1'
-POST_INSTALL=tix-eradicate-libtool-la
+POST_INSTALL=../flex.post-install

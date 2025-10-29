@@ -1,3 +1,6 @@
-#!/bin/sh -e
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
 ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/make" "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/gmake"
 ln "$TIX_INSTALL_DIR$PREFIX/share/man/man1/make.1" "$TIX_INSTALL_DIR$PREFIX/share/man/man1/gmake.1"
+rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"

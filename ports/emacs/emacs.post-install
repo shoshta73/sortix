@@ -1,4 +1,5 @@
 #!/bin/sh
 set -e
-cd "$TIX_INSTALL_DIR/$PREFIX"
-find -type f -name '*.el.gz' -delete
+[ -n "$TIX_INSTALL_DIR" ]
+rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"
+find "$TIX_INSTALL_DIR/$PREFIX" -type f -name '*.el.gz' -delete

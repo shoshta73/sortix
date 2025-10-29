@@ -9,5 +9,5 @@ UPSTREAM_SITE=https://sourceware.org/pub/libffi
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=MIT
 BUILD_SYSTEM=configure
-POST_INSTALL=tix-eradicate-libtool-la
+POST_INSTALL=../libffi.post-install
 CONFIGURE_ARGS=--program-prefix=

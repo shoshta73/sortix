@@ -12,3 +12,4 @@ BUILD_SYSTEM=configure
 CONFIGURE_ARGS=--disable-perl-xs
 MAKE_VARS='V=1'
 RUNTIME_DEPS=perl
+POST_INSTALL=../texinfo.post-install

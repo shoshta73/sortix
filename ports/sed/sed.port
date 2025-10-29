@@ -11,3 +11,4 @@ BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--without-libiconv-prefix --without-libintl-prefix'
 MAKE_VARS='V=1'
 LICENSE=GPL-3.0-or-later
+POST_INSTALL=../sed.post-install

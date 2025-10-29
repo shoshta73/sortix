@@ -1,6 +1,8 @@
-#!/bin/sh -e
-tix-eradicate-libtool-la
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
 if [ -e "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/gcc" ]; then
   ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/gcc" "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/cc"
 fi
 ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-gcc" "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-cc"
+rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"

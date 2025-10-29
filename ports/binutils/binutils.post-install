@@ -1,4 +1,6 @@
-#!/bin/sh -e
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
 tix-eradicate-libtool-la
 programs=$(ls "$TIX_INSTALL_DIR$EXEC_PREFIX/bin")
 for program in $programs; do
@@ -7,3 +9,4 @@ for program in $programs; do
        "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-$program"
   fi
 done
+rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"

@@ -10,3 +10,4 @@ UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
 MAKE_VARS='V=1'
+POST_INSTALL=../grep.post-install

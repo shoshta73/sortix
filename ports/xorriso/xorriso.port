@@ -9,3 +9,4 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/xorriso
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--program-prefix='
+POST_INSTALL=../xorriso.post-install

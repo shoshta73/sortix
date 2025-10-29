@@ -9,3 +9,4 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/mtools
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
+POST_INSTALL=../mtools.post-install

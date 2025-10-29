@@ -1,4 +1,6 @@
-#!/bin/sh -e
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
 cp update-grub "$TIX_INSTALL_DIR$EXEC_PREFIX/sbin/update-grub"
 if [ ! -e "$TIX_INSTALL_DIR$PREFIX/share/grub/unicode.pf2" ]; then
   # Cheat as I'm not sure how to get this when cross-building.
@@ -10,3 +12,4 @@ fi
 rm -rf "$TIX_INSTALL_DIR$PREFIX/lib/grub/"*"-none"
 rmdir --ignore-fail-on-non-empty "$TIX_INSTALL_DIR$PREFIX/lib/grub"
 rmdir --ignore-fail-on-non-empty "$TIX_INSTALL_DIR$PREFIX/lib"
+rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"

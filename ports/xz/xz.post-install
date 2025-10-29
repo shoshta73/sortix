@@ -1,4 +1,6 @@
 #!/bin/sh
 set -e
-cd "$TIX_INSTALL_DIR/$PREFIX"
-rm -rf include lib # Provided by liblzma
+[ -n "$TIX_INSTALL_DIR" ]
+# Provided by liblzma:
+rm -rf "$TIX_INSTALL_DIR/$PREFIX/include"
+rm -rf "$TIX_INSTALL_DIR/$PREFIX/lib"
