@@ -142,7 +142,7 @@ int main(int argc, char* argv[])
 	const char* fuse_options = NULL;
 	const char* pretend_mount_path = NULL;
 	bool foreground = false;
-	bool write = false;
+	bool write = true;
 	enum
 	{
 		OPT_FUSE_OPTIONS = 257,
