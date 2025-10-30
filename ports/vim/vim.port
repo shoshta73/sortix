@@ -7,6 +7,7 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=a6456bc154999d83d0c20d968ac7ba6e7df0d02f3cb6427fb248660bacfb336e
 UPSTREAM_SITE=http://ftp.vim.org/pub/vim/unix
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=Vim
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--enable-multibyte --with-modified-by=sortie@maxsi.org'
 # TODO: Consider vim_cv_tty_group and vim_cv_tty_mode.
