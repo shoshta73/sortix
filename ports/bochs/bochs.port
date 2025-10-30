@@ -7,6 +7,7 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=a85b13aff7d8411f7a9f356ba6c33b5f5dc1fbb107eb5018cc23a62639da0059
 UPSTREAM_SITE=https://sourceforge.net/projects/bochs/files/bochs/$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=LGPL-2.1-or-later
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--with-sdl --enable-x86-64'
 RELEASE_SEARCH_PAGE=https://sourceforge.net/projects/bochs/files/bochs/
