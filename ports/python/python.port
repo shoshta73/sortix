@@ -7,6 +7,7 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=1999658298cf2fb837dffed8ff3c033ef0c98ef20cf73c5d5f66bed5ab89697c
 UPSTREAM_SITE=https://www.python.org/ftp/python/$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=Python-2.0.1
 BUILD_SYSTEM=configure
 USE_BOOTSTRAP=true
 # Work around that pip always ends up in /usr despite the prefix and that this
