@@ -7,6 +7,7 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=1412a1c760bbd05db026b6c0d1657affd6631cd0a63cddb6f73cc6d4aa616148
 UPSTREAM_SITE=https://www.nasm.us/pub/nasm/releasebuilds/$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=BSD-2-Clause
 BUILD_SYSTEM=configure
 RELEASE_SEARCH_PAGE=https://www.nasm.us/pub/nasm/releasebuilds/
 RELEASE_SEARCH_REGEX='([0-9]+\.[0-9]+(\.[0-9]+)*)/'
