@@ -7,5 +7,6 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=88cdcaa9c7134503dd0364a97fa860da3381a09cb555c3aae9918360827c2032
 UPSTREAM_SITE=https://github.com/klange/nyancat/archive/refs/tags
 UPSTREAM_ARCHIVE=$VERSION.tar.gz
+LICENSE=NCSA
 BUILD_SYSTEM=sortix-usual-makefile
 RELEASE_SEARCH_PAGE=https://github.com/klange/nyancat/tags
