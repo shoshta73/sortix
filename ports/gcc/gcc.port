@@ -9,6 +9,7 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/gcc/gcc-$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
 RELEASE_SEARCH_PAGE=https://ftp.gnu.org/gnu/gcc/
 RELEASE_SEARCH_REGEX='gcc-([0-9]+\.[0-9]+(\.[0-9]+)*)/'
+LICENSE='GPL-3.0-or-later WITH GCC-exception-3.1'
 BUILD_SYSTEM=configure
 CONFIGURE_WITH_SYSROOT=true
 CONFIGURE_WITH_SYSROOT_LD_BUG=true
