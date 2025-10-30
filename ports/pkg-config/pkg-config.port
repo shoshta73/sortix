@@ -7,6 +7,7 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=6fc69c01688c9458a57eb9a1664c9aba372ccda420a02bf4429fe610e7e7d591
 UPSTREAM_SITE=https://pkgconfig.freedesktop.org/releases
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE='GPL-2.0-or-later AND (GPL-2.0-only OR GPL-2.0-only)'
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--with-system-include-path=/include --with-system-library-path=/lib --enable-indirect-deps=yes'
 MAKE_VARS='V=1'
