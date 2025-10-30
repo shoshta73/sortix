@@ -7,6 +7,7 @@ ARCHIVE=$DISTNAME.$COMPRESSION
 SHA256SUM=e87aae032bf07c26f85ac0ed3250998c37621d95f8bd748b31f15b33c45ee995
 UPSTREAM_SITE=https://github.com/westes/flex/releases/download/v$VERSION
 UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=BSD-3-Clause-flex
 BUILD_SYSTEM=configure
 CONFIGURE_ARGS='--without-libiconv-prefix --without-libintl-prefix'
 MAKE_VARS='V=1'
