@@ -8,6 +8,7 @@ SHA256SUM=7f123462a28b7ca3ebe2607485f7168554c2b10dfc155c7ec46300666ac27f95
 UPSTREAM_SITE=https://www.kernel.org/pub/software/scm/git
 UPSTREAM_ARCHIVE=$ARCHIVE
 BUILD_PROGRAMS='asciidoc? dblatex? docbook2x? xmlto?'
+LICENSE=GPL-2.0-only
 BUILD_SYSTEM=configure
 DIRTY_FILE=config.mak.autogen
 CONFIGURE_ARGS='--with-editor=editor --with-pager=less --with-shell=sh --with-perl=perl --with-python=python'
