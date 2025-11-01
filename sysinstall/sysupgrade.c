@@ -980,7 +980,8 @@ int main(void)
 		else if ( conf.system &&
 		          access_or_die("etc/default/grub.d/10_sortix", F_OK) == 0 )
 		{
-			// Help dual booters by making /etc/default/grub.d/10_sortix.cache.
+			// Help dual booters by making /etc/default/grub.d/10_sortix.cache
+			// and /etc/default/grub.d/10_sortix.include.
 			printf(" - Creating bootloader fragment...\n");
 			execute((const char*[]) { "chroot", "-d", ".",
 			                          "/etc/default/grub.d/10_sortix", NULL },
@@ -1017,6 +1018,20 @@ int main(void)
 	else
 		textf("The %s installation has been upgraded to %s as requested.\n\n",
 		      bdev_path, new_release.pretty_name);
+
+	if ( !conf.grub )
+	{
+		text("Note: You did not accept a bootloader and you must set up a "
+		     "bootloader yourself in order to boot " BRAND_DISTRIBUTION_NAME
+		     ". etc/default/grub.d/10_sortix.include is a GRUB configuration "
+		     "fragment that boots the newly upgraded system. "
+		     "You should add its contents to the /etc/grub.d/40_custom file of "
+		     "an existing GRUB installation and then run update-grub. "
+		     "Enter ! now to escape to a shell, so you can copy its "
+		     "contents.\n\n");
+		prompt(input, sizeof(input), "confirm_grub_include", "Acknowledge?",
+		       "yes");
+	}
 
 	if ( target_release->abi_major < new_release.abi_major )
 	{

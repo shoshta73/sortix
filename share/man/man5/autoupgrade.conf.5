@@ -153,6 +153,15 @@ Note how
 .Xr chroot 8
 command may not work as intended at this point since the ABI may have
 incompatibly changed.
+.It Sy confirm_grub_install Ns "=" Ns Ar confirmation
+If the GRUB bootloader is not accepted, then acknowledge that you have seen the
+instructions telling you how to manually arrange bootloading by adding the
+contents of
+.Pa etc/default/grub.d/10_sortix.include
+to
+.Pa /etc/default/40_custom
+of an existing GRUB installation and then running
+.Xr update-grub 8 .
 .It Sy finally Ns "=" Ns Oo Sy exit "|" Sy poweroff "|" Sy reboot "|" Sy halt "|" Sy boot Oc ( default Sy boot )
 What action should be taken when the upgrade is finished?
 .Pp

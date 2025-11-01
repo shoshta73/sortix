@@ -166,7 +166,7 @@ The bootloader configuration is regenerated with a menu option to perform
 the upgrade if grub is enabled in
 .Xr upgrade.conf 5 ,
 otherwise the
-.Pa /etc/default/grub.d/10_sortix.cache
+.Pa /etc/default/grub.d/10_sortix.include
 bootloader fragment can be used to manually bootload the upgrade.
 .Pp
 This behavior is the default if the target is a system installation.
@@ -175,7 +175,7 @@ This behavior happens regardless if a system installation is upgraded across
 an incompatible ABI Change.
 .El
 .Sh FILES
-.Bl -tag -width "/etc/default/grub.d/10_sortix.cache" -compact
+.Bl -tag -width "/etc/default/grub.d/10_sortix.include" -compact
 .It Pa /boot/sortix.bin
 Old system
 .Xr kernel 7 .
@@ -184,7 +184,7 @@ Old system
 .Xr initrd 7 .
 .It Pa /boot/sysmerge/
 New system kernel and initrd files.
-.It Pa /etc/default/grub.d/10_sortix.cache
+.It Pa /etc/default/grub.d/10_sortix.include
 GRUB configuration fragment that boots the new system.
 .It Pa /etc/upgrade.conf
 Controls the bootloader upgrade behavior (see

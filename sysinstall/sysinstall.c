@@ -1976,13 +1976,21 @@ int main(void)
 		text("\n");
 	}
 
-	text("It's time to boot into the newly installed system.\n\n");
-
 	if ( strcasecmp(accept_grub, "no") == 0 )
-		text("You did not accept a bootloader and need to set up bootloading "
-		     "yourself. /etc/default/grub.d/10_sortix.cache is a GRUB "
-		     "configuration fragment that boots the newly installed system."
-		     "\n\n");
+	{
+		text("Note: You did not accept a bootloader and you must set up a "
+		     "bootloader yourself in order to boot " BRAND_DISTRIBUTION_NAME
+		     ". etc/default/grub.d/10_sortix.include is a GRUB configuration "
+		     "fragment that boots the newly installed system. "
+		     "You should add its contents to the /etc/grub.d/40_custom file of "
+		     "an existing GRUB installation and then run update-grub. "
+		     "Enter ! now to escape to a shell, so you can copy its "
+		     "contents.\n\n");
+		prompt(input, sizeof(input), "confirm_grub_include", "Acknowledge?",
+		       "yes");
+	}
+
+	text("It's time to boot into the newly installed system.\n\n");
 
 	text("Upon boot, you'll be greeted with a login screen. Enter your "
 	     "credentials to get a command line. Login as user 'poweroff' as "

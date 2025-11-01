@@ -362,7 +362,7 @@ Single-boot BIOS configurations should use the offered bootloader.
 Dual-boot BIOS configurations should refuse it and arrange for bootloading by
 other means.
 The installer will generate
-.Pa /etc/default/grub.d/10_sortix.cache
+.Pa /etc/default/grub.d/10_sortix.include
 which is a fragment of GRUB configuration that offers the menu option of running
 Sortix.
 You can splice that into
@@ -370,6 +370,10 @@ You can splice that into
 of an existing GRUB installation and run
 .Xr update-grub 8
 to add it as a boot option.
+This fragment will locate the Sortix root filesystem and include the actual
+Sortix GRUB bootloader fragment, which changes over time.
+If you manually arrange bootloading and do not use this fragment, then operating
+system upgrades will not be available in the bootloader.
 .Pp
 If you accept the bootloader, you will be asked if you wish to password protect
 the bootloader.

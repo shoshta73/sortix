@@ -1302,12 +1302,13 @@ diff -Paur --no-dereference -- grub.upstream/util/grub.d/00_header.in grub/util/
 diff -Paur --no-dereference -- grub.upstream/util/grub.d/10_sortix.in grub/util/grub.d/10_sortix.in
 --- grub.upstream/util/grub.d/10_sortix.in
 +++ grub/util/grub.d/10_sortix.in
-@@ -0,0 +1,95 @@
+@@ -0,0 +1,104 @@
 +#!/bin/sh
 +
 +set -e
 +
 +rm -f "$0.cache.new"
++rm -f "$0.include.new"
 +
 +# This script will run on the previous stable release during a sysmerge(8) with
 +# a potentially old version of GRUB installed.
@@ -1398,6 +1399,14 @@ diff -Paur --no-dereference -- grub.upstream/util/grub.d/10_sortix.in grub/util/
 +EOF
 +mv "$0.cache.new" "$0.cache"
 +cat "$0.cache"
++
++cat > "$0.include.new" << EOF
++insmod part_$PARTMAP
++insmod $FS
++search --no-floppy --fs-uuid --set=sortix $HINTS_STRING $FS_UUID
++. "(\$sortix)/etc/default/grub.d/10_sortix.cache"
++EOF
++mv "$0.include.new" "$0.include"
 diff -Paur --no-dereference -- grub.upstream/util/grub.d/README grub/util/grub.d/README
 --- grub.upstream/util/grub.d/README
 +++ grub/util/grub.d/README
