@@ -69,6 +69,8 @@
 const char* prompt_man_section = "7";
 const char* prompt_man_page = "installation";
 
+static char input[256];
+
 static struct partition_table* search_bios_boot_pt(struct filesystem* root_fs)
 {
 	struct blockdevice* bdev = root_fs->bdev;
@@ -164,6 +166,23 @@ static bool should_ignore_bootloader_on_filesystem(struct blockdevice* bdev)
 	       !strcmp(bdev->fs->fstype_name, "iso9660");
 }
 
+static bool consent_fsck(struct blockdevice* bdev)
+{
+	textf("Filesystem %s is inconsistent and requires repair to be mounted.\n",
+	      device_path_of_blockdevice(bdev));
+	while ( true )
+	{
+		char question[256];
+		snprintf(question, sizeof(question), "Repair filesystem %s? (yes/no)",
+		         device_path_of_blockdevice(bdev));
+		prompt(input, sizeof(input), "consent_fsck", question, "yes");
+		if ( !strcasecmp(input, "yes") )
+			return true;
+		else if ( !strcasecmp(input, "no") )
+			return false;
+	}
+}
+
 static bool should_install_bootloader_bdev(struct blockdevice* bdev)
 {
 	if ( !bdev->fs )
@@ -172,6 +191,13 @@ static bool should_install_bootloader_bdev(struct blockdevice* bdev)
 		return false;
 	if ( !bdev->fs->driver )
 		return false;
+	if ( (bdev->fs->flags & FILESYSTEM_FLAG_FSCK_MUST) &&
+	     !consent_fsck(bdev) )
+	{
+		textf("Not probing inconsistent filesystem %s.\n",
+		      device_path_of_blockdevice(bdev));
+		return false;
+	}
 	char* mnt = join_paths(get_tmpdir(), "fs.XXXXXX");
 	if ( !mnt )
 	{
@@ -557,8 +583,6 @@ int main(void)
 		errx(2, "fatal: stderr is not a terminal");
 
 	setvbuf(stdout, NULL, _IOLBF, 0);
-
-	static char input[256];
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " installer for %s.\n\n", uts.machine);

@@ -111,6 +111,10 @@ If the installation is non-interactive with
 .Sy accept_defaults=true ,
 then the default is instead
 .Sy no .
+.It Sy consent_fsck Ns "=" Ns Oo Sy no "|" Sy yes Oc ( default Sy yes )
+Automatically repair inconsistent filesystems with
+.Xr fsck 8
+when probing for existing installations?
 .It Sy grub Ns "=" Ns Oo Sy no "|" Sy yes Oc
 Install the GRUB bootloader onto the device containing the
 .Pa /boot

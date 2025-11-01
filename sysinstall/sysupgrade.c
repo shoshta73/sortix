@@ -56,6 +56,8 @@
 const char* prompt_man_section = "7";
 const char* prompt_man_page = "upgrade";
 
+static char input[256];
+
 struct installation
 {
 	struct blockdevice* bdev;
@@ -74,6 +76,23 @@ static size_t mountpoints_used;
 static bool fs_made = false;
 static char* fs;
 static int exit_gui_code = -1;
+
+static bool consent_fsck(struct blockdevice* bdev)
+{
+	textf("Filesystem %s is inconsistent and requires repair to be mounted.\n",
+	      device_path_of_blockdevice(bdev));
+	while ( true )
+	{
+		char question[256];
+		snprintf(question, sizeof(question), "Repair filesystem %s? (yes/no)",
+		         device_path_of_blockdevice(bdev));
+		prompt(input, sizeof(input), "consent_fsck", question, "yes");
+		if ( !strcasecmp(input, "yes") )
+			return true;
+		else if ( !strcasecmp(input, "no") )
+			return false;
+	}
+}
 
 static bool add_installation(struct blockdevice* bdev,
                              struct release* release,
@@ -166,6 +185,13 @@ static void search_installation_bdev(const char* mnt, struct blockdevice* bdev)
 		return;
 	if ( !bdev->fs->driver )
 		return;
+	if ( (bdev->fs->flags & FILESYSTEM_FLAG_FSCK_MUST) &&
+	     !consent_fsck(bdev) )
+	{
+		textf("Not probing inconsistent filesystem %s.\n",
+		       device_path_of_blockdevice(bdev));
+		return;
+	}
 	struct mountpoint mp = { 0 };
 	mp.absolute = (char*) mnt;
 	mp.fs = bdev->fs;
@@ -382,8 +408,6 @@ int main(void)
 
 	struct utsname uts;
 	uname(&uts);
-
-	static char input[256];
 
 	textf("Hello and welcome to the " BRAND_DISTRIBUTION_NAME " " VERSIONSTR ""
 	      " upgrader for %s.\n\n", uts.machine);
