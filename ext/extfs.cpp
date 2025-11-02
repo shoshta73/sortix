@@ -239,6 +239,9 @@ int main(int argc, char* argv[])
 	if ( sb.s_rev_level == EXT2_GOOD_OLD_REV )
 		errx(1, "%s: Is formatted with an obsolete filesystem revision",
 		     device_path);
+	else if ( sb.s_rev_level != EXT2_DYNAMIC_REV )
+		errx(1, "%s: Is formatted with a too new filesystem revision: %u",
+		     device_path, sb.s_rev_level);
 
 	// Verify that no incompatible features are in use.
 	if ( sb.s_feature_compat & ~EXT2_FEATURE_INCOMPAT_SUPPORTED )
