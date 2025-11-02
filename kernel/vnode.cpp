@@ -331,11 +331,20 @@ int Vnode::mkdir(ioctx_t* ctx, const char* filename, mode_t mode)
 
 int Vnode::unlink(ioctx_t* ctx, const char* filename)
 {
+	// TODO: SECURITY: Time of check to time of use vulnerability. A mount point
+	//       could be added between the is_mount_point call and the deletion.
+	//       Unfortunately I don't see an easy good solution without a big lock.
+	//       A big read+write lock could work. See also rmdir.
+	if ( is_mount_point(ctx, filename) )
+		return errno = EBUSY, -1;
 	return inode->unlink(ctx, filename);
 }
 
 int Vnode::rmdir(ioctx_t* ctx, const char* filename)
 {
+	// TODO: SECURITY: See the same problem as in unlink.
+	if ( is_mount_point(ctx, filename) )
+		return errno = EBUSY, -1;
 	return inode->rmdir(ctx, filename);
 }
 
@@ -511,6 +520,16 @@ int Vnode::getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 int Vnode::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 {
 	return inode->getsockname(ctx, addr, addrsize);
+}
+
+bool Vnode::is_mount_point(ioctx_t* ctx, const char* filename)
+{
+	if ( !strcmp(filename, ".") || !strcmp(filename, "..") )
+		return false;
+	Ref<Inode> normal_inode = inode->open(ctx, filename, O_READ, 0);
+	if ( !normal_inode )
+		return false;
+	return LookupMount(normal_inode);
 }
 
 } // namespace Sortix

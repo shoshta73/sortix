@@ -122,6 +122,9 @@ public:
 	int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 
+private:
+	bool is_mount_point(ioctx_t* ctx, const char* filename);
+
 public /*TODO: private*/:
 	Ref<Inode> inode;
 	Ref<Vnode> mountedat;

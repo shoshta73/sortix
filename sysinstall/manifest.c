@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2018, 2020, 2021, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2018, 2020, 2021, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -74,14 +74,14 @@ static void unlink_rename_conflict(const char* path)
 {
 	if ( !unlink(path) || errno == ENOENT )
 		return;
-	if ( errno != EISDIR )
+	if ( errno != EISDIR && errno != EBUSY )
 	{
 		warn("unlink: %s", path);
 		_exit(2);
 	}
 	if ( !rmdir(path) )
 		return;
-	if ( errno != ENOTEMPTY && errno != EEXIST )
+	if ( errno != ENOTEMPTY && errno != EEXIST && errno != EBUSY )
 	{
 		warn("rmdir: %s", path);
 		_exit(2);
@@ -239,11 +239,12 @@ void install_manifest(const char* manifest,
 			}
 			if ( unlink(out_path) < 0 )
 			{
-				if ( errno == EISDIR )
+				if ( errno == EISDIR || errno == EBUSY )
 				{
 					if ( rmdir(out_path) < 0 )
 					{
-						if ( errno == ENOTEMPTY || errno == EEXIST )
+						if ( errno == ENOTEMPTY || errno == EEXIST ||
+						     errno == EBUSY )
 						{
 							if ( !string_array_append(&rmdirs, &rmdirs_count,
 							                          &rmdirs_length, path) )
@@ -308,7 +309,8 @@ void install_manifest(const char* manifest,
 		}
 		else if ( S_ISDIR(inst.st_mode) )
 		{
-			if ( unlink(out_path) < 0 && errno != ENOENT && errno != EISDIR )
+			if ( unlink(out_path) < 0 && errno != ENOENT && errno != EISDIR &&
+			     errno != EBUSY )
 			{
 				warn("unlink: %s", out_path);
 				_exit(2);
@@ -440,8 +442,8 @@ void install_manifest(const char* manifest,
 			warn("asprintf");
 			_exit(2);
 		}
-		if ( rmdir(out_path) < 0 &&
-		     errno != ENOTEMPTY && errno != EEXIST && errno != ENOENT )
+		if ( rmdir(out_path) < 0 && errno != ENOTEMPTY && errno != EEXIST &&
+		     errno != ENOENT && errno != EBUSY )
 		{
 			warn("unlink: %s", out_path);
 			_exit(2);
