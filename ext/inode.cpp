@@ -405,6 +405,8 @@ Inode* Inode::Open(const char* elem, int flags, mode_t mode)
 {
 	if ( !EXT2_S_ISDIR(Mode()) )
 		return errno = ENOTDIR, (Inode*) NULL;
+	if ( !data->i_links_count )
+		return errno = ENOENT, (Inode*) NULL;
 	size_t elem_length = strlen(elem);
 	if ( elem_length == 0 )
 		return errno = ENOENT, (Inode*) NULL;
@@ -499,6 +501,8 @@ bool Inode::Link(const char* elem, Inode* dest, bool directories)
 {
 	if ( !EXT2_S_ISDIR(Mode()) )
 		return errno = ENOTDIR, false;
+	if ( !data->i_links_count )
+		return errno = ENOENT, -1;
 	if ( directories && !EXT2_S_ISDIR(dest->Mode()) )
 		return errno = ENOTDIR, false;
 	if ( !directories && EXT2_S_ISDIR(dest->Mode()) )
@@ -682,7 +686,8 @@ Inode* Inode::UnlinkKeep(const char* elem, bool directories, bool force)
 			Modified();
 
 			inode->BeginWrite();
-			inode->data->i_links_count--;
+			if ( inode->data->i_links_count )
+				inode->data->i_links_count--;
 			inode->FinishWrite();
 
 			block->BeginWrite();
@@ -865,6 +870,8 @@ bool Inode::UnembedInInode()
 
 bool Inode::Rename(Inode* olddir, const char* oldname, const char* newname)
 {
+	if ( !data->i_links_count )
+		return errno = ENOENT, -1;
 	if ( !strcmp(oldname, ".") || !strcmp(oldname, "..") ||
 	     !strcmp(newname, ".") || !strcmp(newname, "..") )
 		return errno = EINVAL, false;
@@ -1029,6 +1036,8 @@ bool Inode::IsEmptyDirectory()
 {
 	if ( !EXT2_S_ISDIR(Mode()) )
 		return errno = ENOTDIR, false;
+	if ( !data->i_links_count )
+		return errno = ENOENT, false;
 	uint32_t block_size = filesystem->block_size;
 	uint64_t filesize = Size();
 	uint64_t offset = 0;
