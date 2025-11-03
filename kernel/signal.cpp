@@ -296,7 +296,7 @@ int sys_kill(pid_t pid, int signum)
 	bool process_group = pid < 0 ? (pid = -pid, true) : false;
 
 	Process* other = process->GetPTable()->Get(pid);
-	if ( !other )
+	if ( !other || (process_group && other->group != other) )
 		return errno = ESRCH, -1;
 
 	// TODO: Protect init?
