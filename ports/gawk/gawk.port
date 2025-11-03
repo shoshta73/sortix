@@ -1,12 +1,12 @@
 NAME=gawk
 BUILD_LIBRARIES='libiconv? libintl? libgmp? libmpfr? libreadline?'
-VERSION=5.3.0
+VERSION=5.3.2
 DISTNAME=$NAME-$VERSION
 COMPRESSION=tar.xz
 ARCHIVE=$DISTNAME.$COMPRESSION
-SHA256SUM=ca9c16d3d11d0ff8c69d79dc0b47267e1329a69b39b799895604ed447d3ca90b
+SHA256SUM=f8c3486509de705192138b00ef2c00bbbdd0e84c30d5c07d23fc73a9dc4cc9cc
 UPSTREAM_SITE=https://ftp.gnu.org/gnu/gawk
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
-POST_INSTALL=../gawk.post-install
+POST_INSTALL=tix-eradicate-libtool-la
