@@ -85,19 +85,17 @@ extern "C" {
 #endif
 
 void abort(void) __attribute__ ((__noreturn__));
-int abs(int value);
-int atexit(void (*function)(void));
-double atof(const char* value);
+int abs(int);
+int atexit(void (*)(void));
+double atof(const char*);
 int atoi(const char*);
 long atol(const char*);
-void* bsearch(const void*, const void*, size_t, size_t, int (*)(const void*, const void*));
+void* bsearch(const void*, const void*, size_t, size_t,
+              int (*)(const void*, const void*));
 void* calloc(size_t, size_t);
-char* canonicalize_file_name(const char* path);
-char* canonicalize_file_name_at(int dirfd, const char* path);
-int clearenv(void);
 div_t div(int, int);
 void exit(int)  __attribute__ ((__noreturn__));
-void _Exit(int status)  __attribute__ ((__noreturn__));
+void _Exit(int)  __attribute__ ((__noreturn__));
 void free(void*);
 char* getenv(const char*);
 long labs(long);
@@ -107,10 +105,7 @@ int mblen(const char*, size_t);
 size_t mbstowcs(wchar_t* __restrict, const char* __restrict, size_t);
 int mbtowc(wchar_t *__restrict, const char* __restrict, size_t);
 char* mkdtemp(char*);
-char* mkdtemps(char*, size_t);
 int mkstemp(char*);
-int mkstemps(char*, int);
-int on_exit(void (*function)(int, void*), void* arg);
 void qsort(void*, size_t, size_t, int (*)(const void*, const void*));
 #if !defined(__is_sortix_libc) /* not a warning inside libc */
 __attribute__((__warning__("rand() isn't random, use arc4random()")))
@@ -150,8 +145,8 @@ void quick_exit(int) __attribute__ ((__noreturn__));
 /* Functions from POSIX 2024. */
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 int mkostemp(char*, int);
-int ptsname_r(int, char*, size_t);
-void qsort_r(void*, size_t, size_t, int (*)(const void*, const void*, void*), void*);
+void qsort_r(void*, size_t, size_t, int (*)(const void*, const void*, void*),
+             void*);
 void* reallocarray(void*, size_t, size_t);
 char* secure_getenv(const char*);
 #endif
@@ -208,12 +203,26 @@ int getsubopt(char**, char* const*, char**);
 int posix_openpt(int);
 #endif
 
+#if __USE_SORTIX || 800 <= __USE_XOPEN
+int ptsname_r(int, char*, size_t);
+#endif
+
 /* Functions copied from elsewhere. */
 #if __USE_SORTIX
 uint32_t arc4random(void);
 void arc4random_buf(void*, size_t);
 uint32_t arc4random_uniform(uint32_t);
+char* canonicalize_file_name(const char*);
+int clearenv(void);
 int mkostemps(char*, int, int);
+int mkstemps(char*, int);
+int on_exit(void (*)(int, void*), void*);
+#endif
+
+/* Functions that are Sortix extensions. */
+#if __USE_SORTIX
+char* canonicalize_file_name_at(int, const char*);
+char* mkdtemps(char*, size_t);
 #endif
 
 #ifdef __cplusplus
