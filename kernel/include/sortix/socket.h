@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2016, 2017, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,7 +22,7 @@
 
 #include <sys/cdefs.h>
 
-#define SOCK_TYPE_MASK ((1<<20)-1)
+#define __SOCK_TYPE_MASK ((1<<20)-1)
 #define SOCK_DGRAM 1
 #define SOCK_SEQPACKET 2
 #define SOCK_STREAM 3

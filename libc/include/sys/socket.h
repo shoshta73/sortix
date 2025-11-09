@@ -87,9 +87,12 @@ struct cmsghdr
 
 #define SCM_RIGHTS 1
 
-#define CMSG_ALIGN(value) \
+#define __CMSG_ALIGN(value) \
 	(-(-(size_t)(value) & ~(__alignof__(struct cmsghdr) - 1)))
-#define CMSG_SPACE(size) (sizeof(struct cmsghdr) + CMSG_ALIGN(size))
+#if __USE_SORTIX
+#define CMSG_ALIGN(value) __CMSG_ALIGN(value)
+#endif
+#define CMSG_SPACE(size) (sizeof(struct cmsghdr) + __CMSG_ALIGN(size))
 #define CMSG_LEN(size) (sizeof(struct cmsghdr) + (size))
 #define CMSG_DATA(cmsg) ((unsigned char*) ((struct cmsghdr*) (cmsg) + 1))
 #define CMSG_FIRSTHDR(mhdr) \
@@ -99,9 +102,9 @@ struct cmsghdr
 #define CMSG_NXTHDR(mhdr, cmsg) \
 	((cmsg)->cmsg_len < sizeof(struct cmsghdr) || \
 	 (char*) (mhdr)->msg_control + (mhdr)->msg_controllen - (char*) (cmsg) <= \
-	 CMSG_ALIGN((cmsg)->cmsg_len) ? \
+	 __CMSG_ALIGN((cmsg)->cmsg_len) ? \
 	(struct cmsghdr*) 0 : \
-	(struct cmsghdr*) (((char*) (cmsg)) + CMSG_ALIGN((cmsg)->cmsg_len)))
+	(struct cmsghdr*) (((char*) (cmsg)) + __CMSG_ALIGN((cmsg)->cmsg_len)))
 
 struct linger
 {
@@ -148,7 +151,9 @@ struct linger
 #define MSG_PEEK (1<<5)
 #define MSG_TRUNC (1<<6)
 #define MSG_WAITALL (1<<7)
+#if __USE_SORTIX
 #define MSG_DONTWAIT (1<<8)
+#endif
 #define MSG_CMSG_CLOEXEC (1<<9)
 #define MSG_CMSG_CLOFORK (1<<10)
 
@@ -159,6 +164,7 @@ struct linger
 
 /* TODO: POSIX doesn't specifiy these and it is a bit of a BSD-ism, but they
          appear to be used in some software (such as GNU wget). */
+#if __USE_SORTIX
 #define PF_UNSPEC AF_UNSPEC
 #define PF_INET AF_INET
 #define PF_INET6 AF_INET6
@@ -166,6 +172,7 @@ struct linger
 
 #define AF_LOCAL AF_UNIX
 #define PF_LOCAL PF_UNIX
+#endif
 
 /* TODO: Nicely wrap this in an enum, as in glibc's header? */
 #define SHUT_RD (1 << 0)
