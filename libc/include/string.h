@@ -22,6 +22,10 @@
 
 #include <sys/cdefs.h>
 
+#if __USE_SORTIX
+#include <strings.h>
+#endif
+
 #if __USE_SORTIX || __USE_POSIX
 #include <sys/__/types.h>
 #endif
@@ -71,16 +75,9 @@ char* strstr(const char*, const char*);
 char* strtok(char* __restrict, const char* __restrict);
 size_t strxfrm(char* __restrict, const char* __restrict, size_t);
 
-/* Functions from early POSIX. */
-#if __USE_SORTIX || __USE_POSIX
-int strcasecmp(const char*, const char*);
-int strncasecmp(const char*, const char*, size_t);
-#endif
-
 /* Functions from early XOPEN. */
 #if __USE_SORTIX || __USE_XOPEN
 void* memccpy(void* __restrict, const void* __restrict, int, size_t);
-int ffs(int);
 #endif
 
 /* Functions from XOPEN 420 gone into POSIX 2008. */
@@ -98,10 +95,8 @@ char* strtok_r(char* __restrict, const char* __restrict, char** __restrict);
 #if __USE_SORTIX || 200809L <= __USE_POSIX
 char* stpcpy(char* __restrict, const char* __restrict);
 char* stpncpy(char* __restrict, const char* __restrict, size_t);
-int strcasecmp_l(const char*, const char*, locale_t);
 int strcoll_l(const char*, const char*, locale_t);
 char* strerror_l(int, locale_t);
-int strncasecmp_l(const char*, const char*, size_t, locale_t);
 char* strndup(const char*, size_t);
 size_t strnlen(const char*, size_t);
 char* strsignal(int);
@@ -112,11 +107,6 @@ size_t strxfrm_l(char* __restrict, const char* __restrict, size_t, locale_t);
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 size_t strlcat(char* __restrict, const char* __restrict, size_t);
 size_t strlcpy(char* __restrict, const char* __restrict, size_t);
-#endif
-
-#if __USE_SORTIX || 800 <= __USE_XOPEN
-int ffsl(long int);
-int ffsll(long long int);
 #endif
 
 /* Functions copied from elsewhere. */
