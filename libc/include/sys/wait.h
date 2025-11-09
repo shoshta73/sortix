@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,9 +35,9 @@ extern "C" {
 typedef __pid_t pid_t;
 #endif
 
-pid_t wait(int* stat_loc);
+pid_t wait(int*);
 /* TODO: int waitid(idtype_t, id_t, siginfo_t*, int); */
-pid_t waitpid(pid_t pid, int *stat_loc, int options);
+pid_t waitpid(pid_t, int*, int);
 
 #ifdef __cplusplus
 } /* extern "C" */
