@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2023 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2023, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,9 +28,11 @@
 extern "C" {
 #endif
 
+#if __USE_SORTIX
 #ifndef __FILE_defined
 #define __FILE_defined
 typedef struct __FILE FILE;
+#endif
 #endif
 
 #ifndef __gid_t_defined
@@ -66,24 +68,30 @@ extern FILE* __pwd_file;
 FILE* __openent(const char*);
 #endif
 
-int bcrypt_newhash(const char*, int, char*, size_t);
-int bcrypt_checkpass(const char*, const char*);
-void endpwent(void);
-struct passwd* fgetpwent(FILE*);
-int fgetpwent_r(FILE* __restrict, struct passwd* __restrict, char* __restrict,
-                size_t, struct passwd** __restrict);
-struct passwd* getpwent(void);
-int getpwent_r(struct passwd* __restrict, char* __restrict, size_t,
-               struct passwd** __restrict);
 struct passwd* getpwnam(const char*);
 int getpwnam_r(const char* __restrict, struct passwd* __restrict,
                char* __restrict, size_t, struct passwd** __restrict);
 struct passwd* getpwuid(uid_t);
 int getpwuid_r(uid_t, struct passwd* __restrict, char* __restrict, size_t,
                struct passwd** __restrict);
-int scanpwent(char* __restrict, struct passwd* __restrict);
-FILE* openpw(void);
+
+#if __USE_XOPEN || __USE_SORTIX
+void endpwent(void);
+struct passwd* getpwent(void);
 void setpwent(void);
+#endif
+
+#if __USE_SORTIX
+int bcrypt_newhash(const char*, int, char*, size_t);
+int bcrypt_checkpass(const char*, const char*);
+struct passwd* fgetpwent(FILE*);
+int fgetpwent_r(FILE* __restrict, struct passwd* __restrict, char* __restrict,
+                size_t, struct passwd** __restrict);
+int getpwent_r(struct passwd* __restrict, char* __restrict, size_t,
+               struct passwd** __restrict);
+FILE* openpw(void);
+int scanpwent(char* __restrict, struct passwd* __restrict);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
