@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2015, 2018, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,25 +42,28 @@ typedef __mode_t mode_t;
 extern "C" {
 #endif
 
-int chmod(const char* path, mode_t mode);
-int fchmod(int fd, mode_t mode);
-int fchmodat(int dirfd, const char* path, mode_t mode, int flags);
-int fstat(int fd, struct stat* st);
-int fstatat(int dirfd, const char* path, struct stat* buf, int flags);
-int futimens(int fd, const struct timespec times[2]);
-int lstat(const char* __restrict path, struct stat* __restrict st);
+int chmod(const char*, mode_t);
+int fchmod(int, mode_t);
+int fchmodat(int, const char*, mode_t, int);
+int fstat(int, struct stat*);
+int fstatat(int, const char*, struct stat*, int);
+int futimens(int, const struct timespec[2]);
+int lstat(const char* __restrict, struct stat* __restrict);
+#if __USE_SORTIX
 mode_t getumask(void);
-int mkdir(const char* path, mode_t mode);
-int mkdirat(int dirfd, const char* path, mode_t mode);
+#endif
+int mkdir(const char*, mode_t);
+int mkdirat(int, const char*, mode_t);
 /* TODO: mkfifo */
 /* TODO: mkfifoat */
 /* TODO: mknod? */
 /* TODO: mknodat? */
-int stat(const char* __restrict path, struct stat* __restrict st);
-mode_t umask(mode_t mask);
-int utimens(const char* path, const struct timespec times[2]);
-int utimensat(int dirfd, const char* path, const struct timespec times[2],
-              int flags);
+int stat(const char* __restrict, struct stat* __restrict);
+mode_t umask(mode_t);
+#if __USE_SORTIX
+int utimens(const char*, const struct timespec[2]);
+#endif
+int utimensat(int, const char*, const struct timespec[2], int);
 
 #ifdef __cplusplus
 } /* extern "C" */
