@@ -30,7 +30,7 @@
 extern "C" {
 #endif
 
-#if __USE_XOPEN
+#if __USE_SORTIX || __USE_XOPEN
 #ifndef __id_t_defined
 #define __id_t_defined
 typedef __id_t id_t;
@@ -61,7 +61,7 @@ struct timeval
 };
 #endif
 
-#if __USE_XOPEN
+#if __USE_SORTIX || __USE_XOPEN
 #define RUSAGE_SELF 0
 #define RUSAGE_CHILDREN 1
 
@@ -75,7 +75,7 @@ struct rusage
 int getrlimit(int, struct rlimit*);
 int setrlimit(int, const struct rlimit*);
 
-#if __USE_XOPEN
+#if __USE_SORTIX || __USE_XOPEN
 int getpriority(int, id_t);
 int getrusage(int, struct rusage*);
 int setpriority(int, id_t, int);

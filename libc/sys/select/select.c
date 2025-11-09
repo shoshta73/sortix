@@ -18,9 +18,10 @@
  * Waiting on multiple file descriptors.
  */
 
-#include <errno.h>
-
 #include <sys/select.h>
+
+#include <errno.h>
+#include <stddef.h>
 
 int select(int nfds, fd_set* restrict readfds, fd_set* restrict writefds,
            fd_set* restrict exceptfds, struct timeval* restrict timeout)

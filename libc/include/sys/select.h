@@ -25,8 +25,6 @@
 
 #include <sys/__/types.h>
 
-#include <string.h> /* TODO: HACK: for FD_ZERO */
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -78,13 +76,13 @@ typedef struct
 #define FD_CLR(fd, fdsetp) (__FD_ACCESS(fd, fdsetp) &= ~__FD_MASK(fd))
 #define FD_ISSET(fd, fdsetp) (__FD_ACCESS(fd, fdsetp) & __FD_MASK(fd))
 #define FD_SET(fd, fdsetp) (__FD_ACCESS(fd, fdsetp) |= __FD_MASK(fd))
-#define FD_ZERO(fdsetp) memset(fdsetp, 0, sizeof(fd_set))
+#define FD_ZERO(fdsetp) __builtin_memset(fdsetp, 0, sizeof(fd_set))
 
 int select(int, fd_set* __restrict, fd_set* __restrict, fd_set* __restrict,
            struct timeval* __restrict);
 int pselect(int, fd_set* __restrict, fd_set* __restrict, fd_set* __restrict,
             const struct timespec* __restrict,
-            const sigset_t* __restrict sigmask);
+            const sigset_t* __restrict);
 
 #ifdef __cplusplus
 } /* extern "C" */
