@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,9 +28,11 @@
 extern "C" {
 #endif
 
+#if __USE_SORTIX || __USE_XOPEN
 #define PRIO_PROCESS 0
 #define PRIO_PGRP 1
 #define PRIO_USER 2
+#endif
 
 typedef __uintmax_t rlim_t;
 
@@ -46,7 +48,9 @@ struct rlimit
 
 #define RLIMIT_AS 0
 #define RLIMIT_CORE 1
+#if __USE_SORTIX || __USE_XOPEN
 #define RLIMIT_CPU 2
+#endif
 #define RLIMIT_DATA 3
 #define RLIMIT_FSIZE 4
 #define RLIMIT_NOFILE 5

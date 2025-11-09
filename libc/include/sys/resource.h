@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,9 +30,11 @@
 extern "C" {
 #endif
 
+#if __USE_XOPEN
 #ifndef __id_t_defined
 #define __id_t_defined
 typedef __id_t id_t;
+#endif
 #endif
 
 #ifndef __pid_t_defined
@@ -59,6 +61,7 @@ struct timeval
 };
 #endif
 
+#if __USE_XOPEN
 #define RUSAGE_SELF 0
 #define RUSAGE_CHILDREN 1
 
@@ -67,13 +70,20 @@ struct rusage
 	struct timeval ru_utime;
 	struct timeval ru_stime;
 };
+#endif
 
-int getpriority(int, id_t);
 int getrlimit(int, struct rlimit*);
-int getrusage(int, struct rusage*);
-int prlimit(pid_t, int, const struct rlimit*, struct rlimit*);
-int setpriority(int, id_t, int);
 int setrlimit(int, const struct rlimit*);
+
+#if __USE_XOPEN
+int getpriority(int, id_t);
+int getrusage(int, struct rusage*);
+int setpriority(int, id_t, int);
+#endif
+
+#if __USE_SORTIX
+int prlimit(pid_t, int, const struct rlimit*, struct rlimit*);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
