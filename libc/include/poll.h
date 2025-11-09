@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,11 +35,10 @@
 extern "C" {
 #endif
 
-int poll(struct pollfd* fds, nfds_t nfds, int timeout);
+int poll(struct pollfd*, nfds_t, int);
 
 #if __USE_SORTIX || 202405L <= __USE_POSIX
-int ppoll(struct pollfd* fds, nfds_t nfds, const struct timespec* timeout,
-          const sigset_t* sigmask);
+int ppoll(struct pollfd*, nfds_t, const struct timespec*, const sigset_t*);
 #endif
 
 #ifdef __cplusplus
