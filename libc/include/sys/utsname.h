@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,9 +34,17 @@ struct utsname
 	char nodename[_UTSNAME_LENGTH];
 	char release[_UTSNAME_LENGTH];
 	char version[_UTSNAME_LENGTH];
+#if __USE_SORTIX
 	char tagline[_UTSNAME_LENGTH];
+#else
+	char __tagline[_UTSNAME_LENGTH];
+#endif
 	char machine[_UTSNAME_LENGTH];
+#if __USE_SORTIX
 	char processor[_UTSNAME_LENGTH];
+#else
+	char __processor[_UTSNAME_LENGTH];
+#endif
 };
 
 int uname(struct utsname*);
