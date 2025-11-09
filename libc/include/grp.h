@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,9 +28,11 @@
 extern "C" {
 #endif
 
+#if __USE_SORTIX
 #ifndef __FILE_defined
 #define __FILE_defined
 typedef struct __FILE FILE;
+#endif
 #endif
 
 #ifndef __gid_t_defined
@@ -56,20 +58,26 @@ struct group
 extern FILE* __grp_file;
 #endif
 
-void endgrent(void);
-struct group* fgetgrent(FILE*);
-int fgetgrent_r(FILE* __restrict, struct group* __restrict, char* __restrict,
-                size_t, struct group** __restrict);
-struct group* getgrent(void);
-int getgrent_r(struct group* __restrict, char* __restrict, size_t,
-               struct group** __restrict);
 struct group* getgrgid(gid_t);
 int getgrgid_r(gid_t, struct group* __restrict, char* __restrict, size_t,
                struct group** __restrict);
 struct group* getgrnam(const char*);
 int getgrnam_r(const char*, struct group*, char*, size_t, struct group**);
-FILE* opengr(void);
+
+#if __USE_XOPEN || __USE_SORTIX
+void endgrent(void);
+struct group* getgrent(void);
 void setgrent(void);
+#endif
+
+#if __USE_SORTIX
+struct group* fgetgrent(FILE*);
+int fgetgrent_r(FILE* __restrict, struct group* __restrict, char* __restrict,
+                size_t, struct group** __restrict);
+int getgrent_r(struct group* __restrict, char* __restrict, size_t,
+               struct group** __restrict);
+FILE* opengr(void);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
