@@ -25,11 +25,16 @@
  * SUCH DAMAGE.
  */
 
-#ifndef INCLUDE_MACHINE_FENV_H
-#define INCLUDE_MACHINE_FENV_H
+#ifndef _INCLUDE_MACHINE_FENV_H
+#define _INCLUDE_MACHINE_FENV_H
+
+#include <sys/cdefs.h>
 
 #include <__/stdint.h>
+
+#if __USE_SORTIX
 #include <machine/npx.h>
+#endif
 
 /*
  * Each symbol representing a floating point exception expands to an integer
@@ -74,6 +79,7 @@
 /*
  * fenv_t represents the entire floating-point environment
  */
+#if __USE_SORTIX
 typedef struct {
 	struct {
 		__uint16_t control;	/* Control word register */
@@ -87,6 +93,21 @@ typedef struct {
 
 	__uint32_t mxcsr;			/* Control and status register */
 } fenv_t;
+#else
+typedef struct {
+	struct {
+		__uint16_t __control;	/* Control word register */
+		__uint16_t __unused1;
+		__uint16_t __status;	/* Status word register */
+		__uint16_t __unused2;
+		__uint16_t __tag;		/* Tag word register */
+		__uint16_t __unused3;
+		__uint32_t __others[4];	/* EIP, Pointer Selector, etc */
+	} __x87;
+
+	__uint32_t __mxcsr;			/* Control and status register */
+} fenv_t;
+#endif
 
 /*
  * The following constant represents the default floating-point environment
