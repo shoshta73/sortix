@@ -113,8 +113,10 @@ struct addrinfo
 
 /* These are not standardized, but are provided on other platforms and existing
    sofware uses them, so let's just provide ourselves. */
+#if __USE_SORTIX
 #define NI_MAXHOST 1025
 #define NI_MAXSERV 32
+#endif
 
 /* endhostent will not be implemented. */
 __attribute__((__warning__("endnetent() is IPv4-only and does nothing on this system")))
