@@ -87,7 +87,7 @@ struct tm
 #endif
 
 #define CLOCKS_PER_SEC 1000000l
-#if __USE__SORTIX || 202405L <= __USE_POSIX || __USE_C <= 2011
+#if __USE_SORTIX || 202405L <= __USE_POSIX || __USE_C <= 2011
 #define TIME_UTC 1
 #endif
 
@@ -104,10 +104,12 @@ extern "C" {
 __attribute__((__warning__("asctime() is obsolete, use strftime()")))
 #endif
 char* asctime(const struct tm*);
+#if __USE_SORTIX || (__USE_POSIX && __USE_POSIX < 202405L)
 #if !defined(__is_sortix_libc) /* not a warning inside libc */
 __attribute__((__warning__("asctime_r() is obsolete, use strftime()")))
 #endif
 char* asctime_r(const struct tm* __restrict, char* __restrict);
+#endif
 clock_t clock(void);
 /* TODO: clock_getcpuclockid */
 int clock_getres(clockid_t, struct timespec*);
@@ -118,10 +120,12 @@ int clock_settime(clockid_t, const struct timespec*);
 __attribute__((__warning__("ctime() is obsolete, use strftime()")))
 #endif
 char* ctime(const time_t* clock);
+#if __USE_SORTIX || (__USE_POSIX && __USE_POSIX < 202405L)
 #if !defined(__is_sortix_libc) /* not a warning inside libc */
 __attribute__((__warning__("ctime_r() is obsolete, use strftime()")))
 #endif
 char* ctime_r(const time_t* clock, char* buf);
+#endif
 double difftime(time_t, time_t);
 /* getdate is omitted, use strptime */
 struct tm* gmtime(const time_t*);
@@ -134,8 +138,10 @@ size_t strftime(char* __restrict, size_t, const char* __restrict,
                 const struct tm* __restrict);
 size_t strftime_l(char* __restrict, size_t, const char* __restrict,
                 const struct tm* __restrict, locale_t);
+#if __USE_SORTIX || __USE_XOPEN
 char* strptime(const char* __restrict, const char* __restrict,
                struct tm* __restrict);
+#endif
 time_t time(time_t*);
 int timer_create(clockid_t, struct sigevent* __restrict, timer_t* __restrict);
 int timer_delete(timer_t);
@@ -145,10 +151,11 @@ int timer_settime(timer_t, int, const struct itimerspec* __restrict,
                   struct itimerspec* __restrict);
 void tzset(void);
 
-/* TODO: This is some _MISC_SOURCE thing according to GNU, but I like it. */
+#if __USE_SORTIX
 time_t timegm(struct tm*);
+#endif
 
-#if __USE__SORTIX || 202405L <= __USE_POSIX || __USE_C <= 2011
+#if __USE_SORTIX || 202405L <= __USE_POSIX || __USE_C <= 2011
 int timespec_get(struct timespec*, int);
 #endif
 
