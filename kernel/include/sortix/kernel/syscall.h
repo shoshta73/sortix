@@ -43,6 +43,7 @@
 #include <sortix/termios.h>
 #include <sortix/timespec.h>
 #include <sortix/tmns.h>
+#include <sortix/wincurpos.h>
 #include <sortix/winsize.h>
 
 namespace Sortix {

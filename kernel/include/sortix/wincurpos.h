@@ -17,8 +17,8 @@
  * Defines values for termios.
  */
 
-#ifndef _INCLUDE_SORTIX_WINSIZE_H
-#define _INCLUDE_SORTIX_WINSIZE_H
+#ifndef _INCLUDE_SORTIX_WINCURPOS_H
+#define _INCLUDE_SORTIX_WINCURPOS_H
 
 #include <sys/cdefs.h>
 
@@ -28,12 +28,10 @@
 #include <stddef.h>
 #endif
 
-struct winsize
+struct wincurpos
 {
-	size_t ws_row;
-	size_t ws_col;
-	size_t ws_xpixel;
-	size_t ws_ypixel;
+	size_t wcp_row;
+	size_t wcp_col;
 };
 
 #endif

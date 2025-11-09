@@ -27,6 +27,9 @@
 #include <sys/__/types.h>
 
 #include <sortix/termios.h>
+#if __USE_SORTIX
+#include <sortix/wincurpos.h>
+#endif
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 #include <sortix/winsize.h>
 #endif

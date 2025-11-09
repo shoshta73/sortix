@@ -29,6 +29,7 @@
 #include <sortix/statvfs.h>
 #include <sortix/termios.h>
 #include <sortix/timespec.h>
+#include <sortix/wincurpos.h>
 #include <sortix/winsize.h>
 
 #ifdef __cplusplus

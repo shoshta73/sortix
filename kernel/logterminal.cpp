@@ -34,6 +34,7 @@
 #include <sortix/signal.h>
 #include <sortix/stat.h>
 #include <sortix/termios.h>
+#include <sortix/wincurpos.h>
 #include <sortix/winsize.h>
 
 #include <sortix/kernel/inode.h>
