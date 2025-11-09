@@ -55,7 +55,7 @@
 #warning "You should define PAGESIZE for this architecture"
 /*#undef PAGESIZE*/
 #endif
-#if __USE_XOPEN && defined(PAGESIZE)
+#if (__USE_SORTIX || __USE_XOPEN) && defined(PAGESIZE)
 #define PAGE_SIZE PAGESIZE
 #endif
 /*#undef PTHREAD_DESTRUCTOR_ITERATIONS*/
