@@ -114,7 +114,7 @@ typedef __float_t float_t;
 #if __USE_SORTIX || __USE_XOPEN
 #define M_E             2.7182818284590452354   /* e */
 #endif
-#if __USE_SORTIX || 1999 <= __USE_C || __USE_XOPEN
+#if __USE_SORTIX || __USE_XOPEN
 #define M_LOG2E         1.4426950408889634074   /* log 2e */
 #define M_LOG10E        0.43429448190325182765  /* log 10e */
 #define M_LN2           0.69314718055994530942  /* log e2 */
@@ -129,10 +129,12 @@ typedef __float_t float_t;
 #define M_SQRT1_2       0.70710678118654752440  /* 1/sqrt(2) */
 #endif
 
-#if __USE_SORTIX || __USE_XOPEN
-/* TODO: MAXFLOAT is obsoleted by FLT_MAX of float.h. */
+/* MAXFLOAT is obsoleted by FLT_MAX of float.h. */
+#if __USE_SORTIX || (__USE_XOPEN && __USE_XOPEN < 800)
 #define MAXFLOAT        ((float)3.40282346638528860e+38)
+#endif
 
+#if __USE_SORTIX || __USE_XOPEN
 extern int signgam;
 #endif /* __USE_SORTIX || __USE_XOPEN */
 
@@ -169,7 +171,10 @@ struct exception
 };
 #endif
 
+/* HUGE is kept for now because libm uses it. */
+#if __USE_SORTIX
 #define HUGE MAXFLOAT
+#endif
 
 /*
  * set X_TLOSS = pi*2**52, which is possibly defined in <values.h>
@@ -228,16 +233,8 @@ double fmod(double, double);
 #if __USE_SORTIX || 1999 <= __USE_C || __USE_XOPEN
 double erf(double);
 double erfc(double);
-double gamma(double);
 double hypot(double, double);
-int finite(double);
-double j0(double);
-double j1(double);
-double jn(int, double);
 double lgamma(double);
-double y0(double);
-double y1(double);
-double yn(int, double);
 #endif  /* __USE_SORTIX ||  1999 <= __USE_C || __USE_XOPEN */
 
 #if __USE_SORTIX || 1999 <= __USE_C || 500 <= __USE_XOPEN
@@ -252,8 +249,22 @@ double logb(double);
 double nextafter(double, double);
 double remainder(double, double);
 double rint(double);
-double scalb(double, double);
 #endif /* __USE_SORTIX || 1999 <= __USE_C || 500 <= __USE_XOPEN */
+
+#if __USE_SORTIX || __USE_XOPEN
+double j0(double);
+double j1(double);
+double jn(int, double);
+double y0(double);
+double y1(double);
+double yn(int, double);
+#endif /* __USE_SORTIX || __USE_XOPEN */
+
+#if __USE_SORTIX
+double gamma(double);
+int finite(double);
+double scalb(double, double);
+#endif /* __USE_SORTIX */
 
 /*
  * ISO C99
