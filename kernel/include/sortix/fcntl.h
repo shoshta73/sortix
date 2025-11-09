@@ -85,7 +85,9 @@
 #define AT_REMOVEDIR (1<<0)
 #define AT_EACCESS (1<<1)
 #define AT_SYMLINK_NOFOLLOW (1<<2)
+#if __USE_SORTIX
 #define AT_REMOVEFILE (1<<3)
+#endif
 #define AT_SYMLINK_FOLLOW (1<<4)
 
 #endif

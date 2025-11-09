@@ -49,10 +49,10 @@ typedef __mode_t mode_t;
 extern "C" {
 #endif
 
-int creat(const char* path, mode_t mode);
-int fcntl(int fd, int cmd, ...);
-int open(const char* path, int oflag, ...);
-int openat(int fd, const char* path, int oflag, ...);
+int creat(const char*, mode_t);
+int fcntl(int, int, ...);
+int open(const char*, int, ...);
+int openat(int, const char*, int, ...);
 
 #ifdef __cplusplus
 } /* extern "C" */
