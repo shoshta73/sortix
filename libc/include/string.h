@@ -59,7 +59,7 @@ int strcmp(const char*, const char*);
 int strcoll(const char*, const char*);
 char* strcpy(char* __restrict, const char* __restrict);
 size_t strcspn(const char*, const char*);
-char* strerror(int errnum);
+char* strerror(int);
 size_t strlen(const char*);
 char* strncat(char* __restrict, const char* __restrict, size_t);
 int strncmp(const char*, const char*, size_t);
@@ -73,8 +73,8 @@ size_t strxfrm(char* __restrict, const char* __restrict, size_t);
 
 /* Functions from early POSIX. */
 #if __USE_SORTIX || __USE_POSIX
-int strcasecmp(const char* a, const char* b);
-int strncasecmp(const char* a, const char* b, size_t n);
+int strcasecmp(const char*, const char*);
+int strncasecmp(const char*, const char*, size_t);
 #endif
 
 /* Functions from early XOPEN. */
@@ -104,7 +104,7 @@ char* strerror_l(int, locale_t);
 int strncasecmp_l(const char*, const char*, size_t, locale_t);
 char* strndup(const char*, size_t);
 size_t strnlen(const char*, size_t);
-char* strsignal(int signum);
+char* strsignal(int);
 size_t strxfrm_l(char* __restrict, const char* __restrict, size_t, locale_t);
 #endif
 
@@ -124,7 +124,7 @@ int ffsll(long long int);
 void explicit_bzero(void*, size_t);
 
 void* memrchr(const void*, int, size_t);
-char* strchrnul(const char* str, int c);
+char* strchrnul(const char*, int);
 char* stresep(char**, const char*, int);
 char* strsep(char**, const char*);
 int strverscmp(const char*, const char*);
