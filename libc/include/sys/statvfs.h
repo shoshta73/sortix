@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,7 +31,9 @@ extern "C" {
 #endif
 
 int fstatvfs(int, struct statvfs*);
+#if __USE_SORTIX
 int fstatvfsat(int, const char* __restrict, struct statvfs* __restrict, int);
+#endif
 int statvfs(const char* __restrict, struct statvfs* __restrict);
 
 #ifdef __cplusplus
