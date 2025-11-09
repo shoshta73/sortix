@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2016-2017, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -78,14 +78,18 @@ typedef __pthread_t pthread_t;
 
 #endif /* !defined(__is_sortix_libk) && !defined(__is_sortix_kernel) */
 
+#if __USE_SORTIX
 #define NSIG __SIG_MAX_NUM
+#endif
 
 #endif /* __USE_SORTIX || __USE_POSIX */
 
 typedef int sig_atomic_t;
 
+#if __USE_SORTIX || __USE_XOPEN
 #define MINSIGSTKSZ 2048
 #define SIGSTKSZ 8192
+#endif
 
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 #define SIG2STR_MAX 16
@@ -95,27 +99,21 @@ typedef int sig_atomic_t;
 extern "C" {
 #endif
 
-int raise(int sig);
+int raise(int);
 void (*signal(int, void (*)(int)))(int);
 
 #if __USE_SORTIX || __USE_POSIX
 int kill(pid_t, int);
-int killpg(pid_t, int);
 void psiginfo(const siginfo_t*, const char*);
 void psignal(int, const char*);
 /* TODO: int pthread_kill(pthread_t, int); */
 int pthread_sigmask(int, const sigset_t* __restrict, sigset_t* __restrict);
 int sigaction(int, const struct sigaction* __restrict, struct sigaction* __restrict);
 int sigaddset(sigset_t*, int);
-int sigaltstack(const stack_t* __restrict, stack_t* __restrict);
-int sigandset(sigset_t*, const sigset_t*, const sigset_t*);
 int sigdelset(sigset_t*, int);
 int sigemptyset(sigset_t*);
 int sigfillset(sigset_t*);
-int sigisemptyset(const sigset_t*);
 int sigismember(const sigset_t*, int);
-int signotset(sigset_t*, const sigset_t*);
-int sigorset(sigset_t*, const sigset_t*, const sigset_t*);
 int sigpending(sigset_t*);
 int sigprocmask(int, const sigset_t* __restrict, sigset_t* __restrict);
 /* TODO: int sigqueue(pid_t, int, const union sigval); */
@@ -126,9 +124,21 @@ int sigsuspend(const sigset_t*);
 /* TODO: int sigwaitinfo(const sigset_t* __restrict, siginfo_t* __restrict); */
 #endif
 
+#if __USE_SORTIX || __USE_XOPEN
+int killpg(pid_t, int);
+int sigaltstack(const stack_t* __restrict, stack_t* __restrict);
+#endif
+
 #if __USE_SORTIX || 202405L <= __USE_POSIX
 int sig2str(int, char*);
 int str2sig(const char* __restrict, int* __restrict);
+#endif
+
+#if __USE_SORTIX
+int sigandset(sigset_t*, const sigset_t*, const sigset_t*);
+int sigisemptyset(const sigset_t*);
+int signotset(sigset_t*, const sigset_t*);
+int sigorset(sigset_t*, const sigset_t*, const sigset_t*);
 #endif
 
 #ifdef __cplusplus

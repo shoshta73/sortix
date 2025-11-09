@@ -31,9 +31,10 @@ extern "C" {
 
 /* Register declarations for i386 */
 #if defined(__i386__)
-typedef int greg_t;
-#define NGREG 23
-typedef greg_t gregset_t[NGREG];
+typedef int __greg_t;
+#define __NGREG 23
+typedef __greg_t __gregset_t[__NGREG];
+#if __USE_SORTIX
 enum
 {
 	REG_GS = 0,
@@ -76,12 +77,14 @@ enum
 #define REG_GSBASE REG_GSBASE
 };
 #endif
+#endif
 
 /* Register declarations for x86-64 */
 #if defined(__x86_64__)
-typedef long int greg_t;
-#define NGREG 23
-typedef greg_t gregset_t[NGREG];
+typedef long int __greg_t;
+#define __NGREG 23
+typedef __greg_t __gregset_t[__NGREG];
+#if __USE_SORTIX
 enum
 {
 	REG_R8 = 0,
@@ -130,18 +133,33 @@ enum
 #define REG_GSBASE REG_GSBASE
 };
 #endif
+#endif
+
+#if __USE_SORTIX
+typedef __greg_t greg_t;
+#define NGREG __NGREG
+typedef __gregset_t gregset_t;
+#endif
 
 typedef struct
 {
+#if __USE_SORTIX
 	gregset_t gregs;
 #if defined(__i386__) || defined(__x86_64__)
 	unsigned char fpuenv[512];
 #endif
+#else
+	__gregset_t __gregs;
+#if defined(__i386__) || defined(__x86_64__)
+	unsigned char __fpuenv[512];
+#endif
+#endif
 } mcontext_t;
 
-typedef struct ucontext
+typedef struct __ucontext ucontext_t;
+typedef struct __ucontext
 {
-	struct ucontext* uc_link;
+	ucontext_t* uc_link;
 	sigset_t uc_sigmask;
 	stack_t uc_stack;
 	mcontext_t uc_mcontext;

@@ -74,8 +74,10 @@ typedef struct
 #define BUS_ADRALN 19
 #define BUS_ADRERR 20
 #define BUS_OBJERR 21
+#if __USE_SORTIX || __USE_XOPEN
 #define TRAP_BRKPT 22
 #define TRAP_TRACE 23
+#endif
 #define CLD_EXITED 24
 #define CLD_KILLED 25
 #define CLD_DUMPED 26

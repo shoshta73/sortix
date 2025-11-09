@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,8 +34,10 @@ extern "C" {
 #include <stddef.h>
 #endif
 
+#if __USE_SORTIX || __USE_XOPEN
 #define SS_ONSTACK (1<<0)
 #define SS_DISABLE (1<<1)
+#endif
 
 #define __SS_SUPPORTED_FLAGS (SS_ONSTACK | SS_DISABLE)
 
