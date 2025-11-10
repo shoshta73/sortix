@@ -144,7 +144,7 @@ void TextBufferHandle::FinishReplace(TextBuffer* newtextbuf)
 				else if ( src_width && src_height )
 				{
 					TextPos templ_pos;
-					templ_pos.x = src_y < src_width ? src_y : src_x - 1;
+					templ_pos.x = src_x < src_width ? src_x : src_width - 1;
 					templ_pos.y = src_y < src_height ? src_y : src_height - 1;
 					tc = textbuf->GetChar(templ_pos);
 					tc.c = 0;

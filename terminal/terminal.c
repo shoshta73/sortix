@@ -175,14 +175,14 @@ static void scrollback_resize(size_t new_rows, size_t new_columns)
 				tc = scrollback[src_y * columns + src_x];
 			else if ( columns && rows )
 			{
-				size_t templ_x = src_y < columns ? src_y : src_x - 1;
+				size_t templ_x = src_x < columns ? src_x : columns - 1;
 				size_t templ_y = src_y < rows ? src_y : rows - 1;
 				tc = scrollback[templ_y * columns + templ_x];
 				tc.wc = 0;
 				tc.attr = 0;
 			}
 			else
-				tc = (struct entry) { 0 };
+				tc = (struct entry) { 0, current_fgcolor, current_bgcolor, 0 };
 			new_scrollback[dst_y * new_columns + dst_x] = tc;
 			if ( src_x == column && src_y == row )
 			{
@@ -931,6 +931,10 @@ void on_resize(void* ctx, uint32_t window_id, uint32_t width, uint32_t height)
 	pthread_mutex_lock(&scrollback_mutex);
 	size_t new_rows = height / FONT_HEIGHT;
 	size_t new_columns = width / FONT_WIDTH;
+	if ( !new_rows )
+		new_rows = 1;
+	if ( !new_columns )
+		new_columns = 1;
 	scrollback_resize(new_rows, new_columns);
 	struct winsize ws;
 	ws.ws_row = rows;
