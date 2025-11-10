@@ -1,7 +1,7 @@
 The Sortix Operating System
 ===========================
 
-Sortix is a small self-hosting operating-system aiming to be a clean and modern
+Sortix is a small self-hosting operating system aiming to be a clean and modern
 POSIX implementation.  It is a hobbyist operating system written from scratch
 with its own base system, including kernel and standard library, as well as
 ports of third party software.  It has a straightforward installer and can be
