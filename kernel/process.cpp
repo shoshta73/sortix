@@ -589,7 +589,9 @@ pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 
 	// It is safe to access these clocks directly as the child process is no
 	// longer running at this point and the values are nicely frozen.
+	child_execute_clock.Advance(zombie->execute_clock.current_time);
 	child_execute_clock.Advance(zombie->child_execute_clock.current_time);
+	child_system_clock.Advance(zombie->system_clock.current_time);
 	child_system_clock.Advance(zombie->child_system_clock.current_time);
 
 	int status = zombie->exit_code;

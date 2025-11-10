@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -40,8 +40,8 @@ void statistics(void)
 	struct tmns ts;
 	timens(&ts);
 	struct timespec real_time = timespec_sub(end_time, start_time);
-	struct timespec execute_time =timespec_sub(ts.tmns_cutime, ts.tmns_utime);
-	struct timespec system_time = timespec_sub(ts.tmns_cstime, ts.tmns_stime);
+	struct timespec execute_time = ts.tmns_cutime;
+	struct timespec system_time = ts.tmns_cstime;
 	struct timespec user_time = timespec_sub(execute_time, system_time);
 
 	if ( p )

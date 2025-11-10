@@ -79,14 +79,15 @@ void OnTick(struct timespec tick_period, bool system_mode)
 	uptime_clock->Advance(tick_period);
 	Thread* thread = CurrentThread();
 	Process* process = thread->process;
-	thread->execute_clock.Advance(tick_period);
-	process->execute_clock.Advance(tick_period);
-	process->child_execute_clock.Advance(tick_period);
 	if ( system_mode )
 	{
 		thread->system_clock.Advance(tick_period);
 		process->system_clock.Advance(tick_period);
-		process->child_system_clock.Advance(tick_period);
+	}
+	else
+	{
+		thread->execute_clock.Advance(tick_period);
+		process->execute_clock.Advance(tick_period);
 	}
 }
 
