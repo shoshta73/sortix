@@ -140,6 +140,7 @@ public:
 public:
 	Thread* first_thread;
 	kthread_mutex_t thread_lock;
+	kthread_cond_t single_threaded_cond;
 	size_t threads_not_exiting_count;
 	bool threads_exiting;
 
@@ -198,7 +199,8 @@ private:
 public:
 	void OnLastThreadExit();
 	void AfterLastThreadExit();
-	void ResetForExecute();
+	bool ExitOtherThreads();
+	bool ResetForExecute();
 
 };
 

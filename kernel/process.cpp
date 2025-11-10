@@ -144,6 +144,7 @@ Process::Process()
 
 	first_thread = NULL;
 	thread_lock = KTHREAD_MUTEX_INITIALIZER;
+	single_threaded_cond = KTHREAD_COND_INITIALIZER;
 	threads_not_exiting_count = 0;
 	threads_exiting = false;
 
@@ -262,6 +263,8 @@ void Process::OnThreadDestruction(Thread* thread)
 		first_thread->prev_sibling = NULL;
 	thread->prev_sibling = thread->next_sibling = NULL;
 	bool threadsleft = first_thread;
+	if ( first_thread && !first_thread->next_sibling )
+		kthread_cond_signal(&single_threaded_cond);
 	kthread_mutex_unlock(&thread_lock);
 
 	// We are called from the threads destructor, let it finish before we
@@ -840,8 +843,34 @@ Process* Process::Fork()
 	return clone;
 }
 
-void Process::ResetForExecute()
+bool Process::ExitOtherThreads()
 {
+	ScopedLock lock(&thread_lock);
+
+	// Exit if we're not the first thread.
+	if ( threads_exiting || Signal::IsPending() )
+		return errno = EINTR, false;
+
+	// Request all other threads exit.
+	threads_exiting = true;
+	Thread* current_thread = CurrentThread();
+	for ( Thread* thread = first_thread; thread; thread = thread->next_sibling )
+		if ( thread != current_thread )
+			thread->DeliverSignal(SIGKILL);
+
+	// Wait for the process to become single threaded.
+	while ( first_thread != current_thread || first_thread->next_sibling )
+		kthread_cond_wait(&single_threaded_cond, &thread_lock);
+	threads_exiting = false;
+
+	return true;
+}
+
+bool Process::ResetForExecute()
+{
+	if ( !ExitOtherThreads() )
+		return false;
+
 	DeleteTimers();
 
 	for ( int i = 0; i < SIG_MAX_NUM; i++ )
@@ -860,6 +889,8 @@ void Process::ResetForExecute()
 	signal_stack->ss_flags = SS_DISABLE;
 
 	ResetAddressSpace();
+
+	return true;
 }
 
 bool Process::MapSegment(struct segment* result, void* hint, size_t size,

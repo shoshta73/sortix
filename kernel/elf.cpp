@@ -135,7 +135,8 @@ uintptr_t Load(Ref<Descriptor> program, Auxiliary* aux)
 	if ( ehdr.e_shentsize < sizeof(Elf_Shdr) )
 		return errno = EINVAL, 0;
 
-	process->ResetForExecute();
+	if ( !process->ResetForExecute() )
+		return 0;
 
 	if ( ehdr.e_phnum == (Elf_Half) -1 )
 		return errno = EINVAL, 0;
