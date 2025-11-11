@@ -73,6 +73,7 @@ private:
 	__attribute__((format(printf, 2, 3)))
 	void LogF(const char* format, ...);
 	bool Reset();
+	void EnableFIS();
 	void Seek(blkcnt_t block_index, size_t count);
 	void CommandDMA(uint8_t cmd, size_t size, bool write);
 	bool FinishTransferDMA();

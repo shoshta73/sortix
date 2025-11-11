@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2018, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -83,6 +83,33 @@ bool WaitSet(volatile little_uint32_t* reg,
 		struct timespec elapsed = timespec_sub(now, begun);
 		if ( timespec_le(timeout, elapsed) )
 			return errno = ETIMEDOUT, false;
+		kthread_yield();
+	}
+}
+
+bool WaitChange(volatile little_uint32_t* reg,
+                uint32_t* current_ptr,
+                uint32_t bits,
+                struct timespec* remaining)
+{
+	uint32_t current = *current_ptr;
+	Clock* clock = Time::GetClock(CLOCK_BOOTTIME);
+	struct timespec begun;
+	clock->Get(&begun, NULL);
+	struct timespec end = timespec_add(begun, *remaining);
+	while ( true )
+	{
+		struct timespec now;
+		clock->Get(&now, NULL);
+		uint32_t reg_snapshop = *reg;
+		if ( (reg_snapshop & bits) != (current & bits) )
+		{
+			*current_ptr = reg_snapshop;
+			return true;
+		}
+		if ( timespec_le(end, now) )
+			return errno = ETIMEDOUT, false;
+		*remaining = timespec_sub(end, now);
 		kthread_yield();
 	}
 }

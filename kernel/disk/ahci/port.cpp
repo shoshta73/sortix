@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2021, 2024, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2016, 2021, 2024-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -172,36 +172,13 @@ bool Port::Initialize()
 
 	Memory::Flush();
 
+	EnableFIS();
+
 	return true;
 }
 
-bool Port::FinishInitialize()
+void Port::EnableFIS()
 {
-	// Disable power management transitions for now (IPM = 3 = transitions to
-	// partial/slumber disabled).
-	regs->pxsctl = regs->pxsctl | 0x300 /* TODO: Magic constant? */;
-
-	// Power on and spin up the device if necessary.
-	if ( regs->pxcmd & PXCMD_CPD )
-		regs->pxcmd = regs->pxcmd | PXCMD_POD;
-	if ( hba->regs->cap & CAP_SSS )
-		regs->pxcmd = regs->pxcmd | PXCMD_SUD;
-
-	// Activate the port.
-	regs->pxcmd = (regs->pxcmd & ~PXCMD_ICC(16)) | (1 << 28);
-
-	if ( !Reset() )
-	{
-		// TODO: Is this safe?
-		return false;
-	}
-
-	// Clear interrupt status.
-	regs->pxis = regs->pxis;
-
-	// Clear error bits.
-	regs->pxserr = regs->pxserr;
-
 	uintptr_t virt = control_alloc.from;
 	uintptr_t phys = control_physical_frame;
 
@@ -231,21 +208,80 @@ bool Port::FinishInitialize()
 	offset += sizeof(struct prd);
 	// TODO: There can be more of these, fill until end of page!
 
+	assert(offset <= Page::Size());
+
 	// Enable FIS receive.
 	regs->pxcmd = regs->pxcmd | PXCMD_FRE;
 	ahci_port_flush(regs);
+}
 
-	assert(offset <= Page::Size());
+bool Port::FinishInitialize()
+{
+	// Disable power management transitions for now (IPM = 3 = transitions to
+	// partial/slumber disabled).
+	regs->pxsctl = regs->pxsctl | 0x300 /* TODO: Magic constant? */;
+
+	// Power on the device if necessary.
+	if ( regs->pxcmd & PXCMD_CPD )
+		regs->pxcmd = regs->pxcmd | PXCMD_POD;
+
+	// Complete the staggered spin-up process if necessary.
+	if ( hba->regs->cap & CAP_SSS )
+	{
+		regs->pxcmd = regs->pxcmd | PXCMD_SUD;
+
+		// Wait for device detection.
+		struct timespec timeout = timespec_make(1, 400000000); // 1.4s in bunnix
+		uint32_t ssts = regs->pxssts;
+		while ( (ssts & PXSSTS_DET) != PXSSTS_DET_NOPHY &&
+		        (ssts & PXSSTS_DET) != PXSSTS_DET_PRESENT )
+			if ( !WaitChange(&regs->pxssts, &ssts, PXSSTS_DET, &timeout) )
+				return false;
+
+		// Clear the error bits.
+		regs->pxserr = regs->pxserr;
+
+		// Wait for the device to be ready.
+		uint32_t bits = ATA_STATUS_BSY | ATA_STATUS_DRQ | ATA_STATUS_ERR;
+		// TODO: What is the appropriate timeout?
+		if ( !WaitClear(&regs->pxtfd, bits, true, 1000) )
+			return false;
+	}
+
+	// There does not appear to be any need to reset the port, since previously
+	// the function did not actually do the reset, and just cleared/set bits
+	// and state that we've already checked at this point.
+#if 0
+	if ( !Reset() )
+	{
+		// TODO: Is this safe?
+		return false;
+	}
+#endif
+
+	// Clear interrupt status.
+	regs->pxis = regs->pxis;
+
+	// Clear error bits.
+	regs->pxserr = regs->pxserr;
 
 	uint32_t ssts = regs->pxssts;
 	uint32_t pxtfd = regs->pxtfd;
 
-	if ( (ssts & 0xF) != 0x3 )
+	if ( (ssts & PXSSTS_DET) != PXSSTS_DET_PRESENT )
+	{
+		// TODO: If staggered spin-up is not supported, do we still want to wait
+		//       for the interface to come up? This might be the case if the
+		//       HBA was reset, or if the firmware didn't wait for us?
 		return false;
+	}
 	if ( pxtfd & ATA_STATUS_BSY )
 		return false;
 	if ( pxtfd & ATA_STATUS_DRQ )
 		return false;
+
+	// Activate the port.
+	regs->pxcmd = (regs->pxcmd & ~PXCMD_ICC) | PXCMD_ICC_ACTIVE;
 
 	// TODO: ATAPI.
 	if ( regs->pxsig == 0xEB140101 )
@@ -357,50 +393,34 @@ bool Port::Reset()
 		}
 	}
 
-#if 0
 	// Reset the device
-	regs->pxsctl = (regs->pxsctl & ~0xF) | 1;
+	regs->pxsctl = (regs->pxsctl & ~PXSCTL_DET) | PXSCTL_DET_INIT;
 	ahci_port_flush(regs);
 	delay(1500);
-	regs->pxsctl = (regs->pxsctl & ~0xF);
+	regs->pxsctl = (regs->pxsctl & ~PXSCTL_DET);
 	ahci_port_flush(regs);
-#endif
 
-	// Wait for the device to be detected.
-	if ( !WaitSet(&regs->pxssts, 0x1, false, 600) )
+	struct timespec timeout = timespec_make(0, 600000000); // 600ms
+	uint32_t ssts = regs->pxssts;
+	while ( (ssts & PXSSTS_DET) != PXSSTS_DET_NOPHY &&
+	        (ssts & PXSSTS_DET) != PXSSTS_DET_PRESENT )
+		if ( !WaitChange(&regs->pxssts, &ssts, PXSSTS_DET, &timeout) )
+			return false;
+
+	if ( (ssts & PXSSTS_DET) != PXSSTS_DET_PRESENT )
 		return false;
 
-	// Clear error.
+	// Clear the error bits.
 	regs->pxserr = regs->pxserr;
 	ahci_port_flush(regs);
 
-	// Wait for communication to be established with device
-	if ( regs->pxssts & 0x1 )
-	{
-		if ( !WaitSet(&regs->pxssts, 0x3, false, 600) )
-			return false;
-		regs->pxserr = regs->pxserr;
-		ahci_port_flush(regs);
-	}
-
-	// Wait for the device to come back up.
-	if ( (regs->pxtfd & 0xFF) == 0xFF )
-	{
-		delay(500 * 1000);
-		if ( (regs->pxtfd & 0xFF) == 0xFF )
-		{
-			LogF("error: device did not come back up after reset");
-			return errno = EINVAL, false;
-		}
-	}
-
-#if 0
-	if ( !WaitClear(&regs->pxtfd, ATA_STATUS_BSY, false, 1000) )
-	{
-		LogF("error: device did not unbusy");
+	// Wait for the device to be ready.
+	uint32_t bits = ATA_STATUS_BSY | ATA_STATUS_DRQ | ATA_STATUS_ERR;
+	// TODO: What is the appropriate timeout?
+	if ( !WaitClear(&regs->pxtfd, bits, true, 1000) )
 		return false;
-	}
-#endif
+
+	EnableFIS();
 
 	return true;
 }

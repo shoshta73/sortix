@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -197,7 +197,21 @@ static const uint32_t PXCMD_ATAPI = 1 << 24; /* 0x01000000 */
 static const uint32_t PXCMD_DLAE =  1 << 25; /* 0x02000000 */
 static const uint32_t PXCMD_ALPE =  1 << 26; /* 0x04000000 */
 static const uint32_t PXCMD_ASP =   1 << 27; /* 0x08000000 */
-static inline uint32_t PXCMD_ICC(uint32_t val) { return (val >> 28) % 16; }
+static const uint32_t PXCMD_ICC = 0xF << 28;
+static const uint32_t PXCMD_ICC_NOOP = 0 << 28;
+static const uint32_t PXCMD_ICC_ACTIVE = 1 << 28;
+static const uint32_t PXCMD_ICC_PARTIAL = 2 << 28;
+static const uint32_t PXCMD_ICC_SLUMBER = 7 << 28;
+
+static const uint32_t PXSSTS_DET = 0x7;
+static const uint32_t PXSSTS_DET_NODEV = 0x0;
+static const uint32_t PXSSTS_DET_NOPHY = 0x1;
+static const uint32_t PXSSTS_DET_PRESENT = 0x3;
+static const uint32_t PXSSTS_DET_OFFLINE = 0x4;
+
+static const uint32_t PXSCTL_DET = 0x7;
+static const uint32_t PXSCTL_DET_INIT = 0x1;
+static const uint32_t PXSCTL_DET_DISABLE = 0x4;
 
 struct hba_regs
 {
@@ -239,6 +253,16 @@ static const uint32_t CAP_CCCS = 1U << 7;
 static const uint32_t CAP_EMS = 1U << 6;
 static const uint32_t CAP_SXS = 1U << 5;
 static inline uint32_t CAP_NP(uint32_t val) { return (val >> 0) % 32 + 1; }
+
+static const uint32_t CAP2_BOH = 1U << 0;
+static const uint32_t CAP2_NVMP = 1U << 1;
+static const uint32_t CAP2_APST = 1U << 2;
+
+static const uint32_t BOHC_BOS = 1U << 0;
+static const uint32_t BOHC_OOS = 1U << 1;
+static const uint32_t BOHC_SOOE = 1U << 2;
+static const uint32_t BOHC_OOC = 1U << 3;
+static const uint32_t BOHC_BB = 1U << 4;
 
 static const uint32_t GHC_AE = 1U << 31;
 static const uint32_t GHC_MRSM = 1U << 2;
