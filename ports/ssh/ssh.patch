@@ -999,19 +999,6 @@ diff -Paur --no-dereference -- ssh.upstream/pathnames.h ssh/pathnames.h
  
  #ifndef _PATH_SSH_PROGRAM
  #define _PATH_SSH_PROGRAM		"/usr/bin/ssh"
-diff -Paur --no-dereference -- ssh.upstream/progressmeter.c ssh/progressmeter.c
---- ssh.upstream/progressmeter.c
-+++ ssh/progressmeter.c
-@@ -79,7 +79,8 @@
- static int
- can_output(void)
- {
--	return (getpgrp() == tcgetpgrp(STDOUT_FILENO));
-+	/* PATCH: Prefer the agreed upon and standard getpgid over getpgrp.  */
-+	return (getpgid(0) == tcgetpgrp(STDOUT_FILENO));
- }
- 
- /* size needed to format integer type v, using (nbits(v) * log2(10) / 10) */
 diff -Paur --no-dereference -- ssh.upstream/readconf.c ssh/readconf.c
 --- ssh.upstream/readconf.c
 +++ ssh/readconf.c
