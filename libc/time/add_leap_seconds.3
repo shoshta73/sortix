@@ -53,7 +53,7 @@ TAI-10 has the advantage that every actual past moment in time has an unique and
 unambiguous and continuous representation.
 The time difference between two TAI-10 timestamps can be calculated as a simple
 subtraction.
-Durations can be simply added to TAI-10 timestamps to produce the the timestamp
+Durations can be simply added to TAI-10 timestamps to produce the timestamp
 changed by that many seconds.
 However it's not possible to compute which TAI10  timestamp corresponds to a
 calendar date and time more than 6 months in the future, as the leap seconds
@@ -75,7 +75,7 @@ possible to losslessly convert UTC to and from calendar time.
 On success 1 is returned.
 .Pp
 0 is returned when the input timestamp has no representation in the output
-format or is ambigous.
+format or is ambiguous.
 The output timestamp will be the best approximation.
 This can happen in
 .Fn sub_leap_seconds
