@@ -301,7 +301,7 @@ int pthread_setspecific(pthread_key_t, const void*);
 /* TODO: pthread_spin_unlock */
 /* TODO: pthread_testcancel */
 
-#if __USE_SORTIX || 202405L <= __USE_POSIX
+#if __USE_SORTIX || 202405L <= __USE_POSIX || defined(__cplusplus)
 int pthread_cond_clockwait(pthread_cond_t* __restrict,
                            pthread_mutex_t* __restrict, clockid_t,
                            const struct timespec* __restrict);
