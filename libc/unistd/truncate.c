@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,5 +24,5 @@
 
 int truncate(const char* pathname, off_t length)
 {
-	return truncateat(AT_FDCWD, pathname, length);
+	return truncateat(AT_FDCWD, pathname, length, 0);
 }

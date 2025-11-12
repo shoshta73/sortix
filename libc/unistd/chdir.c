@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 201 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,5 +22,5 @@
 
 int chdir(const char* path)
 {
-	return fchdirat(AT_FDCWD, path);
+	return fchdirat(AT_FDCWD, path, 0);
 }

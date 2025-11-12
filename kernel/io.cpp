@@ -283,15 +283,26 @@ long sys_fpathconf(int fd, int name)
 	return desc->pathconf(&ctx, name);
 }
 
-int sys_truncateat(int dirfd, const char* path, off_t length)
+// TODO: After releasing Sortix 1.1, remove this old compatibility syscall and
+//       do an incompatible ABI bump.
+int sys_truncateat_noflags(int dirfd, const char* path, off_t length)
 {
+	return sys_truncateat(dirfd, path, length, 0);
+}
+
+int sys_truncateat(int dirfd, const char* path, off_t length, int flags)
+{
+	if ( flags & ~(AT_SYMLINK_NOFOLLOW) )
+		return errno = EINVAL, -1;
 	char* pathcopy = GetStringFromUser(path);
 	if ( !pathcopy )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	Ref<Descriptor> desc = from->open(&ctx, pathcopy, O_WRITE);
+	int open_flags =
+		O_WRITE | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	delete[] pathcopy;
 	if ( !desc )
 		return -1;
@@ -427,14 +438,26 @@ int sys_fchdir(int fd)
 	return 0;
 }
 
-int sys_fchdirat(int dirfd, const char* path)
+// TODO: After releasing Sortix 1.1, remove this old compatibility syscall and
+//       do an incompatible ABI bump.
+int sys_fchdirat_noflags(int dirfd, const char* path)
 {
+	return sys_fchdirat(dirfd, path, 0);
+}
+
+int sys_fchdirat(int dirfd, const char* path, int flags)
+{
+	if ( flags & ~(AT_SYMLINK_NOFOLLOW) )
+		return errno = EINVAL, -1;
 	char* pathcopy = GetStringFromUser(path);
 	if ( !pathcopy )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
-	Ref<Descriptor> desc = from->open(&ctx, pathcopy, O_READ | O_DIRECTORY);
+	if ( !from ) { delete[] pathcopy; return -1; }
+	int open_flags =
+		O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	from.Reset();
 	delete[] pathcopy;
 	if ( !desc )
@@ -455,14 +478,26 @@ int sys_fchroot(int fd)
 	return 0;
 }
 
-int sys_fchrootat(int dirfd, const char* path)
+// TODO: After releasing Sortix 1.1, remove this old compatibility syscall and
+//       do an incompatible ABI bump.
+int sys_fchrootat_noflags(int dirfd, const char* path)
 {
+	return sys_fchrootat(dirfd, path, 0);
+}
+
+int sys_fchrootat(int dirfd, const char* path, int flags)
+{
+	if ( flags & ~(AT_SYMLINK_NOFOLLOW) )
+		return errno = EINVAL, -1;
 	char* pathcopy = GetStringFromUser(path);
 	if ( !pathcopy )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
-	Ref<Descriptor> desc = from->open(&ctx, pathcopy, O_READ | O_DIRECTORY);
+	if ( !from ) { delete[] pathcopy; return -1; }
+	int open_flags =
+		O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	from.Reset();
 	delete[] pathcopy;
 	if ( !desc )

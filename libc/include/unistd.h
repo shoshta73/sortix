@@ -558,16 +558,16 @@ int usleep(useconds_t);
 #if __USE_SORTIX
 int alarmns(const struct timespec*, struct timespec*);
 int exit_thread(int, int, const struct exit_thread*);
-int fchdirat(int, const char*);
+int fchdirat(int, const char*, int);
 int fchroot(int);
-int fchrootat(int, const char*);
+int fchrootat(int, const char*, int);
 pid_t getinit(pid_t);
 int memstat(size_t*, size_t*);
 int mkpartition(int, off_t, off_t);
 pid_t setinit(void);
 pid_t sfork(int);
 pid_t tfork(int, struct tfork*);
-int truncateat(int, const char*, off_t);
+int truncateat(int, const char*, off_t, int);
 #endif
 
 #ifdef __cplusplus

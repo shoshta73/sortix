@@ -610,22 +610,13 @@ static bool log_rotate(struct log* log)
 				// file is truncated to zero size to avoid disk space remaining
 				// temporarily in use that way, although the inode itself does
 				// remain open temporarily.
-				// TODO: truncateat should have a flags parameter, to not follow
-				// symbolic links. Otherwise a symlink in /var/log could be
-				// used to truncate an arbitrary file, which is avoided here.
-				int fd = open(log->path_dst, O_WRONLY | O_NOFOLLOW);
-				if ( fd < 0 )
+				if ( truncateat(AT_FDCWD, log->path_dst, 0,
+				                AT_SYMLINK_NOFOLLOW) < 0 )
 				{
 					// Don't rotate logs on read-only filesystems.
 					if ( errno == EROFS )
 						break;
-					log_error(log, "archiving: opening: ", log->path_dst);
-				}
-				else
-				{
-					if ( ftruncate(fd, 0) < 0 )
-						log_error(log, "archiving: truncate: ", log->path_dst);
-					close(fd);
+					log_error(log, "archiving: truncate: ", log->path_dst);
 				}
 				if ( unlink(log->path_dst) < 0 )
 					log_error(log, "archiving: unlink: ", log->path_dst);

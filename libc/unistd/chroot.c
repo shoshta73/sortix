@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 201 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,5 +22,5 @@
 
 int chroot(const char* path)
 {
-	return fchrootat(AT_FDCWD, path);
+	return fchrootat(AT_FDCWD, path, 0);
 }

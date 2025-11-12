@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 201 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,9 +21,9 @@
 
 #include <unistd.h>
 
-DEFN_SYSCALL2(int, sys_fchrootat, SYSCALL_FCHROOTAT, int, const char*);
+DEFN_SYSCALL3(int, sys_fchrootat, SYSCALL_FCHROOTAT, int, const char*, int);
 
-int fchrootat(int dirfd, const char* path)
+int fchrootat(int dirfd, const char* path, int flags)
 {
-	return sys_fchrootat(dirfd, path);
+	return sys_fchrootat(dirfd, path, flags);
 }

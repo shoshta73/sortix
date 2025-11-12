@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,9 +22,10 @@
 
 #include <unistd.h>
 
-DEFN_SYSCALL3(int, sys_truncateat, SYSCALL_TRUNCATEAT, int, const char*, off_t);
+DEFN_SYSCALL4(int, sys_truncateat, SYSCALL_TRUNCATEAT, int, const char*, off_t,
+              int);
 
-int truncateat(int dirfd, const char* pathname, off_t length)
+int truncateat(int dirfd, const char* pathname, off_t length, int flags)
 {
-	return sys_truncateat(dirfd, pathname, length);
+	return sys_truncateat(dirfd, pathname, length, flags);
 }

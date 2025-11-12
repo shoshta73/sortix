@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 201 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,9 +21,9 @@
 
 #include <unistd.h>
 
-DEFN_SYSCALL2(int, sys_fchdirat, SYSCALL_FCHDIRAT, int, const char*);
+DEFN_SYSCALL3(int, sys_fchdirat, SYSCALL_FCHDIRAT, int, const char*, int);
 
-int fchdirat(int dirfd, const char* path)
+int fchdirat(int dirfd, const char* path, int flags)
 {
-	return sys_fchdirat(dirfd, path);
+	return sys_fchdirat(dirfd, path, flags);
 }

@@ -69,6 +69,17 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add flags parameters to fchdirat(2), fchrootat(2), and truncateat(2)
+The non-standard
+.Xr fchdirat 2 ,
+.Xr fchrootat 2 ,
+and
+.Xr truncateat 2
+system calls now have a flags parameter like most other *at family system calls.
+.Pp
+This is a compatible ABI change.
+The old syscalls are retained for temporary ABI compatibility with the 1.0
+stable release, and will be removed after the next stable release.
 .Ss Remove /home and /mnt from the system manifest
 The
 .Pa /home ,

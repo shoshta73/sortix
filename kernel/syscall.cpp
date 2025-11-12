@@ -95,7 +95,7 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_FACCESSAT] = (void*) sys_faccessat,
 	[SYSCALL_MKDIRAT] = (void*) sys_mkdirat,
 	[SYSCALL_FCHDIR] = (void*) sys_fchdir,
-	[SYSCALL_TRUNCATEAT] = (void*) sys_truncateat,
+	[SYSCALL_TRUNCATEAT_NOFLAGS] = (void*) sys_truncateat_noflags,
 #if !defined(__i386__)
 	[SYSCALL_FCHOWNAT] = (void*) sys_fchownat,
 #else
@@ -142,9 +142,9 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_CLOCK_NANOSLEEP] = (void*) sys_clock_nanosleep,
 	[SYSCALL_TIMENS] = (void*) sys_timens,
 	[SYSCALL_UMASK] = (void*) sys_umask,
-	[SYSCALL_FCHDIRAT] = (void*) sys_fchdirat,
+	[SYSCALL_FCHDIRAT_NOFLAGS] = (void*) sys_fchdirat_noflags,
 	[SYSCALL_FCHROOT] = (void*) sys_fchroot,
-	[SYSCALL_FCHROOTAT] = (void*) sys_fchrootat,
+	[SYSCALL_FCHROOTAT_NOFLAGS] = (void*) sys_fchrootat_noflags,
 	[SYSCALL_MKPARTITION] = (void*) sys_mkpartition,
 	[SYSCALL_GETPGID] = (void*) sys_getpgid,
 	[SYSCALL_SETPGID] = (void*) sys_setpgid,
@@ -208,6 +208,9 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_SETINIT] = (void*) sys_setinit,
 	[SYSCALL_PATHCONFAT] = (void*) sys_pathconfat,
 	[SYSCALL_FPATHCONF] = (void*) sys_fpathconf,
+	[SYSCALL_TRUNCATEAT] = (void*) sys_truncateat,
+	[SYSCALL_FCHDIRAT] = (void*) sys_fchdirat,
+	[SYSCALL_FCHROOTAT] = (void*) sys_fchrootat,
 	[SYSCALL_MAX_NUM] = (void*) sys_bad_syscall,
 };
 } /* extern "C" */
