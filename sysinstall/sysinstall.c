@@ -71,6 +71,43 @@ const char* prompt_man_page = "installation";
 
 static char input[256];
 
+static bool is_valid_hostname(const char* hostname)
+{
+	if ( !hostname[0] )
+		return false;
+	for ( size_t i = 0; hostname[i]; i++ )
+		if ( !('a' <= hostname[i] && hostname[i] <= 'z') &&
+		     !('A' <= hostname[i] && hostname[i] <= 'Z') &&
+		     !('0' <= hostname[i] && hostname[i] <= '9') &&
+		     hostname[i] != '-' && hostname[i] != '.' )
+			return false;
+	return true;
+}
+
+static bool is_valid_username(const char* username)
+{
+	if ( !('a' <= username[0] && username[0] <= 'z') &&
+	     !('A' <= username[0] && username[0] <= 'Z') )
+		return false;
+	for ( size_t i = 1; username[i]; i++ )
+		if ( !('a' <= username[i] && username[i] <= 'z') &&
+		     !('A' <= username[i] && username[i] <= 'Z') &&
+		     !('0' <= username[i] && username[i] <= '9') &&
+		     username[i] != '-' && username[i] != '_' )
+			return false;
+	return true;
+}
+
+static bool is_valid_user_full_name(const char* name)
+{
+	if ( !name[0] )
+		return false;
+	for ( size_t i = 0; name[i]; i++ )
+		if ( name[i] == ':' || name[i] == '\\' )
+			return false;
+	return true;
+}
+
 static struct partition_table* search_bios_boot_pt(struct filesystem* root_fs)
 {
 	struct blockdevice* bdev = root_fs->bdev;
@@ -1344,6 +1381,13 @@ int main(void)
 		char hostname[HOST_NAME_MAX + 1] = "";
 		prompt(hostname, sizeof(hostname), "hostname", "System hostname?",
 		       defhost[0] ? defhost : NULL);
+		if ( !is_valid_hostname(hostname) )
+		{
+			if ( non_interactive )
+				errx(2, "fatal: invalid hostname: %s", hostname);
+			text("Invalid hostname\n");
+			continue;
+		}
 		if ( !install_configurationf("etc/hostname", "w", "%s\n", hostname) )
 			continue;
 		textf("/etc/hostname was set to \"%s\".\n", hostname);
@@ -1512,13 +1556,31 @@ int main(void)
 		const char* user = userstr;
 		while ( user[0] == ' ')
 			user++;
+		if ( !is_valid_username(user) )
+		{
+			if ( non_interactive )
+				errx(2, "fatal: invalid username: %s", user);
+			text("Invalid username\n");
+			continue;
+		}
 		if ( passwd_has_name("etc/passwd", user) )
 		{
 			textf("Account '%s' already exists.\n", user);
 			continue;
 		}
 		static char name[256];
-		prompt(name, sizeof(name), NULL, "Full name of user?", user);
+		while ( true )
+		{
+			prompt(name, sizeof(name), NULL, "Full name of user?", user);
+			if ( !is_valid_user_full_name(name) )
+			{
+				if ( non_interactive )
+					errx(2, "fatal: invalid full name: %s", name);
+				text("Invalid full name\n");
+				continue;
+			}
+			break;
+		}
 		char first[128];
 		char second[128];
 		while ( true )
