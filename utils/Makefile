@@ -13,6 +13,7 @@ CPPFLAGS:=$(CPPFLAGS) -DVERSIONSTR=\"$(VERSION)\"
 BINARIES_EXCEPT_INSTALL:=\
 basename \
 cat \
+chgrp \
 chmod \
 chown \
 clear \

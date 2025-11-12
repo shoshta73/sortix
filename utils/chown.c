@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2020, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -287,10 +287,15 @@ int main(int argc, char* argv[])
 	char* spec = argv[1];
 	uid_t uid = (uid_t) -1;
 	gid_t gid = (gid_t) -1;
+#ifdef CHGRP
+	const char* ownerspec = "";
+	const char* groupspec = spec;
+#else
 	size_t offset = strcspn(spec, ":");
 	const char* ownerspec = spec;
 	const char* groupspec = spec[offset] ? spec + offset + 1 : "";
 	spec[offset] = '\0';
+#endif
 	char* end;
 	if ( ownerspec[0] )
 	{

@@ -1,11 +1,10 @@
 *.o
 basename
 cat
-chkblayout
+chgrp
 chmod
 chown
 chroot
-chvideomode
 clear
 colormake
 column
