@@ -135,15 +135,62 @@ For instance, to prepare a 1 GiB harddisk and install the operating system onto
 it, run something
 like:
 .Bd -literal
-qemu-img create sortix.raw 1G
-qemu-system-x86_64 -enable-kvm -m 1024 -vga std -cdrom sortix.iso \\
-                   -drive file=sortix.raw,format=raw
+qemu-img create -f qcow2 sortix.qcow2 1G
+qemu-system-x86_64 -enable-kvm -m 1408 -vga std -hda sortix.qcow2 \\
+                   -cdrom sortix.iso
 .Ed
 .Pp
 After the installation is complete, power off the computer and remove the
 .Ar -cdrom
 .Pa sortix.iso
 option.
+.Pp
+Optionally, if you wish to connect into the virtual machine, for instance to
+forward its TCP port 22 to the local port 2022 on the local 127.0.0.1 address,
+add these options:
+.Bd -literal
+  -device e1000,netdev=net0 -netdev user,id=net0,hostfwd=tcp:127.0.0.1:2022-:22
+.Ed
+.Pp
+To
+.Xr ssh 1
+into the virtual machine once the operating system is running, you need
+to configure authentication:
+.Pp
+.Bl -bullet -compact
+.It
+Using
+.Xr release-iso-modification 7
+to configure authentication ahead-of-time (recommended); or
+.It
+Manually deploy using
+.Xr ssh-keygen 1
+and
+.Xr authorized_keys 5 ;
+or
+.It
+Setting a password with
+.Xr passwd 1
+and enabling password authentication in
+.Xr sshd_config 5
+(strongly discouraged).
+.El
+.Pp
+And if you enable the
+.Sy sshd
+daemon with
+.Xr service 8
+inside the virtual machine:
+.Bd -literal
+  service sshd enable
+.Ed
+.Pp
+Then you can
+.Xr ssh 1
+into the virtual machine from the outside using:
+.Bd -literal
+  ssh -p 2022 root@localhost
+.Ed
 .Ss Bootloader Menu
 Booting the release will present you with a GRUB bootloader menu.
 You have three primary options:
