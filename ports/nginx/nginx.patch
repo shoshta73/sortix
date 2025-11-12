@@ -657,7 +657,26 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/ng
          return 1;
      }
  
-@@ -991,6 +991,7 @@
+@@ -766,7 +766,8 @@
+ 
+     ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx, ngx_core_module);
+ 
+-    if (ngx_rename_file(ccf->pid.data, ccf->oldpid.data) == NGX_FILE_ERROR) {
++    if (ccf->daemon &&
++        ngx_rename_file(ccf->pid.data, ccf->oldpid.data) == NGX_FILE_ERROR) {
+         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                       ngx_rename_file_n " %s to %s failed "
+                       "before executing new binary process \"%s\"",
+@@ -781,7 +782,7 @@
+     pid = ngx_execute(cycle, &ctx);
+ 
+     if (pid == NGX_INVALID_PID) {
+-        if (ngx_rename_file(ccf->oldpid.data, ccf->pid.data)
++        if (ccf->daemon && ngx_rename_file(ccf->oldpid.data, ccf->pid.data)
+             == NGX_FILE_ERROR)
+         {
+             ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+@@ -991,6 +992,7 @@
  {
      u_char  *p;
      size_t   len;
@@ -665,7 +684,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/ng
  
      if (ngx_prefix) {
          len = ngx_strlen(ngx_prefix);
-@@ -1051,14 +1052,18 @@
+@@ -1051,14 +1053,18 @@
          cycle->conf_file.data = ngx_conf_file;
  
      } else {
@@ -686,7 +705,7 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/nginx.c nginx/src/core/ng
           p > cycle->conf_file.data;
           p--)
      {
-@@ -1140,7 +1145,7 @@
+@@ -1140,7 +1146,7 @@
  {
      ngx_core_conf_t  *ccf = conf;
  
@@ -804,6 +823,36 @@ diff -Paur --no-dereference -- nginx.upstream/src/core/ngx_config.h nginx/src/co
  
  #define NGX_INT32_LEN   (sizeof("-2147483648") - 1)
  #define NGX_INT64_LEN   (sizeof("-9223372036854775808") - 1)
+diff -Paur --no-dereference -- nginx.upstream/src/core/ngx_cycle.c nginx/src/core/ngx_cycle.c
+--- nginx.upstream/src/core/ngx_cycle.c
++++ nginx/src/core/ngx_cycle.c
+@@ -319,7 +319,7 @@
+ 
+     if (ngx_test_config) {
+ 
+-        if (ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
++        if (ccf->daemon && ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
+             goto failed;
+         }
+ 
+@@ -337,7 +337,7 @@
+         {
+             /* new pid file name */
+ 
+-            if (ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
++            if (ccf->daemon && ngx_create_pidfile(&ccf->pid, log) != NGX_OK) {
+                 goto failed;
+             }
+ 
+@@ -1072,7 +1072,7 @@
+ 
+     name = ngx_new_binary ? ccf->oldpid.data : ccf->pid.data;
+ 
+-    if (ngx_delete_file(name) == NGX_FILE_ERROR) {
++    if (ccf->daemon && ngx_delete_file(name) == NGX_FILE_ERROR) {
+         ngx_log_error(NGX_LOG_ALERT, cycle->log, ngx_errno,
+                       ngx_delete_file_n " \"%s\" failed", name);
+     }
 diff -Paur --no-dereference -- nginx.upstream/src/core/ngx_cycle.h nginx/src/core/ngx_cycle.h
 --- nginx.upstream/src/core/ngx_cycle.h
 +++ nginx/src/core/ngx_cycle.h
@@ -1144,7 +1193,17 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_process_cycle.c ng
      for ( ;; ) {
          ngx_log_debug0(NGX_LOG_DEBUG_EVENT, cycle->log, 0, "worker cycle");
  
-@@ -804,11 +826,13 @@
+@@ -619,7 +641,8 @@
+                 ccf = (ngx_core_conf_t *) ngx_get_conf(cycle->conf_ctx,
+                                                        ngx_core_module);
+ 
+-                if (ngx_rename_file((char *) ccf->oldpid.data,
++                if (ccf->daemon &&
++                    ngx_rename_file((char *) ccf->oldpid.data,
+                                     (char *) ccf->pid.data)
+                     == NGX_FILE_ERROR)
+                 {
+@@ -804,11 +827,13 @@
              exit(2);
          }
  
