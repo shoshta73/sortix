@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,10 +36,6 @@ bool WaitSet(volatile little_uint32_t* reg,
              uint32_t bits,
              bool any,
              unsigned int msecs);
-bool WaitChange(volatile little_uint32_t* reg,
-                uint32_t* current_ptr,
-                uint32_t bits,
-                struct timespec* remaining);
 void Init(const char* devpath, Ref<Descriptor> dev);
 
 } // namespace AHCI
