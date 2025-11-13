@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2017, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2017 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -156,17 +156,7 @@ bool HBA::Initialize(Ref<Descriptor> dev, const char* devpath)
 		return errno = EINVAL, false;
 	}
 
-	// Indicate the system software is AHCI-aware.
-	regs->ghc = regs->ghc | GHC_AE;
-
-	// Receive ownership from the firmware.
-	if ( regs->cap2 & CAP2_BOH )
-	{
-		regs->bohc = regs->bohc | BOHC_OOS;
-		WaitClear(&regs->bohc, BOHC_BOS, false, 25);
-		if ( WaitClear(&regs->bohc, BOHC_BOS | BOHC_BB, false, 2000) )
-			LogF("warning: firmware did not release ownership");
-	}
+	// TODO: Take control from BIOS?
 
 #if 0
 	// TODO: Is it bad to do a hard reset?
@@ -182,7 +172,7 @@ bool HBA::Initialize(Ref<Descriptor> dev, const char* devpath)
 	regs->ghc = regs->ghc & ~GHC_IE;
 
 	uint32_t ports_implemented = regs->pi;
-	uint32_t num_ports = 32;
+	uint32_t num_ports = CAP_NCS(regs->cap);
 
 	uint32_t actual_ports = 0;
 
@@ -219,8 +209,6 @@ bool HBA::Initialize(Ref<Descriptor> dev, const char* devpath)
 					continue;
 				}
 			}
-
-			// TODO: Wait for PxSCTL.DET to clear here?
 		}
 
 		regs->ports[i].pxis = regs->ports[i].pxis;
