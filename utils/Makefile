@@ -61,6 +61,7 @@ stty \
 tail \
 tee \
 time \
+timeout \
 touch \
 tr \
 true \
