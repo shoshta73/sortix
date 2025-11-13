@@ -79,6 +79,9 @@ void UpdatePendingSignals(Thread* thread) // thread->process->signal_lock held
 
 	// TODO: Handle that signals can be pending process-wide!
 
+	// SIGKILL and SIGSTOP cannot be blocked and are always handled.
+	sigorset(&handled_signals, &handled_signals, &unblockable_signals);
+
 	// Discard all requested signals that would be ignored if delivered.
 	sigandset(&thread->signal_pending, &thread->signal_pending, &handled_signals);
 
