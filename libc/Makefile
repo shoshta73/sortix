@@ -906,6 +906,7 @@ MANPAGES2=\
 scram/scram.2 \
 sys/dnsconfig/getdnsconfig.2 \
 sys/dnsconfig/setdnsconfig.2 \
+sys/kernelinfo/kernelinfo.2 \
 unistd/setinit.2 \
 unistd/getinit.2 \
 
