@@ -17,28 +17,37 @@ bytes (including the terminating NUL byte) in
 .Pp
 .Fa request
 is a string requesting one of the following pieces of information:
-.Bl -tag -offset 2 -width Qq
+.Bl -tag -offset 2 -width \(dqoptions\(dq
 .It Qq name
-The kernel's name, e.g. "Sortix".
+The kernel's name, e.g.\&
+.Qq Sortix .
 .It Qq version
-The kernel's version, e.g. "1.1.0-dev".
+The kernel's version, e.g.\&
+.Qq 1.1.0-dev .
 .It Qq tagline
-The kernel's tagline, e.g. "\\"Self-Hosting & Installable\\"".
+The kernel's tagline, e.g.\&
+.Qq \e\(dqSelf-Hosting & Installable\e\(dq .
 .It Qq options
-The options the kernel was booted with, e.g. "--firmware=pc".
+The options the kernel was booted with, e.g.\&
+.Qq --firmware=pc .
 See
 .Xr kernel 7
 for details.
 .It Qq builddate
-The date when the kernel was built, e.g. "Feb 13 2009" per the C
+The date when the kernel was built per the C
 .Dv __DATE__
-macro.
+macro, e.g.\&
+.Qq Feb 13 2009 .
 .It Qq buildtime
-The time when the kernel was built, e.g. "23:31:30" per the C
+The time when the kernel was built per the C
 .Dv __TIME__
-macro.
+macro, e.g.\&
+.Qq 23:31:30 .
 .It Qq firmware
-The system's firmware, e.g. "bios" or "efi".
+The system's firmware, e.g.\&
+.Qq bios
+or
+.Qq efi .
 .El
 .Sh RETURN VALUES
 On success, zero is returned.
