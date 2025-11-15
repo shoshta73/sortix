@@ -1,9 +1,9 @@
-.Dd May 16, 2023
+.Dd November 15, 2025
 .Dt KERNELINFO 2
 .Os
 .Sh NAME
 .Nm kernelinfo
-.Nd gets information about the system
+.Nd get information about the system
 .Sh SYNOPSIS
 .In sys/kernelinfo.h
 .Ft ssize_t
@@ -12,39 +12,48 @@
 .Fn kernelinfo
 queries information about the currently running system, storing up to
 .Fa resplen
-bytes in
+bytes (including the terminating NUL byte) in
 .Fa response .
 .Pp
 .Fa request
-points to a NUL-terminated string specifying the requested information.
-It can be one of the following:
+is a string requesting one of the following pieces of information:
 .Bl -tag -offset 2 -width Qq
 .It Qq name
 The kernel's name, e.g. "Sortix".
 .It Qq version
-The kernel's version, e.g. "1.1dev".
+The kernel's version, e.g. "1.1.0-dev".
 .It Qq tagline
 The kernel's tagline, e.g. "\\"Self-Hosting & Installable\\"".
 .It Qq builddate
-The date when the kernel was built, e.g. "Feb 13 2009".
+The date when the kernel was built, e.g. "Feb 13 2009" per the C
+.Dv __DATE__
+macro.
 .It Qq buildtime
-The time when the kernel was built, e.g. "23:31:30".
+The time when the kernel was built, e.g. "23:31:30" per the C
+.Dv __TIME__
+macro.
 .It Qq firmware
-The system's firmware, e.g. "bios".
+The system's firmware, e.g. "bios" or "efi".
 .El
 .Sh RETURN VALUES
 On success, zero is returned.
-On error,
+If the information doesn't fit in the
+.Fa response ,
+then the needed size (excluding the NUL byte) is returned and
 .Va errno
-is set, and nothing is written to
+is set to
+.Er ERANGE ,
+and nothing is written to the
 .Fa response .
-The return value depends on the error.
+On any other error, -1 is returned and
+.Va errno
+is set, and nothing is written to the
+.Fa response .
 .Sh ERRORS
 .Bl -tag -width Er
 .It Er EINVAL
 .Fa *request
 doesn't point to a supported request string.
-The return value is -1.
 .It Er ERANGE
 .Fa resplen
 is too small to contain the entire output.
