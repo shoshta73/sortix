@@ -4,5 +4,11 @@ set -e
 if [ -e "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/gcc" ]; then
   ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/gcc" "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/cc"
 fi
+printf '#!/bin/sh\nexec %s -std=c99 "$@"\n' "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/gcc" > "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/c99"
+chmod +x "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/c99"
+printf '#!/bin/sh\nexec %s -std=c17 "$@"\n' "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/gcc" > "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/c17"
+chmod +x "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/c17"
 ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-gcc" "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-cc"
+ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/c99" "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-c99"
+ln "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/c17" "$TIX_INSTALL_DIR$EXEC_PREFIX/bin/$TARGET-c17"
 rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"

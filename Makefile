@@ -204,7 +204,11 @@ install-cross-compiler:
 	PATH="$(PREFIX)/bin:$(PATH)" \
 	$(MAKE) -C ports/gcc/gcc.build install-gcc install-target-libgcc
 	rm -rf ports/gcc/gcc.build
-	ln -sf "$(TARGET)-gcc" "$(PREFIX)/bin/$(TARGET)-cc"
+	ln -f "$(PREFIX)/bin/$(TARGET)-gcc" "$(PREFIX)/bin/$(TARGET)-cc"
+	printf '#!/bin/sh\nexec %s -std=c99 "$$@"\n' "$(PREFIX)/bin/$(TARGET)-gcc" > "$(PREFIX)/bin/$(TARGET)-c99"
+	chmod +x "$(PREFIX)/bin/$(TARGET)-c99"
+	printf '#!/bin/sh\nexec %s -std=c17 "$$@"\n' "$(PREFIX)/bin/$(TARGET)-gcc" > "$(PREFIX)/bin/$(TARGET)-c17"
+	chmod +x "$(PREFIX)/bin/$(TARGET)-c17"
 
 .PHONY: clean-cross-toolchain
 clean-cross-toolchain: clean-sysroot clean-build-tools clean-cross-compiler
