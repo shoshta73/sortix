@@ -804,12 +804,22 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 	mode &= ~process->umask;
 	kthread_mutex_unlock(&process->id_lock);
 
+	if ( !S_ISDIR(type) )
+		return errno = ENOTDIR, Ref<Descriptor>();
+
 	if ( !filename[0] )
 		return errno = ENOENT, Ref<Descriptor>();
 
 	// Reject some non-sensical flag combinations early.
 	if ( !IsSaneFlagModeCombination(flags, mode) )
 		return errno = EINVAL, Ref<Descriptor>();
+
+	// Strip leading slashes and follow at least "." if the path is all slashes,
+	// so we return a new file descriptor instead of ourselves.
+	while ( filename[0] == '/' )
+		filename++;
+	if ( !filename[0] )
+		filename = "./";
 
 	char* filename_mine = NULL;
 
@@ -904,6 +914,7 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 
 		desc = next;
 	}
+	assert(desc != this);
 
 	delete[] filename_mine;
 
@@ -926,11 +937,7 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 	if ( flags & O_DIRECTORY && !S_ISDIR(desc->type) )
 		return errno = ENOTDIR, Ref<Descriptor>();
 
-	// TODO: The new file descriptor may not be opened with the correct
-	//       permissions in the below case!
-	// If the path only contains slashes, we'll get outselves back, be sure to
-	// get ourselves back.
-	return desc == this ? Fork() : desc;
+	return desc;
 }
 
 Ref<Descriptor> Descriptor::open_elem(ioctx_t* ctx, const char* filename,
