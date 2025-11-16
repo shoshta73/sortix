@@ -871,7 +871,7 @@ ifeq ($(HOST),x86_64-sortix)
     LIBK_FLAGS:=$(LIBK_FLAGS) -mno-red-zone -mno-mmx -mno-sse -mno-sse2
 endif
 
-BINS=libc.a libdl.a libpthread.a librt.a $(CRTOBJ)
+BINS=libc.a libdl.a libpthread.a librt.a libxnet.a $(CRTOBJ)
 BINSKERNEL=libk.a
 INSTALLLIBS:=$(addprefix $(DESTDIR)$(LIBDIR)/,$(BINS))
 INSTALLLIBSKERNEL:=$(addprefix $(DESTDIR)$(LIBDIR)/,$(BINSKERNEL))
@@ -900,6 +900,9 @@ libpthread.a:
 	$(AR) rcs $@
 
 librt.a:
+	$(AR) rcs $@
+
+libxnet.a:
 	$(AR) rcs $@
 
 # TODO: After releasing Sortix 1.1, remove crt0.o.

@@ -2,4 +2,6 @@
 set -e
 [ -n "$TIX_INSTALL_DIR" ]
 tix-eradicate-libtool-la
+mkdir -p "$TIX_INSTALL_DIR$EXEC_PREFIX/lib"
+${AR-ar} rcs "$TIX_INSTALL_DIR$EXEC_PREFIX/lib/libl.a"
 rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"
