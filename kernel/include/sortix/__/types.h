@@ -115,11 +115,11 @@ typedef __uintptr_t __dev_t;
 #define __SCNuDEV __SCNuPTR
 #define __SCNxDEV __SCNxPTR
 
-typedef __intmax_t __fsblkcnt_t;
-/*#define __FSBLKCNT_UNSIGNED*/
-#define __FSBLKCNT_C(c) __INTMAX_C(c)
-#define __FSBLKCNT_MIN __INTMAX_MIN
-#define __FSBLKCNT_MAX __INTMAX_MAX
+typedef __uintmax_t __fsblkcnt_t;
+#define __FSBLKCNT_UNSIGNED
+#define __FSBLKCNT_C(c) __UINTMAX_C(c)
+#define __FSBLKCNT_MIN __UINTMAX_MIN
+#define __FSBLKCNT_MAX __UINTMAX_MAX
 #define __PRIdFSBLKCNT __PRIdMAX
 #define __PRIiFSBLKCNT __PRIiMAX
 #define __PRIoFSBLKCNT __PRIoMAX
@@ -132,11 +132,11 @@ typedef __intmax_t __fsblkcnt_t;
 #define __SCNuFSBLKCNT __SCNuMAX
 #define __SCNxFSBLKCNT __SCNxMAX
 
-typedef __intmax_t __fsfilcnt_t;
-/*#define __FSFILCNT_UNSIGNED*/
-#define __FSFILCNT_C(c) __INTMAX_C(c)
-#define __FSFILCNT_MIN __INTMAX_MIN
-#define __FSFILCNT_MAX __INTMAX_MAX
+typedef __uintmax_t __fsfilcnt_t;
+#define __FSFILCNT_UNSIGNED
+#define __FSFILCNT_C(c) __UINTMAX_C(c)
+#define __FSFILCNT_MIN __UINTMAX_MIN
+#define __FSFILCNT_MAX __UINTMAX_MAX
 #define __PRIdFSFILCNT __PRIdMAX
 #define __PRIiFSFILCNT __PRIiMAX
 #define __PRIoFSFILCNT __PRIoMAX
