@@ -1,6 +1,5 @@
-
 /*
- * Copyright (c) 2012, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -70,7 +69,7 @@ bool RemoveRecursively(int dirfd, const char* full, const char* rel,
 		warn("cannot remove: %s", full);
 		return false;
 	}
-	int targetfd = openat(dirfd, rel, O_RDONLY | O_DIRECTORY);
+	int targetfd = openat(dirfd, rel, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
 	if ( targetfd < 0 )
 	{
 		if ( force && errno == ENOENT )
