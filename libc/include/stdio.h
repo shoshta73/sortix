@@ -274,8 +274,6 @@ int fseeko_unlocked(FILE*, off_t, int);
 off_t ftello_unlocked(FILE*);
 int removeat(int, const char*);
 int setvbuf_unlocked(FILE* __restrict, char* __restrict, int, size_t);
-char* sortix_gets(void);
-int sortix_puts(const char*);
 int ungetc_unlocked(int, FILE*);
 int vfprintf_unlocked(FILE* __restrict, const char* __restrict, __gnuc_va_list)
 	__attribute__((__format__ (printf, 2, 0)));
