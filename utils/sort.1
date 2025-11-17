@@ -6,8 +6,10 @@
 .Nd sort lines of text
 .Sh SYNOPSIS
 .Nm
-.Op Fl CcmRruVz
+.Op Fl bCcdfgihMmnRruVz
+.Op Fl k Ar key
 .Op Fl o Ar path
+.Op Fl t Ar separator
 .Ar
 .Sh DESCRIPTION
 .Nm
@@ -24,6 +26,8 @@ The lines are compared according to the current locale's collating rules.
 .Pp
 The options are as follows:
 .Bl -tag -width "12345678"
+.It Fl b , \-ignore-leading-blanks
+Ignore leading blank characters (space and tab) when determining fields.
 .It Fl c , \-check , \-check=diagnose-first
 Check whether the input is already sorted.
 If a line is out of order (or an equal line is found if
@@ -34,8 +38,48 @@ order and exit 1.
 Same as
 .Fl c ,
 but write no error to the standard output about the input being out of order.
+.It Fl d , \-dictionary-order
+Only alphanumeric and blank characters are significant when comparing.
+.It Fl f , \-ignore-case
+Compare lowercase characters as if they were uppercase.
+.It Fl g , \-general-numeric-sort , Fl \-sort Ns = Ns general-numeric
+Compare the strings as floating-pointer numbers parsed with
+.Xr strtod 3 .
+.It Fl i , \-ignore-nonprinting
+Ignore non-printable characters when comparing.
+.It Fl k Ar key , Fl \-key Ns = Ns Ar key
+Add another sorting
+.Ar key
+in order of decreasing priorities with the format:
+.Pp
+.Ar starting_field Ns Oo modifier Oc Ns Oo , Ns ending_field Ns Oo modifier Oc Oc
+.Pp
+The lines are split into fields per the
+.Fl t
+option.
+Each key compares lines starting from the start of the
+.Ar starting_field
+until the end of the
+.Ar ending_field .
+If every key compares equal, the lines are compared with
+.Xr strcoll 3
+as a fallback.
+Optional
+.Ar modifier
+strings using characters from the set
+.Sy bdfghiMnRrV
+select the comparison behavior from the option by that name.
+If no keys are specified, a key is added spanning the whole line.
+.It Fl h , \-human-numeric-sort , Fl \-sort Ns = Ns human-numeric
+Compare numeric values followed by a unit magnitude character from the
+.Sy YZEPTGMKk
+set.
+.It Fl M , \-month-sort , Fl \-sort Ns = Ns month
+Compare month names.
 .It Fl m , \-merge
 Merge the presorted input files into a sorted output.
+.It Fl n , \-numeric-sort , Fl \-sort Ns = Ns numeric
+Compare numeric values.
 .It Fl o Ar path , Fl \-output Ns = Ns Ar path
 After reading the full input; write the output to the file at
 .Pa path
@@ -46,7 +90,7 @@ This option is incompatible with
 .Fl C
 and
 .Fl c .
-.It Fl R , \-random-sort
+.It Fl R , \-random-sort , Fl \-sort Ns = Ns random
 Sort the lines randomly with a uniform distribution, where all permutations are
 equally likely.
 This option is incompatible with
@@ -58,9 +102,19 @@ If
 don't write duplicate lines to the output.
 .It Fl r , \-reverse
 Compare the lines in reverse order.
+.It Fl t Ar separator , Fl \-field-separator Ns = Ns Ar separator
+Use
+.Ar separator
+as the character that separates fields for use in
+.Fl k .
+Each occurence of the character is significant.
+If
+.Fl t
+is not specicied, fields are split on sequences of blank characters, where
+multiple occurences are not significant.
 .It Fl u , \-unique
 Don't write a line if it is equal to the previous line.
-.It Fl V , \-version-sort
+.It Fl V , \-version-sort , Fl \-sort Ns = Ns version
 Sort according to the version string, per
 .Xr strverscmp 3 .
 .It Fl z , \-zero-terminated
@@ -128,12 +182,10 @@ sort -u
 .Sh STANDARDS
 .Nm
 is standardized in
-.St -p1003.1-2008 ,
-which is currently partially implemented in this implementation of
-.Nm .
+.St -p1003.1-2008 .
 .Pp
 The
-.Fl R , V ,
+.Fl g , h , M, R , V ,
 and
 .Fl z
 options, as well as the long options, are extensions also found in GNU
@@ -151,19 +203,6 @@ and
 .Fl c
 options support multiple input files.
 .Sh BUGS
-The
-.St -p1003.1-2008
-options
-.Fl b ,
-.Fl d ,
-.Fl f ,
-.Fl i ,
-.Fl k ,
-.Fl n ,
-and
-.Fl t
-are not currently implemented.
-.Pp
 The
 .Fl m
 option is not currently taken advantage of to speed up the sorting, rather the
