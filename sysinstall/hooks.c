@@ -615,6 +615,14 @@ void upgrade_prepare(const struct release* old_release,
 		free(tix_conf_path_new);
 		conf_free(&conf);
 	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_to_be_run(source_prefix, target_prefix,
+	                          "sortix-1.1-home-mnt") )
+	{
+		// Recreate the directories if needed post-upgrade.
+		hook_want_finalization(target_prefix, "sortix-1.1-home-mnt");
+	}
 }
 
 void upgrade_finalize(const struct release* old_release,
@@ -627,6 +635,7 @@ void upgrade_finalize(const struct release* old_release,
 	(void) source_prefix;
 	(void) target_prefix;
 
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
 	if ( hook_needs_finalization(target_prefix, "sortix-1.1-tix3g") )
 	{
 		printf(" - Finishing migration to tix version 3...\n");
@@ -655,6 +664,26 @@ void upgrade_finalize(const struct release* old_release,
 		}
 		free(path);
 		hook_did_finalization(target_prefix, "sortix-1.1-tix3g");
+	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	if ( hook_needs_finalization(target_prefix, "sortix-1.1-home-mnt") )
+	{
+		char* home_path = join_paths(target_prefix, "home");
+		char* mnt_path = join_paths(target_prefix, "mnt");
+		if ( !home_path || !mnt_path )
+		{
+			warn("malloc");
+			_exit(2);
+		}
+		printf(" - Ensuring /home and /mnt exists...\n");
+		if ( mkdir(home_path, 0777) < 0 && errno != EEXIST )
+			err(1, "mkdir: %s", home_path);
+		if ( mkdir(mnt_path, 0777) < 0 && errno != EEXIST )
+			err(1, "mkdir: %s", mnt_path);
+		free(home_path);
+		free(mnt_path);
+		hook_did_finalization(target_prefix, "sortix-1.1-home-mnt");
 	}
 }
 

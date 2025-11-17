@@ -260,14 +260,11 @@ sysroot-fsh:
 	mkdir -p "$(SYSROOT)/boot"
 	mkdir -p "$(SYSROOT)/dev"
 	mkdir -p "$(SYSROOT)/etc"
-	mkdir -p "$(SYSROOT)/home"
 	mkdir -p "$(SYSROOT)/include"
 	mkdir -p "$(SYSROOT)/lib"
 	mkdir -p "$(SYSROOT)/libexec"
-	mkdir -p "$(SYSROOT)/mnt"
 	mkdir -p "$(SYSROOT)/sbin"
 	mkdir -p "$(SYSROOT)/share"
-	mkdir -p "$(SYSROOT)/src"
 	mkdir -p "$(SYSROOT)/tix"
 	mkdir -p "$(SYSROOT)/tix/tixinfo"
 	mkdir -p "$(SYSROOT)/tix/manifest"
@@ -292,14 +289,11 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /boot >> "$(SYSROOT)/tix/manifest/system"
 	echo /dev >> "$(SYSROOT)/tix/manifest/system"
 	echo /etc >> "$(SYSROOT)/tix/manifest/system"
-	echo /home >> "$(SYSROOT)/tix/manifest/system"
 	echo /include >> "$(SYSROOT)/tix/manifest/system"
 	echo /lib >> "$(SYSROOT)/tix/manifest/system"
 	echo /libexec >> "$(SYSROOT)/tix/manifest/system"
-	echo /mnt >> "$(SYSROOT)/tix/manifest/system"
 	echo /sbin >> "$(SYSROOT)/tix/manifest/system"
 	echo /share >> "$(SYSROOT)/tix/manifest/system"
-	echo /src >> "$(SYSROOT)/tix/manifest/system"
 	echo /tmp >> "$(SYSROOT)/tix/manifest/system"
 	echo /usr >> "$(SYSROOT)/tix/manifest/system"
 	echo /var >> "$(SYSROOT)/tix/manifest/system"
@@ -366,6 +360,7 @@ else
 	-cd "$(SYSROOT)/src" && git remote rm origin
 endif
 else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
+	mkdir -p "$(SYSROOT)/src"
 	cp .gitignore -t "$(SYSROOT)/src"
 	cp LICENSE -t "$(SYSROOT)/src"
 	cp Makefile -t "$(SYSROOT)/src"
@@ -575,6 +570,8 @@ $(LIVE_INITRD): sysroot
 	mkdir -p $(LIVE_INITRD).d
 	mkdir -p $(LIVE_INITRD).d/etc
 	mkdir -p $(LIVE_INITRD).d/etc/init
+	mkdir -p $(LIVE_INITRD).d/home
+	mkdir -p $(LIVE_INITRD).d/mnt
 	echo require single-user exit-code > $(LIVE_INITRD).d/etc/init/default
 	echo "root::0:0:root:/root:sh" > $(LIVE_INITRD).d/etc/passwd
 	echo "include /etc/default/passwd.d/*" >> $(LIVE_INITRD).d/etc/passwd

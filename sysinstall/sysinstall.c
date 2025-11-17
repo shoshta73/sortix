@@ -1303,6 +1303,8 @@ int main(void)
 	{
 		printf(" - Populating root filesystem...\n");
 		chmod(".", 0755);
+		mkdir_or_chmod_or_die("home", 0755);
+		mkdir_or_chmod_or_die("mnt", 0755);
 		execute((const char*[]) { "tix-create", "-C", ".", "--import=/", NULL },
 		        "_e");
 		install_manifests_detect("", ".", true, true, true, false);

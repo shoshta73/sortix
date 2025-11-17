@@ -69,6 +69,25 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Remove /home and /mnt from the system manifest
+The
+.Pa /home ,
+.Pa /mnt ,
+and
+.Pa /src
+directories are no longer part of the
+.Sy system
+package and are rather created by
+.Xr sysinstall 8 .
+Operating system upgrades will temporarily remove the directories if they are
+empty.
+No data will be deleted under any circumstances.
+A post-upgrade hook will recreate the
+.Pa /home
+and
+.Pa /mnt
+directories if they were empty and ownership is transferred from the operating
+system to the system administrator.
 .Ss Add .init_array support and rename crt0.o to crt1.o
 The compiler now uses the
 .Sy ".init_array"

@@ -64,6 +64,7 @@ install: all
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix3g
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-grub-cache
 	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-collection-conf
+	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-home-mnt
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount -ldisplay
