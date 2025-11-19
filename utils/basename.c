@@ -18,7 +18,6 @@
  */
 
 #include <err.h>
-#include <errno.h>
 #include <libgen.h>
 #include <locale.h>
 #include <stdbool.h>

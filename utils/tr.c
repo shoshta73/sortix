@@ -20,7 +20,6 @@
 #include <assert.h>
 #include <ctype.h>
 #include <err.h>
-#include <errno.h>
 #include <limits.h>
 #include <locale.h>
 #include <stdbool.h>

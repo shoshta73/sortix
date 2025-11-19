@@ -18,7 +18,6 @@
  */
 
 #include <err.h>
-#include <errno.h>
 #include <stdio.h>
 
 int main(int argc, char* argv[])
@@ -31,9 +30,6 @@ int main(int argc, char* argv[])
 	}
 	putchar('\n');
 	if ( ferror(stdout) || fflush(stdout) == EOF )
-	{
 		err(1, "<stdout>");
-		return 1;
-	}
 	return 0;
 }

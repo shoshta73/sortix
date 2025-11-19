@@ -20,7 +20,6 @@
 #include <sys/stat.h>
 
 #include <err.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>

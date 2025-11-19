@@ -105,7 +105,6 @@ int main(int argc, char* argv[])
 				{
 					errno = ENOMEM;
 					err(1, "malloc");
-					return 1;
 				}
 				buffer_size *= 2;
 				continue;

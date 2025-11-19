@@ -18,7 +18,6 @@
  */
 
 #include <err.h>
-#include <errno.h>
 #include <locale.h>
 #include <stdio.h>
 #include <stdlib.h>

@@ -20,7 +20,6 @@
 #include <sys/utsname.h>
 
 #include <err.h>
-#include <errno.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>

@@ -19,7 +19,6 @@
 
 #include <ctype.h>
 #include <err.h>
-#include <errno.h>
 #include <locale.h>
 #include <stdbool.h>
 #include <stdio.h>
