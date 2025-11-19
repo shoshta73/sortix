@@ -450,7 +450,7 @@ Upon exit, the original terminal settings are restored and
 reclaims ownership of the terminal.
 .It Sy per if
 Specifies that an instance of the daemon should run for each network interface.
-The daemon becomes a virtual daemon that depends on on the instantiated daemons
+The daemon becomes a virtual daemon that depends on the instantiated daemons
 for each network interface.
 The name of each instantiated daemon is the name of the virtual daemon plus
 .Sq "."
@@ -518,7 +518,7 @@ The dependency is assumed to exist and a warning occurs if it doesn't exist.
 .Pp
 Dependencies can be forgotten using
 .Sy unset require Ar dependency .
-Flags on a dependency can be be unset using
+Flags on a dependency can be unset using
 .Sy unset require Ar dependency flag ... .
 .It Sy signal-to Oo Sy process "|" Sy group Oc
 Send all signals to this destination:
