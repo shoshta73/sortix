@@ -20,7 +20,6 @@
  */
 
 #include <sys/display.h>
-#include <sys/display.h>
 #include <sys/kernelinfo.h>
 #include <sys/ioctl.h>
 #include <sys/ps2mouse.h>

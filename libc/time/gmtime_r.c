@@ -18,8 +18,6 @@
  */
 
 #include <stdbool.h>
-#include <time.h>
-
 #include <stdint.h>
 #include <time.h>
 

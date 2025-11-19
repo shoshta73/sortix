@@ -36,8 +36,6 @@
 #include <unistd.h>
 #include <wchar.h>
 
-#include <display.h>
-
 #include "autoconf.h"
 #include "execute.h"
 #include "interactive.h"
