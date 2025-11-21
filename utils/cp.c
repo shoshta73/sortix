@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,8 +24,11 @@
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#ifdef CP_PRETEND_TO_BE_INSTALL
+#ifdef INSTALL
+#include <grp.h>
+#include <inttypes.h>
 #include <libgen.h>
+#include <pwd.h>
 #endif
 #include <stdbool.h>
 #include <stddef.h>
@@ -49,11 +52,13 @@ static const int FLAG_TARGET_DIR = 1 << 2;
 static const int FLAG_NO_TARGET_DIR = 1 << 3;
 static const int FLAG_UPDATE = 1 << 4;
 static const int FLAG_FORCE = 1 << 5;
-#ifdef CP_PRETEND_TO_BE_INSTALL
+#ifdef INSTALL
 static const int FLAG_MKDIR = 1 << 31;
+
+static mode_t old_umask;
 #endif
 
-#ifdef CP_PRETEND_TO_BE_INSTALL
+#ifdef INSTALL
 int mkdir_p(const char* path, mode_t mode)
 {
 	int saved_errno = errno;
@@ -75,6 +80,121 @@ int mkdir_p(const char* path, mode_t mode)
 	if ( errno == EEXIST )
 		return errno = saved_errno, 0;
 	return -1;
+}
+
+static bool is_octal_string(const char* str)
+{
+	if ( !str[0] )
+		return false;
+	for ( size_t i = 0; str[i]; i++ )
+		if ( !('0' <= str[i] && str[i] <= '7') )
+			return false;
+	return true;
+}
+
+static mode_t execute_modespec(const char* str,
+                               mode_t mode,
+                               mode_t type,
+                               mode_t umask)
+{
+	if ( is_octal_string(str) )
+	{
+		errno = 0;
+		uintmax_t input = strtoumax((char*) str, NULL, 8);
+		if ( errno == ERANGE )
+			return (mode_t) -1;
+		if ( input & ~((uintmax_t) 07777) )
+			return (mode_t) -1;
+		return (mode_t) input;
+	}
+
+	size_t index = 0;
+	do
+	{
+		mode_t who_mask = 01000;
+		while ( true )
+		{
+			if ( str[index] == 'u' && (index++, true) )
+				who_mask |= 04700;
+			else if ( str[index] == 'g' && (index++, true) )
+				who_mask |= 02070;
+			else if ( str[index] == 'o' && (index++, true) )
+				who_mask |= 00007;
+			else if ( str[index] == 'a' && (index++, true) )
+				who_mask |= 06777;
+			else
+				break;
+		}
+		if ( !(who_mask & 0777) )
+			who_mask |= 06777 & ~umask;
+		do
+		{
+			char op;
+			switch ( (op = str[index++]) )
+			{
+			case '+': break;
+			case '-': break;
+			case '=': break;
+			default: return (mode_t) -1;
+			};
+			mode_t operand = 0;
+			if ( str[index] == 'u' || str[index] == 'g' || str[index] == 'o' )
+			{
+				char permcopy = str[index++];
+				switch ( permcopy )
+				{
+				case 'u': operand = mode >> 6 & 07; break;
+				case 'g': operand = mode >> 3 & 07; break;
+				case 'o': operand = mode >> 0 & 07; break;
+				default: __builtin_unreachable();
+				};
+				operand = operand << 0 | operand << 3 | operand << 6;
+				switch ( permcopy )
+				{
+				case 'u': if ( mode & 04000) operand |= 06000; break;
+				case 'g': if ( mode & 02000) operand |= 06000; break;
+				};
+				who_mask &= ~((mode_t) 01000);
+			}
+			else
+			{
+				bool unknown = false;
+				do
+				{
+					switch ( str[index] )
+					{
+					case 'r': operand |= 00444; break;
+					case 'w': operand |= 00222; break;
+					case 'x': operand |= 00111; break;
+					case 'X':
+						if ( S_ISDIR(type) || (mode & 0111) )
+							operand |= 00111;
+						break;
+					case 's': operand |= 06000; break;
+					case 't': operand |= 00000; break;
+					default: unknown = true; break;
+					}
+				} while ( !unknown && (index++, true) );
+			}
+			switch ( op )
+			{
+			case '+': mode |= (operand & who_mask); break;
+			case '-': mode &= ~(operand & who_mask); break;
+			case '=': mode = (mode & ~who_mask) | (operand & who_mask); break;
+			default: __builtin_unreachable();
+			}
+		} while ( str[index] == '+' ||
+		          str[index] == '-' ||
+		          str[index] == '=' );
+	} while ( str[index] == ',' && (index++, true) );
+	if ( str[index] )
+		return (mode_t) -1;
+	return mode;
+}
+
+static bool is_valid_modespec(const char* str)
+{
+	return execute_modespec(str, 0, 0, 0) != (mode_t) -1;
 }
 #endif
 
@@ -159,7 +279,8 @@ static bool cp_contents(int srcfd, const char* srcpath,
 
 static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
                int dstdirfd, const char* dstrel, const char* dstpath,
-               int flags, enum symbolic_dereference symbolic_dereference)
+               int flags, enum symbolic_dereference symbolic_dereference,
+               const char* modespec, uid_t uid, gid_t gid)
 {
 	struct stat srcst;
 	int deref_flags = O_RDONLY;
@@ -264,7 +385,15 @@ static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
 				warn("%s", dstpath);
 				return close(srcfd), false;
 			}
-			if ( mkdirat(dstdirfd, dstrel, srcst.st_mode & 03777) )
+#ifdef INSTALL
+			mode_t omode = execute_modespec(modespec, srcst.st_mode,
+			                                srcst.st_mode, old_umask);
+#else
+			(void) modespec;
+			mode_t omode = srcst.st_mode & 03777;
+#endif
+			int ret = mkdirat(dstdirfd, dstrel, omode);
+			if ( ret )
 			{
 				warn("cannot create directory `%s'", dstpath);
 				return close(srcfd), false;
@@ -275,6 +404,17 @@ static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
 				warn("%s", dstpath);
 				return close(srcfd), false;
 			}
+#ifdef INSTALL
+			if ( (uid != (uid_t) -1 || gid != (gid_t) -1) &&
+			     fchown(dstfd, uid, gid) < 0 )
+			{
+				warn("chown: %s", dstpath);
+				return close(srcfd), false;
+			}
+#else
+			(void) uid;
+			(void) gid;
+#endif
 		}
 		struct stat srcst, dstst;
 		if ( fstat(srcfd, &srcst) < 0 )
@@ -312,7 +452,7 @@ static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
 				err(1, "malloc");
 			bool ok = cp(dirfd(srcdir), name, srcpath_new,
 			             dstfd, name, dstpath_new,
-			             flags, symbolic_dereference);
+			             flags, symbolic_dereference, modespec, uid, gid);
 			free(srcpath_new);
 			free(dstpath_new);
 			ret = ret && ok;
@@ -342,7 +482,13 @@ static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
 		}
 
 		int oflags = O_WRONLY | O_CREAT;
+#ifdef INSTALL
+		mode_t omode = execute_modespec(modespec, srcst.st_mode,
+			                            srcst.st_mode, old_umask);
+#else
+		(void) modespec;
 		mode_t omode = srcst.st_mode & 03777;
+#endif
 		int dstfd = openat(dstdirfd, dstrel, oflags, omode);
 		if ( dstfd < 0 &&
 		     flags & FLAG_FORCE &&
@@ -360,6 +506,14 @@ static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
 			warn("%s", dstpath);
 			return close(srcfd), false;
 		}
+#ifdef INSTALL
+		if ( (uid != (uid_t) -1 || uid != (uid_t) -1) &&
+		     fchown(dstfd, uid, gid) < 0 )
+		{
+			warn("chown: %s", dstpath);
+			return close(srcfd), false;
+		}
+#endif
 		bool ret = cp_contents(srcfd, srcpath, dstfd, dstpath, flags);
 		close(dstfd);
 		close(srcfd);
@@ -370,7 +524,8 @@ static bool cp(int srcdirfd, const char* srcrel, const char* srcpath,
 static
 bool cp_directory(int srcdirfd, const char* srcrel, const char* srcpath,
                   int dstdirfd, const char* dstrel, const char* dstpath,
-                  int flags, enum symbolic_dereference symbolic_dereference)
+                  int flags, enum symbolic_dereference symbolic_dereference,
+                  const char* modespec, uid_t uid, gid_t gid)
 {
 	size_t srcrel_last_slash = strlen(srcrel);
 	while ( srcrel_last_slash && srcrel[srcrel_last_slash-1] != '/' )
@@ -387,7 +542,7 @@ bool cp_directory(int srcdirfd, const char* srcrel, const char* srcpath,
 		err(1, "malloc");
 	bool ret = cp(srcdirfd, srcrel, srcpath,
 	              dstfd, src_basename, dstpath_new,
-	              flags, symbolic_dereference);
+	              flags, symbolic_dereference, modespec, uid, gid);
 	free(dstpath_new);
 	return ret;
 }
@@ -395,7 +550,8 @@ bool cp_directory(int srcdirfd, const char* srcrel, const char* srcpath,
 static
 bool cp_ambigious(int srcdirfd, const char* srcrel, const char* srcpath,
                   int dstdirfd, const char* dstrel, const char* dstpath,
-                  int flags, enum symbolic_dereference symbolic_dereference)
+                  int flags, enum symbolic_dereference symbolic_dereference,
+                  const char* modespec, uid_t uid, gid_t gid)
 {
 	struct stat dstst;
 	if ( fstatat(dstdirfd, dstrel, &dstst, 0) < 0 )
@@ -410,11 +566,11 @@ bool cp_ambigious(int srcdirfd, const char* srcrel, const char* srcpath,
 	if ( S_ISDIR(dstst.st_mode) )
 		return cp_directory(srcdirfd, srcrel, srcpath,
 		                    dstdirfd, dstrel, dstpath,
-		                    flags, symbolic_dereference);
+		                    flags, symbolic_dereference, modespec, uid, gid);
 	else
 		return cp(srcdirfd, srcrel, srcpath,
 		          dstdirfd, dstrel, dstpath,
-		          flags, symbolic_dereference);
+		          flags, symbolic_dereference, modespec, uid, gid);
 }
 
 static void compact_arguments(int* argc, char*** argv)
@@ -432,6 +588,14 @@ static void compact_arguments(int* argc, char*** argv)
 
 int main(int argc, char* argv[])
 {
+#ifdef INSTALL
+	const char* groupspec = "";
+	const char* modespec = "0755";
+	const char* ownerspec = "";
+#else
+	const char* modespec = NULL;
+#endif
+
 	int flags = 0;
 	const char* target_directory = NULL;
 	const char* preserve_list = NULL;
@@ -449,14 +613,47 @@ int main(int argc, char* argv[])
 			char c;
 			while ( (c = *++arg) ) switch ( c )
 			{
-#ifdef CP_PRETEND_TO_BE_INSTALL
+#ifdef INSTALL
 			case 'b': /* ignored */ break;
 			case 'c': /* ignored */ break;
 			case 'C': /* ignored */ break;
 			case 'd': flags |= FLAG_MKDIR; break;
-			case 'g': if ( *(arg + 1) ) arg = "g"; else if ( i + 1 != argc ) argv[++i] = NULL; break;
-			case 'm': if ( *(arg + 1) ) arg = "m"; else if ( i + 1 != argc ) argv[++i] = NULL; break;
-			case 'o': if ( *(arg + 1) ) arg = "o"; else if ( i + 1 != argc ) argv[++i] = NULL; break;
+			case 'g':
+				if ( *(arg + 1) )
+					groupspec = arg + 1;
+				else if ( i + 1 == argc )
+					errx(1, "option requires an argument -- '%c'", c);
+				else
+				{
+					groupspec = argv[i+1];
+					argv[++i] = NULL;
+				}
+				arg = "g";
+				break;
+			case 'm':
+				if ( *(arg + 1) )
+					modespec = arg + 1;
+				else if ( i + 1 == argc )
+					errx(1, "option requires an argument -- '%c'", c);
+				else
+				{
+					modespec = argv[i+1];
+					argv[++i] = NULL;
+				}
+				arg = "m";
+				break;
+			case 'o':
+				if ( *(arg + 1) )
+					ownerspec = arg + 1;
+				else if ( i + 1 == argc )
+					errx(1, "option requires an argument -- '%c'", c);
+				else
+				{
+					ownerspec = argv[i+1];
+					argv[++i] = NULL;
+				}
+				arg = "o";
+				break;
 			case 's': /* ignored */ break;
 #endif
 			case 'f': flags |= FLAG_FORCE; break;
@@ -483,11 +680,6 @@ int main(int argc, char* argv[])
 			case 'p': preserve_list = "mode,ownership,timestamps"; break;
 			case 'P': symbolic_dereference = SYMBOLIC_DEREFERENCE_NONE; break;
 			default:
-#ifdef CP_PRETEND_TO_BE_INSTALL
-				fprintf(stderr, "%s (fake): unknown option, ignoring -- '%c'\n",
-				        argv[0], c);
-				continue;
-#endif
 				errx(1, "unknown option -- '%c'", c);
 			}
 		}
@@ -521,13 +713,7 @@ int main(int argc, char* argv[])
 		else if ( !strcmp(arg, "--no-dereference") )
 			symbolic_dereference = SYMBOLIC_DEREFERENCE_NONE;
 		else
-		{
-#ifdef CP_PRETEND_TO_BE_INSTALL
-			fprintf(stderr, "%s (fake): unknown option, ignoring: %s\n", argv[0], arg);
-			continue;
-#endif
 			errx(1, "unknown option: %s", arg);
-		}
 	}
 
 	if ( (flags & FLAG_TARGET_DIR) && (flags & FLAG_NO_TARGET_DIR) )
@@ -549,13 +735,46 @@ int main(int argc, char* argv[])
 	if ( argc < 2 )
 		errx(1, "missing file operand");
 
-#ifdef CP_PRETEND_TO_BE_INSTALL
+	uid_t uid = (uid_t) -1;
+	gid_t gid = (gid_t) -1;
+#ifdef INSTALL
+	old_umask = umask(0);
+	if ( !is_valid_modespec(modespec) )
+		errx(1, "invalid mode: `%s'", modespec);
+	char* end;
+	if ( ownerspec[0] )
+	{
+		errno = 0;
+		uid = strtoumax(ownerspec, &end, 10);
+		if ( errno || *end )
+		{
+			struct passwd* pwd = getpwnam(ownerspec);
+			if ( !pwd )
+				err(1, "no such user: %s", ownerspec);
+			uid = pwd->pw_uid;
+		}
+	}
+	if ( groupspec[0] )
+	{
+		errno = 0;
+		gid = strtoumax(groupspec, &end, 10);
+		if ( errno || *end )
+		{
+			struct group* grp = getgrnam(groupspec);
+			if ( !grp )
+				err(1, "no such user: %s", groupspec);
+			gid = grp->gr_gid;
+		}
+	}
+
 	if ( flags & FLAG_MKDIR )
 	{
+		mode_t mode = execute_modespec(modespec, 0777 & ~old_umask, S_IFDIR,
+		                               old_umask);
 		bool success = true;
 		for ( int i = 1; i < argc; i++ )
 		{
-			if ( mkdir_p(argv[i], 0777) < 0 )
+			if ( mkdir_p(argv[i], mode) < 0 )
 			{
 				warn("%s", argv[i]);
 				success = false;
@@ -575,7 +794,7 @@ int main(int argc, char* argv[])
 			errx(1, "extra operand `%s'", argv[3]);
 		return cp(AT_FDCWD, src, src,
 		          AT_FDCWD, dst, dst,
-		          flags, symbolic_dereference) ? 0 : 1;
+		          flags, symbolic_dereference, modespec, uid, gid) ? 0 : 1;
 	}
 
 	if ( !(flags & FLAG_TARGET_DIR) && argc <= 3 )
@@ -586,7 +805,8 @@ int main(int argc, char* argv[])
 		const char* dst = argv[2];
 		return cp_ambigious(AT_FDCWD, src, src,
 		                    AT_FDCWD, dst, dst,
-		                    flags, symbolic_dereference) ? 0 : 1;
+		                    flags, symbolic_dereference, modespec, uid, gid)
+		       ? 0 : 1;
 	}
 
 	if ( !target_directory )
@@ -605,7 +825,7 @@ int main(int argc, char* argv[])
 		const char* dst = target_directory;
 		if ( !cp_directory(AT_FDCWD, src, src,
 		                   AT_FDCWD, dst, dst,
-		                   flags, symbolic_dereference) )
+		                   flags, symbolic_dereference, modespec, uid, gid) )
 			success = false;
 	}
 
