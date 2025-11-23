@@ -31,10 +31,10 @@ arrow.inc: arrow.rgb
 	carray -cs --identifier=arrow arrow.rgb -o $@
 
 install: all
-	mkdir -p $(DESTDIR)$(SBINDIR)
-	install $(BINARY) $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp login.8 $(DESTDIR)$(MANDIR)/man8/login.8
+	mkdir -m 755 -p $(DESTDIR)$(SBINDIR)
+	install -m 755 $(BINARY) $(DESTDIR)$(SBINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man8
+	install -m 644 login.8 $(DESTDIR)$(MANDIR)/man8/login.8
 
 clean:
 	rm -f $(BINARY) $(OBJS) *.o arrow.inc

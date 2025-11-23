@@ -871,19 +871,17 @@ ifeq ($(HOST),x86_64-sortix)
     LIBK_FLAGS:=$(LIBK_FLAGS) -mno-red-zone -mno-mmx -mno-sse -mno-sse2
 endif
 
-BINS=libc.a libdl.a libpthread.a librt.a libxnet.a $(CRTOBJ)
-BINSKERNEL=libk.a
-INSTALLLIBS:=$(addprefix $(DESTDIR)$(LIBDIR)/,$(BINS))
-INSTALLLIBSKERNEL:=$(addprefix $(DESTDIR)$(LIBDIR)/,$(BINSKERNEL))
+LIBC=libc.a libdl.a libpthread.a librt.a libxnet.a $(CRTOBJ)
+LIBK=libk.a
 
-all: libs libs-kernel
+all: libc libk
 
-libs: $(BINS)
+libc: $(LIBC)
 
-libs-kernel: $(BINSKERNEL)
+libk: $(LIBK)
 
-.PHONY: all libs headers clean install install-include-dirs install-headers \
-        install-lib-dirs install-libs install-man libs-kernel
+.PHONY: all libc libk headers clean install install-headers install-libc \
+        install-libk install-man
 
 FORCE:
 
@@ -963,32 +961,24 @@ clean:
 	rm -f *.o */*.o */*/*.o *.a sha2/*hl.c
 
 # Installation into sysroot
-install: install-headers install-libs install-libs-kernel install-man
+install: install-headers install-libc install-libk install-man
 
 $(DESTDIR)$(LIBDIR):
-	mkdir -p $@
+	mkdir -m 755 -p $@
 
-$(DESTDIR)$(LIBDIR)/%: %
-	cp -P $< $@
+install-headers: headers
+	mkdir -m 755 -p $(DESTDIR)$(INCLUDEDIR)
+	cp -RT include $(DESTDIR)$(INCLUDEDIR)
+	for file in `cd include && find . | sort`; do chmod o=u-w,g=o "$(DESTDIR)$(INCLUDEDIR)/$$file"; done
 
-$(INSTALLLIBS): | $(DESTDIR)$(LIBDIR)
+install-libc: $(DESTDIR)$(LIBDIR) $(LIBC)
+	install -m 644 $(LIBC) $(DESTDIR)$(LIBDIR)
 
-$(INSTALLLIBSKERNEL): | $(DESTDIR)$(LIBDIR)
-
-install-include-dirs: headers
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
-
-install-headers: install-include-dirs headers
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
-
-install-lib-dirs: $(DESTDIR)$(LIBDIR)
-
-install-libs: $(INSTALLLIBS)
-
-install-libs-kernel: $(INSTALLLIBSKERNEL)
+install-libk: $(DESTDIR)$(LIBDIR) $(LIBK)
+	install -m 644 $(LIBK) $(DESTDIR)$(LIBDIR)
 
 install-man:
-	mkdir -p $(DESTDIR)$(MANDIR)/man2
-	cp $(MANPAGES2) $(DESTDIR)$(MANDIR)/man2
-	mkdir -p $(DESTDIR)$(MANDIR)/man3
-	cp $(MANPAGES3) $(DESTDIR)$(MANDIR)/man3
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man2
+	install -m 644 $(MANPAGES2) $(DESTDIR)$(MANDIR)/man2
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man3
+	install -m 644 $(MANPAGES3) $(DESTDIR)$(MANDIR)/man3

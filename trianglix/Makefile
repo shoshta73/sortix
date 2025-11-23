@@ -16,8 +16,8 @@ all: $(BINARY)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARY) $(DESTDIR)$(BINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(BINARY) $(DESTDIR)$(BINDIR)
 
 %: %.cpp
 	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $< -o $@ $(LIBS)

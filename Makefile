@@ -243,9 +243,9 @@ install-cross-grub:
 	rm -rf ports/grub/grub.build
 	if [ ! -e "$(PREFIX)/share/grub/unicode.pf2" ]; then \
 	  if [ -e /share/grub/unicode.pf2 ]; then \
-	    cp /share/grub/unicode.pf2 "$(PREFIX)/share/grub/unicode.pf2"; \
+	    install -m 644 /share/grub/unicode.pf2 "$(PREFIX)/share/grub/unicode.pf2"; \
 	  elif [ -e /usr/share/grub/unicode.pf2 ]; then \
-	    cp /usr/share/grub/unicode.pf2 "$(PREFIX)/share/grub/unicode.pf2"; \
+	    install -m 644 /usr/share/grub/unicode.pf2 "$(PREFIX)/share/grub/unicode.pf2"; \
 	  fi; \
 	fi
 
@@ -255,25 +255,25 @@ clean-cross-grub:
 
 .PHONY: sysroot-fsh
 sysroot-fsh:
-	mkdir -p "$(SYSROOT)"
-	mkdir -p "$(SYSROOT)/bin"
-	mkdir -p "$(SYSROOT)/boot"
-	mkdir -p "$(SYSROOT)/dev"
-	mkdir -p "$(SYSROOT)/etc"
-	mkdir -p "$(SYSROOT)/include"
-	mkdir -p "$(SYSROOT)/lib"
-	mkdir -p "$(SYSROOT)/libexec"
-	mkdir -p "$(SYSROOT)/sbin"
-	mkdir -p "$(SYSROOT)/share"
-	mkdir -p "$(SYSROOT)/tix"
-	mkdir -p "$(SYSROOT)/tix/tixinfo"
-	mkdir -p "$(SYSROOT)/tix/manifest"
-	mkdir -p "$(SYSROOT)/tmp" -m 1777
-	mkdir -p "$(SYSROOT)/var"
-	mkdir -p "$(SYSROOT)/var/cache"
-	mkdir -p "$(SYSROOT)/var/empty" -m 555
-	mkdir -p "$(SYSROOT)/var/log"
-	mkdir -p "$(SYSROOT)/var/run"
+	mkdir -m 755 -p "$(SYSROOT)"
+	mkdir -m 755 -p "$(SYSROOT)/bin"
+	mkdir -m 755 -p "$(SYSROOT)/boot"
+	mkdir -m 755 -p "$(SYSROOT)/dev"
+	mkdir -m 755 -p "$(SYSROOT)/etc"
+	mkdir -m 755 -p "$(SYSROOT)/include"
+	mkdir -m 755 -p "$(SYSROOT)/lib"
+	mkdir -m 755 -p "$(SYSROOT)/libexec"
+	mkdir -m 755 -p "$(SYSROOT)/sbin"
+	mkdir -m 755 -p "$(SYSROOT)/share"
+	mkdir -m 755 -p "$(SYSROOT)/tix"
+	mkdir -m 755 -p "$(SYSROOT)/tix/tixinfo"
+	mkdir -m 755 -p "$(SYSROOT)/tix/manifest"
+	mkdir -m 1777 -p "$(SYSROOT)/tmp"
+	mkdir -m 755 -p "$(SYSROOT)/var"
+	mkdir -m 755 -p "$(SYSROOT)/var/cache"
+	mkdir -m 555 -p "$(SYSROOT)/var/empty"
+	mkdir -m 755 -p "$(SYSROOT)/var/log"
+	mkdir -m 755 -p "$(SYSROOT)/var/run"
 	ln -sfT . "$(SYSROOT)/usr"
 
 .PHONY: sysroot-base-headers
@@ -301,7 +301,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /var/empty >> "$(SYSROOT)/tix/manifest/system"
 	echo /var/log >> "$(SYSROOT)/tix/manifest/system"
 	echo /var/run >> "$(SYSROOT)/tix/manifest/system"
-	(echo 'NAME="Sortix"' && \
+	umask 0022 && (echo 'NAME="Sortix"' && \
 	 echo 'VERSION="$(VERSION)"' && \
 	 echo 'ID=sortix' && \
 	 echo 'VERSION_ID="$(VERSION)"' && \
@@ -314,7 +314,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /lib/os-release >> "$(SYSROOT)/tix/manifest/system"
 	# TODO: After releasing Sortix 1.1, delete these machine and sortix-release
 	#       compatibility files needed to sysmerge from Sortix 1.0.
-	echo "$(HOST_MACHINE)" > "$(SYSROOT)/lib/machine"
+	umask 0022 && echo "$(HOST_MACHINE)" > "$(SYSROOT)/lib/machine"
 	echo /lib/machine >> "$(SYSROOT)/tix/manifest/system"
 	ln -sf ../lib/machine "$(SYSROOT)/etc/machine"
 	echo /etc/machine >> "$(SYSROOT)/tix/manifest/system"
@@ -322,13 +322,15 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	echo /etc/sortix-release >> "$(SYSROOT)/tix/manifest/system"
 	find etc | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
 	cp -RT etc "$(SYSROOT)/etc"
+	for file in `find etc | sort`; do chmod o=u-w,g=o "$(SYSROOT)/$$file"; done
 	find share | sed -e 's,^,/,' >> "$(SYSROOT)/tix/manifest/system"
 	cp -RT share "$(SYSROOT)/share"
+	for file in `find share | sort`; do chmod o=u-w,g=o "$(SYSROOT)/$$file"; done
 	export SYSROOT="$(SYSROOT)" && \
 	(for D in $(MODULES); \
 	  do ($(MAKE) -C $$D && \
 	      rm -rf "$(SYSROOT).destdir" && \
-	      mkdir -p "$(SYSROOT).destdir" && \
+	      mkdir -m 755 -p "$(SYSROOT).destdir" && \
 	      $(MAKE) -C $$D install DESTDIR="$(SYSROOT).destdir" && \
 	      (cd "$(SYSROOT).destdir" && find .) | sed -e 's/\.//' -e 's/^$$/\//' | \
 	      grep -E '^.+$$' >> "$(SYSROOT)/tix/manifest/system" && \
@@ -337,7 +339,8 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	  || exit $$?; done)
 	LC_ALL=C sort -u "$(SYSROOT)/tix/manifest/system" > "$(SYSROOT)/tix/manifest/system.new"
 	mv "$(SYSROOT)/tix/manifest/system.new" "$(SYSROOT)/tix/manifest/system"
-	printf 'TIX_VERSION=3\nNAME=system\nPLATFORM=$(HOST)\nPREFIX=\nSYSTEM=true\n' > "$(SYSROOT)/tix/tixinfo/system"
+	chmod 644 "$(SYSROOT)/tix/manifest/system"
+	umask 0022 && printf 'TIX_VERSION=3\nNAME=system\nPLATFORM=$(HOST)\nPREFIX=\nSYSTEM=true\n' > "$(SYSROOT)/tix/tixinfo/system"
 
 .PHONY: sysroot-source
 sysroot-source: sysroot-fsh
@@ -360,7 +363,7 @@ else
 	-cd "$(SYSROOT)/src" && git remote rm origin
 endif
 else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
-	mkdir -p "$(SYSROOT)/src"
+	mkdir -m 755 -p "$(SYSROOT)/src"
 	cp .gitignore -t "$(SYSROOT)/src"
 	cp LICENSE -t "$(SYSROOT)/src"
 	cp Makefile -t "$(SYSROOT)/src"
@@ -372,9 +375,13 @@ else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
 	(for D in $(MODULES); do cp -R $$D -t "$(SYSROOT)/src" || exit $$?; done)
 	$(MAKE) -C "$(SYSROOT)/src" distclean
 endif
+ifneq ($(SORTIX_INCLUDE_SOURCE),no)
+	chmod -R o=u-w,g=o "$(SYSROOT)/src"
+endif
 	(cd "$(SYSROOT)" && find .) | sed 's/\.//' | \
 	grep -E '^/src(/.*)?$$' | \
 	LC_ALL=C sort > "$(SYSROOT)/tix/manifest/src"
+	chmod 644 "$(SYSROOT)/tix/manifest/src"
 
 .PHONY: available-ports
 available-ports:
@@ -552,14 +559,16 @@ $(ISO_VOLSET_ID_FILE):
 $(CHAIN_INITRD): $(ISO_VOLSET_ID_FILE) sysroot
 	mkdir -p `dirname $(CHAIN_INITRD)`
 	rm -rf $(CHAIN_INITRD).d
-	mkdir -p $(CHAIN_INITRD).d
-	mkdir -p $(CHAIN_INITRD).d/etc
+	mkdir -m 755 -p $(CHAIN_INITRD).d
+	mkdir -m 755 -p $(CHAIN_INITRD).d/etc
 	echo "VOLUME_SET_ID=`cat $(ISO_VOLSET_ID_FILE)` / iso9660 ro 0 1" > $(CHAIN_INITRD).d/etc/fstab
-	mkdir -p $(CHAIN_INITRD).d/etc/init
+	chmod 644 $(CHAIN_INITRD).d/etc/fstab
+	mkdir -m 755 -p $(CHAIN_INITRD).d/etc/init
 	echo require chain exit-code > $(CHAIN_INITRD).d/etc/init/default
-	mkdir -p $(CHAIN_INITRD).d/sbin
-	cp "$(SYSROOT)/sbin/init" $(CHAIN_INITRD).d/sbin
-	cp "$(SYSROOT)/sbin/iso9660fs" $(CHAIN_INITRD).d/sbin
+	chmod 644 $(CHAIN_INITRD).d/etc/init/default
+	mkdir -m 755 -p $(CHAIN_INITRD).d/sbin
+	install -m 755 "$(SYSROOT)/sbin/init" $(CHAIN_INITRD).d/sbin
+	install -m 755 "$(SYSROOT)/sbin/iso9660fs" $(CHAIN_INITRD).d/sbin
 	LC_ALL=C ls -A $(CHAIN_INITRD).d | \
 	tar -cf $(CHAIN_INITRD) -C $(CHAIN_INITRD).d --numeric-owner --owner=0 --group=0 -T -
 	rm -rf $(CHAIN_INITRD).d
@@ -567,17 +576,20 @@ $(CHAIN_INITRD): $(ISO_VOLSET_ID_FILE) sysroot
 $(LIVE_INITRD): sysroot
 	mkdir -p `dirname $(LIVE_INITRD)`
 	rm -rf $(LIVE_INITRD).d
-	mkdir -p $(LIVE_INITRD).d
-	mkdir -p $(LIVE_INITRD).d/etc
-	mkdir -p $(LIVE_INITRD).d/etc/init
-	mkdir -p $(LIVE_INITRD).d/home
-	mkdir -p $(LIVE_INITRD).d/mnt
+	mkdir -m 755 -p $(LIVE_INITRD).d
+	mkdir -m 755 -p $(LIVE_INITRD).d/etc
+	mkdir -m 755 -p $(LIVE_INITRD).d/etc/init
+	mkdir -m 755 -p $(LIVE_INITRD).d/home
+	mkdir -m 755 -p $(LIVE_INITRD).d/mnt
 	echo require single-user exit-code > $(LIVE_INITRD).d/etc/init/default
+	chmod 644 $(LIVE_INITRD).d/etc/init/default
 	echo "root::0:0:root:/root:sh" > $(LIVE_INITRD).d/etc/passwd
 	echo "include /etc/default/passwd.d/*" >> $(LIVE_INITRD).d/etc/passwd
+	chmod 644 $(LIVE_INITRD).d/etc/passwd
 	echo "root::0:root" > $(LIVE_INITRD).d/etc/group
 	echo "include /etc/default/group.d/*" >> $(LIVE_INITRD).d/etc/group
-	mkdir -p $(LIVE_INITRD).d/root -m 700
+	chmod 644 $(LIVE_INITRD).d/etc/group
+	mkdir -m 700 -p $(LIVE_INITRD).d/root
 	if [ -e "$(SYSROOT)/etc/skel" ]; then cp -RT "$(SYSROOT)/etc/skel" $(LIVE_INITRD).d/root; fi
 	(echo "You can view the documentation for new users by typing:" && \
 	 echo && \
@@ -586,7 +598,8 @@ $(LIVE_INITRD): sysroot
 	 echo "You can view the installation instructions by typing:" && \
 	 echo && \
 	 echo "  man installation") > $(LIVE_INITRD).d/root/welcome
-	tix-create -C $(LIVE_INITRD).d --platform=$(HOST) --prefix= --generation=3 --build-id="$(BUILD_ID)" --release-key="$(SIGNING_PUBLIC_KEY)" --release-url="$(RELEASE_URL)"
+	chmod 700 $(LIVE_INITRD).d/root/welcome
+	umask 0022 && tix-create -C $(LIVE_INITRD).d --platform=$(HOST) --prefix= --generation=3 --build-id="$(BUILD_ID)" --release-key="$(SIGNING_PUBLIC_KEY)" --release-url="$(RELEASE_URL)"
 	LC_ALL=C ls -A $(LIVE_INITRD).d | \
 	tar -cf $(LIVE_INITRD) -C $(LIVE_INITRD).d --numeric-owner --owner=0 --group=0 -T -
 	rm -rf $(LIVE_INITRD).d

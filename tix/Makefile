@@ -73,14 +73,12 @@ all: $(PROGRAMS)
 %: %.c util.h
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
 
-$(DESTDIR)$(SBINDIR):
-	mkdir -p $@
-
-install: all $(DESTDIR)$(SBINDIR)
-	install $(PROGRAMS) $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
+install: all
+	mkdir -m 755 -p $(DESTDIR)$(SBINDIR)
+	install -m 755 $(PROGRAMS) $(DESTDIR)$(SBINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man8
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man8
+	install -m 644 $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 	# TODO: After releasing Sortix 1.1, delete tix-collection compatibility.
 	ln -f $(DESTDIR)$(SBINDIR)/tix-create $(DESTDIR)$(SBINDIR)/tix-collection
 

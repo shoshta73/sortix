@@ -18,10 +18,10 @@ all: $(BINARIES)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARIES) $(DESTDIR)$(BINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(BINARIES) $(DESTDIR)$(BINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man1
+	install -m 644 $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@ $(LIBS)

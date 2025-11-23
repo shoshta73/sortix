@@ -42,29 +42,29 @@ all: sysinstall sysmerge sysupgrade
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(SBINDIR)
-	install sysinstall $(DESTDIR)$(SBINDIR)
-	install sysmerge $(DESTDIR)$(SBINDIR)
-	install sysupgrade $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(LIBEXECDIR)/sysmerge
-	install prepare $(DESTDIR)$(LIBEXECDIR)/sysmerge
-	install grub $(DESTDIR)$(LIBEXECDIR)/sysmerge
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp sysinstall.8 $(DESTDIR)$(MANDIR)/man8/sysinstall.8
-	cp sysmerge.8 $(DESTDIR)$(MANDIR)/man8/sysmerge.8
-	cp sysupgrade.8 $(DESTDIR)$(MANDIR)/man8/sysupgrade.8
-	mkdir -p $(DESTDIR)$(DATADIR)/sysinstall/hooks
+	mkdir -m 755 -p $(DESTDIR)$(SBINDIR)
+	install -m 755 sysinstall $(DESTDIR)$(SBINDIR)
+	install -m 755 sysmerge $(DESTDIR)$(SBINDIR)
+	install -m 755 sysupgrade $(DESTDIR)$(SBINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(LIBEXECDIR)/sysmerge
+	install -m 755 prepare $(DESTDIR)$(LIBEXECDIR)/sysmerge
+	install -m 755 grub $(DESTDIR)$(LIBEXECDIR)/sysmerge
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man8
+	install -m 644 sysinstall.8 $(DESTDIR)$(MANDIR)/man8/sysinstall.8
+	install -m 644 sysmerge.8 $(DESTDIR)$(MANDIR)/man8/sysmerge.8
+	install -m 644 sysupgrade.8 $(DESTDIR)$(MANDIR)/man8/sysupgrade.8
+	mkdir -m 755 -p $(DESTDIR)$(DATADIR)/sysinstall/hooks
 	# TODO: After releasing Sortix 1.1, remove this compatibility.
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-random-seed
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix-manifest-mode
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-leaked-files
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-init
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-passwd
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-group
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix3g
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-grub-cache
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-collection-conf
-	touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-home-mnt
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-random-seed
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix-manifest-mode
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-leaked-files
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-init
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-passwd
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-group
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-tix3g
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-grub-cache
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-collection-conf
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-home-mnt
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount -ldisplay

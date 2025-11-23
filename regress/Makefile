@@ -37,11 +37,11 @@ all: $(BINARIES) $(TESTS)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARIES) $(DESTDIR)$(BINDIR)
-	mkdir -p $(DESTDIR)$(TESTDIR)
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(BINARIES) $(DESTDIR)$(BINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(TESTDIR)
 ifneq ($(TESTS),)
-	install $(TESTS) $(DESTDIR)$(TESTDIR)
+	install -m 755 $(TESTS) $(DESTDIR)$(TESTDIR)
 endif
 
 %: %.c

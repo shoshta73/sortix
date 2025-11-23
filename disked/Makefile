@@ -17,10 +17,10 @@ all: $(BINARY)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(SBINDIR)
-	install $(BINARY) $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp disked.8 $(DESTDIR)$(MANDIR)/man8
+	mkdir -m 755 -p $(DESTDIR)$(SBINDIR)
+	install -m 755 $(BINARY) $(DESTDIR)$(SBINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man8
+	install -m 644 disked.8 $(DESTDIR)$(MANDIR)/man8
 
 $(BINARY): $(BINARY).c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -std=gnu11 $< -o $@ -lmount

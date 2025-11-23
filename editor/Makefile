@@ -36,12 +36,12 @@ $(BINARY): $(OBJS)
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) -c $< -o $@
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARY) $(DESTDIR)$(BINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp editor.1 $(DESTDIR)$(MANDIR)/man1/editor.1
-	mkdir -p $(DESTDIR)$(MANDIR)/man5
-	cp editor.5 $(DESTDIR)$(MANDIR)/man5/editor.5
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(BINARY) $(DESTDIR)$(BINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man1
+	install -m 644 editor.1 $(DESTDIR)$(MANDIR)/man1/editor.1
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man5
+	install -m 644 editor.5 $(DESTDIR)$(MANDIR)/man5/editor.5
 
 clean:
 	rm -f $(BINARY) $(OBJS) *.o

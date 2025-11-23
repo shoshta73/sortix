@@ -369,8 +369,7 @@ all: libs
 
 libs: $(BINS)
 
-.PHONY: libs headers clean install install-include-dirs install-headers \
-        install-libm-dirs install-libm install-libs
+.PHONY: libs headers clean install install-headers install-libs
 
 # TODO: Do not pick up the i387 asm version, it is incorrect
 arch/i387/s_modf.o: src/s_modf.c
@@ -395,20 +394,15 @@ clean:
 	rm -f $(BINS) $(OBJS) $(ARCH_SUBDIR)/*.o src/*.o */*.o arch/*/*.o
 
 # Installation into sysroot
-install: install-headers install-libm
+install: install-headers install-libs
 
-install-include-dirs: headers
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)/machine
+install-headers: headers
+	mkdir -m 755 -p $(DESTDIR)$(INCLUDEDIR)
+	mkdir -m 755 -p $(DESTDIR)$(INCLUDEDIR)/machine
+	cp -RT include $(DESTDIR)$(INCLUDEDIR)
+	for file in `cd include && find . | sort`; do chmod o=u-w,g=o "$(DESTDIR)$(INCLUDEDIR)/$$file"; done
+	install -m 644 $(ARCH_MACHINE_HEADERS) $(DESTDIR)$(INCLUDEDIR)/machine
 
-install-headers: install-include-dirs headers
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
-	cp -v $(ARCH_MACHINE_HEADERS) $(DESTDIR)$(INCLUDEDIR)/machine
-
-install-libs: install-libm
-
-install-libm-dirs:
-	mkdir -p $(DESTDIR)$(LIBDIR)
-
-install-libm: install-libm-dirs libm.a
-	cp -P libm.a $(DESTDIR)$(LIBDIR)
+install-libs: libm.a
+	mkdir -m 755 -p $(DESTDIR)$(LIBDIR)
+	install -m 644 libm.a $(DESTDIR)$(LIBDIR)

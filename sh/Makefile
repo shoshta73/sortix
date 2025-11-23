@@ -23,15 +23,15 @@ all: $(BINARIES)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARIES) $(DESTDIR)$(BINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp sh.1 $(DESTDIR)$(MANDIR)/man1/sh.1
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(BINARIES) $(DESTDIR)$(BINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man1
+	install -m 644 sh.1 $(DESTDIR)$(MANDIR)/man1/sh.1
 	ln -sf sh.1 $(DESTDIR)$(MANDIR)/man1/sortix-sh.1
-	mkdir -p $(DESTDIR)$(MANDIR)/man5
-	cp profile.5 $(DESTDIR)$(MANDIR)/man5/profile.5
-	cp proper-sh.5 $(DESTDIR)$(MANDIR)/man5/proper-sh.5
-	cp shrc.5 $(DESTDIR)$(MANDIR)/man5/shrc.5
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man5
+	install -m 644 profile.5 $(DESTDIR)$(MANDIR)/man5/profile.5
+	install -m 644 proper-sh.5 $(DESTDIR)$(MANDIR)/man5/proper-sh.5
+	install -m 644 shrc.5 $(DESTDIR)$(MANDIR)/man5/shrc.5
 
 sortix-sh: $(SORTIX_SH_SRCS) *.h
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $(SORTIX_SH_SRCS) -o $@

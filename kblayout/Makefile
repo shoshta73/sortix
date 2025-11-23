@@ -22,8 +22,8 @@ all: $(LAYOUTS)
 	$(KBLAYOUT_COMPILER) --format=sortix-kblayout-1 --compression=none $< -o $@
 
 install: all
-	mkdir -p $(DESTDIR)$(KBLAYOUTDIR)
-	cp $(LAYOUTS) $(DESTDIR)$(KBLAYOUTDIR)
+	mkdir -m 755 -p $(DESTDIR)$(KBLAYOUTDIR)
+	install -m 644 $(LAYOUTS) $(DESTDIR)$(KBLAYOUTDIR)
 
 clean:
 	rm -f $(LAYOUTS)

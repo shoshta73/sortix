@@ -19,10 +19,10 @@ all: $(BINARY)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARY) $(DESTDIR)$(BINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp carray.1 $(DESTDIR)$(MANDIR)/man1/carray.1
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(BINARY) $(DESTDIR)$(BINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man1
+	install -m 644 carray.1 $(DESTDIR)$(MANDIR)/man1/carray.1
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@

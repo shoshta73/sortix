@@ -14,14 +14,14 @@ all: checksum
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install checksum $(DESTDIR)$(BINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 checksum $(DESTDIR)$(BINDIR)
 	ln -f $(DESTDIR)$(BINDIR)/checksum $(DESTDIR)$(BINDIR)/sha224sum
 	ln -f $(DESTDIR)$(BINDIR)/checksum $(DESTDIR)$(BINDIR)/sha256sum
 	ln -f $(DESTDIR)$(BINDIR)/checksum $(DESTDIR)$(BINDIR)/sha384sum
 	ln -f $(DESTDIR)$(BINDIR)/checksum $(DESTDIR)$(BINDIR)/sha512sum
-	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp checksum.1 $(DESTDIR)$(MANDIR)/man1/checksum.1
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man1
+	install -m 644 checksum.1 $(DESTDIR)$(MANDIR)/man1/checksum.1
 	ln -f $(DESTDIR)$(MANDIR)/man1/checksum.1 $(DESTDIR)$(MANDIR)/man1/sha224sum.1
 	ln -f $(DESTDIR)$(MANDIR)/man1/checksum.1 $(DESTDIR)$(MANDIR)/man1/sha256sum.1
 	ln -f $(DESTDIR)$(MANDIR)/man1/checksum.1 $(DESTDIR)$(MANDIR)/man1/sha384sum.1

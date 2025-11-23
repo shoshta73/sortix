@@ -19,10 +19,11 @@ all: $(LIBRARY)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(LIBDIR)
-	cp $(LIBRARY) $(DESTDIR)$(LIBDIR)
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
+	mkdir -m 755 -p $(DESTDIR)$(LIBDIR)
+	install -m 644 $(LIBRARY) $(DESTDIR)$(LIBDIR)
+	mkdir -m 755 -p $(DESTDIR)$(INCLUDEDIR)
+	cp -RT include $(DESTDIR)$(INCLUDEDIR)
+	for file in `cd include && find . | sort`; do chmod o=u-w,g=o "$(DESTDIR)$(INCLUDEDIR)/$$file"; done
 
 %.o: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) -c $< -o $@

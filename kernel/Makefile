@@ -229,13 +229,14 @@ clean:
 install: install-headers install-kernel
 
 install-include-dirs: headers
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
+	mkdir -m 755 -p $(DESTDIR)$(INCLUDEDIR)
 
 install-headers: install-include-dirs headers
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
+	cp -RT include $(DESTDIR)$(INCLUDEDIR)
+	for file in `cd include && find . | sort`; do chmod o=u-w,g=o "$(DESTDIR)$(INCLUDEDIR)/$$file"; done
 
 install-kernel: install-kernel-binary
 
 install-kernel-binary: sortix.bin
-	mkdir -p $(DESTDIR)$(BOOTDIR)
-	cp sortix.bin $(DESTDIR)$(BOOTDIR)/sortix.bin
+	mkdir -m 755 -p $(DESTDIR)$(BOOTDIR)
+	install -m 755 sortix.bin $(DESTDIR)$(BOOTDIR)/sortix.bin

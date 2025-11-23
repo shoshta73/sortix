@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+umask 0022
+
 make_dir_path_absolute() {
   (cd "$1" && pwd)
 }

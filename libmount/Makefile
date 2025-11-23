@@ -37,10 +37,11 @@ libmount.a: $(OBJS)
 	$(AR) rcs $@ $(OBJS)
 
 install: libmount.a
-	mkdir -p $(DESTDIR)$(INCLUDEDIR)
-	cp -RTv include $(DESTDIR)$(INCLUDEDIR)
-	mkdir -p $(DESTDIR)$(LIBDIR)
-	cp libmount.a $(DESTDIR)$(LIBDIR)
+	mkdir -m 755 -p $(DESTDIR)$(INCLUDEDIR)
+	cp -RT include $(DESTDIR)$(INCLUDEDIR)
+	for file in `cd include && find . | sort`; do chmod o=u-w,g=o "$(DESTDIR)$(INCLUDEDIR)/$$file"; done
+	mkdir -m 755 -p $(DESTDIR)$(LIBDIR)
+	install -m 644 libmount.a $(DESTDIR)$(LIBDIR)
 
 clean:
 	rm -f libmount.a

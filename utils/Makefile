@@ -114,15 +114,15 @@ all: $(BINARIES) $(SBINS)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(BINDIR)
-	install $(BINARIES_EXCEPT_INSTALL) $(DESTDIR)$(BINDIR)
-	install xinstall $(DESTDIR)$(BINDIR)/install
-	mkdir -p $(DESTDIR)$(SBINDIR)
-	install $(SBINS) $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	cp $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
+	mkdir -m 755 -p $(DESTDIR)$(BINDIR)
+	install -m 755 $(BINARIES_EXCEPT_INSTALL) $(DESTDIR)$(BINDIR)
+	install -m 755 xinstall $(DESTDIR)$(BINDIR)/install
+	mkdir -m 755 -p $(DESTDIR)$(SBINDIR)
+	install -m 755 $(SBINS) $(DESTDIR)$(SBINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man1
+	install -m 644 $(MANPAGES1) $(DESTDIR)$(MANDIR)/man1
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man8
+	install -m 644 $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
 head: tail.c
 

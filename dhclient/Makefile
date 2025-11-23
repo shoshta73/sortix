@@ -18,12 +18,12 @@ all: $(BINARIES)
 .PHONY: all install clean
 
 install: all
-	mkdir -p $(DESTDIR)$(SBINDIR)
-	install $(BINARIES) $(DESTDIR)$(SBINDIR)
-	mkdir -p $(DESTDIR)$(MANDIR)/man5
-	install $(MANPAGES5) $(DESTDIR)$(MANDIR)/man5
-	mkdir -p $(DESTDIR)$(MANDIR)/man8
-	install $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
+	mkdir -m 755 -p $(DESTDIR)$(SBINDIR)
+	install -m 755 $(BINARIES) $(DESTDIR)$(SBINDIR)
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man5
+	install -m 644 $(MANPAGES5) $(DESTDIR)$(MANDIR)/man5
+	mkdir -m 755 -p $(DESTDIR)$(MANDIR)/man8
+	install -m 644 $(MANPAGES8) $(DESTDIR)$(MANDIR)/man8
 
 %: %.c
 	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@
