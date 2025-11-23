@@ -47,22 +47,22 @@ typedef __intmax_t __blkcnt_t;
 #define __SCNuBLKCNT __SCNuMAX
 #define __SCNxBLKCNT __SCNxMAX
 
-typedef __intmax_t __blksize_t;
+typedef long __blksize_t;
 /*#define __BLKSIZE_UNSIGNED*/
-#define __BLKSIZE_C(c) __INTMAX_C(c)
-#define __BLKSIZE_MIN __INTMAX_MIN
-#define __BLKSIZE_MAX __INTMAX_MAX
-#define __PRIdBLKSIZE __PRIdMAX
-#define __PRIiBLKSIZE __PRIiMAX
-#define __PRIoBLKSIZE __PRIoMAX
-#define __PRIuBLKSIZE __PRIuMAX
-#define __PRIxBLKSIZE __PRIxMAX
-#define __PRIXBLKSIZE __PRIXMAX
-#define __SCNdBLKSIZE __SCNdMAX
-#define __SCNiBLKSIZE __SCNiMAX
-#define __SCNoBLKSIZE __SCNoMAX
-#define __SCNuBLKSIZE __SCNuMAX
-#define __SCNxBLKSIZE __SCNxMAX
+#define __BLKSIZE_C(c) c ## L
+#define __BLKSIZE_MIN __LONG_MIN
+#define __BLKSIZE_MAX __LONG_MAX
+#define __PRIdBLKSIZE "ld"
+#define __PRIiBLKSIZE "li"
+#define __PRIoBLKSIZE "lo"
+#define __PRIuBLKSIZE "lu"
+#define __PRIxBLKSIZE "lx"
+#define __PRIXBLKSIZE "lX"
+#define __SCNdBLKSIZE "ld"
+#define __SCNiBLKSIZE "li"
+#define __SCNoBLKSIZE "lo"
+#define __SCNuBLKSIZE "lu"
+#define __SCNxBLKSIZE "lx"
 
 typedef long __clock_t;
 /*#define __CLOCK_UNSIGNED*/

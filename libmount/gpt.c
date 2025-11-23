@@ -220,7 +220,7 @@ blockdevice_get_partition_table_gpt(struct partition_table** pt_ptr,
 	pt->type = PARTITION_TABLE_TYPE_GPT;
 	size_t pt__partitions_length = 0;
 
-	if ( logical_block_size < gpt.header_size )
+	if ( (uintmax_t) logical_block_size < (uintmax_t) gpt.header_size )
 		return free(gpt_block), PARTITION_ERROR_HEADER_TOO_LARGE;
 
 	struct gpt_partition_table* gptpt = CALLOC_TYPE(struct gpt_partition_table);

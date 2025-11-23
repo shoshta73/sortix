@@ -2918,7 +2918,6 @@ static void on_rmtable(size_t argc, char** argv)
 		              argv[0], current_hd->path);
 		return;
 	}
-	// TODO: Assert logical_block_size fits in size_t.
 	size_t block_size = current_hd->logical_block_size;
 	unsigned char* zeroes = (unsigned char*) calloc(1, block_size);
 	if ( !zeroes )

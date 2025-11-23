@@ -87,6 +87,12 @@ struct stat
 	struct timespec st_mtim;
 	struct timespec st_ctim;
 	blksize_t st_blksize;
+	/* TODO: After releasing Sortix 1.1, bump the major ABI with an incompatible
+	         change and remove this padding since blksize_t used to be
+	         intmax_t. */
+#ifdef __i386__
+	long __stat_blksize_padding;
+#endif
 	blkcnt_t st_blocks;
 };
 
