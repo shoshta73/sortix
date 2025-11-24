@@ -18,7 +18,8 @@ Documentation
 -------------
 
 The system is documented as manual pages.  Introductory system usage is covered
-in the user-guide(7) manual page.
+in the user-guide(7) manual page.  See CONTRIBUTING for information on how to
+contribute to this community project.
 
 Links
 -----
@@ -41,7 +42,7 @@ You can view the cross-development(7) manual page with this command:
 License
 -------
 
-Copyright 2011-2016 Jonas 'Sortie' Termansen and contributors.
+Copyright 2011-2025 Jonas 'Sortie' Termansen and contributors.
 
 Sortix is free software licensed under the ISC license as described in the
 LICENSE file.  It also contains permissively licensed code from other projects.
