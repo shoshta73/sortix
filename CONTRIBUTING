@@ -1,0 +1,298 @@
+Contributing
+============
+
+Hello and welcome to your local friendly neighborhood Sortix operating system!
+
+This guide will provide you with all the information needed to start
+contributing effectively to this project. Sortix is a community project that
+strives to be welcoming, fun, inclusive, and generally trying to do better.
+Please come join our community and don't hestitate to ask for any help that you
+could use.
+
+Community
+---------
+
+Joining the IRC chat on irc.sortix.org is the best way to meet the community,
+ask for help, and coordinate development. Please come introduce yourself and
+stick around. The developers might not be around at all times, but will see your
+messages when they're back, and you will always get a response in time. The chat
+actually runs on a real Sortix server.
+
+You can also drop an email or open an issue if you prefer to get in touch in a
+more asynchronously reliable fashion.
+
+Please get in touch if you experience any problems with the community,
+developers, or the maintainer. The community has been very small so far, so we
+just haven't taken the time to make official policies for conduct yet, but we're
+definitely doing it immediately at the first sight of trouble or if anybody
+asks. We're in touch with experts on diversity and inclusion as part of the
+funding this project has received, and we will use them and their resources.
+You are welcome here if you believe everyone is inherently welcome and worthy as
+they are, but not if you are hateful. Welcome to the Sortix community. :)
+
+Documentation
+-------------
+
+All the development needed to develop Sortix should already be documented in
+the official manual. Use the manual from the nightly build instead of the stable
+release manual to get the latest up-to-date information:
+
+<https://pub.sortix.org/sortix/release/nightly/man/>
+
+The <https://pub.sortix.org/sortix/release/nightly/man/man7/installation.7.html>
+guide will show how to install the operaing system. If you're using a virtual
+machine, you might enjoy configuring ssh so you easily can transfer files and
+use your normal shell environment.
+
+The easiest way to build and develop Sortix is by simply installing the latest
+Sortix nightly build, possibly in a virtual machine. All the tools required by
+build Sortix are already available and configured out of the box. You can build
+a new base system and upgrade to it by simply running:
+
+    cd /src
+    make sysmerge PACKAGES=
+    reboot
+
+See <https://pub.sortix.org/sortix/release/nightly/man/man7/development.7.html>
+for all the information on how to develop Sortix natively.
+
+You can also easily cross-compile the operating system if you wish by following
+<https://pub.sortix.org/sortix/release/nightly/man/man7/cross-development.7.html>.
+It is slightly more work to build the cross-toolchain but you can benefit from
+operating systems being faster and more featureful.
+
+Keep an eye on the
+<https://pub.sortix.org/sortix/release/nightly/man/man7/following-development.7.html>
+document when pulling new source code, as it contains a list of potentially
+incompatible changes to the operating system development process that you need
+to know about.
+
+If you wish to port software, please read the following documentation:
+
+* <https://pub.sortix.org/sortix/release/nightly/man/man7/porting.7.html>
+* <https://pub.sortix.org/sortix/release/nightly/man/man5/port.5.html>
+* <https://pub.sortix.org/sortix/release/nightly/man/man7/portability.7.html>
+
+New features should be documented in the mdoc(7) format as manual pages.
+
+Issues
+------
+
+Please report and find all known issues in the official issue tracker:
+
+<https://gitlab.com/sortix/sortix/-/issues>
+
+Issues are continuously triaged, labeled, and assigned milestones for stable
+releases. If you're looking for some great first issues for your first
+contribution, see the `contributable` label:
+
+<https://gitlab.com/sortix/sortix/-/issues?state=opened&label_name[]=contributable>
+
+If an issue is assigned to the lead developer, it means the issue is
+currently prioritized, but doesn't always mean any work has been done on it. If
+you would like to help out on such an issue, ping us on the issue or in the chat
+and we'll let you know if there's any partial work you might want to know about,
+or if you can just take ownership of it.
+
+Some issues are marked `needs-investigation` to mark them as tricky and may
+require careful non-trivial design work, and there may already be a vision in
+mind. You definitely want to talk to us while working on these issues.
+
+Otherwise, the golden rule is to have fun, try out the system, and find some
+itches to scratch and see how your personal skills can be best used!
+
+Merge Requests
+--------------
+
+Merge requests are more than welcome at
+<https://gitlab.com/sortix/sortix/-/merge_requests>.
+
+Please fork the official repository on gitlab to be able to submit MRs and make
+sure the project visibility is public, so the developers are able to pull from
+your repository.
+
+First identity an issue that you would like to work on. Filing an issue or
+talking to the developers on chat early on can help you avoid solving a
+non-problem or using the wrong approach.
+
+You will want to add your git fork as an extra remote and usually leave the
+origin remote pointing to the upstream repository:
+
+    git remote add username git@gitlab.com:username/sortix.git
+
+Please configure git with your identity:
+
+    git config --global user.name 'Firstname Lastname'
+    git config --global user.email 'username@example.com'
+
+Please consider using your real identity, however it is not required. You can be
+pseudonymous. All that we ask is that your identity is established in some sense
+(such as within our project only) and permanent in the sense that we can contact
+you later in the event of problems or disputes and that your email continue to
+be valid. We understand and appreciate that different people are exposed to
+different levels of risk online with different privacy requirements and desires,
+and we only want to make sure we know where our code came from and respect your
+copyright and moral rights when you license your contributions to the project.
+
+Please branch off the main branch for your changes:
+
+    git checkout main
+    git pull origin main
+    git checkout -b my-feature
+
+Edit the source code as you please with your favorite editor and solve the
+problem you set out to solve per the development(7) guide.
+
+Commit your changes early and often to avoid losing work:
+
+    git commit -a -m 'Add foo(1).'
+
+Merge requests should be a singular, perfect commit, so please amend the commit
+with follow-up changes instead of submitting a series of work-in-process
+commits:
+
+    git commit -a --amend
+
+Commit messages should have a special first line using an imperative verb,
+optionally followed by a blank line and additional paragraphs. All lines should
+be less than 76 characters wide as a style. Bug-fixes should use the format
+`Fix foo.` as a style to make it easy to identify and backport such fixes.
+
+Please include context for your changes, such as why the changes needed to be
+made, what was wrong, any non-trivial aspects, and provide an overview of the
+changes in the merge request. Unrelated changes should go in separate merge
+requests to ease reviews.
+
+The main branch will move ahead during development, and you should occasionally
+rebase your branch on main to avoid conflicts with the latest official source
+code:
+
+    git checkout main
+    git pull origin main
+    git checkout my-feature
+    git rebase main
+
+If your branch's git history becomes messy and isn't a singular commit, you can
+clean it up by rebasing on main, and reseting to main to undo your commit
+history but retaining your local files, and then you can recommit your
+changes:
+
+    git checkout my-feature
+    git rebase main
+    git reset main
+    git add foo.c
+    git commit -a -m 'Add foo(1).'
+
+Alternatively git rebase -i with fixup commits is a powerful workflow.
+
+See the Testing section below to make your change ready for submission.
+
+Push your changes to your branch in your fork when you're ready to submit your
+merge request:
+
+   git push username my-branch
+
+Open a merge request on the official gitlab project and ask for your branch to
+be merged to the main branch.
+
+Contributions submitted to the Sortix project are implicitly licensed to the
+Sortix project by the nature of submitting them as contributions. The license of
+the files being contributed to applies, or the ISC license per LICENSE if the
+file has no license statement. Contributors are responsible for ascertaining
+they have the right to license the contribution.
+
+Though submitted contributions are implicitly licensed to the project, first
+time contributors must make a written statement to that effect on the permanent
+record, to ensure there are no misunderstandings, e.g.:
+
+    I hereby license my past, current, and future contributions to Sortix under
+    the ISC license or the license of the relevant files.
+
+Do not submit contributions you do not have the rights to submit, and the
+project will assume good faith and that you have the rights to all contributions
+you submit.
+
+Please be patient and wait for the developers to review your change. Please feel
+free to ping the merge request if the developers are inactive for an extended
+period, so the contribution doesn't fall through the cracks.
+
+You will receive a mandatory code review before your change is merged. You will
+likely receive comments that you will have to address, or explain why your
+approach is better. The project developers will determine the suitability for
+inclusion into the official project, and generally the person that maintains the
+code and does the majority of the work gets to have the final say when resolving
+disagreements. This person can be you if you join and take ownership of an area
+of the project.
+
+To address the feedback, simply amend the commit on your branch, and force push
+it up to your fork:
+
+   git checkout my-branch
+   $EDITOR foo.c
+   git commit -a --amend
+   git push -f username my-branch
+
+Please comment on the merge requests that you have addressed the feedback, and
+you will receive another review round soon.
+
+Trivial and safe changes may be merged immediately. However, risky changes may
+be subject to additional testing proportional to the complexity and risk. Your
+code may be put on the history unstable 'staging' branch where experimental
+changes are tested in the overnight special 'volatile' build. This build is time
+consuming, but subjects the changes to a high amount of quality control, such as
+ensuring the system boots, the system can be bootstrapped, self-built,
+cross-compiled, installed, upgraded, passes tests, and much more. Oh and all of
+this testing actually happens natively on Sortix, including recursive qemu.
+
+If the change has the potential for second-order effects (such as a build tool
+affecting the subsequent build), your change will need to cycle through volatile
+twice which can take two days. The volatile build does break on accidental
+breakagrs in the course of normal development, and it may delay your merge
+request a bit more. Please feel free to parallelize your work by possibly
+working on other merge requests in the meanwhile. You should prefer finishing up
+existing merge requests with feedback rather than submitting additional merge
+requests to avoid overloading the code reviewers.
+
+Your branch will be rebased on main prior when merged. If you disable the
+ability for developers to rebase your branch, you will have to do it yourself.
+
+We're really happy that you chose to contribute to the project. Your
+contributions will be available in the nightly build available sometime the next
+day. The exact nightly build duration you will be told when you roughly can
+expect the new build to be available.
+
+Hey, if you get three contributions merged, then you can receive a special voice
+status on the official IRC channel as a meaningless but fun status symbol to
+show that you're one of us now. That makes you a junior contributor. If you keep
+up the good work, you'll become a senior contributor and be expected to help
+out junior contributors and do code-reviews, in order to off-load the
+maintainer. It's a community project and we're happy to have you here.
+
+Testing
+-------
+
+Please consider contributing testcases for your contributions to the os-test
+project <https://sortix.org/os-test/> as it functions as a shared test suite
+for all POSIX operating systems. If your contribution is Sortix-specific, talk
+to us and we'll figure something out.
+
+The testing inside Sortix repository is fairly minimal at this time as os-test
+fills much of the need. However, there is a bunch of testing infrastructure
+that is used for various special purposes.
+
+You can run various quick presubmit checks on your commit to make sure it builds
+properly without warnings, style issues, and other problems:
+
+    make presubmit
+
+You can use `build-aux/smoketest.sh` to run quick tests to see if an .iso build
+can be booted, ssh'd into, and that basic development tasks function.
+
+You can use `build-aux/installtest.sh` to check whether an .iso build can be
+properly installed and upgraded via all three upgrade mechanisms.
+
+These special scripts may be tricky to invoke directly, but they are integrated
+into the official release process, so builds are only published if they pass
+quality control. Regressions are not allowed on the main branch and the
+developers will help you test your changes and will help you make your
+contributions high quality.
