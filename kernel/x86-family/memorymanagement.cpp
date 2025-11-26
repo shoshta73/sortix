@@ -594,7 +594,8 @@ bool UnmapRange(addr_t where, size_t bytes, enum page_usage usage)
 	for ( addr_t page = where; page < where + bytes; page += 4096UL )
 	{
 		addr_t physicalpage = Unmap(page);
-		Page::Put(physicalpage, usage);
+		if ( physicalpage )
+			Page::Put(physicalpage, usage);
 	}
 	return true;
 }
