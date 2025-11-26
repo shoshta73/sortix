@@ -663,6 +663,7 @@ addr_t Get32Bit(enum page_usage usage)
 
 void PutUnlocked(addr_t page, enum page_usage usage)
 {
+	assert(page);
 	assert(page == AlignDown(page));
 	if ( unlikely(stackused == stacklength) )
 	{
@@ -830,6 +831,7 @@ bool MapRange(addr_t where, size_t bytes, int protection, enum page_usage usage)
 			{
 				page -= 4096UL;
 				physicalpage = Unmap(page);
+				assert(physicalpage);
 				Page::Put(physicalpage, usage);
 			}
 			return false;
@@ -997,6 +999,7 @@ void ForkCleanup(size_t i, size_t level)
 		}
 		enum page_usage usage = 1 < level ? PAGE_USAGE_PAGING_OVERHEAD
 		                                  : PAGE_USAGE_USER_SPACE;
+		assert(phys);
 		Page::Put(phys, usage);
 	}
 }
@@ -1040,6 +1043,7 @@ bool Fork(size_t level, size_t pmloffset)
 		{
 			if ( !Fork(level-1, offset) )
 			{
+				assert(phys);
 				Page::Put(phys, usage);
 				ForkCleanup(i, level);
 				return false;

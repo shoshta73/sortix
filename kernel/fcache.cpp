@@ -123,6 +123,7 @@ void BlockCache::ReleaseBlock(BlockCacheBlock* block)
 		blocks_allocated--;
 		uint8_t* block_data = BlockDataUnlocked(block);
 		addr_t block_data_addr = Memory::Unmap((addr_t) block_data);
+		assert(block_data_addr);
 		Page::Put(block_data_addr, PAGE_USAGE_FILESYSTEM_CACHE);
 		// TODO: We leak this block's meta information here. Rather, we should
 		// put this block into a list of non-present blocks so we can reuse it

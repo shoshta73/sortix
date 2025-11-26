@@ -17,6 +17,7 @@
  * Handles memory for the x64 architecture.
  */
 
+#include <assert.h>
 #include <string.h>
 
 #include <sortix/kernel/interrupt.h>
@@ -51,6 +52,7 @@ void RecursiveFreeUserspacePages(size_t level, size_t offset)
 			RecursiveFreeUserspacePages(level-1, offset * ENTRIES + i);
 		addr_t addr = pml->entry[i] & PML_ADDRESS;
 		// No need to unmap the page, we just need to mark it as unused.
+		assert(addr);
 		Page::PutUnlocked(addr, PAGE_USAGE_PAGING_OVERHEAD);
 	}
 }
@@ -83,6 +85,12 @@ void DestroyAddressSpace(addr_t fallback)
 	Page::Unlock();
 
 	// These are safe to free since we switched address space.
+	assert(fractal3 & PML_ADDRESS);
+	assert(fractal2 & PML_ADDRESS);
+	assert(fractal1 & PML_ADDRESS);
+	assert(fork2 & PML_ADDRESS);
+	assert(fork1 & PML_ADDRESS);
+	assert(dir & PML_ADDRESS);
 	Page::Put(fractal3 & PML_ADDRESS, PAGE_USAGE_PAGING_OVERHEAD);
 	Page::Put(fractal2 & PML_ADDRESS, PAGE_USAGE_PAGING_OVERHEAD);
 	Page::Put(fractal1 & PML_ADDRESS, PAGE_USAGE_PAGING_OVERHEAD);
