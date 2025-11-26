@@ -73,6 +73,7 @@ static void UnmapInitrdPage(struct initrd_context* ctx, addr_t vaddr)
 	addr_t addr = Memory::Unmap(vaddr);
 	if ( !(ctx->initrd_unmap_start <= addr && addr < ctx->initrd_unmap_end) )
 		return;
+	assert(addr);
 	Page::Put(addr, PAGE_USAGE_WASNT_ALLOCATED);
 }
 

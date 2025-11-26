@@ -130,6 +130,7 @@ bool AllocateAndMapPage(paddrmapped_t* ret, enum page_usage usage, addr_t mtype)
 	int prot = PROT_KREAD | PROT_KWRITE;
 	if ( !Memory::MapPAT(page, kmem_virt.from, prot, mtype) )
 	{
+		assert(page);
 		Page::Put(page, usage);
 		FreeKernelAddress(&kmem_virt);
 		return false;
@@ -147,6 +148,7 @@ void FreeAllocatedAndMappedPage(paddrmapped_t* alloc)
 		return;
 	Memory::Unmap(alloc->from);
 	Memory::Flush();
+	assert(alloc->phys);
 	Page::Put(alloc->phys, alloc->usage);
 	alloc->size = 0;
 }
