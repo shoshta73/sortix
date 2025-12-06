@@ -1869,7 +1869,7 @@ mode_t sys_umask(mode_t newmask)
 	Process* process = CurrentProcess();
 	ScopedLock lock(&process->id_lock);
 	mode_t oldmask = process->umask;
-	process->umask = newmask & 0666;
+	process->umask = newmask & 0777;
 	return oldmask;
 }
 
