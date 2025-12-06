@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,17 +13,14 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * signal/sigsuspend.c
- * Wait until a signal occurs from the signal mask.
+ * unistd/pause.c
+ * Wait until a signal occurs.
  */
 
-#include <sys/syscall.h>
-
+#include <stddef.h>
 #include <signal.h>
 
-DEFN_SYSCALL1(int, sys_sigsuspend, SYSCALL_SIGSUSPEND, const sigset_t*);
-
-int sigsuspend(const sigset_t* set)
+int pause(void)
 {
-	return sys_sigsuspend(set);
+	return sigsuspend(NULL);
 }

@@ -806,6 +806,7 @@ unistd/memstat.o \
 unistd/mkpartition.o \
 unistd/pathconf.o \
 unistd/pathconfat.o \
+unistd/pause.o \
 unistd/pipe2.o \
 unistd/pipe.o \
 unistd/pread.o \

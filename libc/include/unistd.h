@@ -422,7 +422,11 @@ int link(const char*, const char*);
 /* lockf will not be implemented. */
 off_t lseek(int, off_t, int);
 long pathconf(const char*, int);
-/* TODO: int pause(void); */
+#if !defined(__is_sortix_libc) /* not a warning inside libc */
+__attribute__((__warning__(
+"pause() always has a race condition, use sigprocmask + sigsuspend instead")))
+#endif
+int pause(void);
 int pipe(int [2]);
 ssize_t read(int, void*, size_t);
 int rmdir(const char*);
