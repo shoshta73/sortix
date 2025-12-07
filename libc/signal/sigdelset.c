@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@
 int sigdelset(sigset_t* set, int signum)
 {
 	int max_signals = sizeof(set->__val) * 8;
-	if ( max_signals <= signum )
+	if ( signum < 0 || max_signals <= signum )
 		return errno = EINVAL, -1;
 	size_t which_byte = signum / 8;
 	size_t which_bit  = signum % 8;
