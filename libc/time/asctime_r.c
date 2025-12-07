@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -31,7 +31,7 @@ char* asctime_r(const struct tm* tm, char* buf)
 	static char month_names[12][4] =
 		{ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct",
 		  "Nov", "Dec" };
-	sprintf(buf, "%.3s %.3s%3d %.2d:%.2d%.2d %d\n",
+	sprintf(buf, "%.3s %.3s%3d %.2d:%.2d:%.2d %d\n",
 	             weekday_names[tm->tm_wday],
 	             month_names[tm->tm_mon],
 	             tm->tm_mday,
