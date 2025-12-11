@@ -158,20 +158,22 @@ int main(int argc, char* argv[])
 
 	size_t usage_width = 0;
 	size_t name_width = 0;
-	for ( size_t i = start_counter; i < num_counters; i++ )
-	{
-		size_t count = values[i];
-		const char* name = usages[i]->name;
-		char* usage = format_bytes_amount(count, unit, raw);
-		if ( !usage )
-			err(1, "malloc");
-		size_t usage_len = strlen(usage);
-		if ( usage_width < usage_len )
-			usage_width = usage_len;
-		size_t name_len = strlen(name);
-		if ( name_width < name_len )
-			name_width = name_len;
-		free(usage);
+	if ( !raw ) {
+		for ( size_t i = start_counter; i < num_counters; i++ )
+		{
+			size_t count = values[i];
+			const char* name = usages[i]->name;
+			char* usage = format_bytes_amount(count, unit, raw);
+			if ( !usage )
+				err(1, "malloc");
+			size_t usage_len = strlen(usage);
+			if ( usage_width < usage_len )
+				usage_width = usage_len;
+			size_t name_len = strlen(name);
+			if ( name_width < name_len )
+				name_width = name_len;
+			free(usage);
+		}
 	}
 
 	for ( size_t i = start_counter; i < num_counters; i++ )
