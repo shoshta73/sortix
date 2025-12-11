@@ -99,6 +99,7 @@ int main(int argc, char* argv[])
 			{
 			case 'i': ignore_environment = true; break;
 			case 'u':
+				const char* key;
 				if ( !arg[1] )
 				{
 					if ( i + 1 == argc )
@@ -107,17 +108,13 @@ int main(int argc, char* argv[])
 						fprintf(stderr, "Try `%s --help' for more information.\n", argv[0]);
 						exit(125);
 					}
-					const char* key = argv[i+1];
+					key = argv[i+1];
 					argv[++i] = NULL;
-					if ( unsetenv(key) != 0 )
-						err(125, "unsetenv failed: %s", key);
 				}
 				else
-				{
-					const char* key = arg + 1;
-					if ( unsetenv(key) != 0 )
-						err(125, "unsetenv failed: %s", key);
-				}
+					key = arg + 1;
+				if ( !ignore_environment && unsetenv(key) != 0 )
+					err(125, "unsetenv failed: %s", key);
 				arg = "u";
 				break;
 			case '0': null_terminate = true; break;
