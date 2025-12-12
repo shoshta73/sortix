@@ -233,7 +233,7 @@ static int sort_records(const void* a_ptr, const void* b_ptr)
 		if ( a->st.st_size < b->st.st_size )
 			return option_reverse(1);
 		if ( b->st.st_size < a->st.st_size )
-			return option_reverse(1);
+			return option_reverse(-1);
 	}
 	else if ( option_sort == SORT_TIME )
 	{
