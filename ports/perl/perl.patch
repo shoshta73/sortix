@@ -1,3 +1,17 @@
+diff -Paur --no-dereference -- perl.upstream/cnf/configure perl/cnf/configure
+--- perl.upstream/cnf/configure
++++ perl/cnf/configure
+@@ -48,7 +48,9 @@
+ # past this point $build/$buildarch are non-empty unless we're in target mode
+ 
+ if [ -z "$mode" ]; then
+-	if [ -z "$target" -o "$target" = "$build" ]; then
++	cc_sysroot=`${CC-cc} --print-sysroot || true`
++	if [ -z "$target" -o "$target" = "$build" ] &&
++	   [ "$cc_sysroot" = "" -o "$cc_sysroot" = / ]; then
+ 		mode='native'
+ 	else
+ 		mode='cross'
 diff -Paur --no-dereference -- perl.upstream/cnf/configure_args.sh perl/cnf/configure_args.sh
 --- perl.upstream/cnf/configure_args.sh
 +++ perl/cnf/configure_args.sh
