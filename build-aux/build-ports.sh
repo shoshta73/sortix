@@ -140,4 +140,5 @@ tix-metabuild \
   ${RELEASE_URL+--release-url="$RELEASE_URL"} \
   ${START:+--start="$START"} \
   ${SYSROOT:+--sysroot="$SYSROOT"} \
+  ${TRACE_OPTIONS:+--trace-options="$TRACE_OPTIONS"} \
   "$SORTIX_PORTS_DIR"

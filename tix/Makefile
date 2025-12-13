@@ -22,6 +22,7 @@ tix-execpatch \
 tix-install \
 tix-rmdiff \
 tix-rmpatch \
+tix-trace-compile \
 tix-vars \
 tix-uninstall \
 

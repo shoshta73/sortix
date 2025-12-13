@@ -42,6 +42,7 @@ unset sysroot
 unset tar
 unset target
 unset tmp
+unset trace_options
 
 unset port
 
@@ -105,6 +106,8 @@ for argument do
   --target) previous_option=target ;;
   --tmp=*) tmp=$parameter ;;
   --tmp) previous_option=tmp ;;
+  --trace-options=*) trace_options=$parameter ;;
+  --trace-options) previous_option=trace_options ;;
   --mirror=*) mirror=$parameter ;;
   --mirror) previous_option=mirror ;;
   --mirror-directory=*) mirror_directory=$parameter ;;
@@ -589,6 +592,7 @@ if [ $(step_number "${start-start}") -lt $(step_number tix-build-end) ] &&
     ${tar+--tar="$tar"} \
     ${target+--target="$target"} \
     ${tmp+--tmp="$tmp"} \
+    ${trace_options+--trace-options="$trace_options"} \
     "$port"
   update_version=true
 fi
