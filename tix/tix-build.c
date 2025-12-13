@@ -139,6 +139,7 @@ struct metainfo
 	char* tar;
 	char* target;
 	char* tmp;
+	char* trace_options;
 	string_array_t package_info;
 	enum build_step start_step;
 	enum build_step end_step;
@@ -201,20 +202,15 @@ static bool has_in_path(const char* program)
 	_exit(1);
 }
 
-static void emit_compiler_wrapper_invocation(FILE* wrapper,
-                                             struct metainfo* minfo,
-                                             const char* name)
-{
-	fprintf(wrapper, "%s", name);
-	if ( minfo->sysroot )
-		fprintf(wrapper, " --sysroot=\"$SYSROOT\"");
-	fprintf(wrapper, " \"$@\"");
-}
-
 static void emit_compiler_sysroot_wrapper(struct metainfo* minfo,
                                           const char* bindir,
-                                          const char* name)
+                                          const char* name,
+                                          bool cross_tool,
+                                          const char* tool,
+                                          bool sysroot_option)
 {
+	if ( !cross_tool && !minfo->trace_options )
+		return;
 	if ( !has_in_path(name) )
 		return;
 	char* wrapper_path = join_paths(bindir, name);
@@ -228,7 +224,36 @@ static void emit_compiler_sysroot_wrapper(struct metainfo* minfo,
 	if ( minfo->sysroot )
 		fprint_shell_variable_assignment(wrapper, "SYSROOT", minfo->sysroot);
 	fprintf(wrapper, "exec ");
-	emit_compiler_wrapper_invocation(wrapper, minfo, name);
+	if ( minfo->trace_options )
+	{
+		fprintf(wrapper, "tix-trace-compile");
+		fprintf(wrapper, " --tool=");
+		// TODO: Quote all these fputs calls.
+		fputs(tool, wrapper);
+		if ( cross_tool )
+			fprintf(wrapper, " --host");
+		else
+			fprintf(wrapper, " --build");
+		fprintf(wrapper, " --build-dir=");
+		fputs(minfo->build_dir, wrapper);
+		fprintf(wrapper, " --source-dir=");
+		fputs(minfo->package_dir, wrapper);
+		if ( minfo->sysroot )
+		{
+			fprintf(wrapper, " --sysroot=");
+			fputs(minfo->sysroot, wrapper);
+		}
+		if ( minfo->trace_options[0] )
+		{
+			fprintf(wrapper, " ");
+			fputs(minfo->trace_options, wrapper);
+		}
+		fprintf(wrapper, " -- ");
+	}
+	fprintf(wrapper, "%s", name);
+	if ( cross_tool && minfo->sysroot && sysroot_option )
+		fprintf(wrapper, " --sysroot=\"$SYSROOT\"");
+	fprintf(wrapper, " \"$@\"");
 	fprintf(wrapper, "\n");
 	fflush(wrapper);
 	fchmod_plus_x(fileno(wrapper));
@@ -240,12 +265,17 @@ static void emit_compiler_sysroot_wrapper(struct metainfo* minfo,
 
 static void emit_compiler_sysroot_cross_wrapper(struct metainfo* minfo,
                                                 const char* bindir,
-                                                const char* name)
+                                                const char* name,
+                                                const char* tool,
+                                                bool sysroot_option)
 {
+	emit_compiler_sysroot_wrapper(minfo, bindir, name, false, tool,
+	                              sysroot_option);
 	char* cross_name = print_string("%s-%s", minfo->host, name);
 	if ( !cross_name )
 		err(1, "malloc");
-	emit_compiler_sysroot_wrapper(minfo, bindir, cross_name);
+	emit_compiler_sysroot_wrapper(minfo, bindir, cross_name, true, tool,
+	                              sysroot_option);
 	free(cross_name);
 }
 
@@ -359,12 +389,16 @@ static void EmitWrappers(struct metainfo* minfo)
 		err(1, "mkdir: %s", bindir);
 
 	emit_pkg_config_wrapper(minfo, bindir);
-	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "cc");
-	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "gcc");
-	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "c++");
-	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "g++");
-	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "ld");
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "cpp", "compile", true);
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "cc", "compile", true);
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "gcc", "compile", true);
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "c++", "compile", true);
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "g++", "compile", true);
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "as", "assemble", false);
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "ar", "archive", false);
+	emit_compiler_sysroot_cross_wrapper(minfo, bindir, "ld", "link", true);
 
+	// TODO: This doesn't nest with BOOTSTRAP
 	append_to_path(bindir);
 
 	free(bindir);
@@ -978,6 +1012,9 @@ static void Compile(struct metainfo* minfo)
 			minfo->subdir = strdup(subdir);
 	}
 
+	// Wrap the toolchain to inject parameters and trace compilation commands.
+	EmitWrappers(minfo);
+
 	// Reset the build directory if needed.
 	if ( SHOULD_DO_BUILD_STEP(BUILD_STEP_PRE_CLEAN, minfo) &&
 	     !use_build_dir &&
@@ -1027,6 +1064,7 @@ static void Bootstrap(struct metainfo* minfo)
 	newinfo.tar = minfo->tar;
 	newinfo.target = minfo->host;
 	newinfo.tmp = minfo->tmp;
+	newinfo.trace_options = minfo->trace_options;
 	const char* bootstrap_prefix =
 		minfo->tixbuildinfo ? "bootstrap." : "BOOTSTRAP_";
 	for ( size_t i = 0; i < minfo->package_info.length; i++ )
@@ -1103,8 +1141,6 @@ static void BuildPackage(struct metainfo* minfo)
 	     (strcmp(minfo->build, minfo->host) != 0 || minfo->sysroot) &&
 	     SHOULD_DO_BUILD_STEP(BUILD_STEP_CONFIGURE, minfo) )
 		Bootstrap(minfo);
-
-	EmitWrappers(minfo);
 
 	Compile(minfo);
 
@@ -1272,6 +1308,7 @@ int main(int argc, char* argv[])
 		else if ( GET_OPTION_VARIABLE("--tar", &minfo.tar) ) { }
 		else if ( GET_OPTION_VARIABLE("--target", &minfo.target) ) { }
 		else if ( GET_OPTION_VARIABLE("--tmp", &minfo.tmp) ) { }
+		else if ( GET_OPTION_VARIABLE("--trace-options", &minfo.trace_options) ) { }
 		else
 			errx(1, "unknown option: %s", arg);
 	}

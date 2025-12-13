@@ -58,6 +58,7 @@ unset sysroots
 unset tar
 unset target
 unset tmp
+unset trace_options
 unset version
 
 operand=1
@@ -149,6 +150,8 @@ for argument do
   --target) previous_option=target ;;
   --tmp=*) tmp=$parameter ;;
   --tmp) previous_option=tmp ;;
+  --trace-options=*) trace_options=$parameter ;;
+  --trace-options) previous_option=trace_options ;;
   --version=*) version=$parameter ;;
   --version) previous_option=version ;;
   -*) echo "$0: unrecognized option $argument" >&2
@@ -264,6 +267,7 @@ for host in ${hosts-${host-build}}; do
       ${tar+--tar="$tar"} \
       ${target+--target="$target"} \
       ${tmp+--tmp="$tmp"} \
+      ${trace_options+--trace-options="$trace_options"} \
       "$ports/$package/$package"
   done
 

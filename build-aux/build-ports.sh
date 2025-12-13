@@ -25,6 +25,7 @@ unset repository_dir
 unset signing_public_key
 unset start
 unset sysroot
+unset trace_options
 unset werrorformat
 
 make_dir_path_absolute() {
@@ -112,6 +113,7 @@ if [ -n "${SORTIX_MIRROR_DIR+x}" ]; then mirror_dir=$SORTIX_MIRROR_DIR; fi
 if [ -n "${SORTIX_PORTS_MIRROR+x}" ]; then ports_mirror=$SORTIX_PORTS_MIRROR; fi
 if [ -n "${SORTIX_REPOSITORY_DIR+x}" ]; then repository_dir=$SORTIX_REPOSITORY_DIR; fi
 if [ -n "${SYSROOT+x}" ]; then sysroot=$SYSROOT; fi
+if [ -n "${TRACE_OPTIONS+x}" ]; then trace_options=$TRACE_OPTIONS; fi
 
 if ! $clean; then
   # Create the mirror directory for downloaded archives.
@@ -181,6 +183,7 @@ unset SORTIX_PORTS_MIRROR
 unset SORTIX_REPOSITORY_DIR
 unset SYSROOT
 unset TARGET
+unset TRACE_OPTIONS
 unset CHANNEL
 unset RELEASE
 unset RELEASE_AUTHORITATIVE
@@ -207,4 +210,5 @@ tix-metabuild \
   ${release_url+--release-url="$release_url"} \
   ${start:+--start="$start"} \
   ${sysroot:+--sysroot="$sysroot"} \
+  ${trace_options:+--trace-options="$trace_options"} \
   "$ports_dir"
