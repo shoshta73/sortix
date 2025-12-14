@@ -763,6 +763,7 @@ unistd/execl.o \
 unistd/execlpe.o \
 unistd/execlp.o \
 unistd/execve.o \
+unistd/execveat.o \
 unistd/execv.o \
 unistd/execvpe.o \
 unistd/execvp.o \
@@ -775,6 +776,7 @@ unistd/fchownat.o \
 unistd/fchown.o \
 unistd/fchrootat.o \
 unistd/fchroot.o \
+unistd/fexecve.o \
 unistd/_Fork.o \
 unistd/fork.o \
 unistd/fpathconf.o \

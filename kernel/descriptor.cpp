@@ -446,7 +446,7 @@ off_t Descriptor::lseek(ioctx_t* ctx, off_t offset, int whence)
 
 ssize_t Descriptor::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 {
-	if ( !(dflags & O_READ) )
+	if ( !(dflags & (O_READ | O_EXEC)) )
 		return errno = EBADF, -1;
 	if ( SIZE_MAX < count )
 		count = SSIZE_MAX;
@@ -472,7 +472,7 @@ ssize_t Descriptor::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 
 ssize_t Descriptor::readv(ioctx_t* ctx, const struct iovec* iov_ptr, int iovcnt)
 {
-	if ( !(dflags & O_READ) )
+	if ( !(dflags & (O_READ | O_EXEC)) )
 		return errno = EBADF, -1;
 	if ( iovcnt < 0 || IOV_MAX < iovcnt )
 		return errno = EINVAL, -1;
@@ -513,7 +513,7 @@ ssize_t Descriptor::pread(ioctx_t* ctx, uint8_t* buf, size_t count, off_t off)
 {
 	if ( S_ISCHR(type) )
 		return read(ctx, buf, count);
-	if ( !(dflags & O_READ) )
+	if ( !(dflags & (O_READ | O_EXEC)) )
 		return errno = EBADF, -1;
 	if ( !IsSeekable() )
 		return errno = ESPIPE, -1;
@@ -536,7 +536,7 @@ ssize_t Descriptor::preadv(ioctx_t* ctx, const struct iovec* iov_ptr,
 {
 	if ( S_ISCHR(type) )
 		return readv(ctx, iov_ptr, iovcnt);
-	if ( !(dflags & O_READ) )
+	if ( !(dflags & (O_READ | O_EXEC)) )
 		return errno = EBADF, -1;
 	if ( !IsSeekable() )
 		return errno = ESPIPE, -1;

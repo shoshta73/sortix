@@ -520,7 +520,7 @@ int seteuid(uid_t);
 #if __USE_SORTIX || 200809L <= __USE_POSIX
 int faccessat(int, const char*, int, int);
 int fchownat(int, const char*, uid_t, gid_t, int);
-/* TODO: int fexecve(int, char* const [], char* const []); */
+int fexecve(int, char* const [], char* const []);
 int linkat(int, const char*, int, const char*, int);
 ssize_t readlinkat(int, const char* __restrict, char* __restrict, size_t);
 int symlinkat(const char*, int, const char*);
@@ -546,6 +546,7 @@ int chroot(const char*);
 int closefrom(int);
 int crypt_checkpass(const char*, const char*);
 int crypt_newhash(const char*, const char*, char*, size_t);
+int execveat(int, const char*, char* const [], char* const [], int);
 int execvpe(const char*, char* const [], char* const []);
 char* get_current_dir_name(void);
 long pathconfat(int, const char*, int, int);

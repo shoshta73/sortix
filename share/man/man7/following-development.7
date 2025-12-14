@@ -69,6 +69,23 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add execveat(2) and fexecve(2)
+The
+.Xr execveat 2
+and
+.Xr fexecve 2
+system calls have been added.
+The
+.Xr execve 2
+libc routine has been reimplemented using the
+.Xr execveat 2
+syscall.
+.Pp
+This is a compatible ABI change.
+The old
+.Xr execve 2
+syscall is retained for temporary ABI compatibility with the 1.0 stable release,
+and will be removed after the next stable release.
 .Ss Add flags parameters to fchdirat(2), fchrootat(2), and truncateat(2)
 The non-standard
 .Xr fchdirat 2 ,

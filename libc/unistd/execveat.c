@@ -13,24 +13,19 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * unistd/execve.c
+ * unistd/execveat.c
  * Loads a program image.
  */
 
-// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility syscall
-//       support for sys_execve becoming sys_execveat.
 #include <sys/syscall.h>
 
-#include <errno.h>
-#include <fcntl.h>
 #include <unistd.h>
 
-DEFN_SYSCALL3(int, sys_execve, SYSCALL_EXECVE, const char*, char* const*, char* const*);
+DEFN_SYSCALL5(int, sys_execveat, SYSCALL_EXECVEAT, int, const char*,
+              char* const*, char* const*, int);
 
-int execve(const char* pathname, char* const* argv, char* const* envp)
+int execveat(int dirfd, const char* pathname, char* const* argv,
+             char* const* envp, int flags)
 {
-	int ret = execveat(AT_FDCWD, pathname, argv, envp, 0);
-	if ( ret < 0 && errno == ENOSYS )
-		return sys_execve(pathname, argv, envp);
-	return ret;
+	return sys_execveat(dirfd, pathname, argv, envp, flags);
 }

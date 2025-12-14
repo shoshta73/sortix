@@ -1275,27 +1275,60 @@ static void sys_execve_free(addralloc_t* alloc)
 }
 
 static
-int sys_execve_kernel(const char* filename,
-                      int argc,
-                      char* const* argv,
-                      int envc,
-                      char* const* envp,
-                      struct thread_registers* regs)
+int sys_execveat_kernel(int dirfd,
+                        const char* filename,
+                        int argc,
+                        char* const* argv,
+                        int envc,
+                        char* const* envp,
+                        int flags,
+                        struct thread_registers* regs,
+                        size_t recursion)
 {
+	if ( 4 <= recursion )
+		return errno = ELOOP, -1;
+
+	if ( flags & ~(AT_SYMLINK_NOFOLLOW) )
+		return errno = EINVAL, -1;
+
 	Process* process = CurrentProcess();
 
 	ioctx_t ctx;
 	SetupKernelIOCtx(&ctx);
-	Ref<Descriptor> from = filename[0] == '/' ? process->GetRoot() : process->GetCWD();
-	Ref<Descriptor> desc = from->open(&ctx, filename, O_EXEC | O_READ, 0);
-	if ( !desc )
-		return -1;
-	from.Reset();
+
+	Ref<Descriptor> desc;
+	if ( filename )
+	{
+		Ref<Descriptor> from;
+		if ( filename[0] == '/' )
+			from = process->GetRoot();
+		else if ( dirfd == AT_FDCWD )
+			from = process->GetCWD();
+		else
+			from = process->GetDescriptor(dirfd);
+		int open_flags =
+			O_EXEC | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+		desc = from->open(&ctx, filename, open_flags, 0);
+		if ( !desc )
+			return -1;
+		from.Reset();
+	}
+	else
+	{
+		if ( !argc )
+			return errno = EINVAL, -1;
+		filename = argv[0];
+		desc = CurrentProcess()->GetDescriptor(dirfd);
+		if ( !desc )
+			return -1;
+	}
 
 	struct stat st;
 	if ( desc->stat(&ctx, &st) )
 		return -1;
-	if ( !(st.st_mode & 0111) )
+
+	if ( !(desc->GetFlags() & O_EXEC) &&
+	     !(st.st_mode & 0111) )
 		return errno = EACCES, -1;
 
 	if ( !process->Execute(filename, desc, argc, argv, envc, envp, regs) )
@@ -1317,7 +1350,8 @@ int sys_execve_kernel(const char* filename,
 	uint8_t* buffer = (uint8_t*) buffer_alloc.from;
 	for ( size_t sofar = 0; sofar < filesize; )
 	{
-		ssize_t amount = desc->read(&ctx, buffer + sofar, filesize - sofar);
+		ssize_t amount = desc->pread(&ctx, buffer + sofar, filesize - sofar,
+		                             sofar);
 		if ( amount < 0 )
 			return sys_execve_free(&buffer_alloc), -1;
 		if ( amount == 0 )
@@ -1411,7 +1445,8 @@ int sys_execve_kernel(const char* filename,
 		if ( asprintf(&fullpath, "%s/%s", dirpath, sb_argv[0]) < 0 )
 			return free(dirpath), -1;
 
-		result = sys_execve_kernel(fullpath, new_argc, new_argv, envc, envp, regs);
+		result = sys_execveat_kernel(AT_FDCWD, fullpath, new_argc, new_argv,
+		                             envc, envp, 0, regs, recursion + 1);
 
 		free(fullpath);
 		free(dirpath);
@@ -1444,7 +1479,8 @@ int sys_execve_kernel(const char* filename,
 	}
 
 	if ( !any_tries )
-		result = sys_execve_kernel(new_argv0, new_argc, new_argv, envc, envp, regs);
+		result = sys_execveat_kernel(AT_FDCWD, new_argv0, new_argc, new_argv,
+		                             envc, envp, 0, regs, recursion + 1);
 
 	if ( result < 0 && any_eacces )
 		errno = EACCES;
@@ -1456,94 +1492,125 @@ int sys_execve_kernel(const char* filename,
 	return result;
 }
 
-int sys_execve(const char* user_filename,
-               char* const* user_argv,
-               char* const* user_envp)
+static void sys_execve_free(char** argv, char** envp)
 {
-	char* filename;
-	int argc;
-	int envc;
-	char** argv;
-	char** envp;
-	int result = -1;
-	struct thread_registers regs;
-	memset(&regs, 0, sizeof(regs));
+	for ( int i = 0; argv && argv[i]; i++ )
+		free(argv[i]);
+	for ( int i = 0; envp && envp[i]; i++ )
+		free(envp[i]);
+	free(argv);
+	free(envp);
+}
 
-	if ( !user_filename || !user_argv || !user_envp )
-		return errno = EFAULT, -1;
-
-	if ( !(filename = GetStringFromUser(user_filename)) )
-		goto cleanup_done;
-
-	argc = 0;
+static bool sys_execve_import(char* const* user_argv,
+                              char* const* user_envp,
+                              int* out_argc,
+                              char*** out_argv,
+                              int* out_envc,
+                              char*** out_envp)
+{
+	int argc = 0;
 	while ( true )
 	{
 		const char* user_arg;
 		if ( !CopyFromUser(&user_arg, user_argv + argc, sizeof(user_arg)) )
-			goto cleanup_filename;
+			return false;
 		if ( !user_arg )
 			break;
 		if ( ++argc == INT_MAX )
-		{
-			errno = E2BIG;
-			goto cleanup_filename;
-		}
+			return errno = E2BIG, false;
 	}
 
-	argv = (char**) calloc(argc+1, sizeof(char*));
-	if ( !argv )
-		goto cleanup_filename;
+	int envc = 0;
+	while ( true )
+	{
+		const char* user_env;
+		if ( !CopyFromUser(&user_env, user_envp + envc, sizeof(user_env)) )
+			return false;
+		if ( !user_env )
+			break;
+		if ( ++envc == INT_MAX  )
+			return errno = E2BIG, false;
+	}
+
+	char** argv = (char**) calloc(argc+1, sizeof(char*));
+	char** envp = (char**) calloc(envc+1, sizeof(char*));
+	if ( !argv || !envp )
+		return sys_execve_free(argv, envp), false;
 
 	for ( int i = 0; i < argc; i++ )
 	{
 		const char* user_arg;
 		if ( !CopyFromUser(&user_arg, user_argv + i, sizeof(user_arg)) )
-			goto cleanup_argv;
+			return sys_execve_free(argv, envp), false;
 		if ( !(argv[i] = GetStringFromUser(user_arg)) )
-			goto cleanup_argv;
+			return sys_execve_free(argv, envp), false;
 	}
-
-	envc = 0;
-	while ( true )
-	{
-		const char* user_env;
-		if ( !CopyFromUser(&user_env, user_envp + envc, sizeof(user_env)) )
-			goto cleanup_argv;
-		if ( !user_env )
-			break;
-		if ( ++envc == INT_MAX  )
-		{
-			errno = E2BIG;
-			goto cleanup_argv;
-		}
-	}
-
-	envp = (char**) calloc(envc+1, sizeof(char*));
-	if ( !envp )
-		goto cleanup_argv;
 
 	for ( int i = 0; i < envc; i++ )
 	{
 		const char* user_env;
 		if ( !CopyFromUser(&user_env, user_envp + i, sizeof(user_env)) )
-			goto cleanup_envp;
+			return sys_execve_free(argv, envp), false;
 		if ( !(envp[i] = GetStringFromUser(user_envp[i])) )
-			goto cleanup_envp;
+			return sys_execve_free(argv, envp), false;
 	}
 
-	result = sys_execve_kernel(filename, argc, argv, envc, envp, &regs);
+	*out_argc = argc;
+	*out_argv = argv;
+	*out_envc = envc;
+	*out_envp = envp;
+	return true;
+}
 
-cleanup_envp:
-	for ( int i = 0; i < envc; i++)
-		delete[] envp[i];
-	free(envp);
-cleanup_argv:
-	for ( int i = 0; i < argc; i++)
-		delete[] argv[i];
-	free(argv);
-cleanup_filename:
+int sys_execveat(int dirfd,
+                 const char* user_filename,
+                 char* const* user_argv,
+                 char* const* user_envp,
+                 int flags)
+{
+	int argc;
+	int envc;
+	char** argv;
+	char** envp;
+	if ( !sys_execve_import(user_argv, user_envp, &argc, &argv, &envc, &envp) )
+		return -1;
+	char* filename = GetStringFromUser(user_filename);
+	if ( !filename )
+		return sys_execve_free(argv, envp), -1;
+	struct thread_registers regs;
+	int result = sys_execveat_kernel(dirfd, filename, argc, argv, envc, envp,
+	                                 flags, &regs, 0);
 	delete[] filename;
-cleanup_done:
+	sys_execve_free(argv, envp);
+	if ( result == 0 )
+		LoadRegisters(&regs);
+	return result;
+}
+
+// TODO: After releasing Sortix 1.1, remove this old compatibility syscall and
+//       do an incompatible ABI bump.
+int sys_execve(const char* user_filename,
+               char* const* user_argv,
+               char* const* user_envp)
+{
+	return sys_execveat(AT_FDCWD, user_filename, user_argv, user_envp, 0);
+}
+
+int sys_fexecve(int fd,
+                char* const* user_argv,
+                char* const* user_envp)
+{
+	int argc;
+	int envc;
+	char** argv;
+	char** envp;
+	if ( !sys_execve_import(user_argv, user_envp, &argc, &argv, &envc, &envp) )
+		return -1;
+	struct thread_registers regs;
+	int result = sys_execveat_kernel(fd, NULL, argc, argv, envc, envp, 0,
+	                                 &regs, 0);
+	sys_execve_free(argv, envp);
 	if ( result == 0 )
 		LoadRegisters(&regs);
 	return result;
