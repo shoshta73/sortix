@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021-2022, 2024-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -77,7 +77,7 @@ public:
 	uintptr_t system_tid;
 	uintptr_t yield_to_tid;
 	struct thread_registers registers;
-	size_t id;
+	tid_t tid;
 	Process* process;
 	Thread* prev_sibling;
 	Thread* next_sibling;

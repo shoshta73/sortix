@@ -287,18 +287,6 @@ diff -Paur --no-dereference -- qemu.upstream/cpus.c qemu/cpus.c
          } while (r == -1 && (errno == EAGAIN || errno == EINTR));
          if (r == -1) {
              perror("sigwait");
-@@ -1204,7 +1211,11 @@
-         return;
-     }
-     cpu->thread_kicked = true;
-+#if defined(__sortix__)
-+    err = ENOSYS;
-+#else
-     err = pthread_kill(cpu->thread->thread, SIG_IPI);
-+#endif
-     if (err) {
-         fprintf(stderr, "qemu:%s: %s", __func__, strerror(err));
-         exit(1);
 diff -Paur --no-dereference -- qemu.upstream/hw/audio/fmopl.c qemu/hw/audio/fmopl.c
 --- qemu.upstream/hw/audio/fmopl.c
 +++ qemu/hw/audio/fmopl.c

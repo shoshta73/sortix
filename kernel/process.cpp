@@ -1096,6 +1096,9 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 	uthread->arg_mmap = (void*) arg_segment.addr;
 	uthread->arg_size = arg_segment.size;
 	memset(uthread + 1, 0, aux.uthread_size - sizeof(struct uthread));
+	kthread_mutex_lock(&thread_lock);
+	CurrentThread()->tid = (tid_t) uthread;
+	kthread_mutex_unlock(&thread_lock);
 
 	memset(regs, 0, sizeof(*regs));
 #if defined(__i386__)

@@ -174,7 +174,7 @@ public:
 	void ExitThroughSignal(int signal);
 	void ExitWithCode(int exit_code);
 	pid_t Wait(pid_t pid, int* status, int options);
-	bool DeliverSignal(int signum);
+	bool DeliverSignal(int signum, tid_t tid = 0);
 	bool DeliverGroupSignal(int signum);
 	bool DeliverSessionSignal(int signum);
 	void OnThreadDestruction(Thread* thread);

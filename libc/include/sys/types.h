@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2016, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -393,6 +393,29 @@ typedef __suseconds_t suseconds_t;
 #define SCNxSUSECONDS __SCNxSUSECONDS
 #endif
 
+#if __USE_SORTIX
+#ifndef __tid_t_defined
+#define __tid_t_defined
+typedef __tid_t tid_t;
+#endif
+#if __USE_SORTIX
+#define TID_C(c) __TID_C(c)
+#define TID_MIN __TID_MIN
+#define TID_MAX __TID_MAX
+#define PRIdTID __PRIdTID
+#define PRIiTID __PRIiTID
+#define PRIoTID __PRIoTID
+#define PRIuTID __PRIuTID
+#define PRIxTID __PRIxTID
+#define PRIXTID __PRIXTID
+#define SCNdTID __SCNdTID
+#define SCNiTID __SCNiTID
+#define SCNoTID __SCNoTID
+#define SCNuTID __SCNuTID
+#define SCNxTID __SCNxTID
+#endif
+#endif
+
 #ifndef __time_t_defined
 #define __time_t_defined
 typedef __time_t time_t;
@@ -435,8 +458,6 @@ typedef __timer_t timer_t;
 #define SCNuTIMER __SCNuTIMER
 #define SCNxTIMER __SCNxTIMER
 #endif
-
-/* TODO: trace*_t */
 
 #ifndef __uid_t_defined
 #define __uid_t_defined

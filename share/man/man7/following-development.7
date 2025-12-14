@@ -69,6 +69,13 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add tkill(2) and pthread_kill(3)
+The
+.Xr tkill 2
+system call has been added to power
+.Xr pthread_kill 3 .
+.Pp
+This is a compatible ABI change.
 .Ss Add execveat(2) and fexecve(2)
 The
 .Xr execveat 2

@@ -185,6 +185,7 @@ int sys_tcsendbreak(int, int);
 int sys_tcsetattr(int, int, const struct termios*);
 ssize_t sys_tcsetblob(int, const char*, const void*, size_t);
 int sys_tcsetpgrp(int, pid_t);
+int sys_tkill(tid_t, int);
 pid_t sys_tfork(int, struct tfork*);
 int sys_timens(struct tmns*);
 int sys_timer_create(clockid_t, struct sigevent*, timer_t*);

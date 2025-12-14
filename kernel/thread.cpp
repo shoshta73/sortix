@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021-2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021-2022, 2024-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -57,7 +57,7 @@ Thread::Thread()
 	name = "";
 	system_tid = (uintptr_t) this;
 	yield_to_tid = 0;
-	id = 0; // TODO: Make a thread id.
+	tid = 0;
 	process = NULL;
 	prev_sibling = NULL;
 	next_sibling = NULL;
@@ -133,6 +133,13 @@ Thread* CreateKernelThread(Process* process,
 		return NULL;
 	thread->name = name;
 
+#if defined(__i386__)
+	thread->tid = regs->gsbase;
+#elif defined(__x86_64__)
+	thread->tid = regs->fsbase;
+#else
+#warning "You need to initialize the tid here"
+#endif
 	memcpy(&thread->registers, regs, sizeof(struct thread_registers));
 
 	// Create the family tree.

@@ -538,6 +538,7 @@ signal/kill.o \
 signal/killpg.o \
 signal/psiginfo.o \
 signal/psignal.o \
+signal/pthread_kill.o \
 signal/pthread_sigmask.o \
 signal/raise.o \
 signal/sigaction.o \
@@ -546,6 +547,7 @@ signal/signal.o \
 signal/sigpending.o \
 signal/sigprocmask.o \
 signal/sigsuspend.o \
+signal/tkill.o \
 stdio/ctermid.o \
 stdio/fdio_close.o \
 stdio/fdio_install_fd.o \

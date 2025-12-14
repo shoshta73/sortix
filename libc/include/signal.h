@@ -58,6 +58,13 @@ typedef __uid_t uid_t;
 typedef __pid_t pid_t;
 #endif
 
+#if __USE_SORTIX
+#ifndef __tid_t_defined
+#define __tid_t_defined
+typedef __tid_t tid_t;
+#endif
+#endif
+
 #ifndef __size_t_defined
 #define __size_t_defined
 #define __need_size_t
@@ -106,7 +113,9 @@ void (*signal(int, void (*)(int)))(int);
 int kill(pid_t, int);
 void psiginfo(const siginfo_t*, const char*);
 void psignal(int, const char*);
-/* TODO: int pthread_kill(pthread_t, int); */
+#if !defined(__is_sortix_libk) && !defined(__is_sortix_kernel)
+int pthread_kill(pthread_t, int);
+#endif
 int pthread_sigmask(int, const sigset_t* __restrict, sigset_t* __restrict);
 int sigaction(int, const struct sigaction* __restrict, struct sigaction* __restrict);
 int sigaddset(sigset_t*, int);
@@ -139,6 +148,7 @@ int sigandset(sigset_t*, const sigset_t*, const sigset_t*);
 int sigisemptyset(const sigset_t*);
 int signotset(sigset_t*, const sigset_t*);
 int sigorset(sigset_t*, const sigset_t*, const sigset_t*);
+int tkill(tid_t, int);
 #endif
 
 #ifdef __cplusplus

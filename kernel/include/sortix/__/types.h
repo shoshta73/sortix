@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -343,6 +343,23 @@ typedef long __suseconds_t;
 #define __SCNoSUSECONDS "lo"
 #define __SCNuSUSECONDS "lu"
 #define __SCNxSUSECONDS "lx"
+
+typedef __uintptr_t __tid_t;
+#define __TID_UNSIGNED
+#define __TID_C(c) __UINTPTR_C(c)
+#define __TID_MIN 0
+#define __TID_MAX __UINTPTR_MAX
+#define __PRIdTID __PRIdPTR
+#define __PRIiTID __PRIiPTR
+#define __PRIoTID __PRIoPTR
+#define __PRIuTID __PRIuPTR
+#define __PRIxTID __PRIxPTR
+#define __PRIXTID __PRIXPTR
+#define __SCNdTID __SCNdPTR
+#define __SCNiTID __SCNiPTR
+#define __SCNoTID __SCNoPTR
+#define __SCNuTID __SCNuPTR
+#define __SCNxTID __SCNxPTR
 
 typedef __int64_t __time_t;
 /*#define __TIME_UNSIGNED*/

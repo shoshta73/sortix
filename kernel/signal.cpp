@@ -310,8 +310,15 @@ int sys_kill(pid_t pid, int signum)
 	      !other->DeliverGroupSignal(signum) :
 	      !other->DeliverSignal(signum)) &&
 	     errno != ESIGPENDING )
-		return errno = 0, 0;
+		return -1;
 
+	return errno = 0, 0;
+}
+
+int sys_tkill(tid_t tid, int signum)
+{
+	if ( !CurrentProcess()->DeliverSignal(signum, tid) && errno != ESIGPENDING )
+		return -1;
 	return errno = 0, 0;
 }
 
@@ -347,11 +354,30 @@ bool Process::DeliverSessionSignal(int signum) // process_family_lock held
 	return true;
 }
 
-bool Process::DeliverSignal(int signum)
+bool Process::DeliverSignal(int signum, tid_t tid)
 {
 	ScopedLock lock(&thread_lock);
 
-	if ( !first_thread )
+	Thread* thread = NULL;
+	if ( tid )
+	{
+		for ( Thread* t = first_thread; t; t = t->next_sibling )
+		{
+			if ( t->tid == tid )
+			{
+				thread = t;
+				break;
+			}
+		}
+		if ( !thread )
+			return errno = ESRCH, false;
+	}
+	// TODO: This isn't how signals should be routed to a particular thread.
+	else if ( CurrentProcess() == this )
+		thread = CurrentThread();
+	else if ( first_thread )
+		thread = first_thread;
+	else
 		return errno = EINIT, false;
 
 	// Broadcast particular signals to all the threads in the process.
@@ -369,11 +395,7 @@ bool Process::DeliverSignal(int signum)
 		return true;
 	}
 
-	// Route the signal to a suitable thread that accepts it.
-	// TODO: This isn't how signals should be routed to a particular thread.
-	if ( CurrentThread()->process == this )
-		return CurrentThread()->DeliverSignal(signum);
-	return first_thread->DeliverSignal(signum);
+	return thread->DeliverSignal(signum);
 }
 
 int sys_raise(int signum)

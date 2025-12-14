@@ -710,6 +710,18 @@ diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/getsize.c e2fsprogs
  	/*
  	 * OK, we couldn't figure it out by using a specialized ioctl,
  	 * which is generally the best way.  So do binary search to
+diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/jfs_compat.h e2fsprogs/lib/ext2fs/jfs_compat.h
+--- e2fsprogs.upstream/lib/ext2fs/jfs_compat.h
++++ e2fsprogs/lib/ext2fs/jfs_compat.h
+@@ -31,6 +31,8 @@
+ #define le64_to_cpu(x)	ext2fs_le64_to_cpu(x)
+ #define be64_to_cpu(x)	ext2fs_be64_to_cpu(x)
+ 
++/* PATCH: Avoid collision with Sortix tid_t in the reserved namespace. */
++#define tid_t e2fsprogs_tid
+ typedef unsigned int tid_t;
+ typedef struct journal_s journal_t;
+ typedef struct kdev_s *kdev_t;
 diff -Paur --no-dereference -- e2fsprogs.upstream/lib/ext2fs/mmp.c e2fsprogs/lib/ext2fs/mmp.c
 --- e2fsprogs.upstream/lib/ext2fs/mmp.c
 +++ e2fsprogs/lib/ext2fs/mmp.c
