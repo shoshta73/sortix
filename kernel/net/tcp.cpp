@@ -217,6 +217,7 @@ public:
 	int shutdown(ioctx_t* ctx, int how);
 	int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	int sockatmark(ioctx_t* ctx);
 
 public:
 	void Unreference();
@@ -451,6 +452,7 @@ public:
 	virtual int shutdown(ioctx_t* ctx, int how);
 	virtual int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	virtual int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	virtual int sockatmark(ioctx_t* ctx);
 
 private:
 	TCPSocket* socket;
@@ -2354,6 +2356,12 @@ int TCPSocket::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize_ptr)
 	return 0;
 }
 
+int TCPSocket::sockatmark(ioctx_t* /*ctx*/)
+{
+	// TODO: Implement out-of-band data.
+	return 0;
+}
+
 // TODO: os-test fstat on a socket.
 TCPSocketNode::TCPSocketNode(TCPSocket* socket)
 {
@@ -2461,6 +2469,11 @@ int TCPSocketNode::getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 int TCPSocketNode::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 {
 	return socket->getsockname(ctx, addr, addrsize);
+}
+
+int TCPSocketNode::sockatmark(ioctx_t* ctx)
+{
+	return socket->sockatmark(ctx);
 }
 
 void HandleIP(Ref<Packet> pkt,

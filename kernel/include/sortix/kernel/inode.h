@@ -133,6 +133,7 @@ public:
 	virtual int shutdown(ioctx_t* ctx, int how) = 0;
 	virtual int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize) = 0;
 	virtual int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize) = 0;
+	virtual int sockatmark(ioctx_t* ctx) = 0;
 
 };
 
@@ -241,6 +242,7 @@ public:
 	virtual int shutdown(ioctx_t* ctx, int how);
 	virtual int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	virtual int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	virtual int sockatmark(ioctx_t* ctx);
 
 };
 

@@ -272,6 +272,7 @@ public:
 	virtual int shutdown(ioctx_t* ctx, int how);
 	virtual int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	virtual int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	virtual int sockatmark(ioctx_t* ctx);
 
 private:
 	bool SendMessage(Channel* channel, size_t type, void* ptr, size_t size,
@@ -1794,6 +1795,11 @@ int Unode::getsockname(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
                        size_t* /*addrsize*/)
 {
 	return errno = ENOTSOCK, -1;
+}
+
+int Unode::sockatmark(ioctx_t* /*ctx*/)
+{
+	return errno = ENOTTY, -1;
 }
 
 bool Bootstrap(Ref<Inode>* out_root,

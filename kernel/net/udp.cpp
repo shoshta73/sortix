@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017, 2018, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2018, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -133,6 +133,7 @@ public:
 	virtual int shutdown(ioctx_t* ctx, int how);
 	virtual int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	virtual int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	virtual int sockatmark(ioctx_t* ctx);
 
 public:
 	void ReceivePacket(Ref<Packet> pkt);
@@ -1135,6 +1136,11 @@ int UDPSocket::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize_ptr)
 		return -1;
 	if ( !ctx->copy_to_dest(addrsize_ptr, &addrsize, sizeof(addrsize)) )
 		return -1;
+	return 0;
+}
+
+int UDPSocket::sockatmark(ioctx_t* /*ctx*/)
+{
 	return 0;
 }
 

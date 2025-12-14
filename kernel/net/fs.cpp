@@ -108,6 +108,7 @@ public:
 	virtual int shutdown(ioctx_t* ctx, int how);
 	virtual int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	virtual int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	virtual int sockatmark(ioctx_t* ctx);
 
 public: /* For use by Manager. */
 	PollChannel accept_poll_channel;
@@ -477,6 +478,11 @@ int StreamSocket::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 	if ( !ctx->copy_to_dest(addrsize, &used_addrsize, sizeof(used_addrsize)) )
 		return -1;
 	return 0;
+}
+
+int StreamSocket::sockatmark(ioctx_t* ctx)
+{
+	return incoming.sockatmark(ctx);
 }
 
 Manager::Manager()

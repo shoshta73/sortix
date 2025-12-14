@@ -1316,4 +1316,9 @@ int Descriptor::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 	return vnode->getsockname(ctx, addr, addrsize);
 }
 
+int Descriptor::sockatmark(ioctx_t* ctx)
+{
+	return vnode->sockatmark(ctx);
+}
+
 } // namespace Sortix

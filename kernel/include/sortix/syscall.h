@@ -202,6 +202,7 @@
 #define SYSCALL_TKILL 179
 #define SYSCALL_GETGROUPS 180
 #define SYSCALL_SETGROUPS 181
-#define SYSCALL_MAX_NUM 182 /* index of highest constant + 1 */
+#define SYSCALL_SOCKATMARK 182
+#define SYSCALL_MAX_NUM 183 /* index of highest constant + 1 */
 
 #endif

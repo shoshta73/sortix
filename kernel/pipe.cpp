@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -112,6 +112,7 @@ public:
 	ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	int read_poll(ioctx_t* ctx, PollNode* node);
 	int write_poll(ioctx_t* ctx, PollNode* node);
+	int sockatmark(ioctx_t* ctx);
 
 private:
 	short ReadPollEventStatus();
@@ -1155,6 +1156,16 @@ int PipeChannel::write_poll(ioctx_t* /*ctx*/, PollNode* node)
 	return errno = EAGAIN, -1;
 }
 
+int PipeChannel::sockatmark(ioctx_t* /*ctx*/)
+{
+	if ( !buffer_used )
+		return 0;
+	struct segment_header header;
+	assert(sizeof(header) <= buffer_used);
+	ReadBuffer(CopyToKernel, &header, sizeof(header), 0);
+	return 0 < header.ancillary;
+}
+
 bool PipeChannel::GetSIGPIPEDelivery()
 {
 	ScopedLock lock(&pipe_lock);
@@ -1365,6 +1376,11 @@ int PipeEndpoint::poll(ioctx_t* ctx, PollNode* node)
 		return 0;
 	return reading ? channel->read_poll(ctx, node)
 	               : channel->write_poll(ctx, node);
+}
+
+int PipeEndpoint::sockatmark(ioctx_t* ctx)
+{
+	return reading ? channel->sockatmark(ctx) : 0;
 }
 
 bool PipeEndpoint::GetSIGPIPEDelivery()

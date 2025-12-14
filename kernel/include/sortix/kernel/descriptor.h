@@ -124,6 +124,7 @@ public:
 	int shutdown(ioctx_t* ctx, int how);
 	int getpeername(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
 	int getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize);
+	int sockatmark(ioctx_t* ctx);
 
 private:
 	Ref<Descriptor> open_elem(ioctx_t* ctx, const char* filename, int flags,

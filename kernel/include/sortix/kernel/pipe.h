@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2017, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2017, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,6 +52,7 @@ public:
 	ssize_t sendmsg(ioctx_t* ctx, const struct msghdr* msg, int flags);
 	ssize_t writev(ioctx_t* ctx, const struct iovec* iov, int iovcnt);
 	int poll(ioctx_t* ctx, PollNode* node);
+	int sockatmark(ioctx_t* ctx);
 
 private:
 	PipeChannel* channel;

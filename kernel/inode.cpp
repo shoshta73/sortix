@@ -647,4 +647,9 @@ int AbstractInode::getsockname(ioctx_t* /*ctx*/, uint8_t* /*addr*/,
 	return errno = ENOTSOCK, -1;
 }
 
+int AbstractInode::sockatmark(ioctx_t* /*ctx*/)
+{
+	return errno = ENOTTY, -1;
+}
+
 } // namespace Sortix

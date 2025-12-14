@@ -1006,6 +1006,15 @@ int sys_shutdown(int fd, int how)
 	return desc->shutdown(&ctx, how);
 }
 
+int sys_sockatmark(int fd)
+{
+	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
+	if ( !desc )
+		return -1;
+	ioctx_t ctx; SetupUserIOCtx(&ctx);
+	return desc->sockatmark(&ctx);
+}
+
 int sys_unmountat(int dirfd, const char* path, int flags)
 {
 	char* pathcopy = GetStringFromUser(path);

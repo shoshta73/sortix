@@ -69,6 +69,12 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add sockatmark(2)
+The
+.Xr sockatmark 2
+system call has been added after being a libc stub for a long time.
+.Pp
+This is a compatible ABI change.
 .Ss Add getgroups(2) and setgroups(2)
 The
 .Xr getgroups 2

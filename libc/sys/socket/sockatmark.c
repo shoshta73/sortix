@@ -18,11 +18,11 @@
  */
 
 #include <sys/socket.h>
+#include <sys/syscall.h>
 
-#include <errno.h>
+DEFN_SYSCALL1(int, sys_sockatmark, SYSCALL_SOCKATMARK, int);
 
 int sockatmark(int fd)
 {
-	(void) fd;
-	return errno = ENOSYS, -1;
+	return sys_sockatmark(fd);
 }

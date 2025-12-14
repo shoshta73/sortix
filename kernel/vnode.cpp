@@ -522,6 +522,11 @@ int Vnode::getsockname(ioctx_t* ctx, uint8_t* addr, size_t* addrsize)
 	return inode->getsockname(ctx, addr, addrsize);
 }
 
+int Vnode::sockatmark(ioctx_t* ctx)
+{
+	return inode->sockatmark(ctx);
+}
+
 bool Vnode::is_mount_point(ioctx_t* ctx, const char* filename)
 {
 	if ( !strcmp(filename, ".") || !strcmp(filename, "..") )

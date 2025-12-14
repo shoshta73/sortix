@@ -172,6 +172,7 @@ int sys_sigaltstack(const stack_t*, stack_t*);
 int sys_sigpending(sigset_t*);
 int sys_sigprocmask(int, const sigset_t*, sigset_t*);
 int sys_sigsuspend(const sigset_t*);
+int sys_sockatmark(int);
 int sys_socket(int, int, int);
 int sys_symlinkat(const char*, int, const char*);
 int sys_tcdrain(int);
