@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, 2021-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -408,6 +408,9 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 
 	if ( !(system->program_image_path = String::Clone("<kernel process>")) )
 		Panic("Unable to clone string for system process name");
+	if ( !(system->groups = new gid_t[1]) )
+		Panic("Unable to allocate groups for system process");
+	system->groups_length = 0;
 
 	// We construct this thread manually for bootstrap reasons. We wish to
 	// create a kernel thread that is the current thread and isn't put into the
@@ -686,6 +689,9 @@ static void BootThread(void* /*user*/)
 		Panic("Could not allocate init process");
 	if ( (init->pid = (init->ptable = CurrentProcess()->ptable)->Allocate(init)) < 0 )
 		Panic("Could not allocate init a pid");
+	if ( !(init->groups = new gid_t[1]) )
+		Panic("Unable to allocate groups for init process");
+	init->groups_length = 0;
 
 	kthread_mutex_lock(&process_family_lock);
 	Process* kernel_process = CurrentProcess();

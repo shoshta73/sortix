@@ -214,6 +214,8 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_EXECVEAT] = (void*) sys_execveat,
 	[SYSCALL_FEXECVE] = (void*) sys_fexecve,
 	[SYSCALL_TKILL] = (void*) sys_tkill,
+	[SYSCALL_GETGROUPS] = (void*) sys_getgroups,
+	[SYSCALL_SETGROUPS] = (void*) sys_setgroups,
 	[SYSCALL_MAX_NUM] = (void*) sys_bad_syscall,
 };
 } /* extern "C" */

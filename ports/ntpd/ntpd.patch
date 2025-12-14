@@ -1,3 +1,30 @@
+diff -Paur --no-dereference -- ntpd.upstream/Makefile.in ntpd/Makefile.in
+--- ntpd.upstream/Makefile.in
++++ ntpd/Makefile.in
+@@ -824,17 +824,14 @@
+ 
+ 
+ install-exec-hook:
+-	@if [ ! -f "$(DESTDIR)$(sysconfdir)/ntpd.conf" ]; then \
+-		$(INSTALL) -m 644 "$(srcdir)/ntpd.conf" "$(DESTDIR)$(sysconfdir)/ntpd.conf"; \
+-	else \
+-		echo; \
+-		echo " $(DESTDIR)$(sysconfdir)/ntpd.conf already exists, install will not overwrite"; \
+-	fi
++	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)/default"
++	$(INSTALL) -m 644 "$(srcdir)/ntpd.conf" "$(DESTDIR)$(sysconfdir)/default/ntpd.conf"
++	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)/default/passwd.d"
++	echo "_ntp:x:100:100:_ntp:/var/empty:sh" > "$(DESTDIR)$(sysconfdir)/default/passwd.d/ntpd"
++	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)/default/group.d"
++	echo "_ntp::100:_ntp" > "$(DESTDIR)$(sysconfdir)/default/group.d/ntpd"
+ 
+ uninstall-local:
+-	@if cmp -s "$(DESTDIR)$(sysconfdir)/ntpd.conf" "$(srcdir)/ntpd.conf"; then \
+-		rm -f "$(DESTDIR)$(sysconfdir)/ntpd.conf"; \
+-	fi
+ 	@rm -f "$(DESTDIR)$(sbindir)/ntpctl"
+ 
+ # Tell versions [3.59,3.63) of GNU make to not export all variables.
 diff -Paur --no-dereference -- ntpd.upstream/compat/bsd-setresuid.c ntpd/compat/bsd-setresuid.c
 --- ntpd.upstream/compat/bsd-setresuid.c
 +++ ntpd/compat/bsd-setresuid.c
@@ -64,33 +91,18 @@ diff -Paur --no-dereference -- ntpd.upstream/include/machine/endian.h ntpd/inclu
  
  #endif
  
-diff -Paur --no-dereference -- ntpd.upstream/Makefile.in ntpd/Makefile.in
---- ntpd.upstream/Makefile.in
-+++ ntpd/Makefile.in
-@@ -824,17 +824,14 @@
+diff -Paur --no-dereference -- ntpd.upstream/src/Makefile.in ntpd/src/Makefile.in
+--- ntpd.upstream/src/Makefile.in
++++ ntpd/src/Makefile.in
+@@ -1003,6 +1003,8 @@
+ info-am:
  
+ install-data-am: install-man
++	mkdir -p $(DESTDIR)$(datadir)/init
++	cp init/ntpd $(DESTDIR)$(datadir)/init/ntpd
  
- install-exec-hook:
--	@if [ ! -f "$(DESTDIR)$(sysconfdir)/ntpd.conf" ]; then \
--		$(INSTALL) -m 644 "$(srcdir)/ntpd.conf" "$(DESTDIR)$(sysconfdir)/ntpd.conf"; \
--	else \
--		echo; \
--		echo " $(DESTDIR)$(sysconfdir)/ntpd.conf already exists, install will not overwrite"; \
--	fi
-+	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)/default"
-+	$(INSTALL) -m 644 "$(srcdir)/ntpd.conf" "$(DESTDIR)$(sysconfdir)/default/ntpd.conf"
-+	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)/default/passwd.d"
-+	echo "_ntp:x:100:100:_ntp:/var/empty:sh" > "$(DESTDIR)$(sysconfdir)/default/passwd.d/ntpd"
-+	$(MKDIR_P) "$(DESTDIR)$(sysconfdir)/default/group.d"
-+	echo "_ntp::100:_ntp" > "$(DESTDIR)$(sysconfdir)/default/group.d/ntpd"
+ install-dvi: install-dvi-am
  
- uninstall-local:
--	@if cmp -s "$(DESTDIR)$(sysconfdir)/ntpd.conf" "$(srcdir)/ntpd.conf"; then \
--		rm -f "$(DESTDIR)$(sysconfdir)/ntpd.conf"; \
--	fi
- 	@rm -f "$(DESTDIR)$(sbindir)/ntpctl"
- 
- # Tell versions [3.59,3.63) of GNU make to not export all variables.
 diff -Paur --no-dereference -- ntpd.upstream/src/client.c ntpd/src/client.c
 --- ntpd.upstream/src/client.c
 +++ ntpd/src/client.c
@@ -172,18 +184,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/config.c ntpd/src/config.c
 diff -Paur --no-dereference -- ntpd.upstream/src/constraint.c ntpd/src/constraint.c
 --- ntpd.upstream/src/constraint.c
 +++ ntpd/src/constraint.c
-@@ -48,6 +48,10 @@
- #define	IMF_FIXDATE	"%a, %d %h %Y %T GMT"
- #define	X509_DATE	"%Y-%m-%d %T UTC"
- 
-+#if defined(__sortix__)
-+#define setgroups(a, b) ((void) (a), (void) (b), 0)
-+#endif
-+
- int	 constraint_addr_init(struct constraint *);
- void	 constraint_addr_head_clear(struct constraint *);
- struct constraint *
-@@ -265,7 +269,8 @@
+@@ -265,7 +265,8 @@
  	constraint_add(cstr);
  	constraint_cnt++;
  
@@ -193,7 +194,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/constraint.c ntpd/src/constrain
  	    pipes) == -1)
  		fatal("%s pipes", __func__);
  
-@@ -683,9 +688,9 @@
+@@ -683,9 +684,9 @@
  	offset = gettime_from_timeval(&tv[0]) -
  	    gettime_from_timeval(&tv[1]);
  
@@ -205,7 +206,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/constraint.c ntpd/src/constrain
  
  	cstr->state = STATE_REPLY_RECEIVED;
  	cstr->last = getmonotime();
-@@ -1095,6 +1100,13 @@
+@@ -1095,6 +1096,13 @@
  	/* Return parsed date as local time */
  	t = timegm(&httpsdate->tls_tm);
  
@@ -250,18 +251,6 @@ diff -Paur --no-dereference -- ntpd.upstream/src/init/ntpd ntpd/src/init/ntpd
 @@ -0,0 +1,2 @@
 +require network
 +exec ntpd -d
-diff -Paur --no-dereference -- ntpd.upstream/src/Makefile.in ntpd/src/Makefile.in
---- ntpd.upstream/src/Makefile.in
-+++ ntpd/src/Makefile.in
-@@ -1003,6 +1003,8 @@
- info-am:
- 
- install-data-am: install-man
-+	mkdir -p $(DESTDIR)$(datadir)/init
-+	cp init/ntpd $(DESTDIR)$(datadir)/init/ntpd
- 
- install-dvi: install-dvi-am
- 
 diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
 --- ntpd.upstream/src/ntp.c
 +++ ntpd/src/ntp.c
@@ -273,18 +262,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
  #include <errno.h>
  #include <fcntl.h>
  #include <paths.h>
-@@ -35,6 +36,10 @@
- 
- #include "ntpd.h"
- 
-+#if defined(__sortix__)
-+#define setgroups(a, b) ((void) (a), (void) (b), 0)
-+#endif
-+
- #define	PFD_PIPE_MAIN	0
- #define	PFD_PIPE_DNS	1
- #define	PFD_SOCK_CTL	2
-@@ -79,7 +84,9 @@
+@@ -79,7 +80,9 @@
  	u_int			 listener_cnt, new_cnt, sent_cnt, trial_cnt;
  	u_int			 ctl_cnt;
  	struct pollfd		*pfd = NULL;
@@ -294,7 +272,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
  	struct listen_addr	*la;
  	struct ntp_peer		*p;
  	struct ntp_peer		**idx2peer = NULL;
-@@ -96,7 +103,7 @@
+@@ -96,7 +99,7 @@
  	    pipe_dns) == -1)
  		fatal("socketpair");
  
@@ -303,7 +281,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
  
  	log_init(nconf->debug ? LOG_TO_STDERR : LOG_TO_SYSLOG, nconf->verbose,
  	    LOG_DAEMON);
-@@ -104,8 +111,10 @@
+@@ -104,8 +107,10 @@
  		fatal("setsid");
  	log_procinit("ntp");
  
@@ -314,7 +292,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
  
  	/* Start control socket. */
  	if ((fd_ctl = control_init(CTLSOCKET)) == -1)
-@@ -137,14 +146,20 @@
+@@ -137,14 +142,20 @@
  	setproctitle("ntp engine");
  
  	conf = nconf;
@@ -335,7 +313,7 @@ diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
  
  	/* The ntp process will want to open NTP client sockets -> "inet" */
  	if (pledge("stdio inet", NULL) == -1)
-@@ -464,6 +479,9 @@
+@@ -464,6 +475,9 @@
  	msgbuf_clear(&ibuf_dns->w);
  	free(ibuf_dns);
  
@@ -345,6 +323,88 @@ diff -Paur --no-dereference -- ntpd.upstream/src/ntp.c ntpd/src/ntp.c
  	log_info("ntp engine exiting");
  	exit(0);
  }
+diff -Paur --no-dereference -- ntpd.upstream/src/ntp_dns.c ntpd/src/ntp_dns.c
+--- ntpd.upstream/src/ntp_dns.c
++++ ntpd/src/ntp_dns.c
+@@ -20,8 +20,10 @@
+ #include <sys/resource.h>
+ #include <sys/time.h>
+ #include <netinet/in.h>
++#ifndef __sortix__
+ #include <arpa/nameser.h>
+ #include <resolv.h>
++#endif
+ 
+ #include <netinet/in.h>
+ 
+@@ -33,7 +35,9 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <syslog.h>
++#ifndef __sortix__
+ #include <resolv.h>
++#endif
+ #include <unistd.h>
+ 
+ #include "ntpd.h"
+@@ -64,7 +68,9 @@
+ 	struct pollfd		 pfd[1];
+ 	int			 nfds, nullfd;
+ 
++#ifndef __sortix__
+ 	res_init();
++#endif
+ 	if (setpriority(PRIO_PROCESS, 0, 0) == -1)
+ 		log_warn("could not set priority");
+ 
+@@ -214,6 +220,9 @@
+ 	return (0);
+ }
+ 
++/* PATCH: Sortix doesn't have res_qury but it's only used to check if the DNS
++           is online, but init(8) already ensures that's the case. */
++#ifndef __sortix__
+ int
+ probe_root_ns(void)
+ {
+@@ -238,18 +247,21 @@
+ 
+ 	return ret;
+ }
++#endif
+ 
+ void
+ probe_root(void)
+ {
+ 	int		n;
+ 
++#ifndef __sortix__
+ 	n = probe_root_ns();
+ 	if (n < 0) {
+ 		/* give programs like unwind a second chance */
+ 		sleep(1);
+ 		n = probe_root_ns();
+ 	}
++#endif
+ 	if (imsg_compose(ibuf_dns, IMSG_PROBE_ROOT, 0, 0, -1, &n,
+ 	    sizeof(int)) == -1)
+ 		fatalx("probe_root");
+diff -Paur --no-dereference -- ntpd.upstream/src/ntp_msg.c ntpd/src/ntp_msg.c
+--- ntpd.upstream/src/ntp_msg.c
++++ ntpd/src/ntp_msg.c
+@@ -53,7 +53,11 @@
+ 	n = sendto(fd, msg, sizeof(*msg), 0, sa, sa_len);
+ 	if (n == -1) {
+ 		if (errno == ENOBUFS || errno == EHOSTUNREACH ||
+-		    errno == ENETDOWN || errno == EHOSTDOWN) {
++		    errno == ENETDOWN
++#ifdef EHOSTDOWN
++		    || errno == EHOSTDOWN
++#endif
++		    ) {
+ 			/* logging is futile */
+ 			return (-1);
+ 		}
 diff -Paur --no-dereference -- ntpd.upstream/src/ntpd.c ntpd/src/ntpd.c
 --- ntpd.upstream/src/ntpd.c
 +++ ntpd/src/ntpd.c
@@ -670,96 +730,6 @@ diff -Paur --no-dereference -- ntpd.upstream/src/ntpd.h ntpd/src/ntpd.h
  
  #ifndef	LOCALSTATEDIR
  #define	LOCALSTATEDIR	"/var"
-diff -Paur --no-dereference -- ntpd.upstream/src/ntp_dns.c ntpd/src/ntp_dns.c
---- ntpd.upstream/src/ntp_dns.c
-+++ ntpd/src/ntp_dns.c
-@@ -20,8 +20,10 @@
- #include <sys/resource.h>
- #include <sys/time.h>
- #include <netinet/in.h>
-+#ifndef __sortix__
- #include <arpa/nameser.h>
- #include <resolv.h>
-+#endif
- 
- #include <netinet/in.h>
- 
-@@ -33,11 +35,17 @@
- #include <stdlib.h>
- #include <string.h>
- #include <syslog.h>
-+#ifndef __sortix__
- #include <resolv.h>
-+#endif
- #include <unistd.h>
- 
- #include "ntpd.h"
- 
-+#ifdef __sortix__
-+#define setgroups(a, b) ((void) (a), (void) (b), 0)
-+#endif
-+
- volatile sig_atomic_t	 quit_dns = 0;
- static struct imsgbuf	*ibuf_dns;
- extern int		 non_numeric;
-@@ -64,7 +72,9 @@
- 	struct pollfd		 pfd[1];
- 	int			 nfds, nullfd;
- 
-+#ifndef __sortix__
- 	res_init();
-+#endif
- 	if (setpriority(PRIO_PROCESS, 0, 0) == -1)
- 		log_warn("could not set priority");
- 
-@@ -214,6 +224,9 @@
- 	return (0);
- }
- 
-+/* PATCH: Sortix doesn't have res_qury but it's only used to check if the DNS
-+           is online, but init(8) already ensures that's the case. */
-+#ifndef __sortix__
- int
- probe_root_ns(void)
- {
-@@ -238,18 +251,21 @@
- 
- 	return ret;
- }
-+#endif
- 
- void
- probe_root(void)
- {
- 	int		n;
- 
-+#ifndef __sortix__
- 	n = probe_root_ns();
- 	if (n < 0) {
- 		/* give programs like unwind a second chance */
- 		sleep(1);
- 		n = probe_root_ns();
- 	}
-+#endif
- 	if (imsg_compose(ibuf_dns, IMSG_PROBE_ROOT, 0, 0, -1, &n,
- 	    sizeof(int)) == -1)
- 		fatalx("probe_root");
-diff -Paur --no-dereference -- ntpd.upstream/src/ntp_msg.c ntpd/src/ntp_msg.c
---- ntpd.upstream/src/ntp_msg.c
-+++ ntpd/src/ntp_msg.c
-@@ -53,7 +53,11 @@
- 	n = sendto(fd, msg, sizeof(*msg), 0, sa, sa_len);
- 	if (n == -1) {
- 		if (errno == ENOBUFS || errno == EHOSTUNREACH ||
--		    errno == ENETDOWN || errno == EHOSTDOWN) {
-+		    errno == ENETDOWN
-+#ifdef EHOSTDOWN
-+		    || errno == EHOSTDOWN
-+#endif
-+		    ) {
- 			/* logging is futile */
- 			return (-1);
- 		}
 diff -Paur --no-dereference -- ntpd.upstream/src/server.c ntpd/src/server.c
 --- ntpd.upstream/src/server.c
 +++ ntpd/src/server.c

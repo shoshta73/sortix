@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -106,6 +106,13 @@ struct psctl_ttyname
 {
 	char* buffer;
 	size_t size;
+};
+
+#define PSCTL_GROUPS __PSCTL(psctl_groups, 6)
+struct psctl_groups
+{
+	gid_t* groups;
+	size_t length;
 };
 
 #endif

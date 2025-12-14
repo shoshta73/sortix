@@ -69,6 +69,14 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Add getgroups(2) and setgroups(2)
+The
+.Xr getgroups 2
+and
+.Xr setgroups 2
+system calls have been added.
+.Pp
+This is a compatible ABI change.
 .Ss Add tkill(2) and pthread_kill(3)
 The
 .Xr tkill 2

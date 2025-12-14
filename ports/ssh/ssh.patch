@@ -1567,23 +1567,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshconnect.c ssh/sshconnect.c
 diff -Paur --no-dereference -- ssh.upstream/sshd-session.c ssh/sshd-session.c
 --- ssh.upstream/sshd-session.c
 +++ ssh/sshd-session.c
-@@ -110,6 +110,15 @@
- #include "srclimit.h"
- #include "dh.h"
- 
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS__)
-+static inline int setgroups(size_t size, const gid_t *list)
-+{
-+	(void)size;
-+	(void)list;
-+	return 0;
-+}
-+#endif
-+
- /* Re-exec fds */
- #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
- #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
-@@ -311,8 +320,8 @@
+@@ -311,8 +311,8 @@
  			fatal("chdir(\"/\"): %s", strerror(errno));
  
  		/* Drop our privileges */
@@ -1594,7 +1578,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd-session.c ssh/sshd-session.c
  		gidset[0] = privsep_pw->pw_gid;
  		if (setgroups(1, gidset) == -1)
  			fatal("setgroups: %.100s", strerror(errno));
-@@ -882,7 +891,7 @@
+@@ -882,7 +882,7 @@
  	struct connection_info *connection_info = NULL;
  	sigset_t sigmask;
  	uint64_t timing_secret = 0;
@@ -1603,7 +1587,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd-session.c ssh/sshd-session.c
  
  	sigemptyset(&sigmask);
  	sigprocmask(SIG_SETMASK, &sigmask, NULL);
-@@ -1279,14 +1288,21 @@
+@@ -1279,14 +1279,21 @@
  	ssh_signal(SIGALRM, grace_alarm_handler);
  	if (!debug_flag && options.login_grace_time > 0) {
  		int ujitter = arc4random_uniform(4 * 1000000);
@@ -1632,7 +1616,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd-session.c ssh/sshd-session.c
  	}
  
  	if ((r = kex_exchange_identification(ssh, -1,
-@@ -1331,10 +1347,9 @@
+@@ -1331,10 +1338,9 @@
  	 * Cancel the alarm we set to limit the time taken for
  	 * authentication.
  	 */
@@ -1646,7 +1630,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd-session.c ssh/sshd-session.c
  	ssh_signal(SIGALRM, SIG_DFL);
  	authctxt->authenticated = 1;
  	if (startup_pipe != -1) {
-@@ -1495,10 +1510,10 @@
+@@ -1495,10 +1501,10 @@
  		do_cleanup(the_active_state, the_authctxt);
  		if (privsep_is_preauth &&
  		    pmonitor != NULL && pmonitor->m_pid > 1) {
@@ -1700,23 +1684,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.8 ssh/sshd.8
 diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
 --- ssh.upstream/sshd.c
 +++ ssh/sshd.c
-@@ -92,6 +92,15 @@
- #include "addr.h"
- #include "srclimit.h"
- 
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS__)
-+static inline int setgroups(size_t size, const gid_t *list)
-+{
-+	(void)size;
-+	(void)list;
-+	return 0;
-+}
-+#endif
-+
- /* Re-exec fds */
- #define REEXEC_DEVCRYPTO_RESERVED_FD	(STDERR_FILENO + 1)
- #define REEXEC_STARTUP_PIPE_FD		(STDERR_FILENO + 2)
-@@ -1234,6 +1243,10 @@
+@@ -1234,6 +1234,10 @@
  	/* Initialize configuration options to their default values. */
  	initialize_server_options(&options);
  
@@ -1727,7 +1695,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  	/* Parse command-line arguments. */
  	while ((opt = getopt(ac, av,
  	    "C:E:b:c:f:g:h:k:o:p:u:46DGQRTdeiqrtV")) != -1) {
-@@ -1351,7 +1364,26 @@
+@@ -1351,7 +1355,26 @@
  	if (!test_flag && !inetd_flag && !do_dump_cfg && !path_absolute(av[0]))
  		fatal("sshd requires execution with an absolute path");
  
@@ -1755,7 +1723,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  
  	/* Reserve fds we'll need later for reexec things */
  	if ((devnull = open(_PATH_DEVNULL, O_RDWR)) == -1)
-@@ -1729,7 +1761,8 @@
+@@ -1729,7 +1752,8 @@
  		 * Write out the pid file after the sigterm handler
  		 * is setup and the listen sockets are bound
  		 */
@@ -1765,7 +1733,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshd.c ssh/sshd.c
  			FILE *f = fopen(options.pid_file, "w");
  
  			if (f == NULL) {
-@@ -1741,6 +1774,15 @@
+@@ -1741,6 +1765,15 @@
  			}
  		}
  
@@ -1841,7 +1809,7 @@ diff -Paur --no-dereference -- ssh.upstream/sshpty.c ssh/sshpty.c
 diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
 --- ssh.upstream/uidswap.c
 +++ ssh/uidswap.c
-@@ -28,6 +28,35 @@
+@@ -28,6 +28,19 @@
  #include "uidswap.h"
  #include "xmalloc.h"
  
@@ -1857,27 +1825,11 @@ diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
 +	return 0;
 +}
 +#endif
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_GETGROUPS__)
-+static inline int getgroups(int size, gid_t list[])
-+{
-+	(void)size;
-+	(void)list;
-+	return 0;
-+}
-+#endif
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS__)
-+static inline int setgroups(size_t size, const gid_t *list)
-+{
-+	(void)size;
-+	(void)list;
-+	return 0;
-+}
-+#endif
 +
  /*
   * Note: all these functions must work in all of the following cases:
   *    1. euid=0, ruid=0
-@@ -64,9 +93,9 @@
+@@ -64,9 +77,9 @@
  #ifdef SAVED_IDS_WORK_WITH_SETEUID
  	saved_euid = geteuid();
  	saved_egid = getegid();
@@ -1890,7 +1842,7 @@ diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
  #ifndef HAVE_CYGWIN
  	if (saved_euid != 0) {
  		privileged = 0;
-@@ -122,16 +151,16 @@
+@@ -122,16 +135,16 @@
  #ifndef SAVED_IDS_WORK_WITH_SETEUID
  	/* Propagate the privileged gid to all of our gids. */
  	if (setgid(getegid()) == -1)
@@ -1911,7 +1863,7 @@ diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
  		    strerror(errno));
  }
  
-@@ -150,12 +179,12 @@
+@@ -150,12 +163,12 @@
  		fatal("restore_uid: temporarily_use_uid not effective");
  
  #ifdef SAVED_IDS_WORK_WITH_SETEUID
@@ -1927,7 +1879,7 @@ diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
  #else /* SAVED_IDS_WORK_WITH_SETEUID */
  	/*
  	 * We are unable to restore the real uid to its unprivileged value.
-@@ -189,11 +218,11 @@
+@@ -189,11 +202,11 @@
  		fatal("permanently_set_uid: no user given");
  	if (temporarily_use_uid_effective)
  		fatal("permanently_set_uid: temporarily_use_uid effective");
@@ -1942,7 +1894,7 @@ diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
  
  #ifdef __APPLE__
  	/*
-@@ -201,12 +230,12 @@
+@@ -201,12 +214,12 @@
  	 * memberd support for >16 supplemental groups.
  	 */
  	if (initgroups(pw->pw_name, pw->pw_gid) == -1)
@@ -1958,7 +1910,7 @@ diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
  
  #ifndef NO_UID_RESTORATION_TEST
  	/* Try restoration of GID if changed (test clearing of saved gid) */
-@@ -217,9 +246,9 @@
+@@ -217,9 +230,9 @@
  
  	/* Verify GID drop was successful */
  	if (getgid() != pw->pw_gid || getegid() != pw->pw_gid) {
@@ -1971,7 +1923,7 @@ diff -Paur --no-dereference -- ssh.upstream/uidswap.c ssh/uidswap.c
  	}
  
  #ifndef NO_UID_RESTORATION_TEST
-@@ -231,8 +260,8 @@
+@@ -231,8 +244,8 @@
  
  	/* Verify UID drop was successful */
  	if (getuid() != pw->pw_uid || geteuid() != pw->pw_uid) {

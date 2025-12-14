@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,6 +19,11 @@
 
 #include <sys/types.h>
 
+#include <errno.h>
+
+#include <sortix/limits.h>
+
+#include <sortix/kernel/copy.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/process.h>
@@ -93,6 +98,42 @@ int sys_setegid(gid_t egid)
 	// TODO: Implement security checks in many place across the operating system
 	//       and until then allow anyone to do this to not pretend to be secure.
 	process->egid = egid;
+	return 0;
+}
+
+int sys_getgroups(int length, gid_t* user_groups)
+{
+	if ( length < 0 )
+		return errno = EINVAL, -1;
+	Process* process = CurrentProcess();
+	ScopedLock lock(&process->id_lock);
+	if ( !length )
+		return process->groups_length;
+	if ( process->groups_length < length )
+		length = process->groups_length;
+	size_t size = sizeof(gid_t) * (size_t) length;
+	if ( !CopyToUser(user_groups, process->groups, size) )
+		return -1;
+	return length;
+}
+
+int sys_setgroups(int length, const gid_t* user_groups)
+{
+	if ( length < 0 || NGROUPS_MAX < length )
+		return errno = EINVAL, -1;
+	Process* process = CurrentProcess();
+	ScopedLock lock(&process->id_lock);
+	// TODO: Implement security checks in many place across the operating system
+	//       and until then allow anyone to do this to not pretend to be secure.
+	gid_t* groups = new gid_t[length];
+	if ( !groups )
+		return -1;
+	size_t size = sizeof(gid_t) * (size_t) length;
+	if ( !CopyFromUser(groups, user_groups, size) )
+		return delete[] groups, -1;
+	delete[] process->groups;
+	process->groups = groups;
+	process->groups_length = length;
 	return 0;
 }
 

@@ -87,6 +87,8 @@ Process::Process()
 	id_lock = KTHREAD_MUTEX_INITIALIZER;
 	uid = euid = 0;
 	gid = egid = 0;
+	groups = NULL;
+	groups_length = 0;
 	umask = 0022;
 
 	ptr_lock = KTHREAD_MUTEX_INITIALIZER;
@@ -174,6 +176,7 @@ Process::~Process() // process_family_lock taken
 	if ( alarm_timer.IsAttached() )
 		alarm_timer.Detach();
 	delete[] program_image_path;
+	delete[] groups;
 	assert(!zombie_child);
 	assert(!init);
 	assert(!session);
@@ -805,14 +808,6 @@ Process* Process::Fork()
 	clone->cwd = cwd;
 	kthread_mutex_unlock(&ptr_lock);
 
-	kthread_mutex_lock(&id_lock);
-	clone->uid = uid;
-	clone->gid = gid;
-	clone->euid = euid;
-	clone->egid = egid;
-	clone->umask = umask;
-	kthread_mutex_unlock(&id_lock);
-
 	kthread_mutex_lock(&signal_lock);
 	memcpy(&clone->signal_actions, &signal_actions, sizeof(signal_actions));
 	sigemptyset(&clone->signal_pending);
@@ -821,6 +816,22 @@ Process* Process::Fork()
 
 	// Initialize things that can fail and abort if needed.
 	bool failure = false;
+
+	kthread_mutex_lock(&id_lock);
+	clone->uid = uid;
+	clone->gid = gid;
+	clone->euid = euid;
+	clone->egid = egid;
+	clone->umask = umask;
+	clone->groups = new gid_t[groups_length];
+	if ( clone->groups )
+	{
+		clone->groups_length = groups_length;
+		memcpy(clone->groups, groups, sizeof(gid_t) * (size_t) groups_length);
+	}
+	else
+		failure = true;
+	kthread_mutex_unlock(&id_lock);
 
 	kthread_mutex_lock(&ptr_lock);
 	if ( !(clone->dtable = dtable->Fork()) )

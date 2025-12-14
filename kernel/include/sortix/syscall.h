@@ -200,6 +200,8 @@
 #define SYSCALL_EXECVEAT 177
 #define SYSCALL_FEXECVE 178
 #define SYSCALL_TKILL 179
-#define SYSCALL_MAX_NUM 180 /* index of highest constant + 1 */
+#define SYSCALL_GETGROUPS 180
+#define SYSCALL_SETGROUPS 181
+#define SYSCALL_MAX_NUM 182 /* index of highest constant + 1 */
 
 #endif

@@ -845,7 +845,7 @@ diff -Paur --no-dereference -- php.upstream/ext/phar/func_interceptors.c php/ext
  			wmask=S_IWGRP;
  			xmask=S_IXGRP;
  		} else {
-+#if !defined(__sortix__) || defined(__SORTIX_HAS_GETGROUPS__)
++#ifdef HAVE_GETGROUPS
  			int   groups, n, i;
  			gid_t *gids;
  
@@ -1487,7 +1487,7 @@ diff -Paur --no-dereference -- php.upstream/ext/standard/filestat.c php/ext/stan
  			wmask=S_IWGRP;
  			xmask=S_IXGRP;
  		} else {
-+#if !defined(__sortix__) || defined(__SORTIX_HAS_GETGROUPS__)
++#ifdef HAVE_GETGROUPS
  			int   groups, n, i;
  			gid_t *gids;
  

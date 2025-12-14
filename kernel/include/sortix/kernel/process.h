@@ -72,6 +72,8 @@ public:
 	kthread_mutex_t id_lock;
 	uid_t uid, euid;
 	gid_t gid, egid;
+	gid_t* groups;
+	int groups_length;
 	mode_t umask;
 
 private:

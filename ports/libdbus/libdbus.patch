@@ -84,20 +84,6 @@ diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-unix.c libdbus
  
    if (!_dbus_credentials_add_pid(credentials, _dbus_getpid()))
      return FALSE;
-diff -Paur --no-dereference -- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c libdbus/dbus/dbus-sysdeps-util-unix.c
---- libdbus.upstream/dbus/dbus-sysdeps-util-unix.c
-+++ libdbus/dbus/dbus-sysdeps-util-unix.c
-@@ -67,6 +67,10 @@
- #define O_BINARY 0
- #endif
- 
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_SETGROUPS__)
-+#define setgroups(a, b) 0
-+#endif
-+
- /**
-  * @addtogroup DBusInternalsUtils
-  * @{
 diff -Paur --no-dereference -- libdbus.upstream/test/Makefile.in libdbus/test/Makefile.in
 --- libdbus.upstream/test/Makefile.in
 +++ libdbus/test/Makefile.in

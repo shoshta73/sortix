@@ -116,14 +116,6 @@
          are updated not rely on this macro. */
 #undef __SORTIX_HAS_INITGROUPS__
 
-/* TODO: Define when setgroups(2) is implemented. Remove when libdbus and ssh
-         are updated not rely on this macro. */
-#undef __SORTIX_HAS_SETGROUPS__
-
-/* TODO: Define when getgroups(2) is implemented. Remove when ssh is updated to
-         not rely on this macro. */
-#undef __SORTIX_HAS_GETGROUPS__
-
 /* TODO: Define when getservbyname(3) is implemented and works. Remove when ssh
          is updated to not rely on this macro. */
 #undef __SORTIX_HAS_GETSERVBYNAME__

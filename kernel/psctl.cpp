@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2022, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022, 2024, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -209,6 +209,31 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 			if ( !CopyToUser(ctl.buffer, ttyname, size) )
 				return -1;
 		}
+		return 0;
+	}
+	else if ( request == PSCTL_GROUPS )
+	{
+		struct psctl_groups ctl;
+		if ( !CopyFromUser(&ctl, ptr, sizeof(ctl)) )
+			return -1;
+		struct psctl_groups resp = ctl;
+		kthread_mutex_unlock(&process->id_lock);
+		if ( ctl.groups )
+		{
+			if ( (size_t) process->groups_length < resp.length )
+				resp.length = (size_t) process->groups_length;
+			size_t size = sizeof(gid_t) * resp.length;
+			if ( !CopyToUser(ctl.groups, process->groups, size) )
+			{
+				kthread_mutex_unlock(&process->id_lock);
+				return -1;
+			}
+		}
+		else
+			resp.length = (size_t) process->groups_length;
+		kthread_mutex_lock(&process->thread_lock);
+		if ( !CopyToUser(ptr, &resp, sizeof(resp)) )
+			return -1;
 		return 0;
 	}
 	return errno = EINVAL, -1;
