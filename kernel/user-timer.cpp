@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -238,6 +238,9 @@ int sys_clock_settimeres(clockid_t clockid,
                          const struct timespec* time,
                          const struct timespec* res)
 {
+	if ( clockid != CLOCK_REALTIME )
+		return errno = EPERM, -1;
+
 	Clock* clock = Time::GetClock(clockid);
 	if ( !clock )
 		return -1;
