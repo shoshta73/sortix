@@ -130,7 +130,19 @@ diff -Paur --no-dereference -- libicu.upstream/source/common/umutex.h libicu/sou
 diff -Paur --no-dereference -- libicu.upstream/source/configure libicu/source/configure
 --- libicu.upstream/source/configure
 +++ libicu/source/configure
-@@ -5111,22 +5111,34 @@
+@@ -1300,9 +1300,10 @@
+ 
+ # FIXME: To remove some day.
+ if test "x$host_alias" != x; then
++  cc_sysroot=`${CC-cc} --print-sysroot || true`
+   if test "x$build_alias" = x; then
+     cross_compiling=maybe
+-  elif test "x$build_alias" != "x$host_alias"; then
++  elif test "x$build_alias" != "x$host_alias" || test "x$cc_sysroot" != "x" -a "x$cc_sysroot" != "x/" ; then
+     cross_compiling=yes
+   fi
+ fi
+@@ -5111,22 +5112,34 @@
  esac
  fi
  
@@ -173,7 +185,7 @@ diff -Paur --no-dereference -- libicu.upstream/source/configure libicu/source/co
  fi
  
  
-@@ -5884,6 +5896,8 @@
+@@ -5884,6 +5897,8 @@
  *-dec-osf*) icu_cv_host_frag=mh-alpha-osf ;;
  *-*-nto*)	icu_cv_host_frag=mh-qnx ;;
  *-ncr-*)	icu_cv_host_frag=mh-mpras ;;
@@ -182,7 +194,7 @@ diff -Paur --no-dereference -- libicu.upstream/source/configure libicu/source/co
  *) 		icu_cv_host_frag=mh-unknown ;;
  esac
  
-@@ -6015,7 +6029,13 @@
+@@ -6015,7 +6030,13 @@
  	     *) ;;
      esac
  else case e in #(
@@ -197,7 +209,7 @@ diff -Paur --no-dereference -- libicu.upstream/source/configure libicu/source/co
   ;;
  esac
  fi
-@@ -6036,6 +6056,14 @@
+@@ -6036,6 +6057,14 @@
  	     no) ;;
  	     *) ;;
      esac
