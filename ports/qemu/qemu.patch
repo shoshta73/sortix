@@ -608,7 +608,7 @@ diff -Paur --no-dereference -- qemu.upstream/net/tap.c qemu/net/tap.c
 diff -Paur --no-dereference -- qemu.upstream/os-posix.c qemu/os-posix.c
 --- qemu.upstream/os-posix.c
 +++ qemu/os-posix.c
-@@ -169,16 +169,18 @@
+@@ -169,16 +169,16 @@
  {
      if (user_pwd) {
          if (setgid(user_pwd->pw_gid) < 0) {
@@ -616,7 +616,6 @@ diff -Paur --no-dereference -- qemu.upstream/os-posix.c qemu/os-posix.c
 +            fprintf(stderr, "Failed to setgid(%jd)\n", (intmax_t)user_pwd->pw_gid);
              exit(1);
          }
-+#if !defined(__sortix__)
          if (initgroups(user_pwd->pw_name, user_pwd->pw_gid) < 0) {
 -            fprintf(stderr, "Failed to initgroups(\"%s\", %d)\n",
 -                    user_pwd->pw_name, user_pwd->pw_gid);
@@ -624,14 +623,13 @@ diff -Paur --no-dereference -- qemu.upstream/os-posix.c qemu/os-posix.c
 +                    user_pwd->pw_name, (intmax_t)user_pwd->pw_gid);
              exit(1);
          }
-+#endif
          if (setuid(user_pwd->pw_uid) < 0) {
 -            fprintf(stderr, "Failed to setuid(%d)\n", user_pwd->pw_uid);
 +            fprintf(stderr, "Failed to setuid(%jd)\n", (intmax_t)user_pwd->pw_uid);
              exit(1);
          }
          if (setuid(0) != -1) {
-@@ -308,10 +310,12 @@
+@@ -308,10 +308,12 @@
      if (fd == -1) {
          return -1;
      }
@@ -644,7 +642,7 @@ diff -Paur --no-dereference -- qemu.upstream/os-posix.c qemu/os-posix.c
      len = snprintf(buffer, sizeof(buffer), FMT_pid "\n", getpid());
      if (write(fd, buffer, len) != len) {
          close(fd);
-@@ -331,10 +335,12 @@
+@@ -331,10 +333,12 @@
  {
      int ret = 0;
  

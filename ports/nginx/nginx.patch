@@ -1203,20 +1203,6 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_process_cycle.c ng
                                      (char *) ccf->pid.data)
                      == NGX_FILE_ERROR)
                  {
-@@ -804,11 +827,13 @@
-             exit(2);
-         }
- 
-+#ifndef __sortix__
-         if (initgroups(ccf->username, ccf->group) == -1) {
-             ngx_log_error(NGX_LOG_EMERG, cycle->log, ngx_errno,
-                           "initgroups(%s, %d) failed",
-                           ccf->username, ccf->group);
-         }
-+#endif
- 
- #if (NGX_HAVE_PR_SET_KEEPCAPS && NGX_HAVE_CAPABILITIES)
-         if (ccf->transparent && ccf->user) {
 diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_shmem.c nginx/src/os/unix/ngx_shmem.c
 --- nginx.upstream/src/os/unix/ngx_shmem.c
 +++ nginx/src/os/unix/ngx_shmem.c

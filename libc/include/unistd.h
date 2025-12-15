@@ -549,6 +549,8 @@ int crypt_newhash(const char*, const char*, char*, size_t);
 int execveat(int, const char*, char* const [], char* const [], int);
 int execvpe(const char*, char* const [], char* const []);
 char* get_current_dir_name(void);
+int getgrouplist(const char*, gid_t, gid_t*, int*);
+int initgroups(const char*, gid_t);
 long pathconfat(int, const char*, int, int);
 int setgroups(int, const gid_t []);
 int sethostname(const char*, size_t);

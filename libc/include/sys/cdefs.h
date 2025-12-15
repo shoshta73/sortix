@@ -112,10 +112,6 @@
          this macro. */
 #undef __SORTIX_HAS_WORKING_PRIVSEP__
 
-/* TODO: Define when initgroups(2) is implemented. Remove when libdbus and ssh
-         are updated not rely on this macro. */
-#undef __SORTIX_HAS_INITGROUPS__
-
 /* TODO: Define when getservbyname(3) is implemented and works. Remove when ssh
          is updated to not rely on this macro. */
 #undef __SORTIX_HAS_GETSERVBYNAME__

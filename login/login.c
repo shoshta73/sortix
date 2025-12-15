@@ -296,6 +296,7 @@ bool login(const char* username, const char* session)
 		(void) (
 		setpgid(0, 0) < 0 ||
 		close(pipe_fds[0]) < 0 ||
+		initgroups(pwd->pw_name, pwd->pw_gid) < 0 ||
 		setgid(pwd->pw_gid) < 0 ||
 		setuid(pwd->pw_uid) < 0 ||
 		setenv("LOGIN_PID", login_pid, 1) < 0 ||

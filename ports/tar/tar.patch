@@ -140,18 +140,7 @@ diff -Paur --no-dereference -- tar.upstream/gnu/getgroups.c tar/gnu/getgroups.c
 diff -Paur --no-dereference -- tar.upstream/lib/rtapelib.c tar/lib/rtapelib.c
 --- tar.upstream/lib/rtapelib.c
 +++ tar/lib/rtapelib.c
-@@ -367,8 +367,10 @@
- 
-   if (!pw)
-     return "getpwuid";
-+#if !defined(__sortix__) || defined(__SORTIX_HAS_INITGROUPS__)
-   if (initgroups (pw->pw_name, gid) != 0 && errno != EPERM)
-     return "initgroups";
-+#endif
-   if (gid != getegid () && setgid (gid) != 0 && errno != EPERM)
-     return "setgid";
-   if (uid != geteuid () && setuid (uid) != 0 && errno != EPERM)
-@@ -452,8 +454,10 @@
+@@ -452,8 +452,10 @@
  
    assume (remote_file);
  

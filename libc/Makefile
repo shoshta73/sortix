@@ -790,6 +790,7 @@ unistd/getegid.o \
 unistd/getentropy.o \
 unistd/geteuid.o \
 unistd/getgid.o \
+unistd/getgrouplist.o \
 unistd/getgroups.o \
 unistd/gethostname.o \
 unistd/getinit.o \
@@ -802,6 +803,7 @@ unistd/getpid.o \
 unistd/getppid.o \
 unistd/getsid.o \
 unistd/getuid.o \
+unistd/initgroups.o \
 unistd/isatty.o \
 unistd/lchown.o \
 unistd/linkat.o \

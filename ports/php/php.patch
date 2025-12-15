@@ -1938,7 +1938,7 @@ diff -Paur --no-dereference -- php.upstream/sapi/fpm/fpm/fpm_unix.c php/sapi/fpm
  			}
  		}
  		if (wp->set_uid) {
-+#if !defined(__sortix__) || defined(__SORTIX_HAS_INITGROUPS__)
++#ifdef HAVE_INITGROUPS
  			if (0 > initgroups(wp->set_user ? wp->set_user : wp->config->user, wp->set_gid)) {
  				zlog(ZLOG_SYSERROR, "[pool %s] failed to initgroups(%s, %d)", wp->config->name, wp->config->user, wp->set_gid);
  				return -1;

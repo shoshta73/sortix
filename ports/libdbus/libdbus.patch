@@ -22,18 +22,7 @@ diff -Paur --no-dereference -- libdbus.upstream/bus/Makefile.in libdbus/bus/Make
 diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/bus/activation-helper.c
 --- libdbus.upstream/bus/activation-helper.c
 +++ libdbus/bus/activation-helper.c
-@@ -48,6 +48,10 @@
- #include <dbus/dbus-marshal-validate.h>
- #include <dbus/dbus-sysdeps-unix.h>
- 
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_INITGROUPS__)
-+#define initgroups(a, b) 0
-+#endif
-+
- static BusDesktopFile *
- desktop_file_for_name (BusConfigParser *parser,
-                        const char *name,
-@@ -320,7 +324,7 @@
+@@ -320,7 +320,7 @@
    if (setgid (pw->pw_gid))
      {
        dbus_set_error (error, DBUS_ERROR_SPAWN_SETUP_FAILED,
@@ -42,7 +31,7 @@ diff -Paur --no-dereference -- libdbus.upstream/bus/activation-helper.c libdbus/
        return FALSE;
      }
  
-@@ -328,7 +332,7 @@
+@@ -328,7 +328,7 @@
    if (setuid (pw->pw_uid) < 0)
      {
        dbus_set_error (error, DBUS_ERROR_SPAWN_SETUP_FAILED,
