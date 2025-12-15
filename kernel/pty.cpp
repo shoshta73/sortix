@@ -643,6 +643,14 @@ int PTY::ioctl(ioctx_t* ctx, int cmd, uintptr_t arg)
 			return -1;
 		return 0;
 	}
+	else if ( cmd == TIOCSWINSZ )
+	{
+		const struct winsize* user_ws = (const struct winsize*) arg;
+		if ( !ctx->copy_from_src(&ws, user_ws, sizeof(ws)) )
+			return -1;
+		winch();
+		return 0;
+	}
 	else if ( cmd == TIOCGPTN )
 	{
 		int* arg_ptr = (int*) arg;
