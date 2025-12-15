@@ -551,23 +551,23 @@ char* get_current_dir_name(void);
 long pathconfat(int, const char*, int, int);
 int sethostname(const char*, size_t);
 typedef unsigned int useconds_t;
-int usleep(useconds_t useconds);
+int usleep(useconds_t);
 #endif
 
 /* Functions that are Sortix extensions. */
 #if __USE_SORTIX
-int alarmns(const struct timespec* delay, struct timespec* odelay);
+int alarmns(const struct timespec*, struct timespec*);
 int exit_thread(int, int, const struct exit_thread*);
 int fchdirat(int, const char*);
 int fchroot(int);
 int fchrootat(int, const char*);
 pid_t getinit(pid_t);
-int memstat(size_t* memused, size_t* memtotal);
-int mkpartition(int fd, off_t start, off_t length);
+int memstat(size_t*, size_t*);
+int mkpartition(int, off_t, off_t);
 pid_t setinit(void);
-pid_t sfork(int flags);
-pid_t tfork(int flags, struct tfork* regs);
-int truncateat(int dirfd, const char*, off_t);
+pid_t sfork(int);
+pid_t tfork(int, struct tfork*);
+int truncateat(int, const char*, off_t);
 #endif
 
 #ifdef __cplusplus
