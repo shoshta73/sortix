@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, 2020, 2022-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2016, 2020, 2022-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1099,7 +1099,8 @@ static void BuildPackage(struct metainfo* minfo)
 	const char* use_bootstrap_var =
 		metainfo_get_def(minfo, "USE_BOOTSTRAP", "pkg.use-bootstrap", "false");
 	bool use_bootstrap = parse_boolean(use_bootstrap_var);
-	if ( use_bootstrap && strcmp(minfo->build, minfo->host) != 0 &&
+	if ( use_bootstrap &&
+	     (strcmp(minfo->build, minfo->host) != 0 || minfo->sysroot) &&
 	     SHOULD_DO_BUILD_STEP(BUILD_STEP_CONFIGURE, minfo) )
 		Bootstrap(minfo);
 
