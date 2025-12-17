@@ -58,7 +58,7 @@ bool Which(const char* filename, const char* path, bool all)
 
 		char* dirpath = strndup(path, len);
 		if ( !dirpath )
-			return -1;
+			return false;
 		if ( (path += len)[0] == ':' )
 			path++;
 		while ( len && dirpath[len - 1] == '/' )
@@ -66,7 +66,7 @@ bool Which(const char* filename, const char* path, bool all)
 
 		char* fullpath;
 		if ( asprintf(&fullpath, "%s/%s", dirpath, filename) < 0 )
-			return free(dirpath), -1;
+			return free(dirpath), false;
 
 		if ( access(fullpath, X_OK) == 0 )
 		{
