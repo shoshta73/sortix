@@ -34,7 +34,7 @@ diff -Paur --no-dereference -- video-player.upstream/Makefile video-player/Makef
 diff -Paur --no-dereference -- video-player.upstream/video-player.c video-player/video-player.c
 --- video-player.upstream/video-player.c
 +++ video-player/video-player.c
-@@ -0,0 +1,317 @@
+@@ -0,0 +1,318 @@
 +/*
 + * Copyright (c) 2016, 2021, 2022, 2024 Jonas 'Sortie' Termansen.
 + *
@@ -186,13 +186,14 @@ diff -Paur --no-dereference -- video-player.upstream/video-player.c video-player
 +
 +	if ( (av_error = avformat_open_input(&format_ctx, path, NULL, NULL)) < 0 )
 +	{
-+		warnx("%s: cannot open: %i\n", path, av_error);
++		warnx("%s: cannot open: %s", path, av_err2str(av_error));
 +		goto cleanup_done;
 +	}
 +
 +	if ( (av_error = avformat_find_stream_info(format_ctx, NULL)) < 0 )
 +	{
-+		warnx("%s: avformat_find_stream_info: %i\n", path, av_error);
++		warnx("%s: avformat_find_stream_info: %s", path,
++			av_err2str(av_error));
 +		goto cleanup_input;
 +	}
 +
@@ -208,7 +209,7 @@ diff -Paur --no-dereference -- video-player.upstream/video-player.c video-player
 +
 +	if ( !video_stream )
 +	{
-+		warnx("%s: no video stream found\n", path);
++		warnx("%s: no video stream found", path);
 +		goto cleanup_input;
 +	}
 +
