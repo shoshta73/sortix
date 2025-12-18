@@ -322,10 +322,10 @@ packages=$(for package in $packages; do
                for dep in \
                    $(grep -E "^$(escape_extended_regex_sed "$package"):" \
                              "$cachedir/repository/dependencies.list" |
-                     grep -Eo '[^:]*$'); do
+                     grep -Eo '[^:]*$' | sed -E 's/[][*?]/\\\0/g'); do
                  case $dep in
-                 \*) cat "$cachedir/repository/packages.list" ;;
-                 *\?) ;; # Omit optional runtime dependencies.
+                 \\*) cat "$cachedir/repository/packages.list" ;;
+                 *\\\?) ;; # Omit optional runtime dependencies.
                  *) echo $dep ;;
                  esac
                done
