@@ -829,6 +829,7 @@ ssize_t UDPSocket::sendmsg_internal(ioctx_t* ctx,
 		count += iov->iov_len;
 	}
 	hdr.uh_ulen = htobe16(pkt->length);
+	hdr.uh_sum = 0;
 	memcpy(out, &hdr, sizeof(hdr));
 	uint16_t checksum = 0;
 	if ( af == AF_INET )
