@@ -1,0 +1,1947 @@
+diff -Paur --no-dereference -- ctags.upstream/ctags.1 ctags/ctags.1
+--- ctags.upstream/ctags.1
++++ ctags/ctags.1
+@@ -0,0 +1,232 @@
++.\"	$OpenBSD: ctags.1,v 1.34 2019/07/15 21:01:53 schwarze Exp $
++.\"	$NetBSD: ctags.1,v 1.4 1995/03/26 20:14:04 glass Exp $
++.\"
++.\" Copyright (c) 1987, 1990, 1993
++.\"	The Regents of the University of California.  All rights reserved.
++.\"
++.\" Redistribution and use in source and binary forms, with or without
++.\" modification, are permitted provided that the following conditions
++.\" are met:
++.\" 1. Redistributions of source code must retain the above copyright
++.\"    notice, this list of conditions and the following disclaimer.
++.\" 2. Redistributions in binary form must reproduce the above copyright
++.\"    notice, this list of conditions and the following disclaimer in the
++.\"    documentation and/or other materials provided with the distribution.
++.\" 3. Neither the name of the University nor the names of its contributors
++.\"    may be used to endorse or promote products derived from this software
++.\"    without specific prior written permission.
++.\"
++.\" THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++.\" SUCH DAMAGE.
++.\"
++.\"     @(#)ctags.1	8.1 (Berkeley) 6/6/93
++.\"
++.Dd $Mdocdate: July 15 2019 $
++.Dt CTAGS 1
++.Os
++.Sh NAME
++.Nm ctags
++.Nd create a tags file
++.Sh SYNOPSIS
++.Nm ctags
++.Op Fl aBdFuvwx
++.Op Fl f Ar tagsfile
++.Ar
++.Sh DESCRIPTION
++.Nm
++makes a tags file from the specified C, Pascal, Fortran,
++YACC, lex, and Lisp sources.
++A tags file gives the locations of specified objects in a group of files.
++Each line of the tags file contains the object name, the file in which it
++is defined, and a search pattern for the object definition, separated by
++whitespace.
++.Pp
++Using the
++.Ar tags
++file,
++a text editor such as
++.Xr ex 1
++or
++.Xr vi 1
++can quickly locate these object definitions.
++Indexed objects include subroutines, typedefs, defines, structs,
++enums, and unions.
++.Pp
++The options are as follows:
++.Bl -tag -width Ds
++.It Fl a
++Append to
++.Ar tags
++file.
++.It Fl B
++Use backward searching patterns
++.Pq Li ?...? .
++.It Fl d
++Create tags for
++.Li #defines
++that don't take arguments;
++.Li #defines
++that take arguments are tagged automatically.
++.It Fl F
++Use forward searching patterns
++.Pq Li /.../
++(the default).
++.It Fl f Ar tagsfile
++Places the tag descriptions in a file called
++.Ar tagsfile .
++The default behaviour is to place them in a file called
++.Ar tags .
++.It Fl u
++Update the specified files in the
++.Ar tags
++file; that is, all
++references to them are regenerated, keeping only the other values in the
++file.
++.It Fl v
++An index of the form expected by the
++.Pa textproc/vgrind
++port is produced on the standard output.
++This listing contains the object name, file name, and page number (assuming
++64 line pages).
++Since the output will be sorted into lexicographic order,
++it may be desired to run the output through
++.Xr sort 1 .
++Sample use:
++.Bd -literal -offset indent
++$ ctags -v files | sort -f > index
++$ vgrind -x index
++.Ed
++.It Fl w
++Suppress warning diagnostics.
++.It Fl x
++.Nm
++produces a list of object
++names, the line number and file name on which each is defined, as well
++as the text of that line and prints this on the standard output.
++This is a simple index which can be printed out as an off-line readable
++function index.
++.El
++.Pp
++Files whose names end in
++.Dq \&.c
++or
++.Dq \&.h
++are assumed to be C
++source files and are searched for C style routine and macro definitions.
++Files whose names end in
++.Dq \&.y
++are assumed to be
++.Xr yacc 1
++source files.
++Files whose names end in
++.Dq \&.l
++are assumed to be Lisp files if their
++first non-blank character is
++.Ql \&; ,
++.Ql \&( ,
++or
++.Ql \&[ ,
++otherwise, they are
++treated as lex files.
++Other files are first examined to see if they
++contain any Pascal or Fortran routine definitions and, if not, are
++searched for C style definitions.
++.Pp
++The tag
++.Li main
++is treated specially in C programs.
++The tag formed is created by prepending
++.Sq M
++to the name of the file, with the
++trailing
++.Dq \&.c
++and any leading pathname components removed.
++This makes use of
++.Nm
++practical in directories with more than one program.
++.Pp
++Yacc and lex files each have a special tag.
++.Ar yyparse
++is the start
++of the second section of the yacc file, and
++.Ar yylex
++is the start of
++the second section of the lex file.
++.Sh FILES
++.Bl -tag -width tags -compact
++.It Pa tags
++default output tags file
++.El
++.Sh EXIT STATUS
++.Ex -std ctags
++.Pp
++Duplicate objects are not considered errors.
++.Sh SEE ALSO
++.Xr mg 1 ,
++.Xr vi 1
++.Sh STANDARDS
++The
++.Nm
++utility is compliant with the
++.St -p1003.1-2008
++specification,
++though its presence is optional.
++.Pp
++The flags
++.Op Fl BdFuvw
++are extensions to that specification.
++.Pp
++Support for Pascal, YACC, lex, and Lisp source files
++is an
++.St -p1003.1-2008
++extension.
++The standard notes that
++.Nm
++is
++.Qo
++not required to accommodate these languages,
++although implementors are encouraged to do so
++.Qc .
++.Sh HISTORY
++The
++.Nm
++command appeared in
++.Bx 2 .
++.Sh BUGS
++Recognition of functions, subroutines, and procedures for FORTRAN
++and Pascal is done in a very simple-minded way.
++No attempt
++is made to deal with block structure; if you have two Pascal procedures
++in different blocks with the same name you lose.
++.Nm
++doesn't
++understand about Pascal types.
++.Pp
++The method of deciding whether to look for C, Pascal or FORTRAN
++functions is a hack.
++.Pp
++.Nm
++relies on the input being well formed, and any syntactical
++errors will completely confuse it.
++It also finds some legal syntax confusing; for example,
++since it doesn't understand
++.Li #ifdef Ns 's
++(incidentally, that's a feature, not a bug), any code with unbalanced
++braces inside
++.Li #ifdef Ns 's
++will cause it to become somewhat disoriented.
++In a similar fashion, multiple line changes within a definition will
++cause it to enter the last line of the object, rather than the first, as
++the searching pattern.
++The last line of multiple line
++.Li typedef Ns 's
++will similarly be noted.
+diff -Paur --no-dereference -- ctags.upstream/Makefile ctags/Makefile
+--- ctags.upstream/Makefile
++++ ctags/Makefile
+@@ -0,0 +1,34 @@
++include ../../../build-aux/platform.mak
++include ../../../build-aux/compiler.mak
++include ../../../build-aux/version.mak
++include ../../../build-aux/dirs.mak
++
++OPTLEVEL?=$(DEFAULT_OPTLEVEL)
++CFLAGS?=$(OPTLEVEL)
++
++CFLAGS:=$(CXXFLAGS) -Wall -Wextra
++
++PROGRAM=ctags
++MANPAGE=ctags.1
++
++OBJS=C.o ctags.o fortran.o lisp.o print.o tree.o yacc.o
++
++.PHONY: all
++all: $(PROGRAM)
++
++$(PROGRAM): $(OBJS)
++	$(CC) $(CFLAGS) -o $(PROGRAM) $(OBJS)
++
++%: %.c
++	$(CC) -std=gnu11 $(CFLAGS) $(CPPFLAGS) $< -o $@ $(LIBS)
++
++.PHONY: clean
++clean:
++	rm -f $(PROGRAM) $(OBJS)
++
++.PHONY: install
++install: all
++	mkdir -p $(DESTDIR)$(BINDIR)
++	install $(PROGRAM) $(DESTDIR)$(BINDIR)
++	mkdir -p $(DESTDIR)$(MANDIR)/man1
++	install $(MANPAGE) $(DESTDIR)$(MANDIR)/man1
+diff -Paur --no-dereference -- ctags.upstream/ctags.h ctags/ctags.h
+--- ctags.upstream/ctags.h
++++ ctags/ctags.h
+@@ -0,0 +1,88 @@
++/*	$OpenBSD: ctags.h,v 1.9 2015/08/22 04:23:07 semarie Exp $	*/
++/*	$NetBSD: ctags.h,v 1.3 1995/03/26 20:14:07 glass Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ *
++ *	@(#)ctags.h	8.3 (Berkeley) 4/2/94
++ */
++
++#define	bool	char
++
++#define	YES		1
++#define	NO		0
++#define	EOS		'\0'
++
++#define	ENDLINE		50		/* max length of pattern */
++#define	MAXTOKEN	250		/* max size of single token */
++
++#define	SETLINE		{++lineno;lineftell = ftell(inf);}
++#define	GETC(op,exp)	((c = getc(inf)) op (int)exp)
++
++#define	iswhite(arg)	(_wht[(unsigned)arg])	/* T if char is white */
++#define	begtoken(arg)	(_btk[(unsigned)arg])	/* T if char can start token */
++#define	intoken(arg)	(_itk[(unsigned)arg])	/* T if char can be in token */
++
++typedef struct nd_st {			/* sorting structure */
++	struct nd_st	*left,
++			*right;		/* left and right sons */
++	char	*entry,			/* function or type name */
++		*file,			/* file name */
++		*pat;			/* search pattern */
++	int	lno;			/* for -x option */
++	bool	been_warned;		/* set if noticed dup */
++	bool	dynfile;		/* set if file will need freed */
++} NODE;
++
++extern char	*curfile;		/* current input file name */
++extern NODE	*head;			/* head of the sorted binary tree */
++extern FILE    *inf;			/* ioptr for current input file */
++extern FILE    *outf;			/* ioptr for current output file */
++extern long	lineftell;		/* ftell after getc( inf ) == '\n' */
++extern int	lineno;			/* line number of current line */
++extern int	dflag;			/* -d: non-macro defines */
++extern int	vflag;			/* -v: vgrind style index output */
++extern int	wflag;			/* -w: suppress warnings */
++extern int	xflag;			/* -x: cxref style output */
++extern bool	_wht[], _itk[], _btk[];
++extern char	lbuf[LINE_MAX];
++extern char    *lbp;
++extern char	searchar;		/* ex search character */
++extern bool	in_preload;
++
++extern int	cicmp(char *);
++extern void	get_line(void);
++extern void	pfnote(char *, int);
++extern int	skip_key(int);
++extern void	put_entries(NODE *);
++extern void	toss_yysec(void);
++extern void	l_entries(void);
++extern void	y_entries(void);
++extern int	PF_funcs(void);
++extern void	c_entries(void);
++extern void	skip_comment(int);
+diff -Paur --no-dereference -- ctags.upstream/ctags.c ctags/ctags.c
+--- ctags.upstream/ctags.c
++++ ctags/ctags.c
+@@ -0,0 +1,312 @@
++/*	$OpenBSD: ctags.c,v 1.19 2022/12/04 23:50:47 cheloha Exp $	*/
++/*	$NetBSD: ctags.c,v 1.4 1995/09/02 05:57:23 jtc Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994, 1995
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <err.h>
++#include <limits.h>
++#include <stdio.h>
++#include <string.h>
++#include <stdlib.h>
++#include <unistd.h>
++
++#include "ctags.h"
++
++/*
++ * ctags: create a tags file
++ */
++
++NODE	*head;			/* head of the sorted binary tree */
++
++				/* boolean "func" (see init()) */
++bool	_wht[256], _itk[256], _btk[256];
++
++FILE	*inf;			/* ioptr for current input file */
++FILE	*outf;			/* ioptr for tags file */
++
++long	lineftell;		/* ftell after getc( inf ) == '\n' */
++
++int	lineno;			/* line number of current line */
++int	dflag;			/* -d: non-macro defines */
++int	vflag;			/* -v: vgrind style index output */
++int	wflag;			/* -w: suppress warnings */
++int	xflag;			/* -x: cxref style output */
++
++char	*curfile;		/* current input file name */
++char	searchar = '/';		/* use /.../ searches by default */
++char	lbuf[LINE_MAX];
++
++void	init(void);
++void	find_entries(char *);
++void	preload_entries(char *, int, char *[]);
++
++int
++main(int argc, char *argv[])
++{
++	static char	*outfile = "tags";	/* output file */
++	int	aflag;				/* -a: append to tags */
++	int	uflag;				/* -u: update tags */
++	int	exit_val;			/* exit value */
++	int	step;				/* step through args */
++	int	ch;				/* getopts char */
++
++	aflag = uflag = NO;
++	while ((ch = getopt(argc, argv, "BFadf:tuwvx")) != -1)
++		switch(ch) {
++		case 'B':
++			searchar = '?';
++			break;
++		case 'F':
++			searchar = '/';
++			break;
++		case 'a':
++			aflag = 1;
++			break;
++		case 'd':
++			dflag = 1;
++			break;
++		case 'f':
++			outfile = optarg;
++			break;
++		case 't':
++			/* backwards compatibility */
++			break;
++		case 'u':
++			uflag = 1;
++			break;
++		case 'w':
++			wflag = 1;
++			break;
++		case 'v':
++			vflag = 1;
++		case 'x':
++			xflag = 1;
++			break;
++		default:
++			goto usage;
++		}
++	argv += optind;
++	argc -= optind;
++	if (!argc) {
++usage:		(void)fprintf(stderr,
++			"usage: ctags [-aBdFuvwx] [-f tagsfile] file ...\n");
++		exit(1);
++	}
++
++	init();
++	if (uflag && !vflag && !xflag)
++		preload_entries(outfile, argc, argv);
++
++	for (exit_val = step = 0; step < argc; ++step)
++		if (!(inf = fopen(argv[step], "r"))) {
++			warn("%s", argv[step]);
++			exit_val = 1;
++		}
++		else {
++			curfile = argv[step];
++			find_entries(argv[step]);
++			(void)fclose(inf);
++		}
++
++	if (head) {
++		if (xflag)
++			put_entries(head);
++		else {
++			if (!(outf = fopen(outfile, aflag ? "a" : "w")))
++				err(exit_val, "%s", outfile);
++			put_entries(head);
++			(void)fclose(outf);
++		}
++	}
++	exit(exit_val);
++}
++
++/*
++ * init --
++ *	this routine sets up the boolean psuedo-functions which work by
++ *	setting boolean flags dependent upon the corresponding character.
++ *	Every char which is NOT in that string is false with respect to
++ *	the pseudo-function.  Therefore, all of the array "_wht" is NO
++ *	by default and then the elements subscripted by the chars in
++ *	CWHITE are set to YES.  Thus, "_wht" of a char is YES if it is in
++ *	the string CWHITE, else NO.
++ */
++void
++init(void)
++{
++	int		i;
++	unsigned char	*sp;
++
++	for (i = 0; i < 256; i++)
++		_wht[i] = _itk[i] = _btk[i] = NO;
++#define	CWHITE	" \f\t\n"
++	for (sp = CWHITE; *sp; sp++)	/* white space chars */
++		_wht[*sp] = YES;
++#define	CINTOK	"ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz0123456789"
++	for (sp = CINTOK; *sp; sp++)	/* valid in-token chars */
++		_itk[*sp] = YES;
++#define	CBEGIN	"ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz"
++	for (sp = CBEGIN; *sp; sp++)	/* token starting chars */
++		_btk[*sp] = YES;
++}
++
++/*
++ * find_entries --
++ *	this routine opens the specified file and calls the function
++ *	which searches the file.
++ */
++void
++find_entries(char *file)
++{
++	char	*cp;
++
++	lineno = 0;				/* should be 1 ?? KB */
++	if ((cp = strrchr(file, '.'))) {
++		if (cp[1] == 'l' && !cp[2]) {
++			int	c;
++
++			for (;;) {
++				if (GETC(==, EOF))
++					return;
++				if (!iswhite(c)) {
++					rewind(inf);
++					break;
++				}
++			}
++#define	LISPCHR	";(["
++/* lisp */		if (strchr(LISPCHR, c)) {
++				l_entries();
++				return;
++			}
++/* lex */		else {
++				/*
++				 * we search all 3 parts of a lex file
++				 * for C references.  This may be wrong.
++				 */
++				toss_yysec();
++				(void)strlcpy(lbuf, "%%$", sizeof lbuf);
++				pfnote("yylex", lineno);
++				rewind(inf);
++			}
++		}
++/* yacc */	else if (cp[1] == 'y' && !cp[2]) {
++			/*
++			 * we search only the 3rd part of a yacc file
++			 * for C references.  This may be wrong.
++			 */
++			toss_yysec();
++			(void)strlcpy(lbuf, "%%$", sizeof lbuf);
++			pfnote("yyparse", lineno);
++			y_entries();
++		}
++/* fortran */	else if ((cp[1] != 'c' && cp[1] != 'h') && !cp[2]) {
++			if (PF_funcs())
++				return;
++			rewind(inf);
++		}
++	}
++/* C */	c_entries();
++}
++
++void
++preload_entries(char *tagsfile, int argc, char *argv[])
++{
++	FILE	*fp;
++	char	 line[LINE_MAX];
++	char	*entry = NULL;
++	char	*file = NULL;
++	char	*pattern = NULL;
++	char	*eol;
++	int	 i;
++
++	in_preload = YES;
++
++	if ((fp = fopen(tagsfile, "r")) == NULL)
++		err(1, "preload_entries: %s", tagsfile);
++
++	while (1) {
++next:
++		if (fgets(line, sizeof(line), fp) == NULL)
++			break;
++
++		if ((eol = strchr(line, '\n')) == NULL)
++			errx(1, "preload_entries: line too long");
++		*eol = '\0';
++
++		/* extract entry */
++		entry = line;
++		if ((file = strchr(line, '\t')) == NULL)
++			errx(1, "preload_entries: couldn't parse entry: %s",
++			    tagsfile);
++		*file = '\0';
++
++		/* extract file */
++		file++;
++		if ((pattern = strchr(file, '\t')) == NULL)
++			errx(1, "preload_entries: couldn't parse filename: %s",
++			    tagsfile);
++		*pattern = '\0';
++
++		/* skip this file ? */
++		for(i = 0; i < argc; i++)
++			if (strcmp(file, argv[i]) == 0)
++				goto next;
++
++		/* rest of string is pattern */
++		pattern++;
++
++		/* grab searchar, and don't keep it around the pattern */
++		if ((pattern[0] == '/' || pattern[0] == '?')
++		    && pattern[1] == '^') {
++
++			i = strlen(pattern);
++			if (pattern[i-1] == pattern[0])
++				/* remove searchar at end */
++				pattern[i-1] = '\0';
++			else
++				errx(1, "preload_entries: couldn't parse "
++				    "pattern: %s", tagsfile);
++
++			/* remove searchar at begin */
++			pattern += 2;
++		}
++
++		/* add entry */
++		if ((curfile = strdup(file)) == NULL)
++			err(1, "preload_entries: strdup");
++		(void)strlcpy(lbuf, pattern, sizeof(lbuf));
++		pfnote(entry, 0);
++	}
++	if (ferror(fp))
++		err(1, "preload_entries: fgets");
++
++	(void)fclose(fp);
++	in_preload = NO;
++}
+diff -Paur --no-dereference -- ctags.upstream/C.c ctags/C.c
+--- ctags.upstream/C.c
++++ ctags/C.c
+@@ -0,0 +1,585 @@
++/*	$OpenBSD: C.c,v 1.15 2014/12/08 03:58:56 jsg Exp $	*/
++/*	$NetBSD: C.c,v 1.3 1995/03/26 20:14:02 glass Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <limits.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "ctags.h"
++
++static int	func_entry(void);
++static void	hash_entry(void);
++static void	skip_string(int);
++static int	str_entry(int);
++
++/*
++ * c_entries --
++ *	read .c and .h files and call appropriate routines
++ */
++void
++c_entries(void)
++{
++	int	c;			/* current character */
++	int	level;			/* brace level */
++	int	token;			/* if reading a token */
++	int	t_def;			/* if reading a typedef */
++	int	t_level;		/* typedef's brace level */
++	char	*sp;			/* buffer pointer */
++	char	tok[MAXTOKEN];		/* token buffer */
++
++	lineftell = ftell(inf);
++	sp = tok; token = t_def = NO; t_level = -1; level = 0; lineno = 1;
++	while (GETC(!=, EOF)) {
++		switch (c) {
++		/*
++		 * Here's where it DOESN'T handle: {
++		 *	foo(a)
++		 *	{
++		 *	#ifdef notdef
++		 *		}
++		 *	#endif
++		 *		if (a)
++		 *			puts("hello, world");
++		 *	}
++		 */
++		case '{':
++			++level;
++			goto endtok;
++		case '}':
++			/*
++			 * if level goes below zero, try and fix
++			 * it, even though we've already messed up
++			 */
++			if (--level < 0)
++				level = 0;
++			goto endtok;
++
++		case '\n':
++			SETLINE;
++			/*
++			 * the above 3 cases are similar in that they
++			 * are special characters that also end tokens.
++			 */
++endtok:			if (sp > tok) {
++				*sp = EOS;
++				token = YES;
++				sp = tok;
++			}
++			else
++				token = NO;
++			continue;
++
++		/*
++		 * We ignore quoted strings and character constants
++		 * completely.
++		 */
++		case '"':
++		case '\'':
++			(void)skip_string(c);
++			break;
++
++		/*
++		 * comments can be fun; note the state is unchanged after
++		 * return, in case we found:
++		 *	"foo() XX comment XX { int bar; }"
++		 */
++		case '/':
++			if (GETC(==, '*')) {
++				skip_comment(c);
++				continue;
++			} else if (c == '/') {
++				skip_comment(c);
++				continue;
++			}
++			(void)ungetc(c, inf);
++			c = '/';
++			goto storec;
++
++		/* hash marks flag #define's. */
++		case '#':
++			if (sp == tok) {
++				hash_entry();
++				break;
++			}
++			goto storec;
++
++		/*
++		 * if we have a current token, parenthesis on
++		 * level zero indicates a function.
++		 */
++		case '(':
++			do {
++				if (GETC(==, EOF))
++					return;
++			} while (iswhite(c));
++			if (c == '*')
++				break;
++			else
++				ungetc(c, inf);
++			if (!level && token) {
++				int	curline;
++
++				if (sp != tok)
++					*sp = EOS;
++				/*
++				 * grab the line immediately, we may
++				 * already be wrong, for example,
++				 *	foo\n
++				 *	(arg1,
++				 */
++				get_line();
++				curline = lineno;
++				if (func_entry()) {
++					++level;
++					pfnote(tok, curline);
++				}
++				break;
++			}
++			goto storec;
++
++		/*
++		 * semi-colons indicate the end of a typedef; if we find a
++		 * typedef we search for the next semi-colon of the same
++		 * level as the typedef.  Ignoring "structs", they are
++		 * tricky, since you can find:
++		 *
++		 *	"typedef int time_t;"
++		 *	"typedef unsigned int u_int;"
++		 *	"typedef unsigned int u_int [10];"
++		 *
++		 * If looking at a typedef, we save a copy of the last token
++		 * found.  Then, when we find the ';' we take the current
++		 * token if it starts with a valid token name, else we take
++		 * the one we saved.  There's probably some reasonable
++		 * alternative to this...
++		 */
++		case ';':
++			if (t_def && level == t_level) {
++				t_def = NO;
++				get_line();
++				if (sp != tok)
++					*sp = EOS;
++				pfnote(tok, lineno);
++				break;
++			}
++			goto storec;
++
++		/*
++		 * store characters until one that can't be part of a token
++		 * comes along; check the current token against certain
++		 * reserved words.
++		 */
++		default:
++			/*
++			 * to treat following function.
++			 * func      (arg) {
++			 * ....
++			 * }
++			 */
++			if (c == ' ' || c == '\t') {
++				int save = c;
++				while (GETC(!=, EOF) && (c == ' ' || c == '\t'))
++					;
++				if (c == EOF)
++					return;
++				(void)ungetc(c, inf);
++				c = save;
++			}
++	storec:		if (!intoken(c)) {
++				if (sp == tok)
++					break;
++				*sp = EOS;
++				/* no typedefs inside typedefs */
++				if (!t_def &&
++					   !memcmp(tok, "typedef",8)) {
++					t_def = YES;
++					t_level = level;
++					break;
++				}
++				/* catch "typedef struct" */
++				if ((!t_def || t_level < level)
++				    && (!memcmp(tok, "struct", 7)
++				    || !memcmp(tok, "union", 6)
++				    || !memcmp(tok, "enum", 5))) {
++					/*
++					 * get line immediately;
++					 * may change before '{'
++					 */
++					get_line();
++					if (str_entry(c))
++						++level;
++					break;
++					/* } */
++				}
++				sp = tok;
++			}
++			else if (sp != tok || begtoken(c)) {
++				/* hell... truncate it */
++				if (sp == tok + sizeof tok - 1)
++					*sp = EOS;
++				else 
++					*sp++ = c;
++				token = YES;
++			}
++			continue;
++		}
++
++		sp = tok;
++		token = NO;
++	}
++}
++
++/*
++ * func_entry --
++ *	handle a function reference
++ */
++static int
++func_entry(void)
++{
++	int	c;			/* current character */
++	int	level = 0;		/* for matching '()' */
++	static char attribute[] = "__attribute__";
++	char maybe_attribute[sizeof attribute + 1];
++	char *anext;
++
++	/*
++	 * Find the end of the assumed function declaration.
++	 * Note that ANSI C functions can have type definitions so keep
++	 * track of the parentheses nesting level.
++	 */
++	while (GETC(!=, EOF)) {
++		switch (c) {
++		case '\'':
++		case '"':
++			/* skip strings and character constants */
++			skip_string(c);
++			break;
++		case '/':
++			/* skip comments */
++			if (GETC(==, '*'))
++				skip_comment(c);
++			else if (c == '/')
++				skip_comment(c);
++			break;
++		case '(':
++			level++;
++			break;
++		case ')':
++			if (level == 0)
++				goto fnd;
++			level--;
++			break;
++		case '\n':
++			SETLINE;
++		}
++	}
++	return (NO);
++fnd:
++	/*
++	 * we assume that the character after a function's right paren
++	 * is a token character if it's a function and a non-token
++	 * character if it's a declaration.  Comments don't count...
++	 */
++	for (anext = maybe_attribute;;) {
++		while (GETC(!=, EOF) && iswhite(c))
++			if (c == '\n')
++				SETLINE;
++		if (c == EOF)
++			return NO;
++		/*
++		 * Recognize the GNU __attribute__ extension, which would
++		 * otherwise make the heuristic test DTWT
++		 */
++		if (anext == maybe_attribute) {
++			if (intoken(c)) {
++				*anext++ = c;
++				continue;
++			}
++		} else {
++			if (intoken(c)) {
++				if (anext - maybe_attribute < (int)(sizeof attribute - 1))
++					*anext++ = c;
++				else
++					break;
++				continue;
++			} else {
++				*anext++ = '\0';
++				if (strcmp(maybe_attribute, attribute) == 0) {
++					(void)ungetc(c, inf);
++					return NO;
++				}
++				break;
++			}
++		}
++		if (intoken(c) || c == '{')
++			break;
++		if (c == '/' && GETC(==, '*'))
++			skip_comment(c);
++		else if (c == '/')
++			skip_comment(c);
++		else {				/* don't ever "read" '/' */
++			(void)ungetc(c, inf);
++			return (NO);
++		}
++	}
++	if (c != '{')
++		(void)skip_key('{');
++	return (YES);
++}
++
++/*
++ * hash_entry --
++ *	handle a line starting with a '#'
++ */
++static void
++hash_entry(void)
++{
++	int	c;			/* character read */
++	int	curline;		/* line started on */
++	char	*sp;			/* buffer pointer */
++	char	tok[MAXTOKEN];		/* storage buffer */
++
++	/*
++	 * to treat following macro.
++	 * #     macro(arg)        ....
++	 */
++	while (GETC(!=, EOF) && (c == ' ' || c == '\t'))
++		;
++	(void)ungetc(c, inf);
++
++	curline = lineno;
++	for (sp = tok;;) {		/* get next token */
++		if (GETC(==, EOF))
++			return;
++		if (iswhite(c))
++			break;
++		/* hell... truncate it */
++		if (sp == tok + sizeof tok - 1)
++			*sp = EOS;
++		else 
++			*sp++ = c;
++	}
++	*sp = EOS;
++	if (memcmp(tok, "define", 6))	/* only interested in #define's */
++		goto skip;
++	for (;;) {			/* this doesn't handle "#define \n" */
++		if (GETC(==, EOF))
++			return;
++		if (!iswhite(c))
++			break;
++	}
++	for (sp = tok;;) {		/* get next token */
++		/* hell... truncate it */
++		if (sp == tok + sizeof tok - 1)
++			*sp = EOS;
++		else 
++			*sp++ = c;
++		if (GETC(==, EOF))
++			return;
++		/*
++		 * this is where it DOESN'T handle
++		 * "#define \n"
++		 */
++		if (!intoken(c))
++			break;
++	}
++	*sp = EOS;
++	if (dflag || c == '(') {	/* only want macros */
++		get_line();
++		pfnote(tok, curline);
++	}
++skip:	if (c == '\n') {		/* get rid of rest of define */
++		SETLINE
++		if (*(sp - 1) != '\\')
++			return;
++	}
++	(void)skip_key('\n');
++}
++
++/*
++ * str_entry --
++ *	handle a struct, union or enum entry
++ */
++static int
++str_entry(int c)
++{
++	int	curline;		/* line started on */
++	char	*sp;			/* buffer pointer */
++	char	tok[LINE_MAX];		/* storage buffer */
++
++	curline = lineno;
++	while (iswhite(c))
++		if (GETC(==, EOF))
++			return (NO);
++	if (c == '{')		/* it was "struct {" */
++		return (YES);
++	for (sp = tok;;) {		/* get next token */
++		/* hell... truncate it */
++		if (sp == tok + sizeof tok - 1)
++			*sp = EOS;
++		else 
++			*sp++ = c;
++		if (GETC(==, EOF))
++			return (NO);
++		if (!intoken(c))
++			break;
++	}
++	switch (c) {
++		case '{':		/* it was "struct foo{" */
++			--sp;
++			break;
++		case '\n':		/* it was "struct foo\n" */
++			SETLINE;
++			/*FALLTHROUGH*/
++		default:		/* probably "struct foo " */
++			while (GETC(!=, EOF))
++				if (!iswhite(c))
++					break;
++			if (c != '{') {
++				(void)ungetc(c, inf);
++				return (NO);
++			}
++	}
++	*sp = EOS;
++	pfnote(tok, curline);
++	return (YES);
++}
++
++/*
++ * skip_comment --
++ *	skip over comment
++ */
++void
++skip_comment(int commenttype)
++{
++	int	c;			/* character read */
++	int	star;			/* '*' flag */
++
++	for (star = 0; GETC(!=, EOF);)
++		switch(c) {
++		/* comments don't nest, nor can they be escaped. */
++		case '*':
++			star = YES;
++			break;
++		case '/':
++			if (commenttype == '*' && star)
++				return;
++			break;
++		case '\n':
++			if (commenttype == '/') {
++				/* We don't really parse C, so sometimes it
++				 * is necessary to see the newline
++				 */
++				ungetc(c, inf);
++				return;
++			}
++			SETLINE;
++			/*FALLTHROUGH*/
++		default:
++			star = NO;
++			break;
++		}
++}
++
++/*
++ * skip_string --
++ *	skip to the end of a string or character constant.
++ */
++static void
++skip_string(int key)
++{
++	int	c,
++		skip;
++
++	for (skip = NO; GETC(!=, EOF); )
++		switch (c) {
++		case '\\':		/* a backslash escapes anything */
++			skip = !skip;	/* we toggle in case it's "\\" */
++			break;
++		case '\n':
++			SETLINE;
++			/*FALLTHROUGH*/
++		default:
++			if (c == key && !skip)
++				return;
++			skip = NO;
++		}
++}
++
++/*
++ * skip_key --
++ *	skip to next char "key"
++ */
++int
++skip_key(int key)
++{
++	int	c,
++		skip,
++		retval;
++
++	for (skip = retval = NO; GETC(!=, EOF);)
++		switch(c) {
++		case '\\':		/* a backslash escapes anything */
++			skip = !skip;	/* we toggle in case it's "\\" */
++			break;
++		case ';':		/* special case for yacc; if one */
++		case '|':		/* of these chars occurs, we may */
++			retval = YES;	/* have moved out of the rule */
++			break;		/* not used by C */
++		case '\'':
++		case '"':
++			/* skip strings and character constants */
++			skip_string(c);
++			break;
++		case '/':
++			/* skip comments */
++			if (GETC(==, '*')) {
++				skip_comment(c);
++				break;
++			} else if (c == '/') {
++				skip_comment(c);
++				break;
++			}
++			(void)ungetc(c, inf);
++			c = '/';
++			goto norm;
++		case '\n':
++			SETLINE;
++			/*FALLTHROUGH*/
++		default:
++		norm:
++			if (c == key && !skip)
++				return (retval);
++			skip = NO;
++		}
++	return (retval);
++}
+diff -Paur --no-dereference -- ctags.upstream/fortran.c ctags/fortran.c
+--- ctags.upstream/fortran.c
++++ ctags/fortran.c
+@@ -0,0 +1,162 @@
++/*	$OpenBSD: fortran.c,v 1.9 2013/11/26 13:18:55 deraadt Exp $	*/
++/*	$NetBSD: fortran.c,v 1.3 1995/03/26 20:14:08 glass Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <ctype.h>
++#include <limits.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "ctags.h"
++
++static void takeprec(void);
++
++char *lbp;				/* line buffer pointer */
++
++int
++PF_funcs(void)
++{
++	bool	pfcnt;			/* pascal/fortran functions found */
++	char	*cp;
++	char	tok[MAXTOKEN];
++
++	for (pfcnt = NO;;) {
++		lineftell = ftell(inf);
++		if (!fgets(lbuf, sizeof(lbuf), inf))
++			return (pfcnt);
++		++lineno;
++		lbp = lbuf;
++		if (*lbp == '%')	/* Ratfor escape to fortran */
++			++lbp;
++		for (; isspace((unsigned char)*lbp); ++lbp)
++			continue;
++		if (!*lbp)
++			continue;
++		switch (*lbp | ' ') {	/* convert to lower-case */
++		case 'c':
++			if (cicmp("complex") || cicmp("character"))
++				takeprec();
++			break;
++		case 'd':
++			if (cicmp("double")) {
++				for (; isspace((unsigned char)*lbp); ++lbp)
++					continue;
++				if (!*lbp)
++					continue;
++				if (cicmp("precision"))
++					break;
++				continue;
++			}
++			break;
++		case 'i':
++			if (cicmp("integer"))
++				takeprec();
++			break;
++		case 'l':
++			if (cicmp("logical"))
++				takeprec();
++			break;
++		case 'r':
++			if (cicmp("real"))
++				takeprec();
++			break;
++		}
++		for (; isspace((unsigned char)*lbp); ++lbp)
++			continue;
++		if (!*lbp)
++			continue;
++		switch (*lbp | ' ') {
++		case 'f':
++			if (cicmp("function"))
++				break;
++			continue;
++		case 'p':
++			if (cicmp("program") || cicmp("procedure"))
++				break;
++			continue;
++		case 's':
++			if (cicmp("subroutine"))
++				break;
++		default:
++			continue;
++		}
++		for (; isspace((unsigned char)*lbp); ++lbp)
++			continue;
++		if (!*lbp)
++			continue;
++		for (cp = lbp + 1; *cp && intoken(*cp); ++cp)
++			continue;
++		if ((cp = lbp + 1))
++			continue;
++		*cp = EOS;
++		(void)strlcpy(tok, lbp, sizeof tok);	/* possible trunc */
++		get_line();			/* process line for ex(1) */
++		pfnote(tok, lineno);
++		pfcnt = YES;
++	}
++	/*NOTREACHED*/
++}
++
++/*
++ * cicmp --
++ *	do case-independent strcmp
++ */
++int
++cicmp(char *cp)
++{
++	int	len;
++	char	*bp;
++
++	for (len = 0, bp = lbp; *cp && (*cp &~ ' ') == (*bp++ &~ ' ');
++	    ++cp, ++len)
++		continue;
++	if (!*cp) {
++		lbp += len;
++		return (YES);
++	}
++	return (NO);
++}
++
++static void
++takeprec(void)
++{
++	for (; isspace((unsigned char)*lbp); ++lbp)
++		continue;
++	if (*lbp == '*') {
++		for (++lbp; isspace((unsigned char)*lbp); ++lbp)
++			continue;
++		if (!isdigit((unsigned char)*lbp))
++			--lbp;			/* force failure */
++		else
++			while (isdigit((unsigned char)*++lbp))
++				continue;
++	}
++}
+diff -Paur --no-dereference -- ctags.upstream/lisp.c ctags/lisp.c
+--- ctags.upstream/lisp.c
++++ ctags/lisp.c
+@@ -0,0 +1,100 @@
++/*	$OpenBSD: lisp.c,v 1.8 2013/11/26 13:18:55 deraadt Exp $	*/
++/*	$NetBSD: lisp.c,v 1.3 1995/03/26 20:14:09 glass Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <ctype.h>
++#include <limits.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "ctags.h"
++
++/*
++ * lisp tag functions
++ * just look for (def or (DEF
++ */
++void
++l_entries(void)
++{
++	int	special;
++	char	*cp;
++	char	savedc;
++	char	tok[MAXTOKEN];
++
++	for (;;) {
++		lineftell = ftell(inf);
++		if (!fgets(lbuf, sizeof(lbuf), inf))
++			return;
++		++lineno;
++		lbp = lbuf;
++		if (!cicmp("(def"))
++			continue;
++		special = NO;
++		switch(*lbp | ' ') {
++		case 'm':
++			if (cicmp("method"))
++				special = YES;
++			break;
++		case 'w':
++			if (cicmp("wrapper") || cicmp("whopper"))
++				special = YES;
++		}
++		for (; !isspace((unsigned char)*lbp); ++lbp)
++			continue;
++		for (; isspace((unsigned char)*lbp); ++lbp)
++			continue;
++		for (cp = lbp; *cp && *cp != '\n'; ++cp)
++			continue;
++		*cp = EOS;
++		if (special) {
++			if (!(cp = strchr(lbp, ')')))
++				continue;
++			for (; cp >= lbp && *cp != ':'; --cp)
++				continue;
++			if (cp < lbp)
++				continue;
++			lbp = cp;
++			for (; *cp && *cp != ')' && *cp != ' '; ++cp)
++				continue;
++		}
++		else
++			for (cp = lbp + 1;
++			    *cp && *cp != '(' && *cp != ' '; ++cp)
++				continue;
++		savedc = *cp;
++		*cp = EOS;
++		(void)strlcpy(tok, lbp, sizeof tok);
++		*cp = savedc;
++		get_line();
++		pfnote(tok, lineno);
++	}
++	/*NOTREACHED*/
++}
+diff -Paur --no-dereference -- ctags.upstream/print.c ctags/print.c
+--- ctags.upstream/print.c
++++ ctags/print.c
+@@ -0,0 +1,109 @@
++/*	$OpenBSD: print.c,v 1.8 2017/10/11 07:26:40 anton Exp $	*/
++/*	$NetBSD: print.c,v 1.4 1995/09/27 01:06:58 jtc Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <limits.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++#include "ctags.h"
++
++/*
++ * get_line --
++ *	get the line the token of interest occurred on,
++ *	prepare it for printing.
++ */
++void
++get_line(void)
++{
++	long	saveftell;
++	int	c;
++	int	cnt;
++	char	*cp;
++
++	saveftell = ftell(inf);
++	(void)fseek(inf, lineftell, SEEK_SET);
++	if (xflag)
++		for (cp = lbuf; GETC(!=, EOF) && c != '\n'; *cp++ = c)
++			continue;
++	/*
++	 * do all processing here, so we don't step through the
++	 * line more than once; means you don't call this routine
++	 * unless you're sure you've got a keeper.
++	 */
++	else for (cnt = 0, cp = lbuf; GETC(!=, EOF) && cnt < ENDLINE; ++cnt) {
++		if (c == '\\') {		/* backslashes */
++			if (cnt > ENDLINE - 2)
++				break;
++			*cp++ = '\\'; *cp++ = '\\';
++			++cnt;
++		}
++		else if (c == (int)searchar) {	/* search character */
++			if (cnt > ENDLINE - 2)
++				break;
++			*cp++ = '\\'; *cp++ = c;
++			++cnt;
++		}
++		else if (c == '\n') {	/* end of keep */
++			*cp++ = '$';		/* can find whole line */
++			break;
++		}
++		else
++			*cp++ = c;
++	}
++	*cp = EOS;
++	(void)fseek(inf, saveftell, SEEK_SET);
++}
++
++/*
++ * put_entries --
++ *	write out the tags
++ */
++void
++put_entries(NODE *node)
++{
++
++	if (node->left)
++		put_entries(node->left);
++	if (vflag)
++		printf("%s %s %d\n",
++		    node->entry, node->file, (node->lno + 63) / 64);
++	else if (xflag)
++		printf("%-16s %4d %-16s %s\n",
++		    node->entry, node->lno, node->file, node->pat);
++	else
++		fprintf(outf, "%s\t%s\t%c^%s%c\n",
++		    node->entry, node->file, searchar, node->pat, searchar);
++	if (node->right)
++		put_entries(node->right);
++}
+diff -Paur --no-dereference -- ctags.upstream/tree.c ctags/tree.c
+--- ctags.upstream/tree.c
++++ ctags/tree.c
+@@ -0,0 +1,139 @@
++/*	$OpenBSD: tree.c,v 1.13 2015/09/29 03:19:24 guenther Exp $	*/
++/*	$NetBSD: tree.c,v 1.4 1995/03/26 20:14:11 glass Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <err.h>
++#include <limits.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#include "ctags.h"
++
++#if defined(__sortix__) && !defined(MAXNAMLEN)
++#define MAXNAMLEN 4096
++#endif
++
++bool	in_preload = NO;
++
++static void	add_node(NODE *, NODE *);
++static void	free_tree(NODE *);
++
++/*
++ * pfnote --
++ *	enter a new node in the tree
++ */
++void
++pfnote(char *name, int ln)
++{
++	NODE	*np;
++	char	*fp;
++	char	nbuf[1+MAXNAMLEN+1];
++
++	if (!(np = malloc(sizeof(NODE)))) {
++		warnx("too many entries to sort");
++		put_entries(head);
++		free_tree(head);
++		if (!(head = np = malloc(sizeof(NODE))))
++			err(1, NULL);
++	}
++	if (!xflag && !strcmp(name, "main")) {
++		if (!(fp = strrchr(curfile, '/')))
++			fp = curfile;
++		else
++			++fp;
++		(void)snprintf(nbuf, sizeof nbuf, "M%s", fp);
++		fp = strrchr(nbuf, '.');
++		if (fp && !fp[2])
++			*fp = EOS;
++		name = nbuf;
++	}
++	if (!(np->entry = strdup(name)))
++		err(1, NULL);
++	np->file = curfile;
++	np->lno = ln;
++	np->left = np->right = 0;
++	np->been_warned = NO;
++	np->dynfile = in_preload;
++	if (!(np->pat = strdup(lbuf)))
++		err(1, NULL);
++	if (!head)
++		head = np;
++	else
++		add_node(np, head);
++}
++
++static void
++add_node(NODE *node, NODE *cur_node)
++{
++	int	dif;
++
++	dif = strcmp(node->entry, cur_node->entry);
++	if (!dif) {
++		if (node->file == cur_node->file) {
++			if (!wflag)
++				fprintf(stderr, "Duplicate entry in file %s, "
++				    "line %d: %s\nSecond entry ignored\n",
++				    node->file, lineno, node->entry);
++			return;
++		}
++		if (!cur_node->been_warned)
++			if (!wflag)
++				fprintf(stderr, "Duplicate entry in files %s "
++				    "and %s: %s (Warning only)\n",
++				    node->file, cur_node->file, node->entry);
++		cur_node->been_warned = YES;
++	}
++	else if (dif < 0)
++		if (cur_node->left)
++			add_node(node, cur_node->left);
++		else
++			cur_node->left = node;
++	else if (cur_node->right)
++		add_node(node, cur_node->right);
++	else
++		cur_node->right = node;
++}
++
++static void
++free_tree(NODE *node)
++{
++	if (node) {
++		free_tree(node->left);
++		free_tree(node->right);
++
++		free(node->entry);
++		free(node->pat);
++		if (node->dynfile == YES)
++			free(node->file);
++		free(node);
++	}
++}
+diff -Paur --no-dereference -- ctags.upstream/yacc.c ctags/yacc.c
+--- ctags.upstream/yacc.c
++++ ctags/yacc.c
+@@ -0,0 +1,146 @@
++/*	$OpenBSD: yacc.c,v 1.9 2012/03/04 04:05:15 fgsch Exp $	*/
++/*	$NetBSD: yacc.c,v 1.3 1995/03/26 20:14:12 glass Exp $	*/
++
++/*
++ * Copyright (c) 1987, 1993, 1994
++ *	The Regents of the University of California.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in the
++ *    documentation and/or other materials provided with the distribution.
++ * 3. Neither the name of the University nor the names of its contributors
++ *    may be used to endorse or promote products derived from this software
++ *    without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
++ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
++ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
++ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
++ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
++ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
++ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
++ * SUCH DAMAGE.
++ */
++
++#include <ctype.h>
++#include <limits.h>
++#include <stdio.h>
++#include <string.h>
++
++#include "ctags.h"
++
++/*
++ * y_entries:
++ *	find the yacc tags and put them in.
++ */
++void
++y_entries(void)
++{
++	int	c;
++	char	*sp;
++	bool	in_rule;
++	char	tok[MAXTOKEN];
++
++	in_rule = NO;
++
++	while (GETC(!=, EOF))
++		switch (c) {
++		case '\n':
++			SETLINE;
++			/* FALLTHROUGH */
++		case ' ':
++		case '\f':
++		case '\r':
++		case '\t':
++			break;
++		case '{':
++			if (skip_key('}'))
++				in_rule = NO;
++			break;
++		case '\'':
++		case '"':
++			if (skip_key(c))
++				in_rule = NO;
++			break;
++		case '%':
++			if (GETC(==, '%'))
++				return;
++			(void)ungetc(c, inf);
++			break;
++		case '/':
++			if (GETC(==, '*'))
++				skip_comment('*');
++			else
++				(void)ungetc(c, inf);
++			break;
++		case '|':
++		case ';':
++			in_rule = NO;
++			break;
++		default:
++			if (in_rule || (!isalpha(c) && c != '.' && c != '_'))
++				break;
++			sp = tok;
++			*sp++ = c;
++			while (GETC(!=, EOF) && (intoken(c) || c == '.'))
++				*sp++ = c;
++			*sp = EOS;
++			get_line();		/* may change before ':' */
++			while (iswhite(c)) {
++				if (c == '\n')
++					SETLINE;
++				if (GETC(==, EOF))
++					return;
++			}
++			if (c == ':') {
++				pfnote(tok, lineno);
++				in_rule = YES;
++			}
++			else
++				(void)ungetc(c, inf);
++		}
++}
++
++/*
++ * toss_yysec --
++ *	throw away lines up to the next "\n%%\n"
++ */
++void
++toss_yysec(void)
++{
++	int	c;			/* read character */
++	int	state;
++
++	/*
++	 * state == 0 : waiting
++	 * state == 1 : received a newline
++	 * state == 2 : received first %
++	 * state == 3 : received second %
++	 */
++	lineftell = ftell(inf);
++	for (state = 0; GETC(!=, EOF);)
++		switch (c) {
++		case '\n':
++			++lineno;
++			lineftell = ftell(inf);
++			if (state == 3)		/* done! */
++				return;
++			state = 1;		/* start over */
++			break;
++		case '%':
++			if (state)		/* if 1 or 2 */
++				++state;	/* goto 3 */
++			break;
++		default:
++			state = 0;		/* reset */
++			break;
++		}
++}
