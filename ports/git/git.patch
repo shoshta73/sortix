@@ -278,6 +278,26 @@ diff -Paur --no-dereference -- git.upstream/configure git/configure
  else $as_nop
    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
  /* end confdefs.h.  */
+diff -Paur --no-dereference -- git.upstream/dir.c git/dir.c
+--- git.upstream/dir.c
++++ git/dir.c
+@@ -3392,10 +3392,15 @@
+ 				continue;
+ 			/* fall through */
+ 		} else if (S_ISDIR(st.st_mode)) {
+-			if (!remove_dir_recurse(path, flag, &kept_down))
++			if (!remove_dir_recurse(path, flag, &kept_down)) {
++				/* PATCH: Sortix readdir is not consistently ordered after
++				          unlink at this time. */
++				rewinddir(dir);
+ 				continue; /* happy */
++			}
+ 		} else if (!only_empty &&
+ 			   (!unlink(path->buf) || errno == ENOENT)) {
++			rewinddir(dir);
+ 			continue; /* happy, too */
+ 		}
+ 
 diff -Paur --no-dereference -- git.upstream/git-compat-util.h git/git-compat-util.h
 --- git.upstream/git-compat-util.h
 +++ git/git-compat-util.h
