@@ -814,20 +814,27 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 	if ( !IsSaneFlagModeCombination(flags, mode) )
 		return errno = EINVAL, Ref<Descriptor>();
 
-	// Strip leading slashes and follow at least "." if the path is all slashes,
-	// so we return a new file descriptor instead of ourselves.
-	while ( filename[0] == '/' )
-		filename++;
-	if ( !filename[0] )
-		filename = "./";
-
 	char* filename_mine = NULL;
-
 	size_t symlink_iteration = 0;
-
+	bool leading = true;
 	Ref<Descriptor> desc(this);
-	while ( filename[0] )
+	while ( true )
 	{
+		// Strip leading slashes and follow at least "." if the path is all
+		// slashes, so we return a new file descriptor instead of ourselves.
+		if ( leading )
+		{
+			while ( filename[0] == '/' )
+				filename++;
+			if ( !filename[0] )
+				filename = "./";
+			leading = false;
+		}
+
+		// The file was opened at the end of the path.
+		if ( !filename[0] )
+			break;
+
 		// Reaching a slash in the path means that the caller intended what came
 		// before to be a directory, stop the open call if it isn't.
 		if ( filename[0] == '/' )
@@ -907,7 +914,10 @@ Ref<Descriptor> Descriptor::open(ioctx_t* ctx, const char* filename, int flags,
 			filename = filename_mine = new_filename;
 
 			if ( link_from_root )
+			{
 				desc = CurrentProcess()->GetRoot();
+				leading = true;
+			}
 
 			continue;
 		}
