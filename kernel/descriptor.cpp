@@ -1051,7 +1051,7 @@ int Descriptor::rename_here(ioctx_t* ctx, Ref<Descriptor> from,
 
 ssize_t Descriptor::readlink(ioctx_t* ctx, char* buf, size_t bufsize)
 {
-	if ( !(dflags & O_READ) )
+	if ( !(dflags & (O_READ | O_WRITE | O_EXEC)) )
 		return errno = EBADF, -1;
 	if ( SSIZE_MAX < bufsize )
 		bufsize = SSIZE_MAX;
