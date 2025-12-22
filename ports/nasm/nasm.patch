@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- nasm.upstream/include/compiler.h nasm/include/compiler.h
 --- nasm.upstream/include/compiler.h
 +++ nasm/include/compiler.h
-@@ -414,4 +414,9 @@
+@@ -482,4 +482,9 @@
  # define default case BOGUS_CASE: default
  #endif
  
