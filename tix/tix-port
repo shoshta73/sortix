@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2022, 2023, 2024 Jonas 'Sortie' Termansen.
+# Copyright (c) 2022, 2023, 2024, 2025 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -37,6 +37,7 @@ unset release_directory
 unset repository
 unset source_port
 unset start
+unset step
 unset sysroot
 unset tar
 unset target
@@ -94,6 +95,8 @@ for argument do
   --source-port) previous_option=source_port ;;
   --start=*) start=$parameter ;;
   --start) previous_option=start ;;
+  --step=*) step=$parameter ;;
+  --step) previous_option=step ;;
   --sysroot=*) sysroot=$parameter ;;
   --sysroot) previous_option=sysroot ;;
   --tar=*) tar=$parameter ;;
@@ -207,6 +210,17 @@ tix-install
 end
 EOF
 }
+
+
+if [ -n "$step" ] && [ -z "$(step_number "$step")" ]; then
+  echo "$0: error: Invalid --step: $end" >&2
+  exit 1
+fi
+
+if [ -n "$step" ]; then
+  start="$step"
+  end="$step"
+fi
 
 if [ -n "$start" ] && [ -z "$(step_number "$start")" ]; then
   echo "$0: error: Invalid --start: $start" >&2
@@ -503,9 +517,10 @@ fi
 if { $cache_package || $download_package; } &&
    [ -f "$destination/$NAME.tix.tar.xz" -a \
      -f "$destination/$NAME.version" ] &&
-   [ "$(cat $destination/$NAME.version)" = "$(desired_version $port)" ]; then
+   [ "$(cat $destination/$NAME.version)" = "$(desired_version $port)" ] &&
+   should_run_step tix-install; then
   start=tix-install
-elif $download_package; then
+elif $download_package && should_run_step tix-install; then
   # TODO: Cache the release information and sha256sum.
   announce "Downloading $NAME package"
   if tix-fetch --collection="$collection" \

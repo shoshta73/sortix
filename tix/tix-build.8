@@ -21,6 +21,7 @@
 .Op Fl \-source-package Ns = Ns Ar source-package
 .Op Fl \-source-port Ns = Ns Ar source-port
 .Op Fl \-start Ns = Ns Ar step
+.Op Fl \-step Ns = Ns Ar step
 .Op Fl \-sysroot Ns = Ns Ar directory
 .Op Fl \-tar Ns = Ns Ar path
 .Op Fl \-target Ns = Ns Ar triplet
@@ -147,6 +148,13 @@ Start the build at this step (see
 .Fl \-end ) .
 (Default:
 .Sy start )
+.It Fl \-step Ns = Ns Ar step
+Execute only a single
+.Ar step
+as per
+.Fl \-start
+and
+.Fl \-end .
 .It Fl \-sysroot Ns = Ns Ar directory
 The system root to use while building and installing the port.
 The toolchain is wrapped to transparently use this sysroot during the build.

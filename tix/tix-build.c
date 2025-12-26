@@ -1226,6 +1226,7 @@ int main(int argc, char* argv[])
 	minfo.tar = strdup("tar");
 	char* tmp = strdup(getenv_def("TMPDIR", "/tmp"));
 	char* start_step_string = strdup("start");
+	char* step_string = NULL;
 	char* end_step_string = strdup("end");
 	char* source_port = NULL;
 
@@ -1266,6 +1267,7 @@ int main(int argc, char* argv[])
 		else if ( GET_OPTION_VARIABLE("--source-package", &source_port) ) { }
 		else if ( GET_OPTION_VARIABLE("--source-port", &source_port) ) { }
 		else if ( GET_OPTION_VARIABLE("--start", &start_step_string) ) { }
+		else if ( GET_OPTION_VARIABLE("--step", &step_string) ) { }
 		else if ( GET_OPTION_VARIABLE("--sysroot", &minfo.sysroot) ) { }
 		else if ( GET_OPTION_VARIABLE("--tar", &minfo.tar) ) { }
 		else if ( GET_OPTION_VARIABLE("--target", &minfo.target) ) { }
@@ -1281,6 +1283,14 @@ int main(int argc, char* argv[])
 	// TODO: After releasing Sortix 1.1, remove generation 2 compatibility.
 	if ( minfo.generation != 2 && minfo.generation != 3 )
 		errx(1, "Unsupported generation: %i", minfo.generation);
+
+	if ( step_string )
+	{
+		free(start_step_string);
+		free(end_step_string);
+		start_step_string = strdup(step_string);
+		end_step_string = strdup(step_string);
+	}
 
 	if ( !(minfo.start_step = step_of_step_name(start_step_string)) )
 	{
