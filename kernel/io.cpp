@@ -160,8 +160,6 @@ int sys_dup2(int oldfd, int newfd)
 	return ret;
 }
 
-// TODO: If this function fails the file may still have been created. Does a
-// standard prohibit this and is that the wrong thing?
 int sys_openat(int dirfd, const char* path, int flags, mode_t mode)
 {
 	char* pathcopy = GetStringFromUser(path);
@@ -173,20 +171,20 @@ int sys_openat(int dirfd, const char* path, int flags, mode_t mode)
 	if ( flags & O_CLOFORK ) fdflags |= FD_CLOFORK;
 	flags &= ~(O_CLOEXEC | O_CLOFORK);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
-	if ( !from ) { delete[] pathcopy; return -1; }
+	if ( !from )
+		return delete[] pathcopy, -1;
+	Ref<DescriptorTable> dtable = CurrentProcess()->GetDTable();
+	int reservation;
+	if ( !dtable->Reserve(1, &reservation) )
+		return delete[] pathcopy, -1;
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, flags, mode);
 	from.Reset();
 	delete[] pathcopy;
 	if ( !desc )
-		return -1;
-	Ref<DescriptorTable> dtable = CurrentProcess()->GetDTable();
-	int ret = dtable->Allocate(desc, fdflags);
-	if ( ret < 0 )
-	{
-		// TODO: We should use a fail-safe dtable reservation mechanism that
-		//       causes this error earlier before we have side effects.
-	}
-	return ret;
+		return dtable->Unreserve(&reservation), -1;
+	int fd = dtable->Allocate(desc, fdflags, 0, &reservation);
+	assert(0 <= fd);
+	return fd;
 }
 
 int sys_faccessat(int dirfd, const char* path, int mode, int flags)
