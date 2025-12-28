@@ -165,7 +165,7 @@ int glob(const char* restrict pattern,
 			bool escaped = false;
 			fputc('^', fp);
 			// Translate the pattern to an extended regular expression.
-			for ( size_t i = 0; fp && i < segment_length; i++ )
+			for ( size_t i = 0; i < segment_length; i++ )
 			{
 				unsigned char c = pattern[offset + i];
 				if ( !escaped && c == '*' )
@@ -230,10 +230,9 @@ int glob(const char* restrict pattern,
 				}
 			}
 			fputc('$', fp);
-			if ( !fp || ferror(fp) || fflush(fp) == EOF )
+			if ( ferror(fp) || fflush(fp) == EOF )
 			{
-				if ( fp )
-					fclose(fp);
+				fclose(fp);
 				free(re);
 				result = GLOB_NOSPACE;
 				segments_count--;
