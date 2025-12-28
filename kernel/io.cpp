@@ -455,8 +455,8 @@ int sys_fchdirat(int dirfd, const char* path, int flags)
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags =
-		O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | O_DIRECTORY |
+	                 (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	from.Reset();
 	delete[] pathcopy;
@@ -495,8 +495,8 @@ int sys_fchrootat(int dirfd, const char* path, int flags)
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
 	Ref<Descriptor> from = PrepareLookup(pathcopy, dirfd);
 	if ( !from ) { delete[] pathcopy; return -1; }
-	int open_flags =
-		O_READ | (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
+	int open_flags = O_READ | O_DIRECTORY |
+	                 (flags & AT_SYMLINK_NOFOLLOW ? O_SYMLINK_NOFOLLOW : 0);
 	Ref<Descriptor> desc = from->open(&ctx, pathcopy, open_flags);
 	from.Reset();
 	delete[] pathcopy;
