@@ -715,6 +715,7 @@ Process* Process::Fork()
 	if ( !clone )
 		return NULL;
 
+	ScopedLock lock_segment(&segment_lock);
 	struct segment* clone_segments = NULL;
 
 	// Fork the segment list.
@@ -743,6 +744,7 @@ Process* Process::Fork()
 	clone->segments = clone_segments;
 	clone->segments_used = segments_used;
 	clone->segments_length = segments_used;
+	lock_segment.Reset();
 
 	kthread_mutex_lock(&process_family_lock);
 
