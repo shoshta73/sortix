@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
 		errx(1, "%s: %s", host, gai_strerror(EAI_NONAME));
 
 	char host_address[NI_MAXHOST];
-	int fd;
+	int fd = -1;
 	for ( struct addrinfo* res = res0; res; res = res->ai_next )
 	{
 		if ( (fd = socket(res->ai_family, res->ai_socktype,
