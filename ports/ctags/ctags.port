@@ -1,0 +1,4 @@
+NAME=ctags
+BUILD_LIBRARIES=
+BUILD_SYSTEM=makefile
+LICENSE=BSD-3-Clause
