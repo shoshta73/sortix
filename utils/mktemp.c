@@ -20,30 +20,21 @@
 #include <err.h>
 #include <limits.h>
 #include <locale.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
-__attribute__((format(printf, 1, 2)))
-char* print_string(const char* format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	char* ret;
-	if ( vasprintf(&ret, format, ap) < 0 )
-		ret = NULL;
-	va_end(ap);
-	return ret;
-}
-
 char* join_paths(const char* a, const char* b)
 {
 	size_t a_len = strlen(a);
 	bool has_slash = (a_len && a[a_len-1] == '/') || b[0] == '/';
-	return has_slash ? print_string("%s%s", a, b) : print_string("%s/%s", a, b);
+	char *fmt = has_slash ? "%s%s" : "%s/%s";
+	char *ret;
+	if ( asprintf(&ret, fmt, a, b) < 0 )
+		ret = NULL;
+	return ret;
 }
 
 static void compact_arguments(int* argc, char*** argv)
