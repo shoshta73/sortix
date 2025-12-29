@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- vim.upstream/src/Makefile vim/src/Makefile
 --- vim.upstream/src/Makefile
 +++ vim/src/Makefile
-@@ -2342,6 +2342,8 @@
+@@ -2305,6 +2305,8 @@
  # install targets
  
  install: $(GUI_INSTALL)
@@ -10,126 +10,10 @@ diff -Paur --no-dereference -- vim.upstream/src/Makefile vim/src/Makefile
  
  install_normal: installvim installtools $(INSTALL_LANGS) install-icons
  
-diff -Paur --no-dereference -- vim.upstream/src/auto/configure vim/src/auto/configure
---- vim.upstream/src/auto/configure
-+++ vim/src/auto/configure
-@@ -10739,7 +10739,9 @@
- 
-     if test "$cross_compiling" = yes; then :
- 
--    as_fn_error $? "cross-compiling: please set 'vim_cv_toupper_broken'" "$LINENO" 5
-+    # PATCH: Assume the best when cross-compiling.
-+    #as_fn_error $? "cross-compiling: please set 'vim_cv_toupper_broken'" "$LINENO" 5
-+    vim_cv_toupper_broken=no
- 
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -11961,7 +11963,7 @@
- 
-     if test "x$olibs" != "x$LIBS"; then
-                         if test "$cross_compiling" = yes; then :
--  res="FAIL"
-+  res="OK"
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
-@@ -12033,7 +12035,8 @@
- 
-     if test "$cross_compiling" = yes; then :
- 
--      as_fn_error $? "cross-compiling: please set 'vim_cv_terminfo'" "$LINENO" 5
-+      #as_fn_error $? "cross-compiling: please set 'vim_cv_terminfo'" "$LINENO" 5
-+      vim_cv_terminfo=yes
- 
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -12085,7 +12088,8 @@
- 
-     if test "$cross_compiling" = yes; then :
- 
--      as_fn_error $? "failed to compile test program." "$LINENO" 5
-+      #as_fn_error $? "failed to compile test program." "$LINENO" 5
-+      vim_cv_tgetent=zero
- 
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -12453,7 +12457,8 @@
- 
-     if test "$cross_compiling" = yes; then :
- 
--      as_fn_error $? "cross-compiling: please set 'vim_cv_getcwd_broken'" "$LINENO" 5
-+      #as_fn_error $? "cross-compiling: please set 'vim_cv_getcwd_broken'" "$LINENO" 5
-+      vim_cv_getcwd_broken=no
- 
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -13115,7 +13120,8 @@
- 
-     if test "$cross_compiling" = yes; then :
- 
--      as_fn_error $? "cross-compiling: please set 'vim_cv_stat_ignores_slash'" "$LINENO" 5
-+      #as_fn_error $? "cross-compiling: please set 'vim_cv_stat_ignores_slash'" "$LINENO" 5
-+      vim_cv_getcwd_broken=no
- 
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -14270,8 +14276,8 @@
- { $as_echo "$as_me:${as_lineno-$LINENO}: checking uint32_t is 32 bits" >&5
- $as_echo_n "checking uint32_t is 32 bits... " >&6; }
- if test "$cross_compiling" = yes; then :
--  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: cannot check uint32_t when cross-compiling." >&5
--$as_echo "$as_me: WARNING: cannot check uint32_t when cross-compiling." >&2;}
-+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: obviously" >&5
-+$as_echo "obviously" >&6; }
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
-@@ -14331,7 +14337,8 @@
- 
-     if test "$cross_compiling" = yes; then :
- 
--	as_fn_error $? "cross-compiling: please set 'vim_cv_memmove_handles_overlap'" "$LINENO" 5
-+	#as_fn_error $? "cross-compiling: please set 'vim_cv_memmove_handles_overlap'" "$LINENO" 5
-+	vim_cv_memmove_handles_overlap=yes
- 
- else
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-@@ -14801,6 +14808,10 @@
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
- 
-+#ifdef HAVE_TERMCAP_H
-+# include <termcap.h>
-+#endif
-+
- int
- main ()
- {
-@@ -14923,6 +14934,8 @@
-   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
- /* end confdefs.h.  */
- 
-+#include <stdlib.h>
-+
- int
- main ()
- {
-diff -Paur --no-dereference -- vim.upstream/src/memfile.c vim/src/memfile.c
---- vim.upstream/src/memfile.c
-+++ vim/src/memfile.c
-@@ -593,7 +593,7 @@
- 	    // OpenNT is strictly POSIX (Benzinger)
- 	    // Tandem/Himalaya NSK-OSS doesn't have sync()
- 	    // No sync() on Stratus VOS
--# if defined(__OPENNT) || defined(__TANDEM) || defined(__VOS__)
-+# if defined(__OPENNT) || defined(__TANDEM) || defined(__VOS__) || (defined(__sortix__) && !defined(__SORTIX_HAS_SYNC__))
- 	    fflush(NULL);
- # else
- 	    sync();
 diff -Paur --no-dereference -- vim.upstream/src/sha256.c vim/src/sha256.c
 --- vim.upstream/src/sha256.c
 +++ vim/src/sha256.c
-@@ -406,10 +406,7 @@
+@@ -407,10 +407,7 @@
      char_u	     sha256sum[32];
      context_sha256_T ctx;
  
