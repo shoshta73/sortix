@@ -1021,8 +1021,8 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 	struct segment tls_segment;
 	struct segment auxcode_segment;
 
-	kthread_mutex_lock(&segment_write_lock);
-	kthread_mutex_lock(&segment_lock);
+	ScopedLock lock_segment_write(&segment_write_lock);
+	ScopedLock lock_segment(&segment_lock);
 
 	if ( !(MapSegment(&arg_segment, stack_hint, arg_size, 0, stack_prot) &&
 	       MapSegment(&stack_segment, stack_hint, stack_size, 0, stack_prot) &&
@@ -1030,8 +1030,8 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 	       MapSegment(&tls_segment, tls_hint, tls_size, 0, tls_prot) &&
 	       MapSegment(&auxcode_segment, auxcode_hint, auxcode_size, 0, auxcode_kprot)) )
 	{
-		kthread_mutex_unlock(&segment_lock);
-		kthread_mutex_unlock(&segment_write_lock);
+		lock_segment.Reset();
+		lock_segment_write.Reset();
 		ResetForExecute();
 		return errno = ENOMEM, -1;
 	}
@@ -1069,20 +1069,22 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 		return errno = EINVAL, -1;
 	uint8_t* target_raw_tls = (uint8_t*) raw_tls_segment.addr;
 	ioctx_t user_ctx; SetupUserIOCtx(&user_ctx);
-	kthread_mutex_unlock(&segment_lock);
+
 	for ( size_t done = 0; done < aux.tls_file_size; )
 	{
+		kthread_mutex_unlock(&segment_lock);
 		ssize_t amount =
 			program->pread(&user_ctx, target_raw_tls + done,
 			               aux.tls_file_size - done,
 			               (off_t) aux.tls_file_offset + done);
+		kthread_mutex_lock(&segment_lock);
 		if ( amount < 0 )
 			return -1;
 		if ( !amount )
 			return errno = EINVAL, -1;
 		done += amount;
 	}
-	kthread_mutex_lock(&segment_lock);
+
 	memset(target_raw_tls + aux.tls_file_size, 0, aux.tls_mem_size - aux.tls_file_size);
 	Memory::ProtectMemory(this, raw_tls_segment.addr, raw_tls_segment.size, raw_tls_prot);
 
@@ -1107,9 +1109,9 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 	uthread->arg_mmap = (void*) arg_segment.addr;
 	uthread->arg_size = arg_segment.size;
 	memset(uthread + 1, 0, aux.uthread_size - sizeof(struct uthread));
-	kthread_mutex_lock(&thread_lock);
+	ScopedLock lock_thread(&thread_lock);
 	CurrentThread()->tid = (tid_t) uthread;
-	kthread_mutex_unlock(&thread_lock);
+	lock_thread.Reset();
 
 	memset(regs, 0, sizeof(*regs));
 #if defined(__i386__)
@@ -1165,14 +1167,14 @@ int Process::Execute(const char* program_name, Ref<Descriptor> program,
 #endif
 	Memory::ProtectMemory(this, auxcode_segment.addr, auxcode_segment.size, auxcode_prot);
 
-	kthread_mutex_unlock(&segment_lock);
-	kthread_mutex_unlock(&segment_write_lock);
+	lock_segment.Reset();
+	lock_segment_write.Reset();
 
 	dtable->OnExecute();
 
-	kthread_mutex_lock(&process_family_lock);
+	ScopedLock lock_process_family(&process_family_lock);
 	has_run_exec = true;
-	kthread_mutex_unlock(&process_family_lock);
+	lock_process_family.Reset();
 
 	return 0;
 }
