@@ -1,0 +1,13 @@
+NAME=sox_ng
+BUILD_LIBRARIES='libiconv? libintl?'
+VERSION=14.6.0.1
+DISTNAME=$NAME-$VERSION
+COMPRESSION=tar.gz
+ARCHIVE=$DISTNAME.$COMPRESSION
+SHA256SUM=6370c0fb7208cfa4e52a36c8ec412334f488e45325cd62f93e1c3d4b3da99f17
+UPSTREAM_SITE=https://codeberg.org/sox_ng/sox_ng/releases/download/sox_ng-$VERSION
+UPSTREAM_ARCHIVE=$ARCHIVE
+LICENSE=GPL-3.0-or-later
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--enable-replace --with-gnu-ld --without-libltdl --program-prefix='
+MAKE_VARS='V=1'
