@@ -317,28 +317,18 @@ uintptr_t Load(Ref<Descriptor> program, Auxiliary* aux)
 
 			assert(IsUserspaceSegment(&segment));
 
-			kthread_mutex_lock(&process->segment_write_lock);
-			kthread_mutex_lock(&process->segment_lock);
+			ScopedLock lock_segment_write(&process->segment_write_lock);
+			ScopedLock lock_segment(&process->segment_lock);
 
 			if ( IsSegmentOverlapping(process, &segment) )
-			{
-				kthread_mutex_unlock(&process->segment_lock);
-				kthread_mutex_unlock(&process->segment_write_lock);
 				return errno = EINVAL, 0;
-			}
 
 			if ( !Memory::MapRange(segment.addr, segment.size, kprot, PAGE_USAGE_USER_SPACE) )
-			{
-				kthread_mutex_unlock(&process->segment_lock);
-				kthread_mutex_unlock(&process->segment_write_lock);
 				return errno = EINVAL, 0;
-			}
 
 			if ( !AddSegment(process, &segment) )
 			{
 				Memory::UnmapRange(segment.addr, segment.size, PAGE_USAGE_USER_SPACE);
-				kthread_mutex_unlock(&process->segment_lock);
-				kthread_mutex_unlock(&process->segment_write_lock);
 				return errno = EINVAL, 0;
 			}
 
@@ -346,28 +336,26 @@ uintptr_t Load(Ref<Descriptor> program, Auxiliary* aux)
 
 			ioctx_t user_ctx; SetupUserIOCtx(&user_ctx);
 
-			kthread_mutex_unlock(&process->segment_lock);
+
 			if ( (uintmax_t) off_max < (uintmax_t) phdr.p_offset ||
 			     OFF_MAX - phdr.p_offset < phdr.p_filesz )
 				return errno = EINVAL, 0;
 			for ( size_t done = 0; done < phdr.p_filesz; )
 			{
+				kthread_mutex_unlock(&process->segment_lock);
 				ssize_t amount = program->pread(&user_ctx,
 				                                (uint8_t*) phdr.p_vaddr + done,
 				                                phdr.p_filesz - done,
 				                                phdr.p_offset + done);
+				kthread_mutex_lock(&process->segment_lock);
 				if ( amount < 0 )
 					return 0;
 				if ( !amount )
 					return errno = EINVAL, 0;
 				done += amount;
 			}
-			kthread_mutex_lock(&process->segment_lock);
 
 			Memory::ProtectMemory(CurrentProcess(), segment.addr, segment.size, prot);
-
-			kthread_mutex_unlock(&process->segment_lock);
-			kthread_mutex_unlock(&process->segment_write_lock);
 		}
 	}
 
