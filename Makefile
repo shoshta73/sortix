@@ -9,7 +9,6 @@ libm \
 libdisplay \
 libmount \
 libui \
-bench \
 carray \
 checksum \
 chkblayout \
