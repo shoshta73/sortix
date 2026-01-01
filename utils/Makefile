@@ -54,6 +54,7 @@ readlink \
 realpath \
 rm \
 rmdir \
+seq \
 sleep \
 sort \
 stat \
