@@ -49,6 +49,7 @@ realpath
 reboot
 rm
 rmdir
+seq
 shutdown
 sleep
 sort
