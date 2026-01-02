@@ -19,7 +19,7 @@ if [ -n "$TIX_INSTALL_DIR" ]; then
   rm -rf -- "$TIX_INSTALL_DIR$PREFIX/share/man/man3"
   # The pod documentation takes up space (9 MB).
   PERLDIR=$(find "$TIX_INSTALL_DIR$PREFIX/lib/perl5" -maxdepth 1 -name '*.*.*')
-  find -- "$PERLDIR" -name '*.pod' -delete
+  find -- "$PERLDIR" -name '*.pod' '!' -name perldiag.pod -delete
   # The per-architecture statically linked modules aren't needed (16MB).
   rm -rf -- "$PERLDIR/$HOST"/{CORE,auto}
 fi
