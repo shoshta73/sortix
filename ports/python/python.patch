@@ -283,6 +283,29 @@ diff -Paur --no-dereference -- python.upstream/Modules/mmapmodule.c python/Modul
      /* XXX flags for msync? */
      if (-1 == msync(self->data + offset, size, MS_SYNC)) {
          PyErr_SetFromErrno(PyExc_OSError);
+@@ -1326,7 +1326,7 @@
+         flags |= MAP_ANONYMOUS;
+ 
+         /* VxWorks only supports MAP_ANONYMOUS with MAP_PRIVATE flag */
+-#ifdef __VXWORKS__
++#if defined(__VXWORKS__) || defined(__sortix__)
+         flags &= ~MAP_SHARED;
+         flags |= MAP_PRIVATE;
+ #endif
+@@ -1350,6 +1350,13 @@
+ 
+     Py_BEGIN_ALLOW_THREADS
+     m_obj->data = mmap(NULL, map_size, prot, flags, fd, offset);
++    /* PATCH: Sortix doesn't have shared memory yet. Try private memory. */
++    if (m_obj->data == MAP_FAILED &&
++        (flags & MAP_SHARED) && !(prot & PROT_WRITE)) {
++        flags &= ~MAP_SHARED;
++        flags |= MAP_PRIVATE;
++        m_obj->data = mmap(NULL, map_size, prot, flags, fd, offset);
++    }
+     Py_END_ALLOW_THREADS
+ 
+     int saved_errno = errno;
 diff -Paur --no-dereference -- python.upstream/Modules/resource.c python/Modules/resource.c
 --- python.upstream/Modules/resource.c
 +++ python/Modules/resource.c
