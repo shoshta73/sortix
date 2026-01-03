@@ -74,6 +74,7 @@ static void Debug(const char* str)
 addr_t PAT2PMLFlags[PAT_NUM];
 
 static addr_t multiboot2_page = (addr_t) -1;
+static size_t multiboot2_size;
 
 static unsigned char* Multiboot2Map(addr_t physical)
 {
@@ -84,10 +85,11 @@ static unsigned char* Multiboot2Map(addr_t physical)
 	size_t offset = physical & (4096UL - 1);
 	if ( page != multiboot2_page )
 	{
-		int prot = PROT_KREAD | PROT_KWRITE;
+		int prot = PROT_KREAD;
 		uintptr_t virt = (uintptr_t) multiboot2_pages;
 		Memory::Map(page + 0 * 4096UL, virt + 0 * 4096UL, prot);
 		Memory::Map(page + 1 * 4096UL, virt + 1 * 4096UL, prot);
+		Flush();
 		multiboot2_page = page;
 	}
 	return &multiboot2_pages[offset];
@@ -183,6 +185,11 @@ static bool CheckUsedRangesMultiboot2(struct multiboot2_info* multiboot2_phys,
 		Debug(msg);
 		if ( tag->type == 0 )
 			break;
+		if ( !tag->size )
+		{
+			Debug("ZERO SIZE TAG\r\n");
+			assert(tag->size);
+		}
 		if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
 		{
 			struct multiboot2_tag* tag = (struct multiboot2_tag*) ptr;
@@ -266,7 +273,12 @@ static void OnMemoryRegion(struct boot_info* boot_info,
 	{
 		size_t distance = base + length - processed;
 		if ( !CheckUsedRanges(boot_info, processed, &distance) )
+		{
+			char msg[256];
+			snprintf(msg, sizeof(msg), "USING MEMORY %#lx + %#lx = %#lx\r\n", processed, distance, processed + distance);
+			Debug(msg);
 			Page::InitPushRegion(processed, distance);
+		}
 		processed += distance;
 	}
 }
@@ -300,7 +312,6 @@ static void InitMultiboot2(struct boot_info* boot_info)
 	addr_t physical = (addr_t) boot_info->multiboot2;
 	bool got_header = false;
 	bool got_tag = false;
-	size_t total_size = 0;
 	size_t entries_left = 0;
 	size_t entry_size = 0;
 
@@ -312,7 +323,7 @@ static void InitMultiboot2(struct boot_info* boot_info)
 			snprintf(msg, sizeof(msg), "InitMultiboot2 header at %#lx\r\n", physical);
 			Debug(msg);
 			struct multiboot2_info* multiboot2 = (struct multiboot2_info*) ptr;
-			total_size = multiboot2->total_size;
+			multiboot2_size = multiboot2->total_size;
 			got_header = true;
 			physical += sizeof(*multiboot2);
 			physical = -(-physical & ~7UL);
@@ -352,22 +363,24 @@ static void InitMultiboot2(struct boot_info* boot_info)
 		physical += entry_size;
 		entries_left--;
 	}
+}
 
-	Page::Put((uintptr_t) multiboot2_pages + 0, PAGE_USAGE_WASNT_ALLOCATED);
-	Page::Put((uintptr_t) multiboot2_pages + 4096, PAGE_USAGE_WASNT_ALLOCATED);
-
-	physical = (addr_t) boot_info->multiboot2;
+static void PostInitMultiboot2(struct boot_info* boot_info)
+{
+	uintptr_t physical = (addr_t) boot_info->multiboot2;
+	uintptr_t info_page = Page::AlignDown(physical);
 	uintptr_t info_offset = physical & (4096UL - 1);
-	uintptr_t info_size = Page::AlignUp(info_offset + total_size);
+	uintptr_t info_size = Page::AlignUp(info_offset + multiboot2_size);
 	addralloc_t alloc;
 	if ( !AllocateKernelAddress(&alloc, info_size) )
 		Panic("Failed to allocate virtual space for multiboot information");
 	for ( size_t i = 0; i < info_size; i += Page::Size() )
 	{
-		int prot = PROT_KREAD | PROT_KWRITE;
-		if ( !Memory::Map(physical + i, alloc.from + i, prot) )
+		int prot = PROT_KREAD;
+		if ( !Memory::Map(info_page + i, alloc.from + i, prot) )
 			Panic("Failed to memory map multiboot information");
 	}
+	Flush();
 
 	boot_info->multiboot2 = (struct multiboot2_info*) alloc.from + info_offset;
 }
@@ -420,6 +433,14 @@ void Init(struct boot_info* boot_info)
 		InvalidatePage(pmladdr);
 		memset((void*) pmladdr, 0, sizeof(PML));
 	}
+
+	// Don't map new high kernel memory until the PMLs have been initialized.
+	if ( boot_info->multiboot2 )
+		PostInitMultiboot2(boot_info);
+
+	uintptr_t mb2_pages = (uintptr_t) multiboot2_pages;
+	Page::Put(Unmap(mb2_pages + 0), PAGE_USAGE_WASNT_ALLOCATED);
+	Page::Put(Unmap(mb2_pages + 4096), PAGE_USAGE_WASNT_ALLOCATED);
 }
 
 void Statistics(size_t* used, size_t* total, size_t* purposes)
