@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2015, 2016, 2018, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014-2016, 2018, 2025-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -105,6 +105,9 @@ physpml1:
 physpml0:
 	.skip 4096
 nullpage: .global nullpage
+	.skip 4096
+multiboot2_pages: .global multiboot2_pages
+	.skip 4096
 	.skip 4096
 
 .section .text

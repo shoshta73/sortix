@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2014-2015, 2017, 2022-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2012, 2014-2015, 2017, 2022-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,7 @@
 
 #include <sortix/mman.h>
 
+#include <sortix/kernel/addralloc.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/memorymanagement.h>
@@ -30,11 +31,14 @@
 #include <sortix/kernel/pat.h>
 #include <sortix/kernel/random.h>
 #include <sortix/kernel/syscall.h>
+#include <sortix/kernel/ioport.h> // DEBUG
 
 #include "multiboot.h"
 #include "multiboot2.h"
 #include "memorymanagement.h"
 #include "msr.h"
+
+extern "C" unsigned char multiboot2_pages[2 * 4096];
 
 namespace Sortix {
 
@@ -60,7 +64,34 @@ kthread_mutex_t pagelock = KTHREAD_MUTEX_INITIALIZER;
 namespace Sortix {
 namespace Memory {
 
+static void Debug(const char* str)
+{
+	uint16_t console_port = 0x3F8;
+	while ( *str )
+		outport8(console_port, *str++);
+}
+
 addr_t PAT2PMLFlags[PAT_NUM];
+
+static addr_t multiboot2_page = (addr_t) -1;
+
+static unsigned char* Multiboot2Map(addr_t physical)
+{
+	char msg[256];
+	snprintf(msg, sizeof(msg), "Multiboot2Map %#lx\r\n", physical);
+	Debug(msg);
+	addr_t page = Page::AlignDown(physical);
+	size_t offset = physical & (4096UL - 1);
+	if ( page != multiboot2_page )
+	{
+		int prot = PROT_KREAD | PROT_KWRITE;
+		uintptr_t virt = (uintptr_t) multiboot2_pages;
+		Memory::Map(page + 0 * 4096UL, virt + 0 * 4096UL, prot);
+		Memory::Map(page + 1 * 4096UL, virt + 1 * 4096UL, prot);
+		multiboot2_page = page;
+	}
+	return &multiboot2_pages[offset];
+}
 
 static bool CheckUsedRange(addr_t test,
                            addr_t from_unaligned,
@@ -121,19 +152,42 @@ static bool CheckUsedRangesMultiboot(struct multiboot_info* multiboot,
 	return false;
 }
 
-static bool CheckUsedRangesMultiboot2(struct multiboot2_info* multiboot2,
+static bool CheckUsedRangesMultiboot2(struct multiboot2_info* multiboot2_phys,
                                       addr_t test,
                                       size_t* dist_ptr)
 {
-	if ( CheckUsedRange(test, (addr_t) multiboot2, multiboot2->total_size,
+	Debug("\r\n");
+	char msg[256];
+	addr_t physical = (addr_t) multiboot2_phys;
+	snprintf(msg, sizeof(msg), "CheckUsedRangesMultiboot2 with %#lx\r\n", physical);
+	Debug(msg);
+	unsigned char* ptr = Multiboot2Map(physical);
+	snprintf(msg, sizeof(msg), "CheckUsedRangesMultiboot2 got %#lx\r\n", physical);
+	Debug(msg);
+	struct multiboot2_info* multiboot2 = (struct multiboot2_info*) ptr;
+
+	if ( CheckUsedRange(test, (addr_t) multiboot2_phys, multiboot2->total_size,
 	                    dist_ptr) )
 		return true;
 
-	struct multiboot2_tag* tag = multiboot2_tag_begin(multiboot2);
-	while ( tag )
+	physical += sizeof(*multiboot2);
+	physical = -(-physical & ~7UL);
+
+	while ( true )
 	{
+		snprintf(msg, sizeof(msg), "CheckUsedRangesMultiboot2 next tag %#lx\r\n", physical);
+		Debug(msg);
+		unsigned char* ptr = Multiboot2Map(physical);
+		struct multiboot2_tag* tag = (struct multiboot2_tag*) ptr;
+		snprintf(msg, sizeof(msg), "CheckUsedRangesMultiboot2 tag type %u\r\n", tag->type);
+		Debug(msg);
+		if ( tag->type == 0 )
+			break;
 		if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
 		{
+			struct multiboot2_tag* tag = (struct multiboot2_tag*) ptr;
+			snprintf(msg, sizeof(msg), "CheckUsedRangesMultiboot2 found module\r\n");
+			Debug(msg);
 			struct multiboot2_tag_module* module =
 				(struct multiboot2_tag_module*) tag;
 			assert(module->mod_start <= module->mod_end);
@@ -141,7 +195,10 @@ static bool CheckUsedRangesMultiboot2(struct multiboot2_info* multiboot2,
 			if ( CheckUsedRange(test, module->mod_start, mod_size, dist_ptr) )
 				return true;
 		}
-		tag = multiboot2_tag_next(tag);
+		snprintf(msg, sizeof(msg), "CheckUsedRangesMultiboot2 tag at %#lx has size %u\r\n", physical, tag->size);
+		Debug(msg);
+		physical += tag->size;
+		physical = -(-physical & ~7UL);
 	}
 
 	return false;
@@ -214,6 +271,10 @@ static void OnMemoryRegion(struct boot_info* boot_info,
 	}
 }
 
+// TODO: This assumes the multiboot structures are accessible. That assumption
+//       is wrong in general and we should map them ourselves in manner that
+//       cannot fail. However, the multiboot 2 implementation does not have
+//       this problem and multiboot 1 support will be removed.
 static void InitMultiboot(struct boot_info* boot_info)
 {
 	struct multiboot_info* multiboot = boot_info->multiboot;
@@ -235,19 +296,80 @@ static void InitMultiboot(struct boot_info* boot_info)
 
 static void InitMultiboot2(struct boot_info* boot_info)
 {
-	struct multiboot2_tag_mmap* mmap = (struct multiboot2_tag_mmap*)
-		multiboot2_tag_lookup(boot_info->multiboot2, MULTIBOOT2_TAG_TYPE_MMAP);
-	if ( !mmap )
-		Panic("The memory map wasn't in the multiboot2 structure");
-	size_t count = (mmap->size - sizeof(*mmap)) / mmap->entry_size;
-	for ( size_t i = 0; i < count; i++ )
+	char msg[256];
+	addr_t physical = (addr_t) boot_info->multiboot2;
+	bool got_header = false;
+	bool got_tag = false;
+	size_t total_size = 0;
+	size_t entries_left = 0;
+	size_t entry_size = 0;
+
+	while ( true )
 	{
-		uintptr_t ptr = (uintptr_t) mmap->entries;
-		ptr += i * mmap->entry_size;
+		unsigned char* ptr = Multiboot2Map(physical);
+		if ( !got_header )
+		{
+			snprintf(msg, sizeof(msg), "InitMultiboot2 header at %#lx\r\n", physical);
+			Debug(msg);
+			struct multiboot2_info* multiboot2 = (struct multiboot2_info*) ptr;
+			total_size = multiboot2->total_size;
+			got_header = true;
+			physical += sizeof(*multiboot2);
+			physical = -(-physical & ~7UL);
+			continue;
+		}
+		if ( !got_tag )
+		{
+			snprintf(msg, sizeof(msg), "InitMultiboot2 tag at %#lx\r\n", physical);
+			Debug(msg);
+			struct multiboot2_tag* tag = (struct multiboot2_tag*) ptr;
+			snprintf(msg, sizeof(msg), "InitMultiboot2 tag at %#lx type %u\r\n", physical, tag->type);
+			Debug(msg);
+			if ( tag->type == 0 )
+				Panic("The memory map wasn't in the multiboot2 structure");
+			if ( tag->type != MULTIBOOT2_TAG_TYPE_MMAP )
+			{
+				physical += tag->size;
+				physical = -(-physical & ~7UL);
+				continue;
+			}
+			struct multiboot2_tag_mmap* mmap =
+				(struct multiboot2_tag_mmap*) tag;
+			physical += sizeof(*mmap);
+			entry_size = mmap->entry_size;
+			entries_left = (mmap->size - sizeof(*mmap)) / entry_size;
+			got_tag = true;
+			continue;
+		}
+		if ( !entries_left )
+			break;
+		Debug("\r\n\r\n");
+		snprintf(msg, sizeof(msg), "InitMultiboot2 mmap entry at %#lx\r\n", physical);
+		Debug(msg);
 		struct multiboot2_mmap_entry* entry =
 			(struct multiboot2_mmap_entry*) ptr;
 		OnMemoryRegion(boot_info, entry->addr, entry->len, entry->type);
+		physical += entry_size;
+		entries_left--;
 	}
+
+	Page::Put((uintptr_t) multiboot2_pages + 0, PAGE_USAGE_WASNT_ALLOCATED);
+	Page::Put((uintptr_t) multiboot2_pages + 4096, PAGE_USAGE_WASNT_ALLOCATED);
+
+	physical = (addr_t) boot_info->multiboot2;
+	uintptr_t info_offset = physical & (4096UL - 1);
+	uintptr_t info_size = Page::AlignUp(info_offset + total_size);
+	addralloc_t alloc;
+	if ( !AllocateKernelAddress(&alloc, info_size) )
+		Panic("Failed to allocate virtual space for multiboot information");
+	for ( size_t i = 0; i < info_size; i += Page::Size() )
+	{
+		int prot = PROT_KREAD | PROT_KWRITE;
+		if ( !Memory::Map(physical + i, alloc.from + i, prot) )
+			Panic("Failed to memory map multiboot information");
+	}
+
+	boot_info->multiboot2 = (struct multiboot2_info*) alloc.from + info_offset;
 }
 
 void Init(struct boot_info* boot_info)
@@ -274,9 +396,6 @@ void Init(struct boot_info* boot_info)
 		PAT2PMLFlags[PAT_UCM] = PML_NOCACHE;
 	}
 
-	// TODO: This assumes the multiboot structures are accessible. That
-	//       assumption is wrong in general and we should map them ourselves in
-	//       manner that cannot fail.
 	if ( boot_info->multiboot )
 		InitMultiboot(boot_info);
 	else if ( boot_info->multiboot2 )

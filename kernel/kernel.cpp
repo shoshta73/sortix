@@ -225,6 +225,8 @@ extern "C" void KernelInit(unsigned long magic, void* boot_info_p)
 	// Initialize the kernel log.
 	Log::Init(&boot_info);
 
+	Log::PrintF("boot_info.multiboot2->total_size = %u\n", boot_info.multiboot2->total_size);
+
 	char* cmdline = NULL;
 	addr_t physical_cmdline = GetBootCommandLine(&boot_info);
 	if ( physical_cmdline )
