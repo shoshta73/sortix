@@ -77,6 +77,8 @@ void initialize_editor(struct editor* editor)
 	editor->lines_length = 1;
 	editor->lines =
 		(struct line*) malloc(sizeof(struct line) * editor->lines_length);
+	if ( editor->lines == NULL )
+		err(1, "malloc");
 	editor->lines[0].data = NULL;
 	editor->lines[0].used = 0;
 	editor->lines[0].length = 0;
@@ -119,10 +121,7 @@ void editor_load_config(struct editor* editor)
 		return;
 	char* path;
 	if ( asprintf(&path, "%s/.editor", home) < 0 )
-	{
-		warn("malloc");
-		return;
-	}
+		err(1, "malloc");
 	editor_load_config_path(editor, path);
 	free(path);
 }
@@ -137,6 +136,8 @@ void editor_reset_contents(struct editor* editor)
 	editor->lines_length = 1;
 	editor->lines =
 		(struct line*) malloc(sizeof(struct line) * editor->lines_length);
+	if ( editor->lines == NULL )
+		err(1, "malloc");
 	editor->lines[0].data = NULL;
 	editor->lines[0].used = 0;
 	editor->lines[0].length = 0;
@@ -212,6 +213,8 @@ bool editor_load_file(struct editor* editor, const char* path)
 		return false;
 
 	editor->current_file_name = strdup(path);
+	if ( editor->current_file_name == NULL )
+		err(1, "malloc");
 	editor->highlight_source = language_of_path(path);
 
 	return true;
@@ -265,6 +268,8 @@ bool editor_save_file(struct editor* editor, const char* path)
 	}
 
 	editor->current_file_name = strdup(path);
+	if ( editor->current_file_name == NULL )
+		err(1, "malloc");
 	editor->dirty = false;
 	editor->highlight_source = language_of_path(path);
 

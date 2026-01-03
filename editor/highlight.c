@@ -17,6 +17,7 @@
  * Syntax highlighting.
  */
 
+#include <err.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -153,7 +154,7 @@ void editor_colorize(struct editor* editor)
 		editor->color_lines = (struct color_line*)
 			malloc(sizeof(struct color_line) * editor->lines_used);
 		if ( !editor->color_lines )
-			return;
+			err(1, "malloc");
 		editor->color_lines_used = editor->lines_used;
 		editor->color_lines_length = editor->lines_used;
 		for ( size_t i = 0; i < editor->lines_used; i++ )
@@ -168,16 +169,7 @@ void editor_colorize(struct editor* editor)
 
 		editor->color_lines[i].data = (uint8_t*) malloc(editor->lines[i].used);
 		if ( !editor->color_lines[i].data )
-		{
-			for ( size_t n = 0; n < i; i++ )
-				free(editor->color_lines[n].data);
-			free(editor->color_lines);
-			editor->color_lines_used = 0;
-			editor->color_lines_length = 0;
-			editor->color_lines = NULL;
-			return;
-		}
-
+			err(1, "malloc");
 		editor->color_lines[i].length = editor->lines[i].used;
 	}
 

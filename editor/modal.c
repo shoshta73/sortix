@@ -21,6 +21,7 @@
 #include <sys/types.h>
 
 #include <ctype.h>
+#include <err.h>
 #include <regex.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -363,7 +364,7 @@ bool match_line(regex_t* regex, const wchar_t* line, size_t used,
 
 	char* buffer = calloc(used, MB_CUR_MAX);
 	if ( !buffer )
-		return false;
+		err(1, "malloc");
 	size_t buffer_used = 0;
 	mbstate_t ps = {0};
 	for ( size_t i = 0; i < used; i++ )
@@ -461,6 +462,8 @@ void editor_modal_character(struct editor* editor, wchar_t c)
 	{
 		if ( !editor->modal )
 			editor->modal = (wchar_t*) malloc(sizeof(wchar_t) * 1);
+		if ( !editor->modal )
+			err(1, "malloc");
 
 		editor->modal[editor->modal_used] = L'\0';
 		char* param = convert_wcs_to_mbs(editor->modal);
@@ -485,6 +488,8 @@ void editor_modal_character(struct editor* editor, wchar_t c)
 	{
 		size_t new_length = editor->modal_length ? 2 * editor->modal_length : 8;
 		wchar_t* new_data = (wchar_t*) malloc(sizeof(wchar_t) * (new_length + 1));
+		if ( new_data == NULL )
+			err(1, "malloc");
 		for ( size_t i = 0; i < editor->modal_used; i++ )
 			new_data[i] = editor->modal[i];
 		free(editor->modal);

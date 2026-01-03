@@ -20,6 +20,7 @@
 #include <sys/ioctl.h>
 
 #include <assert.h>
+#include <err.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -110,6 +111,8 @@ void update_terminal(FILE* fp,
 		size_t data_length = current->width * current->height;
 		size_t data_size = sizeof(struct terminal_datum) * data_length;
 		current->data = (struct terminal_datum*) malloc(data_size);
+		if ( current->data == NULL )
+			err(1, "malloc");
 		for ( size_t i = 0; i < data_length; i++ )
 			current->data[i].character = L' ',
 		current->data[i].vgacolor = 0;
@@ -139,6 +142,8 @@ void make_terminal_state(FILE* fp, struct terminal_state* state)
 	size_t data_length = state->width * state->height;
 	size_t data_size = sizeof(struct terminal_datum) * data_length;
 	state->data = (struct terminal_datum*) malloc(data_size);
+	if ( state->data == NULL )
+		err(1, "malloc");
 	for ( size_t i = 0; i < data_length; i++ )
 		state->data[i].character = L' ',
 		state->data[i].vgacolor = 0;

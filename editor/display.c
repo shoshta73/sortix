@@ -18,6 +18,7 @@
  * Display handling.
  */
 
+#include <err.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -90,6 +91,8 @@ struct display_char* expand_tabs(const wchar_t* str, size_t len, uint8_t* colors
 	size_t ret_len = displayed_string_length(str, len, tabsize);
 	struct display_char* ret = (struct display_char*)
 		malloc(sizeof(struct display_char) * (ret_len + 1));
+	if ( ret == NULL )
+		err(1, "malloc");
 	for ( size_t i = 0, j = 0; i < len; i++ )
 	{
 		uint8_t color = i < colors_len ? colors[i] : 7;

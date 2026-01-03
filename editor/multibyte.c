@@ -18,6 +18,7 @@
  */
 
 #include <assert.h>
+#include <err.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdlib.h>
@@ -59,7 +60,7 @@ wchar_t* convert_mbs_to_wcs(const char* mbs)
 
 	wchar_t* result = (wchar_t*) malloc(sizeof(wchar_t) * (wcs_length + 1));
 	if ( !result )
-		return NULL;
+		err(1, "malloc");
 
 	// Create the resulting string.
 	mbs_offset = 0;
@@ -125,7 +126,7 @@ char* convert_wcs_to_mbs(const wchar_t* wcs)
 
 	char* result = (char*) malloc(sizeof(char) * mbs_length);
 	if ( !result )
-		return NULL;
+		err(1, "malloc");
 
 	// Create the resulting string.
 	wcs_offset = 0;
