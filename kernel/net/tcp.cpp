@@ -1354,6 +1354,7 @@ void TCPSocket::ProcessPacket(Ref<Packet> pkt,
 				outgoing_syn = TCP_SPECIAL_ACKED;
 				state = TCP_STATE_ESTAB;
 				kthread_cond_broadcast(&receive_cond); // Wake up connect.
+				poll_channel.Signal(PollEventStatus());
 				return;
 			}
 		}
@@ -1574,6 +1575,7 @@ void TCPSocket::ProcessPacket(Ref<Packet> pkt,
 		if ( fin_was_acked )
 		{
 			state = TCP_STATE_FIN_WAIT_2;
+			poll_channel.Signal(PollEventStatus());
 			// Time out the connection if the socket is no longer referenced.
 			if ( !is_referenced )
 			{
@@ -1588,6 +1590,7 @@ void TCPSocket::ProcessPacket(Ref<Packet> pkt,
 		if ( fin_was_acked )
 		{
 			state = TCP_STATE_TIME_WAIT;
+			poll_channel.Signal(PollEventStatus());
 			deadline = timespec_make(-1, 0);
 			SetDeadline();
 			SetTimer();
@@ -1662,10 +1665,12 @@ void TCPSocket::ProcessPacket(Ref<Packet> pkt,
 		{
 			// Our sent FIN hasn't been ACK'd or we'd be in FIN_WAIT_2.
 			state = TCP_STATE_CLOSING;
+			poll_channel.Signal(PollEventStatus());
 		}
 		else if ( state == TCP_STATE_FIN_WAIT_2 )
 		{
 			state = TCP_STATE_TIME_WAIT;
+			poll_channel.Signal(PollEventStatus());
 			deadline = timespec_make(-1, 0);
 			SetDeadline();
 			SetTimer();
@@ -2294,6 +2299,7 @@ int TCPSocket::shutdown_unlocked(int how) // tcp_lock taken
 				state = TCP_STATE_FIN_WAIT_1;
 			kthread_cond_broadcast(&transmit_cond);
 			TransmitLoop();
+			poll_channel.Signal(PollEventStatus());
 		}
 	}
 	if ( how & SHUT_RD )
