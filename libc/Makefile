@@ -759,6 +759,7 @@ unistd/crypt_newhash.o \
 unistd/dup2.o \
 unistd/dup3.o \
 unistd/dup.o \
+unistd/__environ_malloced.o \
 unistd/environ.o \
 unistd/execle.o \
 unistd/execl.o \
