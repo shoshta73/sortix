@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2017, 2018, 2022, 2023 Jonas 'Sortie' Termansen.
+# Copyright (c) 2017, 2018, 2022, 2023, 2025 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -233,7 +233,7 @@ EOF
    printf 'function hook_initrd_post {\n'
    printf '  echo -n "Loading /boot/liveconfig.tar.xz (%s) ... "\n' \
            "$(human_size "$directory/boot/liveconfig.tar.xz")"
-   printf '  module /boot/liveconfig.tar.xz\n'
+   printf '  module2 /boot/liveconfig.tar.xz\n'
    printf '  echo done\n'
    printf '}\n'
  fi

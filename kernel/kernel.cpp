@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, 2021-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,6 +45,7 @@
 #include <sortix/kernel/inode.h>
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/ioctx.h>
+#include <sortix/kernel/kernel.h>
 #include <sortix/kernel/keyboard.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/log.h>
@@ -84,6 +85,7 @@
 #include "logterminal.h"
 #include "mouse/ps2.h"
 #include "multiboot.h"
+#include "multiboot2.h"
 #include "net/em/em.h"
 #include "net/fs.h"
 #include "net/lo/lo.h"
@@ -115,7 +117,7 @@ static void SystemIdleThread(void* user);
 
 static int argc;
 static char** argv;
-static multiboot_info_t* bootinfo;
+static struct boot_info boot_info;
 static const char* console = "tty1";
 static bool enable_em = true;
 static bool enable_network_drivers = true;
@@ -179,10 +181,14 @@ static void compact_arguments(int* argc, char*** argv)
 	}
 }
 
-extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
+extern "C" void KernelInit(unsigned long magic, void* boot_info_p)
 {
-	(void) magic;
-	bootinfo = bootinfo_p;
+	if ( magic == MULTIBOOT_BOOTLOADER_MAGIC )
+		boot_info.multiboot = (struct multiboot_info*) boot_info_p;
+	else if ( magic == MULTIBOOT2_BOOTLOADER_MAGIC )
+		boot_info.multiboot2 = (struct multiboot2_info*) boot_info_p;
+	else
+		Panic("Bad boot info magic");
 
 	//
 	// Stage 1. Initialization of Early Environment.
@@ -191,48 +197,28 @@ extern "C" void KernelInit(unsigned long magic, multiboot_info_t* bootinfo_p)
 	// TODO: Call global constructors using the _init function.
 
 	// Detect available physical memory.
-	Memory::Init(bootinfo);
+	Memory::Init(&boot_info);
 
 	// Initialize randomness from the random seed if provided.
-	Random::Init(bootinfo);
+	Random::Init(&boot_info);
 
 	// Initialize the kernel log.
-	Log::Init(bootinfo);
+	Log::Init(&boot_info);
 
-	char* cmdline = NULL;
-	if ( bootinfo->flags & MULTIBOOT_INFO_CMDLINE && bootinfo->cmdline )
-	{
-		addr_t physical_from = Page::AlignDown(bootinfo->cmdline);
-		size_t offset = bootinfo->cmdline - physical_from;
-		size_t desired = 16 * Page::Size();
-		size_t mapped = offset + desired;
-		addralloc_t alloc;
-		if ( !AllocateKernelAddress(&alloc, mapped) )
-			Panic("Failed to allocate virtual space for command line");
-		for ( size_t i = 0; i < mapped; i += Page::Size() )
-		{
-			if ( !Memory::Map(physical_from + i, alloc.from + i, PROT_KREAD) )
-				Panic("Failed to memory map command line");
-		}
-		char* bootloader_cmdline = (char*) (alloc.from + offset);
-		size_t cmdline_length = strnlen(bootloader_cmdline, desired);
-		if ( desired <= cmdline_length )
-			Panic("Kernel command line is too long");
-		if ( !(cmdline = strdup(bootloader_cmdline)) )
-			Panic("Failed to strdup command line");
-		for ( size_t i = 0; i < mapped; i += Page::Size() )
-			Memory::Unmap(alloc.from + i);
-		Memory::Flush();
-		FreeKernelAddress(&alloc);
-
-		Random::Mix(Random::SOURCE_WEAK, cmdline, strlen(cmdline));
-	}
-
-	if ( !(kernel_options = strdup(cmdline ? cmdline : "")) )
+	// Parse the command line options.
+	char* cmdline = strdup(boot_info.cmdline);
+	kernel_options = strdup(boot_info.cmdline);
+	if ( !cmdline || !kernel_options )
 		Panic("Failed to allocate kernel command line");
+
 #if defined(__i386__) || defined(__x86_64__)
-	// TODO: Detect EFI.
 	kernel_firmware = "bios";
+	if ( boot_info.multiboot2 &&
+	     (multiboot2_tag_lookup(boot_info.multiboot2,
+	                            MULTIBOOT2_TAG_TYPE_EFI32) ||
+	      multiboot2_tag_lookup(boot_info.multiboot2,
+	                            MULTIBOOT2_TAG_TYPE_EFI64)) )
+		kernel_firmware = "efi";
 #else
 	#warning "Name your system firmware here"
 	kernel_firmware = "unknown";
@@ -523,9 +509,7 @@ static void BootThread(void* /*user*/)
 		Panic("Unable to link /.. to /");
 
 	// Extract the initrds.
-	if ( bootinfo->mods_count == 0 )
-		Panic("No initrd was loaded");
-	ExtractModules(bootinfo, droot);
+	ExtractModules(&boot_info, droot);
 
 	//
 	// Stage 5. Loading and Initializing Core Drivers.

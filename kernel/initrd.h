@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,9 +26,11 @@ struct multiboot_info;
 
 namespace Sortix {
 
+struct boot_info;
+
 class Descriptor;
 
-void ExtractModules(struct multiboot_info* bootinfo, Ref<Descriptor> root);
+void ExtractModules(struct boot_info* boot_info, Ref<Descriptor> root);
 
 } // namespace Sortix
 

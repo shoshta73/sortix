@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015, 2017, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -25,9 +25,9 @@
 
 #include <sortix/kernel/decl.h>
 
-typedef struct multiboot_info multiboot_info_t;
-
 namespace Sortix {
+
+struct boot_info;
 
 class Process;
 
@@ -90,7 +90,7 @@ const addr_t PAT_WB = 0x06; // Writeback
 const addr_t PAT_UCM = 0x07; // Uncacheable, overruled by MTRR.
 const addr_t PAT_NUM = 0x08;
 
-void Init(multiboot_info_t* bootinfo);
+void Init(struct boot_info* boot_info);
 void InvalidatePage(addr_t addr);
 void Flush();
 addr_t Fork();

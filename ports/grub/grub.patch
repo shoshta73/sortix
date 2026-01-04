@@ -1392,9 +1392,9 @@ diff -Paur --no-dereference -- grub.upstream/util/grub.d/10_sortix.in grub/util/
 +  insmod part_$PARTMAP
 +  insmod $FS
 +  search --no-floppy --fs-uuid --set=root $HINTS_STRING $FS_UUID
-+  multiboot $BOOT_REL/sortix.bin --firmware=\$grub_platform $GRUB_CMDLINE_SORTIX
-+  module $OLD_BOOT_REL/random.seed --random-seed
-+  module $BOOT_REL/sortix.initrd
++  multiboot2 $BOOT_REL/sortix.bin --firmware=\$grub_platform $GRUB_CMDLINE_SORTIX
++  module2 $OLD_BOOT_REL/random.seed --random-seed
++  module2 $BOOT_REL/sortix.initrd
 +}
 +EOF
 +mv "$0.cache.new" "$0.cache"

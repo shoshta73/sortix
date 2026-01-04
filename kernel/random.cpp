@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, 2015, 2016, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2015, 2016, 2024, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -39,6 +39,7 @@
 #include <sortix/kernel/time.h>
 
 #include "multiboot.h"
+#include "multiboot2.h"
 
 // This is the entropy collection subsystem.
 //
@@ -88,15 +89,42 @@ static bool has_any_entropy;
 static bool has_new_record;
 static struct timespec last_stir_at;
 
-void Init(multiboot_info_t* bootinfo)
+static void SeedModule(addr_t phys_from, size_t size)
 {
+	// TODO: Make an early map facility that cannot fail and use it to map
+	//       the random seed.
+	// TODO: AllocateKernelAddress might invoke randomness in some way in
+	//       future.
+	addralloc_t addralloc;
+	if ( !AllocateKernelAddress(&addralloc, size) )
+		PanicF("Random::SeedModule AllocateKernelAddress failed: %m");
+	addr_t map_at = addralloc.from;
+	for ( size_t i = 0; i < size; i += Page::Size() )
+	{
+		if ( !Memory::Map(phys_from + i, map_at + i, PROT_KREAD | PROT_KWRITE) )
+			PanicF("Random::SeedModule Memory::Map failed: %m");
+	}
+	Memory::Flush();
+	unsigned char* seed = (unsigned char*) addralloc.from;
+	Mix(SOURCE_SEED, seed, size);
+	explicit_bzero(seed, size);
+	for ( size_t i = 0; i < size; i += Page::Size() )
+		Memory::Unmap(map_at + i);
+	Memory::Flush();
+	FreeKernelAddress(&addralloc);
+}
+
+static void InitMultiboot(struct boot_info* boot_info)
+{
+	struct multiboot_info* multiboot = boot_info->multiboot;
+
 	// Mix in the random seed if provided as a kernel module.
 	// TODO: This assumes the multiboot structures are accessible. That
 	//       assumption is wrong in general and we should map them ourselves in
 	//       manner that cannot fail.
 	struct multiboot_mod_list* modules =
-		(struct multiboot_mod_list*) (uintptr_t) bootinfo->mods_addr;
-	for ( uint32_t i = 0; i < bootinfo->mods_count; i++ )
+		(struct multiboot_mod_list*) (uintptr_t) multiboot->mods_addr;
+	for ( uint32_t i = 0; i < multiboot->mods_count; i++ )
 	{
 		struct multiboot_mod_list* module = &modules[i];
 		// TODO: This assumes module is mapped.
@@ -105,29 +133,37 @@ void Init(multiboot_info_t* bootinfo)
 		// TODO: This assumes cmdline is mapped.
 		if ( strcmp(cmdline, "--random-seed") != 0 )
 			continue;
-		// TODO: Make an early map facility that cannot fail and use it to map
-		//       the random seed.
-		// TODO: AllocateKernelAddress might invoke randomness in some way in
-		//       future.
-		addralloc_t addralloc;
-		if ( !AllocateKernelAddress(&addralloc, mod_size) )
-			PanicF("Random::Init AllocateKernelAddress failed: %m");
-		addr_t physfrom = module->mod_start;
-		addr_t mapat = addralloc.from;
-		for ( size_t i = 0; i < mod_size; i += Page::Size() )
-		{
-			if ( !Memory::Map(physfrom + i, mapat + i, PROT_KREAD | PROT_KWRITE) )
-				PanicF("Random::Init Memory::Map failed: %m");
-		}
-		Memory::Flush();
-		unsigned char* seed = (unsigned char*) addralloc.from;
-		Mix(SOURCE_SEED, seed, mod_size);
-		explicit_bzero(seed, mod_size);
-		for ( size_t i = 0; i < mod_size; i += Page::Size() )
-			Memory::Unmap(mapat + i);
-		Memory::Flush();
-		FreeKernelAddress(&addralloc);
+		SeedModule(module->mod_start, mod_size);
 	}
+	Random::Mix(Random::SOURCE_WEAK, boot_info->cmdline,
+	            strlen(boot_info->cmdline));
+}
+
+static void InitMultiboot2(struct boot_info* boot_info)
+{
+	struct multiboot2_tag* tag = multiboot2_tag_begin(boot_info->multiboot2);
+	while ( tag )
+	{
+		if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
+		{
+			struct multiboot2_tag_module* module =
+				(struct multiboot2_tag_module*) tag;
+			if ( !strcmp(module->cmdline, "--random-seed") )
+				SeedModule(module->mod_start,
+				           module->mod_end - module->mod_start);
+		}
+		tag = multiboot2_tag_next(tag);
+	}
+	Random::Mix(Random::SOURCE_WEAK, boot_info->multiboot2,
+	            boot_info->multiboot2->total_size);
+}
+
+void Init(struct boot_info* boot_info)
+{
+	if ( boot_info->multiboot )
+		InitMultiboot(boot_info);
+	else if ( boot_info->multiboot2 )
+		InitMultiboot2(boot_info);
 }
 
 int GetFallbackStatus()

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2012, 2014-2015, 2017, 2022-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2012, 2014-2015, 2017, 2022-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -23,6 +23,7 @@
 
 #include <sortix/mman.h>
 
+#include <sortix/kernel/addralloc.h>
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/kthread.h>
 #include <sortix/kernel/memorymanagement.h>
@@ -32,8 +33,11 @@
 #include <sortix/kernel/syscall.h>
 
 #include "multiboot.h"
+#include "multiboot2.h"
 #include "memorymanagement.h"
 #include "msr.h"
+
+extern "C" unsigned char multiboot2_pages[2 * 4096];
 
 namespace Sortix {
 
@@ -61,6 +65,38 @@ namespace Memory {
 
 addr_t PAT2PMLFlags[PAT_NUM];
 
+static addr_t multiboot2_page = (addr_t) -1;
+static size_t multiboot2_size;
+
+// We need to map the arbitrarily sized sized multiboot information into virtual
+// memory before we're able to allocate memory, since it provides the memory
+// map. We need to operate on it using O(1) memory, and the solution is to
+// simply map a window of it and act on at most a page worth of data at a time.
+// Since the data structures are not always page aligned, we actually map two
+// pages so it's always safe to access one page of data regardless of the offset
+// inside the physical page.
+static unsigned char* Multiboot2Map(addr_t physical)
+{
+	addr_t page = Page::AlignDown(physical);
+	size_t offset = physical & (4096UL - 1);
+	// Update the multiboot window if we need to map another page.
+	if ( page != multiboot2_page )
+	{
+		int prot = PROT_KREAD;
+		uintptr_t virt = (uintptr_t) multiboot2_pages;
+		Memory::Map(page + 0 * 4096UL, virt + 0 * 4096UL, prot);
+		Memory::Map(page + 1 * 4096UL, virt + 1 * 4096UL, prot);
+		Flush();
+		multiboot2_page = page;
+	}
+	return &multiboot2_pages[offset];
+}
+
+// Check whether an address conflicts with an used object in physical memory,
+// and calculate the distance to the end of the conflict if conflicting, or the
+// distance to the object if non-conflicting. This function lets us iterate the
+// physical address space while skipping pages that are already used, while
+// using O(1) memory before memory allocation is online.
 static bool CheckUsedRange(addr_t test,
                            addr_t from_unaligned,
                            size_t size_unaligned,
@@ -76,6 +112,7 @@ static bool CheckUsedRange(addr_t test,
 	return false;
 }
 
+// Check if an address collides with a string.
 static bool CheckUsedString(addr_t test,
                             const char* string,
                             size_t* dist_ptr)
@@ -84,28 +121,25 @@ static bool CheckUsedString(addr_t test,
 	return CheckUsedRange(test, (addr_t) string, size, dist_ptr);
 }
 
-static bool CheckUsedRanges(multiboot_info_t* bootinfo,
-                            addr_t test,
-                            size_t* dist_ptr)
+// Check if an address collides with the multiboot information.
+static bool CheckUsedRangesMultiboot(struct multiboot_info* multiboot,
+                                     addr_t test,
+                                     size_t* dist_ptr)
 {
-	addr_t kernel_end = (addr_t) &end;
-	if ( CheckUsedRange(test, 0, kernel_end, dist_ptr) )
+	if ( CheckUsedRange(test, (addr_t) multiboot, sizeof(*multiboot), dist_ptr) )
 		return true;
 
-	if ( CheckUsedRange(test, (addr_t) bootinfo, sizeof(*bootinfo), dist_ptr) )
-		return true;
-
-	const char* cmdline = (const char*) (uintptr_t) bootinfo->cmdline;
+	const char* cmdline = (const char*) (uintptr_t) multiboot->cmdline;
 	if ( CheckUsedString(test, cmdline, dist_ptr) )
 		return true;
 
-	size_t mods_size = bootinfo->mods_count * sizeof(struct multiboot_mod_list);
-	if ( CheckUsedRange(test, bootinfo->mods_addr, mods_size, dist_ptr) )
+	size_t mods_size = multiboot->mods_count * sizeof(struct multiboot_mod_list);
+	if ( CheckUsedRange(test, multiboot->mods_addr, mods_size, dist_ptr) )
 		return true;
 
 	struct multiboot_mod_list* modules =
-		(struct multiboot_mod_list*) (uintptr_t) bootinfo->mods_addr;
-	for ( uint32_t i = 0; i < bootinfo->mods_count; i++ )
+		(struct multiboot_mod_list*) (uintptr_t) multiboot->mods_addr;
+	for ( uint32_t i = 0; i < multiboot->mods_count; i++ )
 	{
 		struct multiboot_mod_list* module = &modules[i];
 		assert(module->mod_start <= module->mod_end);
@@ -117,18 +151,268 @@ static bool CheckUsedRanges(multiboot_info_t* bootinfo,
 			return true;
 	}
 
-	if ( CheckUsedRange(test, bootinfo->mmap_addr, bootinfo->mmap_length,
+	if ( CheckUsedRange(test, multiboot->mmap_addr, multiboot->mmap_length,
 	                      dist_ptr) )
 		return true;
 
 	return false;
 }
 
-void Init(multiboot_info_t* bootinfo)
+// Check if an address collides with the multiboot 2 information.
+static bool CheckUsedRangesMultiboot2(struct multiboot2_info* multiboot2_phys,
+                                      addr_t test,
+                                      size_t* dist_ptr)
 {
-	if ( !(bootinfo->flags & MULTIBOOT_INFO_MEM_MAP) )
+	addr_t physical = (addr_t) multiboot2_phys;
+	unsigned char* ptr = Multiboot2Map(physical);
+	struct multiboot2_info* multiboot2 = (struct multiboot2_info*) ptr;
+
+	if ( CheckUsedRange(test, (addr_t) multiboot2_phys, multiboot2->total_size,
+	                    dist_ptr) )
+		return true;
+
+	physical += sizeof(*multiboot2);
+	physical = -(-physical & ~7UL);
+
+	// Carefully iterate the multiboot 2 information using the multiboot window,
+	// and check for collision with any known objects that we wish to save for
+	// later. See the InitMultiboot2 comment for information on the approach.
+	while ( true )
+	{
+		unsigned char* ptr = Multiboot2Map(physical);
+		struct multiboot2_tag* tag = (struct multiboot2_tag*) ptr;
+		if ( tag->type == 0 )
+			break;
+		if ( tag->type == MULTIBOOT2_TAG_TYPE_MODULE )
+		{
+			struct multiboot2_tag_module* module =
+				(struct multiboot2_tag_module*) tag;
+			assert(module->mod_start <= module->mod_end);
+			size_t mod_size = module->mod_end - module->mod_start;
+			if ( CheckUsedRange(test, module->mod_start, mod_size, dist_ptr) )
+				return true;
+		}
+		physical += tag->size;
+		physical = -(-physical & ~7UL);
+	}
+
+	return false;
+}
+
+// Check if an address collides with any objects we'll use later.
+static bool CheckUsedRanges(struct boot_info* boot_info,
+                            addr_t test,
+                            size_t* dist_ptr)
+{
+	addr_t kernel_end = (addr_t) &end;
+	if ( CheckUsedRange(test, 0, kernel_end, dist_ptr) )
+		return true;
+
+	if ( CheckUsedRange(test, (addr_t) boot_info, sizeof(*boot_info), dist_ptr) )
+		return true;
+
+	if ( boot_info->multiboot &&
+	     CheckUsedRangesMultiboot(boot_info->multiboot, test, dist_ptr) )
+		return true;
+
+	if ( boot_info->multiboot2 &&
+	     CheckUsedRangesMultiboot2(boot_info->multiboot2, test, dist_ptr) )
+		return true;
+
+	return false;
+}
+
+// A memory map region has been found, process it for page allocation.
+static void OnMemoryRegion(struct boot_info* boot_info,
+                           uint64_t addr,
+                           uint64_t size,
+                           uint32_t type)
+{
+	// Check that we can use this kind of RAM.
+	if ( type != 1 )
+		return;
+
+	// Truncate the memory area if needed.
+#if defined(__i386__)
+	if ( 0xFFFFFFFFULL < addr )
+		return;
+	if ( 0xFFFFFFFFULL < addr + size )
+		size = 0x100000000ULL - addr;
+#endif
+
+	// Properly page align the entry if needed.
+	// TODO: Is the bootloader required to page align this? This could be
+	//       raw BIOS data that might not be page aligned? But that would
+	//       be a silly computer.
+	addr_t base_unaligned = (addr_t) addr;
+	addr_t base = Page::AlignUp(base_unaligned);
+	if ( size < base - base_unaligned )
+		return;
+	size_t length_unaligned = size - (base - base_unaligned);
+	size_t length = Page::AlignDown(length_unaligned);
+	if ( !length )
+		return;
+
+	// Count the amount of usable RAM.
+	Page::totalmem += length;
+
+	// Give all the physical memory to the physical memory allocator, but make
+	// sure not to give it things we already use.
+	addr_t processed = base;
+	while ( processed < base + length )
+	{
+		// If the address collides with an object, skip it, otherwise add the
+		// memory until the next collision (if any).
+		size_t distance = base + length - processed;
+		if ( !CheckUsedRanges(boot_info, processed, &distance) )
+			Page::InitPushRegion(processed, distance);
+		processed += distance;
+	}
+}
+
+// Iterate the memory map using the multiboot 1 information.
+// TODO: This assumes the multiboot structures are accessible. That assumption
+//       is wrong in general and we should map them ourselves in manner that
+//       cannot fail. That's a bit tricky because multiboot structure contains
+//       various pointers to physical memory. However, the multiboot 2
+//       implementation does not have this problem and multiboot 1 support will
+//       be removed after the next stable release.
+static void InitMultiboot(struct boot_info* boot_info)
+{
+	struct multiboot_info* multiboot = boot_info->multiboot;
+
+	if ( !(multiboot->flags & MULTIBOOT_INFO_MEM_MAP) )
 		Panic("The memory map flag was't set in the multiboot structure.");
 
+	typedef const multiboot_memory_map_t* mmap_t;
+
+	// Loop over every detected memory region.
+	for ( mmap_t mmap = (mmap_t) (addr_t) multiboot->mmap_addr;
+	      (addr_t) mmap < multiboot->mmap_addr + multiboot->mmap_length;
+	      mmap = (mmap_t) ((addr_t) mmap + mmap->size + sizeof(mmap->size)) )
+	{
+		Random::Mix(Random::SOURCE_WEAK, mmap, sizeof(*mmap));
+		OnMemoryRegion(boot_info, mmap->addr, mmap->len, mmap->type);
+	}
+}
+
+// Iterate the memory map using the multiboot 2 information.
+static void InitMultiboot2(struct boot_info* boot_info)
+{
+	addr_t physical = (addr_t) boot_info->multiboot2;
+	bool got_header = false;
+	bool got_tag = false;
+	size_t entries_left = 0;
+	size_t entry_size = 0;
+
+	// The multiboot 2 information has an arbitrary size, and we cannot allocate
+	// memory yet because we don't know what memory is available yet, and we
+	// can't map arbitrarily sized objects yet because that may require PMLs
+	// that require pages (that we don't have yet). Fortunately we can iterate
+	// the information using fixed sized objects that are smaller than the page
+	// size using a sliding window mapping the multiboot information.
+	while ( true )
+	{
+		unsigned char* ptr = Multiboot2Map(physical);
+		// The header tells us the size of the multiboot 2 information, which is
+		// stored for later, so we can map the entire object when memory
+		// allocation is online.
+		if ( !got_header )
+		{
+			struct multiboot2_info* multiboot2 = (struct multiboot2_info*) ptr;
+			multiboot2_size = multiboot2->total_size;
+			got_header = true;
+			physical += sizeof(*multiboot2);
+			physical = -(-physical & ~7UL);
+			continue;
+		}
+		// Look for the memory map tag and skip past else.
+		if ( !got_tag )
+		{
+			struct multiboot2_tag* tag = (struct multiboot2_tag*) ptr;
+			if ( tag->type == 0 )
+				Panic("The memory map wasn't in the multiboot2 structure");
+			if ( tag->type != MULTIBOOT2_TAG_TYPE_MMAP )
+			{
+				physical += tag->size;
+				physical = -(-physical & ~7UL);
+				continue;
+			}
+			struct multiboot2_tag_mmap* mmap =
+				(struct multiboot2_tag_mmap*) tag;
+			physical += sizeof(*mmap);
+			entry_size = mmap->entry_size;
+			entries_left = (mmap->size - sizeof(*mmap)) / entry_size;
+			got_tag = true;
+			continue;
+		}
+		// Process one memory map entry at a time. The entries are 24 bytes,
+		// which may cross a page boundary, which is why Multiboot2Map uses two
+		// pages to ensure we can always access up to one page worth of data
+		// from our current physical offset.
+		if ( !entries_left )
+			break;
+		struct multiboot2_mmap_entry* entry =
+			(struct multiboot2_mmap_entry*) ptr;
+		OnMemoryRegion(boot_info, entry->addr, entry->len, entry->type);
+		physical += entry_size;
+		entries_left--;
+	}
+}
+
+// Initialize multiboot 1 things now that memory allocation is online.
+static void PostInitMultiboot(struct boot_info* boot_info)
+{
+	// Map the kernel command line into memory.
+	uintptr_t physical = (addr_t) boot_info->multiboot->cmdline;
+	uintptr_t info_page = Page::AlignDown(physical);
+	uintptr_t info_offset = physical & (4096UL - 1);
+	size_t cmdline_limit = 16 * Page::Size();
+	uintptr_t info_size = Page::AlignUp(info_offset + cmdline_limit);
+	addralloc_t alloc;
+	if ( !AllocateKernelAddress(&alloc, info_size) )
+		Panic("Failed to allocate virtual space for multiboot cmdline");
+	for ( size_t i = 0; i < info_size; i += Page::Size() )
+	{
+		int prot = PROT_KREAD;
+		if ( !Memory::Map(info_page + i, alloc.from + i, prot) )
+			Panic("Failed to memory map multiboot cmdline");
+	}
+	Flush();
+	boot_info->cmdline = (char*) (alloc.from + info_offset);
+}
+
+// Initialize multiboot 2 things now that memory allocation is online.
+static void PostInitMultiboot2(struct boot_info* boot_info)
+{
+	// Map the entire multiboot 2 information into memory.
+	uintptr_t physical = (addr_t) boot_info->multiboot2;
+	uintptr_t info_page = Page::AlignDown(physical);
+	uintptr_t info_offset = physical & (4096UL - 1);
+	uintptr_t info_size = Page::AlignUp(info_offset + multiboot2_size);
+	addralloc_t alloc;
+	if ( !AllocateKernelAddress(&alloc, info_size) )
+		Panic("Failed to allocate virtual space for multiboot information");
+	for ( size_t i = 0; i < info_size; i += Page::Size() )
+	{
+		int prot = PROT_KREAD;
+		if ( !Memory::Map(info_page + i, alloc.from + i, prot) )
+			Panic("Failed to memory map multiboot information");
+	}
+	Flush();
+	struct multiboot2_info* multiboot2 =
+		(struct multiboot2_info*) (alloc.from + info_offset);
+	boot_info->multiboot2 = multiboot2;
+
+	// Locate the kernel command line.
+	struct multiboot2_tag_string* cmdline_tag = (struct multiboot2_tag_string*)
+		multiboot2_tag_lookup(multiboot2, MULTIBOOT2_TAG_TYPE_CMDLINE);
+	boot_info->cmdline = cmdline_tag ? cmdline_tag->string : "";
+}
+
+// Initialize memory allocation using the boot information.
+void Init(struct boot_info* boot_info)
+{
 	// If supported, setup the Page Attribute Table feature that allows
 	// us to control the memory type (caching) of memory more precisely.
 	if ( IsPATSupported() )
@@ -151,56 +435,11 @@ void Init(multiboot_info_t* bootinfo)
 		PAT2PMLFlags[PAT_UCM] = PML_NOCACHE;
 	}
 
-	typedef const multiboot_memory_map_t* mmap_t;
-
-	// Loop over every detected memory region.
-	for ( mmap_t mmap = (mmap_t) (addr_t) bootinfo->mmap_addr;
-	      (addr_t) mmap < bootinfo->mmap_addr + bootinfo->mmap_length;
-	      mmap = (mmap_t) ((addr_t) mmap + mmap->size + sizeof(mmap->size)) )
-	{
-		Random::Mix(Random::SOURCE_WEAK, mmap, sizeof(*mmap));
-
-		// Check that we can use this kind of RAM.
-		if ( mmap->type != 1 )
-			continue;
-
-		// Truncate the memory area if needed.
-		uint64_t mmap_addr = mmap->addr;
-		uint64_t mmap_len = mmap->len;
-#if defined(__i386__)
-		if ( 0xFFFFFFFFULL < mmap_addr )
-			continue;
-		if ( 0xFFFFFFFFULL < mmap_addr + mmap_len )
-			mmap_len = 0x100000000ULL - mmap_addr;
-#endif
-
-		// Properly page align the entry if needed.
-		// TODO: Is the bootloader required to page align this? This could be
-		//       raw BIOS data that might not be page aligned? But that would
-		//       be a silly computer.
-		addr_t base_unaligned = (addr_t) mmap_addr;
-		addr_t base = Page::AlignUp(base_unaligned);
-		if ( mmap_len < base - base_unaligned )
-			continue;
-		size_t length_unaligned = mmap_len - (base - base_unaligned);
-		size_t length = Page::AlignDown(length_unaligned);
-		if ( !length )
-			continue;
-
-		// Count the amount of usable RAM.
-		Page::totalmem += length;
-
-		// Give all the physical memory to the physical memory allocator
-		// but make sure not to give it things we already use.
-		addr_t processed = base;
-		while ( processed < base + length )
-		{
-			size_t distance = base + length - processed;
-			if ( !CheckUsedRanges(bootinfo, processed, &distance) )
-				Page::InitPushRegion(processed, distance);
-			processed += distance;
-		}
-	}
+	// Detect available memory using the boot protocol in use.
+	if ( boot_info->multiboot )
+		InitMultiboot(boot_info);
+	else if ( boot_info->multiboot2 )
+		InitMultiboot2(boot_info);
 
 	// Prepare the non-forkable kernel PMLs such that forking the kernel address
 	// space will always keep the kernel mapped.
@@ -221,6 +460,20 @@ void Init(multiboot_info_t* bootinfo)
 		InvalidatePage(pmladdr);
 		memset((void*) pmladdr, 0, sizeof(PML));
 	}
+
+	// Memory allocation is now online and the boot protocol can now allocate.
+	if ( boot_info->multiboot )
+		PostInitMultiboot(boot_info);
+	else if ( boot_info->multiboot2 )
+		PostInitMultiboot2(boot_info);
+
+	// The physical pages in the location of the virtual address space for the
+	// multiboot window are actually never used and can be allocated.
+	uintptr_t mb2_pages = (uintptr_t) multiboot2_pages;
+	Unmap(mb2_pages + 0);
+	Unmap(mb2_pages + 4096);
+	Page::Put(mb2_pages + 0, PAGE_USAGE_WASNT_ALLOCATED);
+	Page::Put(mb2_pages + 4096, PAGE_USAGE_WASNT_ALLOCATED);
 }
 
 void Statistics(size_t* used, size_t* total, size_t* purposes)
@@ -542,7 +795,6 @@ void InvalidatePage(addr_t /*addr*/)
 	// TODO: Actually just call the instruction.
 	Flush();
 }
-
 
 addr_t GetAddressSpace()
 {

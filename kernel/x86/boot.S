@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2015, 2016, 2018, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014-2016, 2018, 2025-2026 Jonas 'Sortie' Termansen.
  * Copyright (c) 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -21,16 +21,59 @@
 
 .section .text.unlikely
 
+	# TODO: After releasing Sortix 1.1, remote multiboot 1 support.
 	# Multiboot header.
 	.align 4
+multiboot:
 	.long 0x1BADB002 # Magic.
 	.long 0x00000007 # Flags.
-	.long -(0x1BADB002 + 0x00000007) # Checksum.
+	.long -(0x1BADB002 + 0x00000007) # Checksum
 	.skip 32-12
 	.long 0 # Mode
 	.long 0 # Width
 	.long 0 # Height
 	.long 0 # Depth
+.size multiboot, . - multiboot
+.Lmultiboot_end:
+
+	# Multiboot2 header.
+	.align 8
+multiboot2:
+	.long 0xE85250D6 # Magic
+	.long 0x0 # Architecture (i386)
+	.long .Lmultiboot2_end - multiboot2 # Length
+	.long -(0xE85250D6 + 0x0 + .Lmultiboot2_end - multiboot2) # Checksum
+
+	.align 8
+	.short 5 # Framebuffer tag
+	.short 0x0 # Flags (optional)
+	.long 20 # Size
+	.long 0 # Width (no prefernece)
+	.long 0 # Height (no prefernece)
+	.long 32 # Depth
+
+.Lmbi_start:
+	.align 8
+	.short 1 # Multiboot2 information request tag
+	.short 0x0 # Flags (mandatory)
+	.long .Lmbi_end - .Lmbi_start # Size
+	.long 1 # Boot command line
+	.long 3 # Modules
+	.long 6 # Memory map
+	.long 8 # Framebuffer info
+.Lmbi_end:
+
+	.align 8
+	.short 6 # Module alignment tag
+	.short 0x0 # Flags (mandatory)
+	.long 8 # Size
+
+	.align 8
+	.short 0 # End tag
+	.short 0x0 # Flags (mandatory)
+	.long 8 # Size
+.size multiboot2, . - multiboot2
+.Lmultiboot2_end:
 
 .section .bss, "aw", @nobits
 	.align 4096
@@ -45,6 +88,9 @@ physpml1:
 physpml0:
 	.skip 4096
 nullpage: .global nullpage
+	.skip 4096
+multiboot2_pages: .global multiboot2_pages
+	.skip 4096
 	.skip 4096
 
 .section .text

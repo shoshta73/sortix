@@ -25,8 +25,6 @@
 
 #include "x86-family/memorymanagement.h"
 
-#include "multiboot.h"
-
 namespace Sortix {
 namespace Page {
 

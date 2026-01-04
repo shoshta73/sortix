@@ -23,7 +23,6 @@
 #include <sortix/kernel/kernel.h>
 #include <sortix/kernel/memorymanagement.h>
 
-#include "multiboot.h"
 #include "x86-family/memorymanagement.h"
 
 namespace Sortix {
