@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -14,7 +14,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * stdlib/clearenv.c
- * Clear the environment and set environ to NULL.
+ * Clear the environment.
  */
 
 #include <stdlib.h>
@@ -22,13 +22,14 @@
 
 int clearenv(void)
 {
+	if ( !environ )
+		return 0;
 	if ( environ == __environ_malloced )
 	{
 		for ( size_t i = 0; environ[i]; i++ )
 			free(environ[i]);
-		free(environ);
-		__environ_malloced = NULL;
+		__environ_used = 0;
 	}
-	environ = NULL;
+	*environ = NULL;
 	return 0;
 }

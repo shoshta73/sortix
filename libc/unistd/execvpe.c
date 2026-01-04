@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2025 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,8 @@
 // TODO: Move this to some generic environment interface.
 static const char* LookupEnvironment(const char* name, char* const* envp)
 {
+	if ( !envp )
+		return NULL;
 	size_t equalpos = strcspn(name, "=");
 	if ( name[equalpos] == '=' )
 		return NULL;
