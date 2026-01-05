@@ -9,4 +9,4 @@ UPSTREAM_SITE=https://ftp.gnu.org/gnu/gawk
 UPSTREAM_ARCHIVE=$ARCHIVE
 LICENSE=GPL-3.0-or-later
 BUILD_SYSTEM=configure
-POST_INSTALL=tix-eradicate-libtool-la
+POST_INSTALL=../gawk.post-install
