@@ -1,0 +1,5 @@
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
+rm -f "$TIX_INSTALL_DIR$PREFIX/share/info/dir"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/doc/automake"
