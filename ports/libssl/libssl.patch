@@ -1,7 +1,7 @@
 diff -Paur --no-dereference -- libssl.upstream/Makefile.in libssl/Makefile.in
 --- libssl.upstream/Makefile.in
 +++ libssl/Makefile.in
-@@ -892,7 +892,7 @@
+@@ -912,7 +912,7 @@
  	@if [ "@OPENSSLDIR@x" != "x" ]; then \
  		OPENSSLDIR="$(DESTDIR)@OPENSSLDIR@"; \
  	else \
@@ -10,7 +10,7 @@ diff -Paur --no-dereference -- libssl.upstream/Makefile.in libssl/Makefile.in
  	fi; \
  	mkdir -p "$$OPENSSLDIR/certs"; \
  	for i in cert.pem openssl.cnf x509v3.cnf; do \
-@@ -907,7 +907,7 @@
+@@ -927,7 +927,7 @@
  	@if [ "@OPENSSLDIR@x" != "x" ]; then \
  		OPENSSLDIR="$(DESTDIR)@OPENSSLDIR@"; \
  	else \
@@ -33,7 +33,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  
  #include <ctype.h>
  #include <err.h>
-@@ -467,8 +470,12 @@
+@@ -470,8 +473,12 @@
  		} else {
  			strlcpy(unix_dg_tmp_socket_buf, "/tmp/nc.XXXXXXXXXX",
  			    UNIX_DG_TMP_SOCKET_SIZE);
@@ -47,17 +47,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  			unix_dg_tmp_socket = unix_dg_tmp_socket_buf;
  		}
  	}
-@@ -1387,7 +1394,8 @@
- 	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
- 	memset(&iov, 0, sizeof(iov));
- 
--	mh.msg_control = (caddr_t)&cmsgbuf.buf;
-+	/* PATCH: Sortix doesn't have the non-standard caddr_t type. */
-+	mh.msg_control = (char*)&cmsgbuf.buf;
- 	mh.msg_controllen = sizeof(cmsgbuf.buf);
- 	cmsg = CMSG_FIRSTHDR(&mh);
- 	cmsg->cmsg_len = CMSG_LEN(sizeof(int));
-@@ -1424,6 +1432,7 @@
+@@ -1429,6 +1436,7 @@
  void
  atelnet(int nfd, unsigned char *buf, unsigned int size)
  {
@@ -65,7 +55,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	unsigned char *p, *end;
  	unsigned char obuf[4];
  
-@@ -1449,6 +1458,9 @@
+@@ -1454,6 +1462,9 @@
  		if (atomicio(vwrite, nfd, obuf, 3) != 3)
  			warn("Write Error!");
  	}
@@ -75,7 +65,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  }
  
  int
-@@ -1592,16 +1604,20 @@
+@@ -1597,16 +1608,20 @@
  			err(1, NULL);
  	}
  	if (Tflag != -1) {
@@ -98,7 +88,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  			errno = ENOPROTOOPT;
  			err(1, "set IPv6 traffic class not supported");
  		}
-@@ -1619,13 +1635,16 @@
+@@ -1624,13 +1639,16 @@
  	}
  
  	if (ttl != -1) {
@@ -117,7 +107,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  	}
  
  	if (minttl != -1) {
-@@ -1663,7 +1682,9 @@
+@@ -1668,7 +1686,9 @@
  		{ "af41",		IPTOS_DSCP_AF41 },
  		{ "af42",		IPTOS_DSCP_AF42 },
  		{ "af43",		IPTOS_DSCP_AF43 },
@@ -127,7 +117,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/nc/netcat.c libssl/apps/nc/n
  		{ "cs0",		IPTOS_DSCP_CS0 },
  		{ "cs1",		IPTOS_DSCP_CS1 },
  		{ "cs2",		IPTOS_DSCP_CS2 },
-@@ -1673,11 +1694,21 @@
+@@ -1678,11 +1698,21 @@
  		{ "cs6",		IPTOS_DSCP_CS6 },
  		{ "cs7",		IPTOS_DSCP_CS7 },
  		{ "ef",			IPTOS_DSCP_EF },
@@ -199,9 +189,9 @@ diff -Paur --no-dereference -- libssl.upstream/apps/openssl/certhash.c libssl/ap
 diff -Paur --no-dereference -- libssl.upstream/apps/openssl/s_socket.c libssl/apps/openssl/s_socket.c
 --- libssl.upstream/apps/openssl/s_socket.c
 +++ libssl/apps/openssl/s_socket.c
-@@ -73,6 +73,23 @@
+@@ -71,6 +71,23 @@
  
- #include "s_apps.h"
+ #include <openssl/ssl.h>
  
 +/* PATCH: The server below only supports IPv4 and only uses the obsolete
 +          gethostbyname and gethostbyaddr instead of the getaddrinfo
@@ -226,7 +216,7 @@ diff -Paur --no-dereference -- libssl.upstream/apps/openssl/s_socket.c libssl/ap
 diff -Paur --no-dereference -- libssl.upstream/configure libssl/configure
 --- libssl.upstream/configure
 +++ libssl/configure
-@@ -12178,6 +12178,10 @@
+@@ -12473,6 +12473,10 @@
  		HOST_OS=midipix
  		CPPFLAGS="$CPPFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
  		;;
@@ -240,7 +230,7 @@ diff -Paur --no-dereference -- libssl.upstream/configure libssl/configure
 diff -Paur --no-dereference -- libssl.upstream/crypto/Makefile.in libssl/crypto/Makefile.in
 --- libssl.upstream/crypto/Makefile.in
 +++ libssl/crypto/Makefile.in
-@@ -92,7 +92,7 @@
+@@ -124,7 +124,7 @@
  @ENABLE_LIBTLS_ONLY_TRUE@am__append_1 = libcrypto.la
  @HAVE_EXPLICIT_BZERO_FALSE@am__append_2 = libcompatnoopt.la
  @OPENSSLDIR_DEFINED_TRUE@am__append_3 = -DOPENSSLDIR=\"@OPENSSLDIR@\"
@@ -249,12 +239,13 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/Makefile.in libssl/crypto/
  
  # compatibility functions that need to be built without optimizations
  @HAVE_EXPLICIT_BZERO_FALSE@am__append_5 = libcompatnoopt.la
-@@ -1448,7 +1448,8 @@
+@@ -1457,7 +1457,9 @@
  CC = @CC@
  CCAS = @CCAS@
  CCASDEPMODE = @CCASDEPMODE@
 -CCASFLAGS = @CCASFLAGS@
-+# TODO: sortix-binutils-1.1-rc3 is too old for endbr64.
++# TODO: After releasing Sortix 1.1, remove this workaround, since
++#       sortix-binutils-1.1-rc3 is too old for endbr64.
 +CCASFLAGS = @CCASFLAGS@ -Dendbr64=
  CCDEPMODE = @CCDEPMODE@
  CFLAGS = @CFLAGS@
@@ -262,9 +253,9 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/Makefile.in libssl/crypto/
 diff -Paur --no-dereference -- libssl.upstream/crypto/bio/b_sock.c libssl/crypto/bio/b_sock.c
 --- libssl.upstream/crypto/bio/b_sock.c
 +++ libssl/crypto/bio/b_sock.c
-@@ -34,6 +34,21 @@
- #include <openssl/buffer.h>
- #include <openssl/err.h>
+@@ -35,6 +35,21 @@
+ 
+ #include "err_local.h"
  
 +/* PATCH: Sortix intentionally doesn't have the obsolete gethostbyname family
 +          but only the modern getaddrinfo(3) family. Actually none of my ports
@@ -299,14 +290,14 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/bio/bss_bio.c libssl/crypt
  #include <assert.h>
  #include <limits.h>
  #include <stdlib.h>
-diff -Paur --no-dereference -- libssl.upstream/crypto/cryptlib.h libssl/crypto/cryptlib.h
---- libssl.upstream/crypto/cryptlib.h
-+++ libssl/crypto/cryptlib.h
-@@ -72,6 +72,13 @@
+diff -Paur --no-dereference -- libssl.upstream/crypto/crypto_local.h libssl/crypto/crypto_local.h
+--- libssl.upstream/crypto/crypto_local.h
++++ libssl/crypto/crypto_local.h
+@@ -76,6 +76,13 @@
  #define X509_CERT_DIR_EVP        "SSL_CERT_DIR"
  #define X509_CERT_FILE_EVP       "SSL_CERT_FILE"
  
-+// PATCH: Search /etc/default/ssl if /etc/ssl doesn't exist.
++/* PATCH: Search /etc/default/ssl if /etc/ssl doesn't exist. */
 +#ifdef OPENSSLDIR_DEFAULT
 +#define X509_CERT_AREA_DEFAULT	OPENSSLDIR_DEFAULT
 +#define X509_CERT_DIR_DEFAULT	OPENSSLDIR_DEFAULT "/certs"
@@ -319,15 +310,17 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/cryptlib.h libssl/crypto/c
 diff -Paur --no-dereference -- libssl.upstream/crypto/x509/x509_def.c libssl/crypto/x509/x509_def.c
 --- libssl.upstream/crypto/x509/x509_def.c
 +++ libssl/crypto/x509/x509_def.c
-@@ -57,6 +57,7 @@
-  */
+@@ -60,6 +60,9 @@
  
- #include <stdio.h>
+ #include "crypto_local.h"
+ 
++/* PATCH: Search /etc/default/ssl if /etc/ssl doesn't exist. */
 +#include <unistd.h>
- #include "cryptlib.h"
- #include <openssl/crypto.h>
- #include <openssl/x509.h>
-@@ -71,6 +72,10 @@
++
+ const char *
+ X509_get_default_private_dir(void)
+ {
+@@ -70,6 +73,10 @@
  const char *
  X509_get_default_cert_area(void)
  {
@@ -335,10 +328,10 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/x509/x509_def.c libssl/cry
 +	if (access(X509_CERT_AREA, F_OK) == -1)
 +		return X509_CERT_AREA_DEFAULT;
 +#endif
- 	return (X509_CERT_AREA);
+ 	return X509_CERT_AREA;
  }
  LCRYPTO_ALIAS(X509_get_default_cert_area);
-@@ -78,6 +83,10 @@
+@@ -77,6 +84,10 @@
  const char *
  X509_get_default_cert_dir(void)
  {
@@ -346,10 +339,10 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/x509/x509_def.c libssl/cry
 +	if (access(X509_CERT_DIR, F_OK) == -1)
 +		return X509_CERT_DIR_DEFAULT;
 +#endif
- 	return (X509_CERT_DIR);
+ 	return X509_CERT_DIR;
  }
  LCRYPTO_ALIAS(X509_get_default_cert_dir);
-@@ -85,6 +94,10 @@
+@@ -84,6 +95,10 @@
  const char *
  X509_get_default_cert_file(void)
  {
@@ -357,13 +350,13 @@ diff -Paur --no-dereference -- libssl.upstream/crypto/x509/x509_def.c libssl/cry
 +	if (access(X509_CERT_FILE, F_OK) == -1)
 +		return X509_CERT_FILE_DEFAULT;
 +#endif
- 	return (X509_CERT_FILE);
+ 	return X509_CERT_FILE;
  }
  LCRYPTO_ALIAS(X509_get_default_cert_file);
 diff -Paur --no-dereference -- libssl.upstream/include/compat/unistd.h libssl/include/compat/unistd.h
 --- libssl.upstream/include/compat/unistd.h
 +++ libssl/include/compat/unistd.h
-@@ -69,9 +69,10 @@
+@@ -71,9 +71,10 @@
  #include "getopt.h"
  #endif
  
@@ -380,15 +373,15 @@ diff -Paur --no-dereference -- libssl.upstream/include/compat/unistd.h libssl/in
 diff -Paur --no-dereference -- libssl.upstream/tls/Makefile.in libssl/tls/Makefile.in
 --- libssl.upstream/tls/Makefile.in
 +++ libssl/tls/Makefile.in
-@@ -90,7 +90,7 @@
+@@ -122,7 +122,7 @@
  build_triplet = @build@
  host_triplet = @host@
  @OPENSSLDIR_DEFINED_TRUE@am__append_1 = -DTLS_DEFAULT_CA_FILE=\"@OPENSSLDIR@/cert.pem\"
 -@OPENSSLDIR_DEFINED_FALSE@am__append_2 = -DTLS_DEFAULT_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\"
 +@OPENSSLDIR_DEFINED_FALSE@am__append_2 = -DTLS_DEFAULT_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\" -DTLS_DEFAULT_CA_FILE_DEFAULT=\"$(sysconfdir)/default/ssl/cert.pem\"
- @HOST_WIN_TRUE@am__append_3 = compat/ftruncate.c compat/pread.c \
- @HOST_WIN_TRUE@	compat/pwrite.c
+ @HOST_WIN_TRUE@am__append_3 = compat/pread.c compat/pwrite.c
  subdir = tls
+ ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 diff -Paur --no-dereference -- libssl.upstream/tls/tls_config.c libssl/tls/tls_config.c
 --- libssl.upstream/tls/tls_config.c
 +++ libssl/tls/tls_config.c
@@ -396,7 +389,7 @@ diff -Paur --no-dereference -- libssl.upstream/tls/tls_config.c libssl/tls/tls_c
  
  #include "tls_internal.h"
  
-+// PATCH: Search /etc/default/ssl if /etc/ssl doesn't exist.
++/* PATCH: Search /etc/default/ssl if /etc/ssl doesn't exist. */
  static const char default_ca_file[] = TLS_DEFAULT_CA_FILE;
 +#ifdef TLS_DEFAULT_CA_FILE_DEFAULT
 +static const char default_ca_file_default[] = TLS_DEFAULT_CA_FILE_DEFAULT;
@@ -412,14 +405,3 @@ diff -Paur --no-dereference -- libssl.upstream/tls/tls_config.c libssl/tls/tls_c
  	return default_ca_file;
  }
  
-@@ -742,8 +750,8 @@
- 
- 	if (sb.st_uid != getuid()) {
- 		tls_config_set_errorx(config, TLS_ERROR_UNKNOWN,
--		    "session file has incorrect owner (uid %u != %u)",
--		    sb.st_uid, getuid());
-+		    "session file has incorrect owner (uid %llu != %llu)",
-+		    (unsigned long long)sb.st_uid, (unsigned long long)getuid());
- 		return (-1);
- 	}
- 	mugo = sb.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO);
