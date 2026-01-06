@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2021, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2021, 2024, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,13 +50,13 @@ static const size_t DEVICE_RETRIES = 5;
 
 PS2Mouse::PS2Mouse()
 {
-	this->queue = NULL;
-	this->queuelength = 0;
-	this->queueoffset = 0;
-	this->queueused = 0;
-	this->owner = NULL;
-	this->ownerptr = NULL;
-	this->mlock = KTHREAD_MUTEX_INITIALIZER;
+	queue = NULL;
+	queue_length = 0;
+	queue_offset = 0;
+	queue_used = 0;
+	owner = NULL;
+	owner_ptr = NULL;
+	mlock = KTHREAD_MUTEX_INITIALIZER;
 }
 
 PS2Mouse::~PS2Mouse()
@@ -64,108 +64,86 @@ PS2Mouse::~PS2Mouse()
 	delete[] queue;
 }
 
-void PS2Mouse::PS2DeviceInitialize(void* send_ctx, bool (*send)(void*, uint8_t),
-                                      uint8_t* id, size_t id_size)
+bool PS2Mouse::PS2DeviceInitialize(PS2Controller* controller, uint8_t port,
+                                   uint8_t* id, size_t id_size)
 {
 	if ( sizeof(this->id) < id_size )
 		id_size = sizeof(this->id);
-	this->send_ctx = send_ctx;
-	this->send = send;
-	this->state = STATE_INIT;
-	this->tries = 0;
+
 	memcpy(this->id, id, id_size);
 	this->id_size = id_size;
-	PS2DeviceOnByte(DEVICE_RESEND);
+
+	controller->SendSync(port, DEVICE_CMD_ENABLE_SCAN);
+
+	return true;
 }
 
 void PS2Mouse::PS2DeviceOnByte(uint8_t byte)
 {
 	Random::MixNow(Random::SOURCE_INPUT);
 	Random::Mix(Random::SOURCE_INPUT, &byte, 1);
+
 	ScopedLock lock(&mlock);
+	PushByte(byte);
+	lock.Reset();
 
-	if ( state == STATE_INIT )
-	{
-		state = STATE_ENABLE_SCAN;
-		tries = DEVICE_RETRIES;
-		byte = DEVICE_RESEND;
-	}
-
-	if ( state == STATE_ENABLE_SCAN )
-	{
-		if ( byte == DEVICE_RESEND && tries-- )
-		{
-			if ( send(send_ctx, DEVICE_CMD_ENABLE_SCAN) )
-				return;
-		}
-		state = STATE_NORMAL;
-		tries = DEVICE_RETRIES;
-		if ( byte == DEVICE_ACK )
-			return;
-		byte = DEVICE_RESEND;
-	}
-
-	if ( state == STATE_NORMAL )
-	{
-		PushByte(byte);
-		lock.Reset();
-		NotifyOwner();
-		return;
-	}
+	NotifyOwner();
 }
 
 void PS2Mouse::NotifyOwner()
 {
 	if ( !owner )
 		return;
-	owner->OnMouseByte(this, ownerptr);
+	owner->OnMouseByte(this, owner_ptr);
 }
 
 void PS2Mouse::SetOwner(PS2MouseDevice* owner, void* user)
 {
 	this->owner = owner;
-	this->ownerptr = user;
-	if ( queueused )
+	this->owner_ptr = user;
+	if ( queue_used )
 		NotifyOwner();
 }
 
 bool PS2Mouse::PushByte(uint8_t byte)
 {
+	// TODO: Just allocate a 1024 byte buffer initially?
+
 	// Check if we need to allocate or resize the circular queue.
-	if ( queueused == queuelength )
+	if ( queue_used == queue_length )
 	{
-		size_t newqueuelength = queuelength ? 2 * queuelength : 32UL;
-		if ( 1024 < newqueuelength )
+		size_t newqueue_length = queue_length ? 2 * queue_length : 32UL;
+		if ( 1024 < newqueue_length )
 			return false;
-		uint8_t* newqueue = new uint8_t[newqueuelength];
+		uint8_t* newqueue = new uint8_t[newqueue_length];
 		if ( !newqueue )
 			return false;
 		size_t elemsize = sizeof(*queue);
-		size_t leadingavai = queuelength - queueoffset;
-		size_t leading = leadingavai < queueused ? leadingavai : queueused;
-		size_t trailing = queueused - leading;
+		size_t leadingavai = queue_length - queue_offset;
+		size_t leading = leadingavai < queue_used ? leadingavai : queue_used;
+		size_t trailing = queue_used - leading;
 		if ( queue )
 		{
-			memcpy(newqueue, queue + queueoffset, leading * elemsize);
+			memcpy(newqueue, queue + queue_offset, leading * elemsize);
 			memcpy(newqueue + leading, queue, trailing * elemsize);
 			delete[] queue;
 		}
 		queue = newqueue;
-		queuelength = newqueuelength;
-		queueoffset = 0;
+		queue_length = newqueue_length;
+		queue_offset = 0;
 	}
 
-	queue[(queueoffset + queueused++) % queuelength] = byte;
+	queue[(queue_offset + queue_used++) % queue_length] = byte;
 	return true;
 }
 
 uint8_t PS2Mouse::PopByte()
 {
-	if ( !queueused )
+	if ( !queue_used )
 		return 0;
-	uint8_t byte = queue[queueoffset];
-	queueoffset = (queueoffset + 1) % queuelength;
-	queueused--;
+	uint8_t byte = queue[queue_offset];
+	queue_offset = (queue_offset + 1) % queue_length;
+	queue_used--;
 	return byte;
 }
 
@@ -178,13 +156,13 @@ uint8_t PS2Mouse::Read()
 size_t PS2Mouse::GetPending() const
 {
 	ScopedLock lock(&mlock);
-	return queueused;
+	return queue_used;
 }
 
 bool PS2Mouse::HasPending() const
 {
 	ScopedLock lock(&mlock);
-	return queueused;
+	return queue_used;
 }
 
 PS2MouseDevice::PS2MouseDevice(dev_t dev, mode_t mode, uid_t owner, gid_t group,
@@ -198,8 +176,8 @@ PS2MouseDevice::PS2MouseDevice(dev_t dev, mode_t mode, uid_t owner, gid_t group,
 	this->stat_uid = owner;
 	this->stat_gid = group;
 	this->mouse = mouse;
-	this->devlock = KTHREAD_MUTEX_INITIALIZER;
-	this->datacond = KTHREAD_COND_INITIALIZER;
+	this->dev_lock = KTHREAD_MUTEX_INITIALIZER;
+	this->data_cond = KTHREAD_COND_INITIALIZER;
 	mouse->SetOwner(this, NULL);
 }
 
@@ -210,9 +188,10 @@ PS2MouseDevice::~PS2MouseDevice()
 
 ssize_t PS2MouseDevice::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 {
-	ScopedLockSignal lock(&devlock);
+	ScopedLockSignal lock(&dev_lock);
 	if ( !lock.IsAcquired() )
 		return errno = EINTR, -1;
+	// TODO: The data should be copied more efficiently to userspace.
 	size_t sofar = 0;
 	while ( sofar < count )
 	{
@@ -222,7 +201,7 @@ ssize_t PS2MouseDevice::read(ioctx_t* ctx, uint8_t* buf, size_t count)
 				break;
 			do
 			{
-				if ( !kthread_cond_wait_signal(&datacond, &devlock) )
+				if ( !kthread_cond_wait_signal(&data_cond, &dev_lock) )
 					return sofar ? sofar : -1;
 			} while ( !mouse->HasPending() );
 		}
@@ -244,7 +223,7 @@ short PS2MouseDevice::PollEventStatus()
 
 int PS2MouseDevice::poll(ioctx_t* /*ctx*/, PollNode* node)
 {
-	ScopedLock lock(&devlock);
+	ScopedLock lock(&dev_lock);
 	short ret_status = PollEventStatus() & node->events;
 	if ( ret_status )
 	{
@@ -257,9 +236,9 @@ int PS2MouseDevice::poll(ioctx_t* /*ctx*/, PollNode* node)
 
 void PS2MouseDevice::OnMouseByte(PS2Mouse* /*mouse*/, void* /*user*/)
 {
-	ScopedLock lock(&devlock);
+	ScopedLock lock(&dev_lock);
 	poll_channel.Signal(PollEventStatus());
-	kthread_cond_signal(&datacond);
+	kthread_cond_signal(&data_cond);
 }
 
 } // namespace Sortix

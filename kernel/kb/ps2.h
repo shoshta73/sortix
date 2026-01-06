@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,13 +38,13 @@ public:
 	virtual size_t GetPending() const;
 	virtual bool HasPending() const;
 	virtual void SetOwner(KeyboardOwner* owner, void* user);
-	virtual void PS2DeviceInitialize(void* send_ctx, bool (*send)(void*, uint8_t),
+	virtual bool PS2DeviceInitialize(PS2Controller* controller, uint8_t port,
                                      uint8_t* id, size_t id_size);
 	virtual void PS2DeviceOnByte(uint8_t byte);
 
 private:
 	void OnKeyboardKey(int kbkey);
-	void UpdateLEDs(int ledval);
+	void UpdateLEDs();
 	bool PushKey(int key);
 	int PopKey();
 	void NotifyOwner();
@@ -52,23 +52,18 @@ private:
 private:
 	mutable kthread_mutex_t kblock;
 	int* queue;
-	size_t queuelength;
-	size_t queueoffset;
-	size_t queueused;
+	size_t queue_length;
+	size_t queue_offset;
+	size_t queue_used;
 	KeyboardOwner* owner;
-	void* ownerptr;
-	void* send_ctx;
-	bool (*send)(void*, uint8_t);
+	void* owner_ptr;
+	PS2Controller* controller;
+	uint8_t port;
 	enum
 	{
-		STATE_INIT = 0,
-		STATE_RESET_LED,
-		STATE_RESET_TYPEMATIC,
-		STATE_ENABLE_SCAN,
-		STATE_NORMAL,
+		STATE_NORMAL = 0,
 		STATE_NORMAL_ESCAPED,
 	} state;
-	size_t tries;
 	uint8_t leds;
 	uint8_t id[2];
 	size_t id_size;

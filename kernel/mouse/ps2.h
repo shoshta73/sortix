@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,7 +42,7 @@ public:
 	virtual size_t GetPending() const;
 	virtual bool HasPending() const;
 	virtual void SetOwner(PS2MouseDevice* owner, void* user);
-	virtual void PS2DeviceInitialize(void* send_ctx, bool (*send)(void*, uint8_t),
+	virtual bool PS2DeviceInitialize(PS2Controller* controller, uint8_t port,
                                      uint8_t* id, size_t id_size);
 	virtual void PS2DeviceOnByte(uint8_t byte);
 
@@ -54,20 +54,11 @@ private:
 private:
 	mutable kthread_mutex_t mlock;
 	uint8_t* queue;
-	size_t queuelength;
-	size_t queueoffset;
-	size_t queueused;
+	size_t queue_length;
+	size_t queue_offset;
+	size_t queue_used;
 	PS2MouseDevice* owner;
-	void* ownerptr;
-	void* send_ctx;
-	bool (*send)(void*, uint8_t);
-	enum
-	{
-		STATE_INIT = 0,
-		STATE_ENABLE_SCAN,
-		STATE_NORMAL,
-	} state;
-	size_t tries;
+	void* owner_ptr;
 	uint8_t id[2];
 	size_t id_size;
 
@@ -92,8 +83,8 @@ private:
 
 private:
 	PollChannel poll_channel;
-	mutable kthread_mutex_t devlock;
-	kthread_cond_t datacond;
+	mutable kthread_mutex_t dev_lock;
+	kthread_cond_t data_cond;
 	PS2Mouse* mouse;
 
 };

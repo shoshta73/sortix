@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2014, 2015, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2014, 2015, 2024, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -57,17 +57,18 @@ static const size_t DEVICE_RETRIES = 5;
 
 PS2Keyboard::PS2Keyboard()
 {
-	this->queue = NULL;
-	this->queuelength = 0;
-	this->queueoffset = 0;
-	this->queueused = 0;
-	this->owner = NULL;
-	this->ownerptr = NULL;
+	queue = NULL;
+	queue_length = 0;
+	queue_offset = 0;
+	queue_used = 0;
+	owner = NULL;
+	owner_ptr = NULL;
 	// TODO: Initial LED status can be read from the BIOS data area. If so, we
 	//       need to emulate fake presses of the modifier keys to keep the
 	//       keyboard layout in sync.
-	this->leds = 0;
-	this->kblock = KTHREAD_MUTEX_INITIALIZER;
+	leds = 0;
+	kblock = KTHREAD_MUTEX_INITIALIZER;
+	state = STATE_NORMAL;
 }
 
 PS2Keyboard::~PS2Keyboard()
@@ -75,74 +76,36 @@ PS2Keyboard::~PS2Keyboard()
 	delete[] queue;
 }
 
-void PS2Keyboard::PS2DeviceInitialize(void* send_ctx, bool (*send)(void*, uint8_t),
+bool PS2Keyboard::PS2DeviceInitialize(PS2Controller* controller, uint8_t port,
                                       uint8_t* id, size_t id_size)
 {
 	if ( sizeof(this->id) < id_size )
 		id_size = sizeof(this->id);
-	this->send_ctx = send_ctx;
-	this->send = send;
-	this->state = STATE_INIT;
-	this->tries = 0;
+	this->controller = controller;
+	this->port = port;
 	memcpy(this->id, id, id_size);
 	this->id_size = id_size;
-	PS2DeviceOnByte(DEVICE_RESEND);
+
+	if ( controller->SendSync(port, DEVICE_CMD_SET_LED) )
+		controller->SendSync(port, leds & 0x07);
+
+	uint8_t rate = 0b00000; // 33.36 ms/repeat.
+	uint8_t delay = 0b01; // 500 ms.
+	uint8_t typematic = delay << 3 | rate << 0;
+	if ( controller->SendSync(port, DEVICE_CMD_SET_TYPEMATIC) )
+		controller->SendSync(port, typematic);
+
+	controller->SendSync(port, DEVICE_CMD_ENABLE_SCAN);
+
+	return true;
 }
 
-void PS2Keyboard::PS2DeviceOnByte(uint8_t byte)
+void PS2Keyboard::PS2DeviceOnByte(uint8_t byte) // Locked: ps2_lock
 {
 	Random::MixNow(Random::SOURCE_INPUT);
 	Random::Mix(Random::SOURCE_INPUT, &byte, 1);
 
 	ScopedLock lock(&kblock);
-
-	if ( state == STATE_INIT )
-	{
-		state = STATE_RESET_LED;
-		tries = DEVICE_RETRIES;
-		byte = DEVICE_RESEND;
-	}
-
-	if ( state == STATE_RESET_LED )
-	{
-		if ( byte == DEVICE_RESEND && tries-- )
-		{
-			if ( send(send_ctx, DEVICE_CMD_SET_LED) &&
-			     send(send_ctx, leds & 0x07) )
-				return;
-		}
-		state = STATE_RESET_TYPEMATIC;
-		tries = DEVICE_RETRIES;
-		byte = DEVICE_RESEND;
-	}
-
-	if ( state == STATE_RESET_TYPEMATIC )
-	{
-		if ( byte == DEVICE_RESEND && tries-- )
-		{
-			uint8_t rate = 0b00000; // 33.36 ms/repeat.
-			uint8_t delay = 0b01; // 500 ms.
-			uint8_t typematic = delay << 3 | rate << 0;
-			if ( send(send_ctx, DEVICE_CMD_SET_TYPEMATIC) &&
-			     send(send_ctx, typematic) )
-				return;
-		}
-		state = STATE_ENABLE_SCAN;
-		tries = DEVICE_RETRIES;
-		byte = DEVICE_RESEND;
-	}
-
-	if ( state == STATE_ENABLE_SCAN )
-	{
-		if ( byte == DEVICE_RESEND && tries-- )
-		{
-			if ( send(send_ctx, DEVICE_CMD_ENABLE_SCAN) )
-				return;
-		}
-		state = STATE_NORMAL;
-		tries = DEVICE_RETRIES;
-		byte = DEVICE_RESEND;
-	}
 
 	if ( byte == DEVICE_RESEND || byte == DEVICE_ACK )
 		return;
@@ -173,7 +136,7 @@ void PS2Keyboard::PS2DeviceOnByte(uint8_t byte)
 	}
 }
 
-void PS2Keyboard::OnKeyboardKey(int kbkey)
+void PS2Keyboard::OnKeyboardKey(int kbkey) // Locked: ps2_lock, kblock
 {
 	if ( !PushKey(kbkey) )
 		return;
@@ -188,69 +151,72 @@ void PS2Keyboard::OnKeyboardKey(int kbkey)
 		newleds ^= DEVICE_LED_NUMLCK;
 
 	if ( newleds != leds )
-		UpdateLEDs(leds = newleds);
+	{
+		leds = newleds;
+		UpdateLEDs();
+	}
 }
 
-void PS2Keyboard::NotifyOwner()
+void PS2Keyboard::NotifyOwner() // Locked: ps2_lock
 {
 	if ( !owner )
 		return;
-	owner->OnKeystroke(this, ownerptr);
+	owner->OnKeystroke(this, owner_ptr);
 }
 
-void PS2Keyboard::UpdateLEDs(int ledval)
+void PS2Keyboard::UpdateLEDs() // Locked: ps2_lock, kblock
 {
-	send(send_ctx, DEVICE_CMD_SET_LED) &&
-	send(send_ctx, ledval);
+	if ( controller->Send(port, DEVICE_CMD_SET_LED) )
+		controller->Send(port, leds & 0x07);
 }
 
 void PS2Keyboard::SetOwner(KeyboardOwner* owner, void* user)
 {
-	kthread_mutex_lock(&kblock);
+	ScopedLock lock(&kblock);
 	this->owner = owner;
-	this->ownerptr = user;
-	kthread_mutex_unlock(&kblock);
-	if ( queueused )
+	this->owner_ptr = user;
+	lock.Reset();
+	if ( queue_used )
 		NotifyOwner();
 }
 
-bool PS2Keyboard::PushKey(int key)
+bool PS2Keyboard::PushKey(int key) // Locked: ps2_lock, kblock
 {
 	// Check if we need to allocate or resize the circular queue.
-	if ( queueused == queuelength )
+	if ( queue_used == queue_length )
 	{
-		size_t newqueuelength = queuelength ? 2 * queuelength : 32UL;
-		if ( 16 * 1024 < newqueuelength )
+		size_t new_queue_length = queue_length ? 2 * queue_length : 32UL;
+		if ( 16 * 1024 < new_queue_length )
 			return false;
-		int* newqueue = new int[newqueuelength];
-		if ( !newqueue )
+		int* new_queue = new int[new_queue_length];
+		if ( !new_queue )
 			return false;
 		if ( queue )
 		{
-			size_t elemsize = sizeof(*queue);
-			size_t leadingavai = queuelength - queueoffset;
-			size_t leading = leadingavai < queueused ? leadingavai : queueused;
-			size_t trailing = queueused - leading;
-			memcpy(newqueue, queue + queueoffset, leading * elemsize);
-			memcpy(newqueue + leading, queue, trailing * elemsize);
+			size_t element_size = sizeof(*queue);
+			size_t available = queue_length - queue_offset;
+			size_t leading = available < queue_used ? available : queue_used;
+			size_t trailing = queue_used - leading;
+			memcpy(new_queue, queue + queue_offset, leading * element_size);
+			memcpy(new_queue + leading, queue, trailing * element_size);
 			delete[] queue;
 		}
-		queue = newqueue;
-		queuelength = newqueuelength;
-		queueoffset = 0;
+		queue = new_queue;
+		queue_length = new_queue_length;
+		queue_offset = 0;
 	}
 
-	queue[(queueoffset + queueused++) % queuelength] = key;
+	queue[(queue_offset + queue_used++) % queue_length] = key;
 	return true;
 }
 
-int PS2Keyboard::PopKey()
+int PS2Keyboard::PopKey() // Locked: kblock
 {
-	if ( !queueused )
+	if ( !queue_used )
 		return 0;
-	int kbkey = queue[queueoffset];
-	queueoffset = (queueoffset + 1) % queuelength;
-	queueused--;
+	int kbkey = queue[queue_offset];
+	queue_offset = (queue_offset + 1) % queue_length;
+	queue_used--;
 	return kbkey;
 }
 
@@ -263,13 +229,13 @@ int PS2Keyboard::Read()
 size_t PS2Keyboard::GetPending() const
 {
 	ScopedLock lock(&kblock);
-	return queueused;
+	return queue_used;
 }
 
 bool PS2Keyboard::HasPending() const
 {
 	ScopedLock lock(&kblock);
-	return queueused;
+	return queue_used;
 }
 
 } // namespace Sortix
