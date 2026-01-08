@@ -251,11 +251,11 @@ void Clock::Cancel(Timer* timer)
 bool Clock::TryCancel(Timer* timer)
 {
 	LockClock();
-	bool active = timer->flags & TIMER_ACTIVE;
-	if ( active )
+	bool firing = timer->flags & TIMER_FIRING;
+	if ( !firing )
 		Unlink(timer);
 	UnlockClock();
-	return active;
+	return !firing;
 }
 
 static void timer_wakeup(Clock* /*clock*/, Timer* /*timer*/, void* ctx)
