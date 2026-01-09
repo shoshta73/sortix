@@ -26,23 +26,6 @@ diff -Paur --no-dereference -- gawk.upstream/extras/Makefile.in gawk/extras/Make
  profile_DATA = gawk.sh gawk.csh
  EXTRA_DIST = $(profile_DATA)
  all: all-am
-diff -Paur --no-dereference -- gawk.upstream/printf.c gawk/printf.c
---- gawk.upstream/printf.c
-+++ gawk/printf.c
-@@ -924,7 +924,13 @@
- 		 * Use snprintf return value to tell if there
- 		 * is enough room in the buffer or not.
- 		 */
-+/* PATCH: Until Sortix has floating point printing. */
-+#if defined(__sortix__) && !__SORTIX_HAS_FLOAT_PARSE__
-+		while ((i = snprintf(buf, buflen, "%lld", (long long)tmpval)) >=
-+			buflen) {
-+#else
- 		while ((i = snprintf(buf, buflen, "%.0f", tmpval)) >= buflen) {
-+#endif
- 			if (i > 0)
- 				buflen += (i > buflen) ?  i : buflen;
- 			else
 diff -Paur --no-dereference -- gawk.upstream/main.c gawk/main.c
 --- gawk.upstream/main.c
 +++ gawk/main.c
@@ -81,3 +64,42 @@ diff -Paur --no-dereference -- gawk.upstream/node.c gawk/node.c
  
  /* wstrstr --- walk haystack, looking for needle, wide char version */
  
+diff -Paur --no-dereference -- gawk.upstream/printf.c gawk/printf.c
+--- gawk.upstream/printf.c
++++ gawk/printf.c
+@@ -924,7 +924,13 @@
+ 		 * Use snprintf return value to tell if there
+ 		 * is enough room in the buffer or not.
+ 		 */
++/* PATCH: Until Sortix has floating point printing. */
++#if defined(__sortix__) && !__SORTIX_HAS_FLOAT_PARSE__
++		while ((i = snprintf(buf, buflen, "%lld", (long long)tmpval)) >=
++			buflen) {
++#else
+ 		while ((i = snprintf(buf, buflen, "%.0f", tmpval)) >= buflen) {
++#endif
+ 			if (i > 0)
+ 				buflen += (i > buflen) ?  i : buflen;
+ 			else
+diff -Paur --no-dereference -- gawk.upstream/support/getopt.h gawk/support/getopt.h
+--- gawk.upstream/support/getopt.h
++++ gawk/support/getopt.h
+@@ -22,6 +22,18 @@
+ # define _GETOPT_H 1
+ #endif
+ 
++/* PATCH: Deal with the crazy gawk custom getopt replacement by accepting it but
++          fix multiple definion problems when linking with old toolchains during
++          the Sortix 1.0 -> 1.1 bootstrap. If I disable it and use Sortix
++          getopt, then gawk is defective and configure outputs broken makefiles,
++          which needs to be debugged. */
++#include <stdlib.h> /* Make sure the renames never affect the real header */
++#define getopt gawk_getopt
++#define getopt_long gawk_getopt_long
++#define optind gawk_optind
++#define optarg gawk_optarg
++#define optopt gawk_optopt
++
+ /* If __GNU_LIBRARY__ is not already defined, either we are being used
+    standalone, or this is the first header included in the source file.
+    If we are being used with glibc, we need to include <features.h>, but
