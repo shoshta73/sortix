@@ -121,6 +121,7 @@ static struct boot_info boot_info;
 static const char* console = "tty1";
 static bool enable_em = true;
 static bool enable_network_drivers = true;
+static uint8_t ps2_scancode_set = 0;
 static char* term = (char*) "TERM=sortix";
 
 static char* cmdline_tokenize(char** saved)
@@ -299,6 +300,9 @@ extern "C" void KernelInit(unsigned long magic, void* boot_info_p)
 				PanicF("Unsupported firmware option: %s", firmware);
 			}
 		}
+		else if ( !strncmp(arg, "--ps2-scancode-set=",
+		                   strlen("--ps2-scancode-set=")) )
+			ps2_scancode_set = atoi(arg + strlen("--ps2-scancode-set="));
 		else if ( !strncmp(arg, "--term=", strlen("--term=")) )
 		{
 			const char* value = arg + strlen("--term=");
@@ -523,7 +527,7 @@ static void BootThread(void* /*user*/)
 		Panic("Unable to create descriptor for RAM filesystem /dev directory.");
 
 	// Initialize the keyboard.
-	PS2Keyboard* keyboard = new PS2Keyboard();
+	PS2Keyboard* keyboard = new PS2Keyboard(ps2_scancode_set);
 	if ( !keyboard )
 		Panic("Could not allocate PS2 Keyboard driver");
 	KeyboardLayoutExecutor* kblayout = new KeyboardLayoutExecutor;

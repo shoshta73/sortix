@@ -27,6 +27,7 @@
 .Op Fl \-kernel-options Ns = Ns Ar options
 .Op Fl \-init-target Ns = Ns Ar target
 .Op Fl \-liveconfig Ns = Ns Ar liveconfig-directory
+.Op Fl \-ps2-scancode-set Ns = Ns Ar set
 .Op Fl \-random-seed
 .Op Fl \-serial Ns = Ns Ar terminal
 .Op Fl \-serial-console Ns = Ns Ar terminal
@@ -276,6 +277,14 @@ or
 .Xr autoupgrade.conf 5 ,
 the menu titles are modified to loudly warn they will automatically
 install/upgrade the operating system.
+.It Fl \-ps2-scancode-set Ns = Ns Ar set
+Force a PS/2 keyboard scancode set by setting the
+.Sy ps2_scancode_set
+GRUB variable to the
+.Fl \-ps2-scancode-set=set
+option which will be passed on the
+.Xr kernel 7
+command line.
 .It Fl \-random-seed
 Copy 256 bytes of randomness from
 .Pa /dev/urandom

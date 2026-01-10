@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2017, 2018, 2022, 2023, 2025 Jonas 'Sortie' Termansen.
+# Copyright (c) 2017, 2018, 2022, 2023, 2025, 2026 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -33,6 +33,7 @@ grub_serial=
 kernel_options=
 init_target=
 liveconfig=
+ps2_scancode_set=
 serial=
 serial_console=
 operand=1
@@ -84,6 +85,8 @@ for argument do
   --init-target) previous_option=init_target ;;
   --liveconfig=*) liveconfig=$parameter ;;
   --liveconfig) previous_option=liveconfig ;;
+  --ps2-scancode-set=*) ps2_scancode_set=$parameter ;;
+  --ps2-scancode-set) previous_option=ps2_scancode_set ;;
   --random-seed) random_seed=true ;;
   --serial=*) serial=$parameter ;;
   --serial) previous_option=serial ;;
@@ -200,6 +203,9 @@ mkdir -p -- "$directory/boot/grub"
  print_enable_default_bool "$enable_ntpd" ntpd ntpd
  if [ -n "$kernel_options" ]; then
    printf 'kernel_options="%s"\n' "$kernel_options"
+ fi
+ if [ -n "$ps2_scancode_set" ]; then
+   printf 'ps2_scancode_set="%s"\n' "$kernel_options"
  fi
  if $enable_append_title; then
    printf "base_menu_title=\"\$base_menu_title - \"'%s'\n" \

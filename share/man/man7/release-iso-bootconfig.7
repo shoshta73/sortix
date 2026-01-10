@@ -326,6 +326,13 @@ and not if set to
 .Sy false .
 (Default:
 .Sy true )
+.It Sy ps2_scancode_set
+An additional
+.Xr kernel 7
+command line parameter that forces the PS/2 keyboard scancode set.
+Either set to the empty string (autodetect) or
+.Sy --ps2-scancode-set=set .
+(Default: The empty string).
 .It Sy serial_console
 When the serial console is enabled in the advanced menu, this variable contains
 the

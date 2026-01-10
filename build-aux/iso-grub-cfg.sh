@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2018, 2022, 2023, 2024, 2025 Jonas 'Sortie' Termansen.
+# Copyright (c) 2018, 2022, 2023, 2024, 2025, 2026 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -245,6 +245,7 @@ set enable_gui=true
 set enable_ntpd=false
 set enable_sshd=false
 set kernel_options=
+set ps2_scancode_set=
 set serial_console=--console=com1
 
 export version
@@ -267,6 +268,7 @@ export enable_gui
 export enable_ntpd
 export enable_sshd
 export kernel_options
+export ps2_scancode_set
 export serial_console
 EOF
 
@@ -354,7 +356,7 @@ esac
 cat << EOF
   hook_kernel_pre
   echo -n "Loading /$kernel ($(human_size $kernel)) ... "
-  multiboot2 /$kernel \$console --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers \$kernel_options \$chain "\$@"
+  multiboot2 /$kernel \$console --firmware=\$grub_platform \$no_random_seed \$enable_network_drivers \$ps2_scancode_set \$kernel_options \$chain "\$@"
   echo done
   hook_kernel_post
   # TODO: Injecting configuration doesn't work for mounted cdroms.
@@ -550,6 +552,28 @@ else
     configfile /boot/grub/advanced.cfg
   }
 fi
+fi
+
+if [ "\$ps2_scancode_set" = --ps2-scancode-set=1 ]; then
+  menuentry "PS/2 Keyboard Scancode Set = 1" {
+    ps2_scancode_set=--ps2-scancode-set=2
+    configfile /boot/grub/advanced.cfg
+  }
+elif [ "\$ps2_scancode_set" = --ps2-scancode-set=2 ]; then
+  menuentry "PS/2 Keyboard Scancode Set = 2" {
+    ps2_scancode_set=
+    configfile /boot/grub/advanced.cfg
+  }
+elif [ "\$ps2_scancode_set" = --ps2-scancode-set=5 ]; then
+  menuentry "PS/2 Keyboard Scancode Set = fingerprint" {
+    ps2_scancode_set=--ps2-scancode-set=5
+    configfile /boot/grub/advanced.cfg
+  }
+else
+  menuentry "PS/2 Keyboard Scancode Set = auto" {
+    ps2_scancode_set=--ps2-scancode-set=1
+    configfile /boot/grub/advanced.cfg
+  }
 fi
 
 if [ "\$enable_network_drivers" = --disable-network-drivers ]; then

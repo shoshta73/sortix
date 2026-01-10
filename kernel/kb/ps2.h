@@ -32,7 +32,7 @@ namespace Sortix {
 class PS2Keyboard : public Keyboard, public PS2Device
 {
 public:
-	PS2Keyboard();
+	PS2Keyboard(uint8_t scancode_set);
 	virtual ~PS2Keyboard();
 	virtual int Read();
 	virtual size_t GetPending() const;
@@ -43,6 +43,7 @@ public:
 	virtual void PS2DeviceOnByte(uint8_t byte);
 
 private:
+	bool OnKeyboardByte(uint8_t byte);
 	void OnKeyboardKey(int kbkey);
 	void UpdateLEDs();
 	bool PushKey(int key);
@@ -59,14 +60,19 @@ private:
 	void* owner_ptr;
 	PS2Controller* controller;
 	uint8_t port;
+	uint8_t scancode_set;
 	enum
 	{
 		STATE_NORMAL = 0,
 		STATE_NORMAL_ESCAPED,
+		STATE_NORMAL_RELEASED,
+		STATE_NORMAL_ESCAPED_RELEASED,
 	} state;
 	uint8_t leds;
 	uint8_t id[2];
+	uint8_t fingerprint[16];
 	size_t id_size;
+	size_t fingerprint_used;
 
 };
 

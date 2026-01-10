@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2021, 2022 Juhani 'nortti' Krekelä.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -261,20 +262,14 @@ struct key keys[] =
 	{ "KPAD3", 0x51 },
 	{ "KPAD0", 0x52 },
 	{ "KSYM15", 0x53 },
-	{ "KALTSYSRQ", 0x54 },
-	{ "KNO_STANDARD_MEANING_1", 0x55 /* Sometimes F11, F12, or even FN */ },
-	{ "KNO_STANDARD_MEANING_2", 0x56 /* Possibly Windows key? */ },
+	{ "KNO_STANDARD_MEANING_2", 0x56 /* Key between left shift and Z */ },
 	{ "KF11", 0x57 },
 	{ "KF12", 0x58 },
 /* [0x59,", 0x7F] are not really standard. */
 	{ "KPADENTER", (0x80 + 0x1C) },
 	{ "KRCTRL", (0x80 + 0x1D) },
-	{ "KFAKELSHIFT", (0x80 + 0x2A) },
 	{ "KSYM16", (0x80 + 0x35) },
-	{ "KFAKERSHIFT", (0x80 + 0x36) },
-	{ "KCTRLPRINTSCRN", (0x80 + 0x37) },
 	{ "KRALT", (0x80 + 0x38) },
-	{ "KCTRLBREAK", (0x80 + 0x46) },
 	{ "KHOME", (0x80 + 0x47) },
 	{ "KUP", (0x80 + 0x48) },
 	{ "KPGUP", (0x80 + 0x49) },

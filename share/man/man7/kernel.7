@@ -15,6 +15,7 @@
 .Op Fl \-enable-logo
 .Op Fl \-firmware Ns = Ns Oo Sy bios "|" Sy efi "|" pc Oc
 .Op Fl \-no-random-seed
+.Op Fl \-ps2-scancode-set Ns = Ns Ar set
 .Op Fl \-term Ns = Ns Ar terminal
 .Op Fl \-
 .Op Ar init ...
@@ -131,6 +132,35 @@ value is a synonym for
 Don't warn if no random seed file was loaded by the bootloader (usually from
 .Pa /boot/random.seed ) .
 This option is useful for live environments where this situation is unavoidable.
+.It Fl \-ps2-scancode-set Ns = Ns Ar set
+Force the PS/2 keyboard driver to use scancode
+.Ar set
+.Sy 0
+(autodetect),
+.Sy 1 ,
+.Sy 2 ,
+or
+.Sy 4
+(fingerprint).
+This option is useful if the PS/2 keyboard device is buggy and is incapable of
+responding with what scancode set is in use.
+.Pp
+Scancode set
+.Sy 3
+is not implemented.
+The special value
+.Sy 4
+fingerprints the scancode set by studying the bytes triggered by key release
+sequences, and the algorithm can detect the correct set after the first key is
+released with one potential mistake.
+The key F5 press + key F7 press sequence on scancode set 2 is identical to key 2
+press + key 2 release in scancode set 1, and the scancode 1 interpretation will
+be preferred since it is much more likely.
+The initial key press events will not be acted on by the system until the first
+key is released and the keyboard driver knows the scancode set.
+Fingerprinting will also occur if the PS/2 keyboard supplies a suspicious
+identity suggesting that scancode translation is enabled, when it is supposed
+to be disabled.
 .It Fl \-term Ns = Ns Ar terminal
 Set the
 .Ev TERM

@@ -312,7 +312,7 @@ bool PS2Controller::Init(PS2Device* keyboard, PS2Device* mouse)
 	config &= ~REG_CONFIG_FIRST_INTERRUPT;
 	config &= ~REG_CONFIG_SECOND_INTERRUPT;
 	config &= ~REG_CONFIG_NO_FIRST_CLOCK;
-	//config &= ~REG_CONFIG_FIRST_TRANSLATION; // TODO: Not ready for this yet.
+	config &= ~REG_CONFIG_FIRST_TRANSLATION;
 	// Write the updated configuration byte.
 	if ( !TryWriteCommand(REG_COMMAND_WRITE_RAM) ||
 	     !TryWriteByte(config) )
