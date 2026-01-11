@@ -105,29 +105,41 @@ static bool TryReadByte(uint8_t* result)
 	if ( !WaitOutput() )
 		return false;
 	*result = inport8(REG_DATA);
+#if 0
+	Log::PrintF("ps2: \tTryReadByte = 0x%02x\n", *result);
+#endif
 	return true;
 }
 
 static bool TryWriteByte(uint8_t byte)
 {
+#if 0
+	Log::PrintF("ps2: TryWriteByte 0x%02x\n", byte);
+#endif
 	if ( !WaitInput() )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	outport8(REG_DATA, byte);
 	return true;
 }
 
 static bool TryWriteCommand(uint8_t byte)
 {
+#if 0
+	Log::PrintF("ps2: TryWriteCommand 0x%02x\n", byte);
+#endif
 	if ( !WaitInput() )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	outport8(REG_COMMAND, byte);
 	return true;
 }
 
 static bool TryWriteToPort(uint8_t byte, uint8_t port)
 {
+#if 0
+	Log::PrintF("ps2: TryWriteToPort %u 0x%02x\n", port, byte);
+#endif
 	if ( port == 2 && !TryWriteCommand(REG_COMMAND_SEND_TO_PORT_2) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	return TryWriteByte(byte);
 }
 
@@ -150,7 +162,7 @@ static bool IsKeyboardResponse(uint8_t* response, size_t size)
 		return true;
 	if ( size == 2 && response[0] == 0xAB && response[1] == 0x54 )
 		return true;
-	return false;
+	return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 }
 
 static bool IsMouseResponse(uint8_t* response, size_t size)
@@ -161,7 +173,7 @@ static bool IsMouseResponse(uint8_t* response, size_t size)
 		return true;
 	if ( size == 1 && response[0] == 0x04 )
 		return true;
-	return false;
+	return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 }
 
 static void IRQ1Work(void* /*context*/);
@@ -300,14 +312,14 @@ bool PS2Controller::Init(PS2Device* keyboard, PS2Device* mouse)
 	// Disable both ports to make sure no more data is sent.
 	if ( !TryWriteCommand(REG_COMMAND_DISABLE_FIRST_PORT) ||
 	     !TryWriteCommand(REG_COMMAND_DISABLE_SECOND_PORT) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	// Read all the data that might be pending.
 	while ( inport8(REG_STATUS) & REG_STATUS_OUTPUT )
 		inport8(REG_DATA);
 	// Read the configuration byte.
 	if ( !TryWriteCommand(REG_COMMAND_READ_RAM) ||
 	     !TryReadByte(&config) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	// Disable interrupts and make sure port 1 is enabled.
 	config &= ~REG_CONFIG_FIRST_INTERRUPT;
 	config &= ~REG_CONFIG_SECOND_INTERRUPT;
@@ -316,24 +328,24 @@ bool PS2Controller::Init(PS2Device* keyboard, PS2Device* mouse)
 	// Write the updated configuration byte.
 	if ( !TryWriteCommand(REG_COMMAND_WRITE_RAM) ||
 	     !TryWriteByte(config) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	// Perform a controller self-test to make sure it works.
 	if ( !TryWriteCommand(REG_COMMAND_TEST_CONTROLLER) ||
 	     !TryReadByte(&byte) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	if ( byte == 0xFF )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	if ( byte != 0x55 )
 	{
 		Log::PrintF("ps2: Self-test failure resulted in 0x%02X "
 		            "instead of 0x55\n", byte);
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	}
 	// Write the configuration byte again, since the osdev wiki claims that some
 	// hardware might reset the PS/2 controller upon the self-test.
 	if ( !TryWriteCommand(REG_COMMAND_WRITE_RAM) ||
 	     !TryWriteByte(config) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	// If the second port is not enabled, detect if is available.
 	dual = !(config & REG_CONFIG_NO_SECOND_CLOCK);
 	if ( !dual )
@@ -342,12 +354,12 @@ bool PS2Controller::Init(PS2Device* keyboard, PS2Device* mouse)
 		if ( !TryWriteCommand(REG_COMMAND_ENABLE_SECOND_PORT) ||
 		     !TryWriteCommand(REG_COMMAND_READ_RAM) ||
 		     !TryReadByte(&config) )
-			return false;
+			return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 		dual = !(config & REG_CONFIG_NO_SECOND_CLOCK);
 		// TODO: Data could be sent here?
 		// If it did, temporarily disable it again.
 		if ( dual && !TryWriteCommand(REG_COMMAND_DISABLE_SECOND_PORT) )
-			return false;
+			return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	}
 	bool port_1 = true;
 	bool port_2 = dual;
@@ -395,33 +407,39 @@ bool PS2Controller::Init(PS2Device* keyboard, PS2Device* mouse)
 	// are enabled. Ensure that only one port is enabled at a time, so the
 	// ports don't talk at the same time and the driver doesn't know which
 	// port sent the bytes.
+#if 0
+	Log::PrintF("ps2: Initializating devices\n");
+#endif
 	if ( devices[0] )
 	{
 		if ( !TryWriteCommand(REG_COMMAND_ENABLE_FIRST_PORT) )
-			return false;
+			return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 		devices[0]->PS2DeviceInitialize(this, 1,
 		                                port_1_resp, port_1_resp_size);
 		if ( !TryWriteCommand(REG_COMMAND_DISABLE_FIRST_PORT) )
-			return false;
+			return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	}
 	if ( devices[1] )
 	{
 		if ( !TryWriteCommand(REG_COMMAND_ENABLE_SECOND_PORT) )
-			return false;
+			return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 		devices[1]->PS2DeviceInitialize(this, 2,
 		                                port_2_resp, port_2_resp_size);
 		if ( !TryWriteCommand(REG_COMMAND_DISABLE_SECOND_PORT) )
-			return false;
+			return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	}
+#if 0
+	Log::PrintF("ps2: Initializating devices done\n");
+#endif
 	// Enable both ports.
 	if ( port_1 && !TryWriteCommand(REG_COMMAND_ENABLE_FIRST_PORT) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	if ( port_2 && !TryWriteCommand(REG_COMMAND_ENABLE_SECOND_PORT) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	// Enable the interrupts now that we are ready to process them.
 	if ( !TryWriteCommand(REG_COMMAND_READ_RAM) ||
 	     !TryReadByte(&config) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	irq1_registration.handler = OnIRQ1;
 	irq1_registration.context = NULL;
 	Interrupt::RegisterHandler(Interrupt::IRQ1, &irq1_registration);
@@ -432,7 +450,15 @@ bool PS2Controller::Init(PS2Device* keyboard, PS2Device* mouse)
 	config |= port_2 ? REG_CONFIG_SECOND_INTERRUPT : 0;
 	if ( !TryWriteCommand(REG_COMMAND_WRITE_RAM) ||
 	     !TryWriteByte(config) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
+#if 0
+	while ( TryReadByte(&byte) )
+	{
+		Log::PrintF("ps2: Finally discarding 0x%02x\n", byte);
+		continue;
+	}
+	Log::PrintF("ps2: Ready\n");
+#endif
 	return true;
 }
 
@@ -445,7 +471,7 @@ bool PS2Controller::DetectDevice(uint8_t port,
 	                              REG_COMMAND_DISABLE_SECOND_PORT;
 	uint8_t byte;
 	if ( !TryWriteCommand(enable) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	// TODO: The port is not reset. A reset may or may not be desirable.
 	if ( !SendSync(port, DEVICE_CMD_DISABLE_SCAN, &byte) )
 	{
@@ -460,32 +486,43 @@ bool PS2Controller::DetectDevice(uint8_t port,
 			// control them.
 			if ( port == 1 )
 			{
+#if 0
+				Log::PrintF("ps2: Assuming port 1 is a keyboard\n");
+#endif
 				*response_size = 2;
 				response[0] = 0xAB;
 				response[1] = 0x83;
 				if ( !TryWriteCommand(disable) )
-					return false;
+					return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 				return true;
 			}
 			if ( port == 2 )
 			{
+#if 0
+				Log::PrintF("ps2: Assuming port 1 is a mouse\n");
+#endif
 				*response_size = 1;
 				response[0] = 0x00;
 				if ( !TryWriteCommand(disable) )
-					return false;
+					return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 				return true;
 			}
 		}
 		TryWriteCommand(disable);
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	}
 	// Empty pending buffer.
 	while ( TryReadByte(&byte) )
+	{
+#if 0
+		Log::PrintF("ps2: DetectDevice discarding %02x\n", byte);
+#endif
 		continue;
+	}
 	if ( !SendSync(port, DEVICE_CMD_IDENTIFY) )
 	{
 		TryWriteCommand(disable);
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	}
 	*response_size = 0;
 	if ( TryReadByte(&byte) )
@@ -495,7 +532,7 @@ bool PS2Controller::DetectDevice(uint8_t port,
 			response[(*response_size)++] = byte;
 	}
 	if ( !TryWriteCommand(disable) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	return true;
 }
 
@@ -509,8 +546,11 @@ void PS2Controller::OnPortByte(uint8_t port, uint8_t byte)
 // properly initialized.
 bool PS2Controller::Send(uint8_t port, uint8_t byte) // Locked: ps2_lock
 {
+#if 0
+	Log::PrintF("ps2: PS2Controller::Send %u 0x%02x\n", port, byte);
+#endif
 	if ( !TryWriteToPort(byte, port) )
-		return false;
+		return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 	return true;
 }
 
@@ -525,30 +565,37 @@ bool PS2Controller::SendSync(uint8_t port, uint8_t command, uint8_t* answer)
 	      retry < DEVICE_RETRIES && unrelated < DEVICE_MAX_UNRELATED;
 	      retry++ )
 	{
+#if 0
+		Log::PrintF("ps2: Send %u 0x%02x\n", port, command);
+#endif
 		if ( !TryWriteToPort(command, port) )
-			return false;
+			return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 		while ( unrelated < DEVICE_MAX_UNRELATED )
 		{
 			uint8_t byte;
 			if ( !TryReadByte(&byte) )
-				return false;
+				return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 			if ( answer )
 				*answer = byte;
 			if ( byte == DEVICE_ACK || byte == DEVICE_ECHO )
 				return true;
 			if ( byte != DEVICE_RESEND )
 			{
+#if 0
+				Log::PrintF("ps2: \tSend UNRELATED 0x%02x\n", byte);
+#endif
 				// We received a weird response, probably pending data, discard
 				// it and hope we receive a real acknowledgement.
 				if ( 1000 <= unrelated )
-					return false;
+					return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 				unrelated++;
 				continue;
 			}
+			Log::PrintF("ps2: \tSend RESEND 0x%02x\n", byte);
 			break;
 		}
 	}
-	return false;
+	return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 }
 
 // This function is safe only if interrupts are disabled and the other port is
@@ -557,8 +604,13 @@ bool PS2Controller::ReadSync(uint8_t port, uint8_t* byte)
 {
 	(void) port;
 	if ( TryReadByte(byte) )
+	{
+#if 0
+		Log::PrintF("ps2: Recv %u 0x%02x\n", port, *byte);
+#endif
 		return true;
-	return false;
+	}
+	return /*Log::PrintF("ps2: %s:%u\n", __FILE__, __LINE__), */false;
 }
 
 } // namespace Sortix

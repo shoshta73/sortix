@@ -266,6 +266,14 @@ bool PS2Keyboard::PS2DeviceInitialize(PS2Controller* controller, uint8_t port,
 	memcpy(this->id, id, id_size);
 	this->id_size = id_size;
 
+#if 0
+	// TODO: Debug code.
+	Log::PrintF("Keyboard identity:");
+	for ( size_t i = 0; i < id_size; i++ )
+		Log::PrintF(" 0x%02x", id[i]);
+	Log::PrintF("\n");
+#endif
+
 	if ( controller->SendSync(port, DEVICE_CMD_SET_LED) )
 		controller->SendSync(port, leds & 0x07);
 
@@ -283,7 +291,12 @@ bool PS2Keyboard::PS2DeviceInitialize(PS2Controller* controller, uint8_t port,
 	// We have no idea what scancode set we're actually getting, so we have to
 	// fingerprint the byte sequences we receive instead.
 	if ( scancode_set == 0 && id_size == 2 && id[0] == 0xAB && id[1] == 0x41 )
+	{
+#if 0
+		Log::PrintF("Buggy PS/2 controller may be translating\n");
+#endif
 		scancode_set = 4;
+	}
 	else
 	{
 		// Try setting scancode set 2.
@@ -311,7 +324,17 @@ bool PS2Keyboard::PS2DeviceInitialize(PS2Controller* controller, uint8_t port,
 	}
 	// If we failed to find the scancode set, we have to fingerprint.
 	if ( scancode_set == 0 || scancode_set == 4 )
+	{
+#if 0
+		Log::PrintF("ps2kb%u: Fingerprinting PS/2 Keyboard scancode set\n",
+		            port);
+#endif
 		scancode_set = 4;
+	}
+#if 0
+	else
+		Log::PrintF("ps2kb%u: Scancode set is %d\n", port, scancode_set);
+#endif
 
 	controller->SendSync(port, DEVICE_CMD_ENABLE_SCAN);
 
@@ -448,10 +471,22 @@ bool PS2Keyboard::OnKeyboardByte(uint8_t byte)  // Locked: ps2_lock, kblock
 		}
 		if ( scancode_set != 5 )
 		{
+#if 0
+			Log::PrintF("ps2kb%u: Fingerprinted scancode set %d using",
+			            port, scancode_set);
+#endif
 			state = STATE_NORMAL;
 			int any = 0;
 			for ( size_t i = 0; i < fingerprint_used; i++ )
+			{
+#if 0
+				Log::PrintF(" 0x%02x", fingerprint[i]);
+#endif
 				any |= OnKeyboardByte(fingerprint[i]);
+			}
+#if 0
+			Log::PrintF(" 0x%02x\n", byte);
+#endif
 			any |= OnKeyboardByte(byte);
 			return any;
 		}
