@@ -1443,7 +1443,7 @@ diff -Paur --no-dereference -- php.upstream/ext/standard/dns.c php/ext/standard/
 -	}
 +	for (struct addrinfo *res = res0; res; res = res->ai_next)
 +	{
-+		in = *(struct in_addr *)res->ai_addr;
++		in.s_addr = ((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
 + 		add_next_index_string(return_value, inet_ntop(AF_INET, &in, addr4, INET_ADDRSTRLEN));
 + 	}
 +	freeaddrinfo(res0);
@@ -1473,7 +1473,7 @@ diff -Paur --no-dereference -- php.upstream/ext/standard/dns.c php/ext/standard/
 -	if (!h_addr_0) {
 -		return zend_string_init(name, strlen(name), 0);
 -	}
-+	memcpy(&in.s_addr, res0->ai_addr, sizeof(in.s_addr));
++	in.s_addr = ((struct sockaddr_in *)res0->ai_addr)->sin_addr.s_addr;
  
 -	memcpy(&in.s_addr, h_addr_0, sizeof(in.s_addr));
 +	freeaddrinfo(res0);
@@ -1614,7 +1614,7 @@ diff -Paur --no-dereference -- php.upstream/main/fastcgi.c php/main/fastcgi.c
  					return -1;
  				}
 -				sa.sa_inet.sin_addr.s_addr = ((struct in_addr*)hep->h_addr_list[0])->s_addr;
-+				sa.sa_inet.sin_addr.s_addr = ((struct in_addr*)res0->ai_addr)->s_addr;
++				sa.sa_inet.sin_addr.s_addr = ((struct sockaddr_in *)res0->ai_addr)->sin_addr.s_addr;
 +				freeaddrinfo(res0);
  			}
  		}
