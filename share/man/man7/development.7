@@ -239,6 +239,22 @@ This variable affects the
 variable.
 This variable defaults to the value in
 .Pa build-aux/version.mak .
+.It Ev DOWNLOAD_PACKAGES
+If set to
+.Sy yes ,
+the signed binary packages from the
+.Ev RELEASE_URL
+are downloaded instead of building each
+.Xr port 5
+from source.
+If the binary packages have the correct version matching the
+.Xr port 5
+metadata and patches exactly, then the binary package is used to speed up the
+build, otherwise the port is built from source anyway.
+This option is useful to speed up a full build massively, when building the same
+source code as the current development builds or stable releases.
+It is specially useful to make only minor changes to the base system and only
+recompile the base system.
 .It Ev HOST
 Specifies platform on which the compiled code will run.
 This defaults to the current machine and operating system.
