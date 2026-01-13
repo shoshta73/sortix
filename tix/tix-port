@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2022, 2023, 2024, 2025 Jonas 'Sortie' Termansen.
+# Copyright (c) 2022, 2023, 2024, 2025, 2026 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -28,6 +28,7 @@ unset end
 unset exec_prefix
 unset generation
 unset host
+lean=false
 unset make
 unset makeflags
 unset mirror
@@ -81,6 +82,7 @@ for argument do
   --generation) previous_option=generation ;;
   --host=*) host=$parameter ;;
   --host) previous_option=host ;;
+  --lean) lean=true ;;
   --make=*) make=$parameter ;;
   --make) previous_option=make ;;
   --makeflags=*) makeflags=$parameter ;;
@@ -150,8 +152,9 @@ if [ "${prefix+x}" = "" -a "${sysroot+x}" = "" -a "${collection+x}" = x ]; then
 fi
 
 NAME=$(tix-vars "$port.port" NAME)
-SOURCE_PORT=$(tix-vars -d '' "$port.port" SOURCE_PORT)
 DEVELOPMENT=$(tix-vars -d false "$port.port" DEVELOPMENT)
+SOURCE_PORT=$(tix-vars -d '' "$port.port" SOURCE_PORT)
+SOURCE_PORT_DEVELOPMENT=false
 
 if [ -z "$NAME" ]; then
   echo "$0: error: NAME must be set: $port.port" >&2
@@ -167,6 +170,7 @@ if [ -n "$SOURCE_PORT" ]; then
          "$source_port.port" >&2
     exit 1
   fi
+  SOURCE_PORT_DEVELOPMENT=$(tix-vars -d false "$source_port.port" DEVELOPMENT)
 fi
 
 if $distclean; then
@@ -207,6 +211,7 @@ tix-build-end
 strip
 diff
 tix-install
+remove-source
 end
 EOF
 }
@@ -616,4 +621,24 @@ if should_run_step tix-install; then
     --reinstall \
     --file \
     "$destination/$NAME.tix.tar.xz"
+fi
+
+if $lean && should_run_step remove-source; then
+  announce "Removing source code extraction"
+  if [ "$DEVELOPMENT" = true ]; then
+    echo "$0: Not removing port in development: $port" >&2
+  else
+    echo "Removing '$port'"
+    rm -rf -- "$port"
+    rm -rf -- "$port.version"
+  fi
+  if [ -n "$source_port" ]; then
+    if [ "$SOURCE_PORT_DEVELOPMENT" = true ]; then
+      echo "$0: Not removing port in development: $source_port" >&2
+    else
+      echo "Removing '$source_port'"
+      rm -rf -- "$source_port"
+      rm -rf -- "$source_port.version"
+    fi
+  fi
 fi

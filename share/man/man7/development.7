@@ -267,6 +267,18 @@ This must be unset when building the build tools as they run on the current
 operating system.
 The compiler tools are prefixed with this variable if it does not match
 .Ev BUILD .
+.It Ev LEAN
+If set to
+.Sy yes ,
+then minimize disk space usage by deleting the extracted
+.Xr port 5
+source code after each port is built.
+This option passes the
+.Fl \-lean
+option to
+.Xr tix-metabuild 8
+and
+.Xr tix-port 8 .
 .It Ev OPTLEVEL
 Specifies compiler optimization options that gets added to
 .Ev CFLAGS

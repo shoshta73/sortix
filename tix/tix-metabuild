@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2014-2016, 2022-2025 Jonas 'Sortie' Termansen.
+# Copyright (c) 2014-2016, 2022-2026 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -31,6 +31,7 @@ unset generation
 unset key_search
 unset host
 unset hosts
+lean=
 unset make
 unset makeflags
 metadata=false
@@ -101,6 +102,7 @@ for argument do
   --hosts) previous_option=hosts ;;
   --key-search=*) key_search=$parameter ;;
   --key-search) previous_option=key_search ;;
+  --lean) lean=--lean;;
   --make=*) make=$parameter ;;
   --make) previous_option=make ;;
   --makeflags=*) makeflags=$parameter ;;
@@ -248,6 +250,7 @@ for host in ${hosts-${host-build}}; do
       ${exec_prefix+--exec-prefix="$exec_prefix"} \
       ${generation+--generation="$generation"} \
       ${host+--host="$host"} \
+      $lean \
       ${make+--make="$make"} \
       ${makeflags+--makeflags="$makeflags"} \
       ${mirror+--mirror="$mirror"} \

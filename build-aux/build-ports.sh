@@ -33,9 +33,16 @@ build) CACHE_PACKAGE=--cache-package; RANDOMIZE=--randomize ;;
    exit 1
 esac
 if [ "$DOWNLOAD_PACKAGES" = "yes" -a "$OPERATION" = build ]; then
+  unset DOWNLOAD_PACKAGES
   DOWNLOAD_PACKAGES=--download-package
 else
   unset DOWNLOAD_PACKAGES
+fi
+if [ "$LEAN" = "yes" ]; then
+  unset LEAN
+  LEAN=--lean
+else
+  unset LEAN
 fi
 
 # TODO: After releasing Sortix 1.1, remove support for building with Sortix 1.0
@@ -131,6 +138,7 @@ tix-metabuild \
   ${END:+--end="$END"} \
   --generation=3 \
   ${HOST:+--host="$HOST"} \
+  ${LEAN} \
   ${SORTIX_PORTS_MIRROR:+--mirror="$SORTIX_PORTS_MIRROR"} \
   ${SORTIX_MIRROR_DIR:+--mirror-directory="$SORTIX_MIRROR_DIR"} \
   --packages="${PACKAGES-all!!}" \

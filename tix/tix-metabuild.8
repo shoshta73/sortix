@@ -18,6 +18,7 @@
 .Op Fl \-generation Ns = Ns Ar level
 .Op Fl \-host Ns = Ns Ar triplet
 .Op Fl \-hosts Ns = Ns Ar triplets
+.Op Fl \-lean
 .Op Fl \-make Ns = Ns Ar path
 .Op Fl \-makeflags Ns = Ns Ar makeflags
 .Op Fl \-metadata
@@ -164,6 +165,9 @@ Strip the executables in the binary package.
 Regenerate the patches if in development.
 .It tix-install
 Install the binary package.
+.It remove-source
+Remove the source code extraction (if
+.Fl \-lean ) .
 .It end
 The end step after everything has happened.
 (Default)
@@ -192,6 +196,12 @@ triplet in the space-separated
 The
 .Fl \-sysroots
 option is useful for cross-compilation.
+.It Fl \-lean
+Remove the source code extraction when the build is complete.
+This option enables the
+.Sy remove-source
+build step.
+The downloaded source code archive in the mirror directory is not removed.
 .It Fl \-make Ns = Ns Ar path
 Which
 .Xr make 1
