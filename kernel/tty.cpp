@@ -593,9 +593,9 @@ ssize_t TTY::write(ioctx_t* ctx, const uint8_t* io_buffer, size_t count)
 
 short TTY::PollEventStatus()
 {
-	short status = 0;
 	if ( hungup )
-		status |= POLLHUP;
+		return POLLIN | POLLHUP | POLLERR;
+	short status = 0;
 	if ( linebuffer.CanPop() || numeofs )
 		status |= POLLIN | POLLRDNORM;
 	if ( true /* can always write */ )
