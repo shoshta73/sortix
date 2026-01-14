@@ -3,6 +3,30 @@ set -e
 
 umask 0022
 
+# Avoid already-exported environment variables leaking into the build. All
+# variables used by this script must be unset here before use.
+unset build
+unset build_id
+unset cache_package
+unset clean
+unset distclean
+unset download_packages
+unset end
+unset host
+unset lean
+unset mirror_dir
+unset operation
+unset packages
+unset ports_dir
+unset ports_mirror
+unset randomize
+unset release_url
+unset repository_dir
+unset signing_public_key
+unset start
+unset sysroot
+unset werrorformat
+
 make_dir_path_absolute() {
   (cd "$1" && pwd)
 }
@@ -16,40 +40,32 @@ if [ $# = 0 ]; then
   echo "$0: usage: $0 <operation>" >&2
   exit 1
 fi
-OPERATION="$1"
-CLEAN=false
-unset CACHE_PACKAGE
-unset DISTCLEAN
-unset END
-unset RANDOMIZE
-unset START
-case "$OPERATION" in
-distclean) CLEAN=true; DISTCLEAN=--distclean ;;
-clean) CLEAN=true; START=clean; END=clean ;;
-download) END=download ;;
-extract) END=extract ;;
-build) CACHE_PACKAGE=--cache-package; RANDOMIZE=--randomize ;;
-*) echo "$0: error: Invalid operation: $OPERATION" >&2
+operation="$1"
+
+clean=false
+case "$operation" in
+distclean) clean=true; distclean=--distclean ;;
+clean) clean=true; start=clean; end=clean ;;
+download) end=download ;;
+extract) end=extract ;;
+build) cache_package=--cache-package; randomize=--randomize ;;
+*) echo "$0: error: Invalid operation: $operation" >&2
    exit 1
 esac
-if [ "$DOWNLOAD_PACKAGES" = "yes" -a "$OPERATION" = build ]; then
-  unset DOWNLOAD_PACKAGES
-  DOWNLOAD_PACKAGES=--download-package
-else
-  unset DOWNLOAD_PACKAGES
+
+if [ "$DOWNLOAD_PACKAGES" = "yes" -a "$operation" = build ]; then
+  download_packages=--download-package
 fi
+
 if [ "$LEAN" = "yes" ]; then
-  unset LEAN
-  LEAN=--lean
-else
-  unset LEAN
+  lean=--lean
 fi
 
 # TODO: After releasing Sortix 1.1, remove support for building with Sortix 1.0
 #       that doesn't have sort -R.
-if [ -n "$RANDOMIZE" ]; then
+if [ -n "$randomize" ]; then
   if ! true | sort -R > /dev/null 2>&1; then
-    RANDOMIZE=
+    randomize=
   fi
 fi
 
@@ -74,38 +90,53 @@ elif ! [ -d "$SORTIX_PORTS_DIR" ]; then
   exit 0
 elif ! has_command tix-metabuild; then
   if $clean; then
-    echo "$0: warning: You need to have Tix installed Tix to clean ports." >&2
+    echo "$0: warning: You need to have Tix installed to clean ports." >&2
     exit 0
   else
-    echo "$0: error: You need to have Tix installed Tix to compile ports." >&2
+    echo "$0: error: You need to have Tix installed to compile ports." >&2
     exit 1
   fi
 fi
 
-if ! $CLEAN; then
+# Import the parameter environment variables (uppercase) as internal
+# non-exported variables (lowercase) that we can use to invoke tix-metabuild
+# without it receiving these variables.
+ports_dir=$SORTIX_PORTS_DIR
+if [ -n "${BUILD+x}" ]; then build=$BUILD; fi
+if [ -n "${BUILD_ID+x}" ]; then build_id=$BUILD_ID; fi
+if [ -n "${HOST+x}" ]; then host=$HOST; fi
+if [ -n "${PACKAGES+x}" ]; then packages=$PACKAGES; fi
+if [ -n "${RELEASE_URL+x}" ]; then release_url=$RELEASE_URL; fi
+if [ -n "${SIGNING_PUBLIC_KEY+x}" ]; then signing_public_key=$SIGNING_PUBLIC_KEY; fi
+if [ -n "${SORTIX_MIRROR_DIR+x}" ]; then mirror_dir=$SORTIX_MIRROR_DIR; fi
+if [ -n "${SORTIX_PORTS_MIRROR+x}" ]; then ports_mirror=$SORTIX_PORTS_MIRROR; fi
+if [ -n "${SORTIX_REPOSITORY_DIR+x}" ]; then repository_dir=$SORTIX_REPOSITORY_DIR; fi
+if [ -n "${SYSROOT+x}" ]; then sysroot=$SYSROOT; fi
+
+if ! $clean; then
   # Create the mirror directory for downloaded archives.
-  mkdir -p "$SORTIX_MIRROR_DIR"
+  mkdir -p "$mirror_dir"
 
   # Add the platform triplet to the binary repository path.
-  if [ "$OPERATION" = build ]; then
-    SORTIX_REPOSITORY_DIR="$SORTIX_REPOSITORY_DIR/$HOST"
-    mkdir -p "$SORTIX_REPOSITORY_DIR"
+  if [ "$operation" = build ]; then
+    repository_dir="$repository_dir/$host"
+    mkdir -p "$repository_dir"
   fi
 
   # Create the system root if absent.
-  if [ "$OPERATION" = build ]; then
-    mkdir -p "$SYSROOT"
+  if [ "$operation" = build ]; then
+    mkdir -p "$sysroot"
   fi
 fi
 
 # Make paths absolute for later use.
-if ! $CLEAN; then
-  SORTIX_MIRROR_DIR=$(make_dir_path_absolute "$SORTIX_MIRROR_DIR")
+if ! $clean; then
+  mirror_dir=$(make_dir_path_absolute "$mirror_dir")
 fi
-SORTIX_PORTS_DIR=$(make_dir_path_absolute "$SORTIX_PORTS_DIR")
-if [ "$OPERATION" = build ]; then
-  SYSROOT=$(make_dir_path_absolute "$SYSROOT")
-  SORTIX_REPOSITORY_DIR=$(make_dir_path_absolute "$SORTIX_REPOSITORY_DIR")
+ports_dir=$(make_dir_path_absolute "$ports_dir")
+if [ "$operation" = build ]; then
+  sysroot=$(make_dir_path_absolute "$sysroot")
+  repository_dir=$(make_dir_path_absolute "$repository_dir")
 fi
 
 # Decide the optimization options with which the ports will be built.
@@ -115,37 +146,65 @@ if [ -z "${PORTS_CFLAGS+x}" ]; then PORTS_CFLAGS="$PORTS_OPTLEVEL"; fi
 if [ -z "${PORTS_CXXFLAGS+x}" ]; then PORTS_CXXFLAGS="$PORTS_OPTLEVEL"; fi
 if [ -z "${CFLAGS+x}" ]; then CFLAGS="$PORTS_CFLAGS"; fi
 if [ -z "${CXXFLAGS+x}" ]; then CXXFLAGS="$PORTS_CXXFLAGS"; fi
-WERRORFORMAT="-Werror=format -Wno-error=format-contains-nul"
+werrorformat="-Werror=format -Wno-error=format-contains-nul"
 # TODO: After releasing Sortix 1.1, use these new options conditionally.
-if [ "$OPERATION" = build ] && \
+if [ "$operation" = build ] && \
    ! "$HOST-gcc" --version | grep -Eq ' \(GCC\) 5\.2\.0$'; then
-  WERRORFORMAT="$WERRORFORMAT -Wno-error=format-overflow -Wno-error=format-truncation"
+  werrorformat="$werrorformat -Wno-error=format-overflow -Wno-error=format-truncation"
 fi
-CFLAGS="$CFLAGS $WERRORFORMAT -Werror=implicit-function-declaration"
-CXXFLAGS="$CXXFLAGS $WERRORFORMAT"
+CFLAGS="$CFLAGS $werrorformat -Werror=implicit-function-declaration"
+CXXFLAGS="$CXXFLAGS $werrorformat"
 export CFLAGS
 export CXXFLAGS
 
+# Avoid unintended environment variables leaking into the build. All variables
+# used as parameters to this script must be unset here, as well as user
+# parameters to the top-level makefile, unless they are explicitly intended for
+# tix-metabuild.
+unset BUILD
+unset BUILD_ID
+unset DOWNLOAD_PACKAGES
+unset HOST
+unset LEAN
+unset PACKAGES
+unset PORTS_CFLAGS
+unset PORTS_CXXFLAGS
+unset PORTS_OPTLEVEL
+unset RELEASE_URL
+unset SIGNING_KEY
+unset SIGNING_KEY_SEARCH
+unset SIGNING_PUBLIC_KEY
+unset SIGNING_SECRET_KEY
+unset SORTIX_MIRROR_DIR
+unset SORTIX_PORTS_DIR
+unset SORTIX_PORTS_MIRROR
+unset SORTIX_REPOSITORY_DIR
+unset SYSROOT
+unset TARGET
+unset CHANNEL
+unset RELEASE
+unset RELEASE_AUTHORITATIVE
+
 # Build and install all the packages.
 tix-metabuild \
-  ${BUILD:+--build="$BUILD"} \
-  ${BUILD_ID+--build-id="$BUILD_ID"} \
-  $CACHE_PACKAGE \
-  ${SYSROOT:+--collection="$SYSROOT"} \
-  ${SORTIX_REPOSITORY_DIR:+--destination="$SORTIX_REPOSITORY_DIR"} \
-  $DISTCLEAN \
-  $DOWNLOAD_PACKAGES \
-  ${END:+--end="$END"} \
+  ${build:+--build="$build"} \
+  ${build_id+--build-id="$build_id"} \
+  $cache_package \
+  ${sysroot:+--collection="$sysroot"} \
+  ${repository_dir:+--destination="$repository_dir"} \
+  $distclean \
+  $download_packages \
+  ${end:+--end="$end"} \
   --generation=3 \
-  ${HOST:+--host="$HOST"} \
-  ${LEAN} \
-  ${SORTIX_PORTS_MIRROR:+--mirror="$SORTIX_PORTS_MIRROR"} \
-  ${SORTIX_MIRROR_DIR:+--mirror-directory="$SORTIX_MIRROR_DIR"} \
-  --packages="${PACKAGES-all!!}" \
+  ${host:+--host="$host"} \
+  ${lean} \
+  ${ports_mirror:+--mirror="$ports_mirror"} \
+  ${mirror_dir:+--mirror-directory="$mirror_dir"} \
+  --packages="${packages-all!!}" \
   --prefix= \
-  $RANDOMIZE \
-  ${SIGNING_PUBLIC_KEY+--release-key="$SIGNING_PUBLIC_KEY"} \
-  ${RELEASE_URL+--release-url="$RELEASE_URL"} \
-  ${START:+--start="$START"} \
-  ${SYSROOT:+--sysroot="$SYSROOT"} \
-  "$SORTIX_PORTS_DIR"
+  $randomize \
+  ${signing_public_key+--release-key="$signing_public_key"} \
+  ${release_url+--release-url="$release_url"} \
+  ${start:+--start="$start"} \
+  ${sysroot:+--sysroot="$sysroot"} \
+  "$ports_dir"
