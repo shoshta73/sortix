@@ -217,7 +217,7 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		if ( !CopyFromUser(&ctl, ptr, sizeof(ctl)) )
 			return -1;
 		struct psctl_groups resp = ctl;
-		kthread_mutex_unlock(&process->id_lock);
+		kthread_mutex_lock(&process->id_lock);
 		if ( ctl.groups )
 		{
 			if ( (size_t) process->groups_length < resp.length )
@@ -231,7 +231,7 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		}
 		else
 			resp.length = (size_t) process->groups_length;
-		kthread_mutex_lock(&process->thread_lock);
+		kthread_mutex_unlock(&process->id_lock);
 		if ( !CopyToUser(ptr, &resp, sizeof(resp)) )
 			return -1;
 		return 0;
