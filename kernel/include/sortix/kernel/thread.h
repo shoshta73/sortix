@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021-2022, 2024-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021-2022, 2024-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -29,12 +29,14 @@
 
 #include <sortix/kernel/clock.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/refcount.h>
 #include <sortix/kernel/registers.h>
 #include <sortix/kernel/scheduler.h>
 #include <sortix/kernel/signal.h>
 
 namespace Sortix {
 
+class Descriptor;
 class Process;
 class Thread;
 
@@ -110,6 +112,9 @@ public:
 	Thread* kutex_prev_waiting;
 	Thread* kutex_next_waiting;
 	enum yield_operation yield_operation;
+	kthread_mutex_t strace_lock;
+	Ref<Descriptor> strace_log;
+	int strace_flags;
 
 public:
 	void HandleSignal(struct interrupt_context* intctx);

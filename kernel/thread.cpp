@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2018, 2021-2022, 2024-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2018, 2021-2022, 2024-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -34,6 +34,7 @@
 #include <sortix/signal.h>
 
 #include <sortix/kernel/copy.h>
+#include <sortix/kernel/descriptor.h>
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kernel.h>
@@ -92,6 +93,9 @@ Thread::Thread()
 	kutex_prev_waiting = NULL;
 	kutex_next_waiting = NULL;
 	yield_operation = YIELD_OPERATION_NONE;
+	strace_lock = KTHREAD_MUTEX_INITIALIZER;
+	// strace_log initialized in member constructor.
+	strace_flags = 0;
 }
 
 Thread::~Thread()

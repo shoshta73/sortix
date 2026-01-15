@@ -1,0 +1,111 @@
+.Dd January 15, 2026
+.Dt STRACE 1
+.Os
+.Sh NAME
+.Nm strace
+.Nd trace system calls
+.Sh SYNOPSIS
+.Nm strace
+.Op Fl f
+.Op Fl o Ar file
+.Op Fl p Ar pid
+.Ar program
+.Op Ar arguments ...
+.Sh DESCRIPTION
+.Nm
+executes
+.Ar program
+with the provided
+.Ar arguments
+in a new process, tracing all its system calls, and writing their invocations to
+the standard error.
+.Pp
+Each output line contains the system call, the value of the parameters, and the
+return value.
+Every thread in the process is traced, but descendant processes are not traced
+unless the option
+.Fl f
+is used.
+.Nm
+will exit when it is no longer tracing any processes.
+.Pp
+The options are as follows:
+.Bl -tag -width "12345678"
+.It Fl f
+Recursively trace all descendant processes and all their threads.
+.It Fl o Ar file
+Write the system call invocations to the
+.Ar file
+instead of the standard error.
+If
+.Fl p
+is not used, then all signals will be blocked in order to make
+.Nm
+into a silent observer that doesn't act on the signals.
+.It Fl p Ar pid
+Attach to the process with this
+.Ar pid
+instead of starting a new process.
+.El
+.Sh FILES
+.Bl -tag
+.It Pa /include/sortix/syscall.h
+Public system call numbers.
+.It Pa /include/sortix/kernel/syscall.h
+Internal kernel function signatures for each system call.
+.El
+.Sh EXIT STATUS
+.Nm
+will exit as the invoked program did when all traced processes have exited,
+exit 125 on an error, and exit 127 if the
+.Ar program
+does could not be executed.
+.Pp
+If
+.Fl p
+is used, then
+.Nm
+exits 0 on success instead.
+.Ed
+.Sh HISTORY
+.Nm
+is meant to be compatible with the traditional program that is portable to
+many systems.
+This implementation originally appeared in Sortix 1.1.
+.Sh BUGS
+The underlying
+.Xr psctl 2
+.Sy PSTCTL_STRACE
+system call is not yet considered and and official kernel interface yet, and
+will be changed in the future, possibly to become
+.Xr ptrace 2 .
+This interface is not subject to the usual kernel ABI compatibility rules.
+The
+.Nm
+program and the
+.Xr kernel 7
+must be synchronized as compatible versions from the same base system.
+.Pp
+.Nm
+is using a fundamentally asynchronous kernel implementation, where the kernel
+fill a
+.Xr pipe 2
+buffer with system call details, which
+.Nm strace
+will report after the fact.
+Traditionally
+.Nm
+is synchronous, which is not the case here yet.
+.Pp
+.Nm
+is not able to peek inside the memory of processes, and cannot deference
+pointers to input/output data.
+It also is not aware of the format of the data structures, even if it could
+access the memory.
+Pointers will be written only as their numeric value and type.
+.Sh SEE ALSO
+.Xr gdb 1 ,
+.Xr time 1 ,
+.Xr timeout 1 ,
+.Xr psctl 2 ,
+.Xr syscall 2

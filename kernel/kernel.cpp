@@ -60,6 +60,7 @@
 #include <sortix/kernel/scheduler.h>
 #include <sortix/kernel/signal.h>
 #include <sortix/kernel/string.h>
+#include <sortix/kernel/syscall.h>
 #include <sortix/kernel/textbuffer.h>
 #include <sortix/kernel/thread.h>
 #include <sortix/kernel/time.h>
@@ -343,6 +344,10 @@ extern "C" void KernelInit(unsigned long magic, void* boot_info_p)
 
 	// Initialize the real-time clock.
 	CMOS::Init();
+
+	// Initialize system calls.
+	Syscall::Init();
+	Syscall::Trace(true);
 
 	// Check a random seed was provided, or try to fallback and warn.
 	int random_status = Random::GetFallbackStatus();

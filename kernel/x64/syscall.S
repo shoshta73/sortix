@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -19,9 +19,9 @@
 
 #include <sortix/syscall.h>
 
-.global syscall_handler
-
 .section .text
+
+.global syscall_handler
 .type syscall_handler, @function
 syscall_handler:
 	cld
@@ -36,13 +36,13 @@ syscall_handler:
 
 1:
 	# Read a system call function pointer.
-	xorq %r11, %r11
-	movq syscall_list(%r11,%rax,8), %rax
+	movq syscall_ptr, %r11
+	movq (%r11,%rax,8), %r10
 
 	# Oh how nice, user-space put the parameters in: rdi, rsi, rdx, rcx, r8, r9
 
 	# Call the system call.
-	callq *%rax
+	callq *%r10
 
 	# Return to user-space, system call result in %rax:%rdx, errno in %ecx.
 	popq %rbp
@@ -90,5 +90,43 @@ syscall_handler:
 	xor %rsi, %rsi
 	xor %r8, %r8
 	jmp 2b
-
 .size syscall_handler, .-syscall_handler
+
+.global strace
+.type strace, @function
+strace:
+	pushq %rbp
+	movq %rsp, %rbp
+	# Make a copy of the parameters, and tell syscall_start what they are.
+	push %rax # rax is a special non-calling-convention parameter here
+	push %rdi
+	push %rsi
+	push %rdx
+	push %rcx
+	push %r8
+	push %r9
+	subq $8, %rsp
+	push %rax # Parameter
+	call syscall_start
+	addq $16, %rsp
+	pop %r9
+	pop %r8
+	pop %rcx
+	pop %rdx
+	pop %rsi
+	pop %rdi
+	pop %rax
+	# Invoke the actual syscall with the real parameters.
+	xorq %r11, %r11
+	movq syscall_list(%r11,%rax,8), %r10
+	callq *%r10
+	# Inform syscall_end what the syscall result was.
+	push %rax
+	mov %rax, %rdi
+	subq $8, %rsp
+	call syscall_end
+	addq $8, %rsp
+	pop %rax
+	pop %rbp
+	ret
+.size strace, .-strace

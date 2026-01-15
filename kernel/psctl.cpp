@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2022, 2024, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022, 2024, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -28,18 +28,22 @@
 #if !defined(TTY_NAME_MAX)
 #include <sortix/limits.h>
 #endif
+#include <sortix/fcntl.h>
 #include <sortix/psctl.h>
 
 #include <sortix/kernel/clock.h>
 #include <sortix/kernel/descriptor.h>
+#include <sortix/kernel/dtable.h>
 #include <sortix/kernel/interrupt.h>
 #include <sortix/kernel/copy.h>
 #include <sortix/kernel/ioctx.h>
 #include <sortix/kernel/kthread.h>
+#include <sortix/kernel/pipe.h>
 #include <sortix/kernel/process.h>
 #include <sortix/kernel/ptable.h>
 #include <sortix/kernel/refcount.h>
 #include <sortix/kernel/syscall.h>
+#include <sortix/kernel/thread.h>
 
 namespace Sortix {
 
@@ -232,6 +236,62 @@ int sys_psctl(pid_t pid, int request, void* ptr)
 		else
 			resp.length = (size_t) process->groups_length;
 		kthread_mutex_unlock(&process->id_lock);
+		if ( !CopyToUser(ptr, &resp, sizeof(resp)) )
+			return -1;
+		return 0;
+	}
+	// NOTE: The psctl(2) PSCTL_STRACE interface is NOT a stable and official
+	//       supported kernel interface at this time. It can only safely be
+	//       used within the base system where strace(1) and kernel(7) match.
+	else if ( request == PSCTL_STRACE )
+	{
+		Process* current_process = CurrentProcess();
+		struct psctl_strace ctl;
+		if ( !CopyFromUser(&ctl, ptr, sizeof(ctl)) )
+			return -1;
+		if ( ctl.flags & ~(PSCTL_STRACE_INHERIT_THREAD |
+		                   PSCTL_STRACE_INHERIT_PROCESS) )
+			return errno = EINVAL, -1;
+		// Tracing the current thread can deadlock before the thread can give
+		// the fd to another thread to read its syscalls. Although this is fine
+		// from a kernel POV, there is no reason to not just make it an error.
+		if ( process == current_process &&
+		     (!ctl.tid || CurrentThread()->system_tid == ctl.tid) )
+			return errno = EPERM, -1;
+		int fdflags = 0;
+		if ( ctl.oflags & O_CLOEXEC ) fdflags |= FD_CLOEXEC;
+		if ( ctl.oflags & O_CLOFORK ) fdflags |= FD_CLOFORK;
+		struct psctl_strace resp = ctl;
+		Ref<Descriptor> recv;
+		Ref<Descriptor> send;
+		if ( !MakePipe(&recv, &send, 0, ctl.oflags) )
+			return -1;
+		Ref<DescriptorTable> dtable = current_process->GetDTable();
+		int reservation;
+		if ( !dtable->Reserve(1, &reservation) )
+			return -1;
+		// TODO: Verify that accessing threads of another thread is safe.
+		bool found = !ctl.tid;
+		ScopedLock thread_lock(&process->thread_lock);
+		for ( Thread* thread = process->first_thread;
+		      thread;
+		      thread = thread->next_sibling )
+		{
+			if ( ctl.tid && thread->system_tid != ctl.tid )
+				continue;
+			// TODO: How should it be handled if multiple calls do this? Can we
+			//       build a multiple subscriper model?
+			ScopedLock strace_lock(&thread->strace_lock);
+			// TODO: Better way to synchronize with the thread to make sure
+			//       stracing is actually turned on.
+			thread->strace_log = send;
+			// TODO: A mechanism for gracefully detaching from a thread.
+			thread->strace_flags = ctl.flags | PSCTL_STRACE_ENABLE;
+			found = true;
+		}
+		if ( !found )
+			return dtable->Unreserve(&reservation), errno = ESRCH;
+		resp.fd = dtable->Allocate(recv, fdflags, 0, &reservation);
 		if ( !CopyToUser(ptr, &resp, sizeof(resp)) )
 			return -1;
 		return 0;

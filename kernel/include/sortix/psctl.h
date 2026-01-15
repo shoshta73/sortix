@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2022, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2022, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,6 +45,11 @@ typedef __pid_t pid_t;
 #ifndef __uid_t_defined
 #define __uid_t_defined
 typedef __uid_t uid_t;
+#endif
+
+#ifndef __tid_t_defined
+#define __tid_t_defined
+typedef __tid_t tid_t;
 #endif
 
 #define __PSCTL(s, v) (sizeof(struct s) << 16 | (v))
@@ -113,6 +118,21 @@ struct psctl_groups
 {
 	gid_t* groups;
 	size_t length;
+};
+
+#define PSCTL_STRACE __PSCTL(psctl_strace, 7)
+#define PSCTL_STRACE_INHERIT_THREAD (1 << 0)
+#define PSCTL_STRACE_INHERIT_PROCESS (1 << 1)
+#define PSCTL_STRACE_ENABLE (1 << 31)
+struct psctl_strace
+{
+	__extension__ union
+	{
+		int oflags;
+		int fd;
+	};
+	int flags;
+	tid_t tid;
 };
 
 #endif

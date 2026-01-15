@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014, 2017, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2017, 2021, 2025-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,6 +59,9 @@ private:
 	bool reading;
 
 };
+
+bool MakePipe(Ref<Descriptor>* recv, Ref<Descriptor>* send,
+              int flags_recv, int flags_send);
 
 } // namespace Sortix
 

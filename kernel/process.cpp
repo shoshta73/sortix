@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,6 +36,7 @@
 #include <sortix/fork.h>
 #include <sortix/limits.h>
 #include <sortix/mman.h>
+#include <sortix/psctl.h>
 #include <sortix/resource.h>
 #include <sortix/signal.h>
 #include <sortix/stat.h>
@@ -1760,6 +1761,20 @@ pid_t sys_tfork(int flags, struct tfork* user_regs)
 		thread->signal_canary = curthread->signal_canary;
 		thread->signal_single = curthread->signal_single;
 	}
+
+	// TODO: Is the all the threads locked here? Is it possible for for another
+	//       thread to mess with our new thread and maybe process, before we're
+	//       finished initializing it?
+	ScopedLock lock_strace(&curthread->strace_lock);
+	int strace_flags = curthread->strace_flags ;
+	if ( strace_flags &&
+	     ((making_process && (strace_flags & PSCTL_STRACE_INHERIT_PROCESS)) ||
+	      (!making_process && (strace_flags & PSCTL_STRACE_INHERIT_THREAD))) )
+	{
+		thread->strace_flags = strace_flags;
+		thread->strace_log = curthread->strace_log;
+	}
+	lock_strace.Reset();
 
 	StartKernelThread(thread);
 

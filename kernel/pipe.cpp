@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2021, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1486,15 +1486,16 @@ int PipeNode::poll(ioctx_t* ctx, PollNode* node)
 	return endpoint.poll(ctx, node);
 }
 
-int sys_pipe2(int* pipefd, int flags)
+bool MakePipe(Ref<Descriptor>* recv, Ref<Descriptor>* send,
+              int flags_recv, int flags_send)
 {
-	int fdflags = 0;
-	if ( flags & O_CLOEXEC ) fdflags |= FD_CLOEXEC;
-	if ( flags & O_CLOFORK ) fdflags |= FD_CLOFORK;
-	flags &= ~(O_CLOEXEC | O_CLOFORK);
+	flags_recv &= ~(O_CLOEXEC | O_CLOFORK);
+	if ( flags_recv & ~(O_NONBLOCK) )
+		return errno = EINVAL, false;
 
-	if ( flags & ~(O_NONBLOCK) )
-		return errno = EINVAL, -1;
+	flags_send &= ~(O_CLOEXEC | O_CLOFORK);
+	if ( flags_send & ~(O_NONBLOCK) )
+		return errno = EINVAL, false;
 
 	Process* process = CurrentProcess();
 	uid_t uid = process->uid;
@@ -1502,21 +1503,38 @@ int sys_pipe2(int* pipefd, int flags)
 	mode_t mode = 0600;
 
 	Ref<PipeNode> recv_inode(new PipeNode(0, uid, gid, mode));
-	if ( !recv_inode ) return -1;
+	if ( !recv_inode ) return false;
 	Ref<PipeNode> send_inode(new PipeNode(0, uid, gid, mode));
-	if ( !send_inode ) return -1;
+	if ( !send_inode ) return false;
 
 	if ( !send_inode->Connect(recv_inode.Get()) )
-		return -1;
+		return false;
 
 	Ref<Vnode> recv_vnode(new Vnode(recv_inode, Ref<Vnode>(NULL), 0, 0));
 	Ref<Vnode> send_vnode(new Vnode(send_inode, Ref<Vnode>(NULL), 0, 0));
-	if ( !recv_vnode || !send_vnode ) return -1;
+	if ( !recv_vnode || !send_vnode ) return false;
 
-	Ref<Descriptor> recv_desc(new Descriptor(recv_vnode, O_READ | flags));
-	Ref<Descriptor> send_desc(new Descriptor(send_vnode, O_WRITE | flags));
-	if ( !recv_desc || !send_desc ) return -1;
+	Ref<Descriptor> recv_desc(new Descriptor(recv_vnode, O_READ | flags_recv));
+	Ref<Descriptor> send_desc(new Descriptor(send_vnode, O_WRITE | flags_send));
+	if ( !recv_desc || !send_desc ) return false;
 
+	return *recv = recv_desc, *send = send_desc, true;
+}
+
+int sys_pipe2(int* pipefd, int flags)
+{
+	int fdflags = 0;
+	if ( flags & O_CLOEXEC ) fdflags |= FD_CLOEXEC;
+	if ( flags & O_CLOFORK ) fdflags |= FD_CLOFORK;
+	flags &= ~(O_CLOEXEC | O_CLOFORK);
+	if ( flags & ~(O_NONBLOCK) )
+		return errno = EINVAL, -1;
+
+	Ref<Descriptor> recv_desc, send_desc;
+	if ( !MakePipe(&recv_desc, &send_desc, flags, flags) )
+		return -1;
+
+	Process* process = CurrentProcess();
 	Ref<DescriptorTable> dtable = process->GetDTable();
 	int reservation;
 	if ( !dtable->Reserve(2, &reservation) )

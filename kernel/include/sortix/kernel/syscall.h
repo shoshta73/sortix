@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -206,6 +206,13 @@ pid_t sys_waitpid(pid_t, int*, int);
 ssize_t sys_write(int, const void*, size_t);
 ssize_t sys_writev(int, const struct iovec*, int);
 uint64_t sys_wrmsr(uint32_t, uint64_t);
+
+namespace Syscall {
+
+void Init();
+void Trace(bool enable);
+
+} // namespace Syscall
 
 } // namespace Sortix
 

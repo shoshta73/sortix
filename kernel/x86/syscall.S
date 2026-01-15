@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -45,10 +45,6 @@ syscall_handler:
 	jae 3f
 
 1:
-	# Read a system call function pointer.
-	xorl %ebp, %ebp
-	movl syscall_list(%ebp,%eax,4), %eax
-
 	# Point the %ebp register to the pushed user-space %ebp above.
 	movl %esp, %ebp
 	addl $4, %ebp
@@ -61,7 +57,10 @@ syscall_handler:
 	pushl %ecx
 	pushl %ebx
 	/* -- stack is 16-byte aligned -- */
-	calll *%eax
+	# Read a system call function pointer.
+	movl syscall_ptr, %edx
+	movl (%edx,%eax,4), %edx
+	calll *%edx
 	addl $20, %esp
 
 	# Restore the previous permissions to data segment.
@@ -107,3 +106,48 @@ syscall_handler:
 	jmp 2b
 
 .size syscall_handler, .-syscall_handler
+
+.global strace
+.type strace, @function
+strace:
+	pushl %ebp
+	movl %esp, %ebp
+	# Make two copies of the parameters, and tell syscall_start what they are.
+	pushl %edi
+	pushl %esi
+	pushl %ebx
+	movl %eax, %ebx # eax is a special non-calling-convention parameter here
+	subl $20, %esp
+	movl 20(%ebp), %esi
+	movl 24(%ebp), %edi
+	pushl %eax
+	pushl %edi
+	pushl %esi
+	pushl 16(%ebp)
+	pushl 12(%ebp)
+	pushl 8(%ebp)
+	call syscall_start
+	# Invoke the actual syscall with the other copy of the parameters.
+	addl $20, %esp
+	pushl %edi
+	pushl %esi
+	pushl 16(%ebp)
+	pushl 12(%ebp)
+	pushl 8(%ebp)
+	call *syscall_list(,%ebx,4)
+	# Inform syscall_end what the syscall result was.
+	movl %eax, %esi
+	movl %edx, %edi
+	addl $24, %esp
+	pushl %edx
+	pushl %eax
+	call syscall_end
+	leal -12(%ebp), %esp
+	movl %esi, %eax
+	movl %edi, %edx
+	popl %ebx
+	popl %esi
+	popl %edi
+	popl %ebp
+	ret
+.size strace, .-strace

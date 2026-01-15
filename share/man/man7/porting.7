@@ -290,6 +290,23 @@ Finally perform the quality assurance and testing of new ports.
 .Sh EXAMPLES
 This section describes common situations and portability issues and how to
 resolve them.
+.Ss Debugging
+Ports may have bugs that need to be debugged before the
+.Xr port 5
+is ready for publication.
+.Pp
+.Xr strace 1
+is handy as an initial investigation into the behavior of a misbehaving program
+and may suggest additional avenues of investigation.
+.Pp
+There is unfortunately not yet a port of
+.Xr gdb 1 ,
+although
+.Xr printf 3
+is generally useful as a quick-and-dirty debugging mechanism if there is a good
+guess where the bug is happening.
+Patching the port, the libc, or even the kernel to obtain additional debug
+information is often a valid strategy.
 .Ss config.sub
 The
 .Pa config.sub

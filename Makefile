@@ -33,6 +33,7 @@ regress \
 rw \
 sf \
 sh \
+strace \
 sysinstall \
 terminal \
 tix \

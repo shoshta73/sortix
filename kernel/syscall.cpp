@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -18,11 +18,17 @@
  */
 
 #include <errno.h>
+#include <signal.h>
 #include <stddef.h>
 
 #include <sortix/syscall.h>
 
+#include <sortix/kernel/descriptor.h>
+#include <sortix/kernel/ioctx.h>
+#include <sortix/kernel/kthread.h>
 #include <sortix/kernel/log.h>
+#include <sortix/kernel/process.h>
+#include <sortix/kernel/thread.h>
 #include <sortix/kernel/syscall.h>
 
 namespace Sortix {
@@ -219,11 +225,116 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_SOCKATMARK] = (void*) sys_sockatmark,
 	[SYSCALL_MAX_NUM] = (void*) sys_bad_syscall,
 };
+void* strace_list[SYSCALL_MAX_NUM + 1];
+void** syscall_ptr = syscall_list;
+void strace(void);
 } /* extern "C" */
+
+static kthread_mutex_t global_strace_lock = KTHREAD_MUTEX_INITIALIZER;
+
+static void strace_message(Thread* thread, const char* msg)
+{
+	sigset_t set, oldset;
+	sigfillset(&set);
+	Signal::UpdateMask(SIG_SETMASK, &set, &oldset);
+	// TODO: Avoid SIGPIPE.
+	ioctx_t ctx; SetupKernelIOCtx(&ctx);
+	size_t sofar = 0;
+	size_t count = strlen(msg);
+	// TODO: A global strace lock is suboptimal, but does ensure that the pipe
+	//       messages are not interleaved if multiple threads are traced on the
+	//       same pipe at the same time. We can avoid this by either making the
+	//       lock per-strace-pipe or implementing PIPE_BUF semantics.
+	ScopedLock lock(&global_strace_lock);
+	while ( sofar < count )
+	{
+		ssize_t amount = thread->strace_log->write(&ctx, (uint8_t*) msg + sofar,
+		                                           count - sofar);
+		if ( amount < 0 )
+			break;
+		sofar += amount;
+	}
+	lock.Reset();
+	Signal::UpdateMask(SIG_SETMASK, &oldset, NULL);
+}
+
+extern "C"
+#if defined(__x86_64__)
+void syscall_start(uint64_t rdi, uint64_t rsi, uint64_t rdx, uint64_t rcx,
+                   uint64_t r8, uint64_t r9, uint64_t rax)
+#elif defined(__i386__)
+void syscall_start(uint32_t p1, uint32_t p2, uint32_t p3, uint32_t p4,
+                   uint32_t p5, uint32_t eax)
+#else
+#warning "You need to implement syscall_start"
+void syscall_start(void)
+#endif
+{
+	Thread* thread = CurrentThread();
+	ScopedLock lock(&thread->strace_lock);
+	if ( !thread->strace_flags || !thread->strace_log )
+		return;
+	char msg[256];
+	msg[0] = 0;
+#if defined(__x86_64__)
+	snprintf(msg, sizeof(msg),
+	         "%jd 0x%lx 0x%lx(0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx, 0x%lx)\n",
+	         (intmax_t) thread->process->pid, thread->system_tid,
+	         rax, rdi, rsi, rdx, rcx, r8, r9);
+#elif defined(__i386__)
+	snprintf(msg, sizeof(msg),
+	         "%jd 0x%x 0x%x(0x%x, 0x%x, 0x%x, 0x%x, 0x%x)\n",
+	         (intmax_t) thread->process->pid, thread->system_tid,
+	         eax, p1, p2, p3, p4, p5);
+#endif
+	strace_message(thread, msg);
+}
+
+extern "C"
+#if defined(__x86_64__) || defined(__i386__)
+void syscall_end(uint64_t result)
+#else
+#warning "You need to implement syscall_end"
+void syscall_end(void)
+#endif
+{
+	Thread* thread = CurrentThread();
+	ScopedLock lock(&thread->strace_lock);
+	if ( !thread->strace_flags || !thread->strace_log )
+		return;
+	char msg[256];
+	msg[0] = 0;
+#if defined(__x86_64__)
+	snprintf(msg, sizeof(msg), "%jd 0x%lx = 0x%lx (%d)\n",
+	         (intmax_t) thread->process->pid, thread->system_tid,
+	         result, errno);
+#elif defined(__i386__)
+	snprintf(msg, sizeof(msg), "%jd 0x%x = 0x%llx (%d)\n",
+	         (intmax_t) thread->process->pid, thread->system_tid,
+	         (unsigned long long) result, errno);
+#endif
+	strace_message(thread, msg);
+}
 
 int sys_bad_syscall(void)
 {
 	return errno = ENOSYS, -1;
 }
+
+namespace Syscall {
+
+void Init()
+{
+	for ( size_t i = 0; i <= SYSCALL_MAX_NUM; i++ )
+		strace_list[i] = (void*) strace;
+}
+
+void Trace(bool enable)
+{
+	syscall_ptr = enable ? strace_list : syscall_list;
+}
+
+
+} // namespace Syscall
 
 } // namespace Sortix

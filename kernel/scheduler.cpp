@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2015, 2021-2022, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2015, 2021-2022, 2024, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -259,6 +259,7 @@ static void SwitchRegisters(struct interrupt_context* intctx,
 	Random::Mix(Random::SOURCE_PREEMPTION, intctx, sizeof(*intctx));
 	SaveInterruptedContext(intctx, &prev->registers);
 	LoadInterruptedContext(intctx, &next->registers);
+	Syscall::Trace(next->strace_flags != 0);
 
 	current_thread = next;
 }
