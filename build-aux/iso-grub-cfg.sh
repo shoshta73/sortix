@@ -129,7 +129,7 @@ list_set() {
 cd "$directory"
 
 
-kernel=$(maybe_compressed boot/sortix.bin)
+kernel=$(maybe_compressed boot/sortix)
 if $mount; then
   initrd=$(maybe_compressed boot/sortix.initrd)
   initrds=$initrd

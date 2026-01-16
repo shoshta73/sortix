@@ -652,7 +652,7 @@ $(SORTIX_BUILDS_DIR)/$(BUILD_NAME).iso: sysroot $(LIVE_INITRD) $(ISO_DEPS) $(ISO
 	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot
 ifeq ($(ISO_MOUNT),yes)
 	tar -C $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso -xf $(LIVE_INITRD)
-	cp "$(SYSROOT)/boot/sortix.bin" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin
+	cp "$(SYSROOT)/boot/sortix" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix
 	cp $(CHAIN_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.initrd
 	mkdir -p $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc
 	echo "VOLUME_SET_ID=`cat $(ISO_VOLSET_ID_FILE)` / iso9660 ro 0 1" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/etc/fstab
@@ -665,21 +665,21 @@ else
 	HOST="$(HOST)" \
 	build-aux/iso-repository.sh $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository
 ifeq ($(SORTIX_ISO_COMPRESSION),xz)
-	xz -c "$(SYSROOT)/boot/sortix.bin" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin.xz
+	xz -c "$(SYSROOT)/boot/sortix" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.xz
 	xz -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar.xz
 	test ! -e "$(OVERLAY_INITRD)" || \
 	xz -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.xz
 	xz -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.xz
 	xz -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar.xz
 else ifeq ($(SORTIX_ISO_COMPRESSION),gzip)
-	gzip -c "$(SYSROOT)/boot/sortix.bin" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin.gz
+	gzip -c "$(SYSROOT)/boot/sortix" > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.gz
 	gzip -c $(LIVE_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar.gz
 	test ! -e "$(OVERLAY_INITRD)" || \
 	gzip -c $(OVERLAY_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar.gz
 	gzip -c $(SRC_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/src.tar.gz
 	gzip -c $(SYSTEM_INITRD) > $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/repository/system.tix.tar.gz
 else # none
-	cp "$(SYSROOT)/boot/sortix.bin" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix.bin
+	cp "$(SYSROOT)/boot/sortix" $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/sortix
 	cp $(LIVE_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/live.tar
 	test ! -e "$(OVERLAY_INITRD)" || \
 	cp $(OVERLAY_INITRD) $(SORTIX_BUILDS_DIR)/$(BUILD_NAME)-iso/boot/overlay.tar
@@ -716,8 +716,8 @@ endif
 $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot: $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)
 	mkdir -p $@
 
-$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.bin.xz: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
-	xz -c "$(SYSROOT)/boot/sortix.bin" > $@
+$(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.xz: sysroot $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
+	xz -c "$(SYSROOT)/boot/sortix" > $@
 
 $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.tar.xz: $(LIVE_INITRD) $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot
 	xz -c $< > $@
@@ -730,7 +730,7 @@ $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.tar.xz: $(SRC_INITRD) $(SOR
 
 .PHONY: release-boot
 release-boot: \
-  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.bin.xz \
+  $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/sortix.xz \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/live.tar.xz \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/overlay.tar.xz \
   $(SORTIX_RELEASE_DIR)/$(RELEASE)/$(MACHINE)/boot/src.tar.xz \
