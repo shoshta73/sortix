@@ -190,14 +190,14 @@ LINK_OBJECTS=$(OBJS) $(LIBS) end.o
 
 all: kernel
 
-kernel: sortix.bin
+kernel: sortix
 
 .PHONY: all kernel headers clean install install-include-dirs install-headers \
         install-kernel install-kernel-binary
 
 headers:
 
-sortix.bin: $(ALLOBJS)
+sortix: $(ALLOBJS)
 	$(CXX) $(CXXFLAGS) $(LDADD) $(LINK_OBJECTS) -o $@
 
 %: %.kblayout
@@ -219,7 +219,7 @@ vgafont.h: vgafont.f16
 	$(CXX) -c $< -o $@ $(CPPFLAGS) $(CXXFLAGS)
 
 clean:
-	rm -f $(ALLOBJS) sortix.bin
+	rm -f $(ALLOBJS) sortix
 	rm -f *.bin *.out *.tmp
 	rm -f *.o */*.o */*/*.o
 	rm -f kb/default-kblayout kb/default-kblayout.h
@@ -237,6 +237,9 @@ install-headers: install-include-dirs headers
 
 install-kernel: install-kernel-binary
 
-install-kernel-binary: sortix.bin
+install-kernel-binary: sortix
 	mkdir -m 755 -p $(DESTDIR)$(BOOTDIR)
-	install -m 755 sortix.bin $(DESTDIR)$(BOOTDIR)/sortix.bin
+	install -m 755 sortix $(DESTDIR)$(BOOTDIR)/sortix
+	# TODO: After releasing Sortix 1.1, remove this compatibility needed to
+	#       bootstrap on Sortix 1.0.
+	ln -fs sortix $(DESTDIR)$(BOOTDIR)/sortix.bin

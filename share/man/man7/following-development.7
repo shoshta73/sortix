@@ -69,6 +69,39 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Rename kernel from /boot/sortix.bin to /boot/sortix
+The
+.Xr kernel(7)
+is renamed from
+.Pa /boot/sortix.bin
+to
+.Pa /boot/sortix .
+.Pp
+The kernel continues to be hardlinked to the old
+.Pa /boot/sortix.bin
+name for compatibility with the 1.0 stable release, and will be removed after
+the next stable release.
+This backwards compatibility is required because
+.Xr sysmerge 8
+on the 1.0 release does not implement the
+.Pa /sysmerge/libexec/sysmerge/grub
+protocol that would've made it aware of the new name, and it instead
+unconditionally boots the old kernel name.
+.Pp
+The
+.Pa /etc/default/grub.d/10_sortix
+script in the GRUB port has been updated to use the new name.
+Installations using the provided bootloader require no further actions.
+Installations manually using
+.Pa /etc/default/grub.d/10_sortix.include
+will be automatically migrated.
+Installations manually using a copy of
+.Pa /etc/default/grub.d/10_sortix.cache
+will need to switch to the newer
+.Pa /etc/default/grub.d/10_sortix.include
+mechanism.
+Installations otherwise using a manually supplied bootloader are not supported
+and will need to migrate to the new name as of the next stable release.
 .Ss Add multiboot2 support
 The
 .Xr kernel 7
