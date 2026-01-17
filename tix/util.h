@@ -1119,18 +1119,42 @@ bool recovery_print_attempted_execution(void)
 
 bool recovery_run_shell(void)
 {
+	// fork_and_wait_or_recovery already checked fd 0 is a tty. fds 1 and 2
+	// might not be the terminal at this point.
+	int tty_fd = 0;
+
+	sigset_t oldset, sigttou;
+	sigemptyset(&sigttou);
+	sigaddset(&sigttou, SIGTTOU);
+
 	pid_t child_pid = fork();
 	if ( child_pid < 0 )
 		return false;
 
 	if ( !child_pid )
 	{
+		// Wait until our process group is in the foreground.
+		pid_t pgid;
+		while ( tcgetpgrp(tty_fd) != (pgid = getpgid(0)) )
+			kill(-pgid, SIGTTIN);
+		// Become a new process group.
+		if ( pgid != getpid() )
+			pgid = setpgid(0, 0);
+		// Become the new foreground process group.
+		sigprocmask(SIG_BLOCK, &sigttou, &oldset);
+		tcsetpgrp(tty_fd, getpgid(0));
+		sigprocmask(SIG_SETMASK, &oldset, NULL);
 		recovery_configure_state_def(true, RECOVERY_STATE_RUN_SHELL);
 		return true;
 	}
 
 	int status;
 	waitpid(child_pid, &status, 0);
+
+	// Reclaim being the foreground process group.
+	sigprocmask(SIG_BLOCK, &sigttou, &oldset);
+	tcsetpgrp(tty_fd, getpgid(0));
+	sigprocmask(SIG_SETMASK, &oldset, NULL);
 
 	return false;
 }
@@ -1141,7 +1165,7 @@ int recovery_execvp(const char* path, char* const* argv)
 		return execvp(path, argv);
 
 	// Make sure that stdout and stderr go to an interactive terminal.
-	if ( !isatty(1) )
+	if ( !isatty(1) || !isatty(2) )
 	{
 		int dev_tty = open("/dev/tty", O_WRONLY);
 		if ( 0 <= dev_tty )
