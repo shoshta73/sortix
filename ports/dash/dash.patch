@@ -70,15 +70,6 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  #ifdef BSD
  #include <sys/wait.h>
  #include <sys/time.h>
-@@ -212,7 +211,7 @@
- 				mflag = on = 0;
- 				goto close;
- 			}
--			if (pgrp == getpgrp())
-+			if (pgrp == getpgid(0))
- 				break;
- 			killpg(0, SIGTTIN);
- 		} while (1);
 @@ -461,7 +460,7 @@
  
  	if (mode & SHOW_PGID) {
@@ -106,7 +97,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  
  start:
  		outfmt(
-@@ -971,7 +970,7 @@
+@@ -968,7 +967,7 @@
  	sigblockall(NULL);
  	vforked++;
  
@@ -115,7 +106,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
  
  	if (!pid) {
  		forkchild(jp, n, FORK_FG);
-@@ -1179,7 +1178,7 @@
+@@ -1176,7 +1175,7 @@
  	do {
  		gotsigchld = 0;
  		do
@@ -127,7 +118,7 @@ diff -Paur --no-dereference -- dash.upstream/src/jobs.c dash/src/jobs.c
 diff -Paur --no-dereference -- dash.upstream/src/Makefile.in dash/src/Makefile.in
 --- dash.upstream/src/Makefile.in
 +++ dash/src/Makefile.in
-@@ -669,12 +669,14 @@
+@@ -670,12 +670,14 @@
  		-rm -f ./$(DEPDIR)/alias.Po
  	-rm -f ./$(DEPDIR)/arith_yacc.Po
  	-rm -f ./$(DEPDIR)/arith_yylex.Po
@@ -142,7 +133,7 @@ diff -Paur --no-dereference -- dash.upstream/src/Makefile.in dash/src/Makefile.i
  	-rm -f ./$(DEPDIR)/input.Po
  	-rm -f ./$(DEPDIR)/jobs.Po
  	-rm -f ./$(DEPDIR)/mail.Po
-@@ -682,11 +684,14 @@
+@@ -683,11 +685,14 @@
  	-rm -f ./$(DEPDIR)/memalloc.Po
  	-rm -f ./$(DEPDIR)/miscbltin.Po
  	-rm -f ./$(DEPDIR)/mystring.Po
@@ -193,7 +184,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  #include <stdlib.h>
  
  #include "shell.h"
-@@ -1137,10 +1134,12 @@
+@@ -1128,10 +1125,12 @@
  				if (len) {
  					char *str;
  
@@ -207,7 +198,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  				}
  			}
  		}
-@@ -1373,7 +1372,7 @@
+@@ -1363,7 +1362,7 @@
  	str = NULL;
  	savelen = out - (char *)stackblock();
  	if (savelen > 0) {
@@ -216,7 +207,7 @@ diff -Paur --no-dereference -- dash.upstream/src/parser.c dash/src/parser.c
  		memcpy(str, stackblock(), savelen);
  	}
          if (oldstyle) {
-@@ -1463,6 +1462,7 @@
+@@ -1449,6 +1448,7 @@
  	if (str) {
  		memcpy(out, str, savelen);
  		STADJUST(savelen, out);
