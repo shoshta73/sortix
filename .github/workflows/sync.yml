@@ -1,5 +1,8 @@
 name: Sync with official Sortix repo
 
+permissions:
+  contents: write
+
 on:
   schedule:
     # 08:00 UTC+1 = 07:00 UTC
