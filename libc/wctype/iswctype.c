@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,5 +21,5 @@
 
 int iswctype(wint_t c, wctype_t wct)
 {
-	return wct(c);
+	return wct ? wct(c) : 0;
 }
