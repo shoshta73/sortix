@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2015, 2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2015, 2016, 2022, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -454,10 +454,11 @@ int getaddrinfo(const char* restrict node,
 		{
 			sin.sin_family = AF_INET;
 			sin.sin_port = htobe16(port);
-			if ( flags & AI_PASSIVE )
-				sin.sin_addr.s_addr = htobe32(INADDR_ANY);
-			else
+			if ( (node && !strcasecmp(node, "localhost")) ||
+			     !(flags & AI_PASSIVE) )
 				sin.sin_addr.s_addr = htobe32(INADDR_LOOPBACK);
+			else
+				sin.sin_addr.s_addr = htobe32(INADDR_ANY);
 			struct addrinfo templ;
 			memset(&templ, 0, sizeof(templ));
 			templ.ai_family = sin.sin_family;
@@ -476,10 +477,11 @@ int getaddrinfo(const char* restrict node,
 			sin6.sin6_family = AF_INET6;
 			sin6.sin6_port = htobe16(port);
 			sin6.sin6_flowinfo = 0;
-			if ( flags & AI_PASSIVE )
-				sin6.sin6_addr = in6addr_any;
-			else
+			if ( (node && !strcasecmp(node, "localhost")) ||
+			     !(flags & AI_PASSIVE) )
 				sin6.sin6_addr = in6addr_loopback;
+			else
+				sin6.sin6_addr = in6addr_any;
 			sin6.sin6_scope_id = 0;
 			struct addrinfo templ;
 			memset(&templ, 0, sizeof(templ));
