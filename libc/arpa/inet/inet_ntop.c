@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2020 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2020, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -42,8 +42,17 @@ const char* inet_ntop(int af,
 	}
 	else if ( af == AF_INET6 )
 	{
-		// TODO: When should x:x:x:x:x:x:d.d.d.d notation be used?
 		const unsigned char* ip = (const unsigned char*) src;
+		unsigned char mapped[12] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF};
+		if ( !memcmp(ip, mapped, 12) )
+		{
+			int len = snprintf(dst, size, "::ffff:%u.%u.%u.%u",
+				               ip[12], ip[13], ip[14], ip[15]);
+			if ( len < 0 )
+				return NULL;
+			if ( size <= (size_t) len )
+				return errno = ENOSPC, (const char*) NULL;
+		}
 		size_t longest_zeroes_offset = 0;
 		size_t longest_zeroes_length = 0;
 		size_t current_zeroes_offset = 0;
