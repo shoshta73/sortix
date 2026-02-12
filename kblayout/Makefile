@@ -11,6 +11,7 @@ LAYOUTS=\
 de \
 dk \
 fi \
+fr \
 uk \
 us \
 
