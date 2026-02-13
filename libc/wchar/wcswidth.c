@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,9 +22,9 @@
 int wcswidth(const wchar_t* wcs, size_t n)
 {
 	int result = 0;
-	for ( size_t i = 0; i < n && wcs[n]; i++ )
+	for ( size_t i = 0; i < n && wcs[i]; i++ )
 	{
-		int columns = wcwidth(wcs[n]);
+		int columns = wcwidth(wcs[i]);
 		if ( columns < 0 )
 			return -1;
 		result += columns;
