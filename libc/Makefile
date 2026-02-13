@@ -866,8 +866,12 @@ wctype/iswpunct_l.o \
 wctype/iswspace_l.o \
 wctype/iswupper_l.o \
 wctype/iswxdigit_l.o \
+wctype/towctrans.o \
+wctype/towctrans_l.o \
 wctype/towlower_l.o \
 wctype/towupper_l.o \
+wctype/wctrans.o \
+wctype/wctrans_l.o \
 wctype/wctype_l.o \
 
 OBJS=\

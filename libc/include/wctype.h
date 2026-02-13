@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,10 +26,6 @@
 
 #include <__/wchar.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef __wint_t_defined
 #define __wint_t_defined
 typedef __wint_t wint_t;
@@ -44,11 +40,12 @@ typedef struct __locale* locale_t;
 #define WEOF __WEOF
 #endif
 
-/* TODO: Figure out what this does and typedef it properly. This is just a
-         temporary assignment. */
-typedef unsigned int wctrans_t;
-
+typedef wint_t (*wctrans_t)(wint_t);
 typedef int (*wctype_t)(wint_t);
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 int iswalnum(wint_t);
 int iswalpha(wint_t);
@@ -63,9 +60,11 @@ int iswpunct(wint_t);
 int iswspace(wint_t);
 int iswupper(wint_t);
 int iswxdigit(wint_t);
+wint_t towctrans(wint_t, wctrans_t);
 wint_t towlower(wint_t);
 wint_t towupper(wint_t);
-wctype_t wctype(const char *);
+wctrans_t wctrans(const char*);
+wctype_t wctype(const char*);
 
 #if __USE_SORTIX || 200809L <= __USE_POSIX
 int iswalnum_l(wint_t, locale_t);
@@ -81,17 +80,11 @@ int iswpunct_l(wint_t, locale_t);
 int iswspace_l(wint_t, locale_t);
 int iswupper_l(wint_t, locale_t);
 int iswxdigit_l(wint_t, locale_t);
+wint_t towctrans_l(wint_t, wctrans_t, locale_t);
 wint_t towlower_l(wint_t, locale_t);
 wint_t towupper_l(wint_t, locale_t);
-wctype_t wctype_l(const char *, locale_t);
-#endif
-
-/* TODO: These are not implemented in sortix libc yet. */
-#if 0
-wint_t towctrans(wint_t, wctrans_t);
-wint_t towctrans_l(wint_t, wctrans_t, locale_t);
-wctrans_t wctrans(const char *);
-wctrans_t wctrans_l(const char *, locale_t);
+wctrans_t wctrans_l(const char*, locale_t);
+wctype_t wctype_l(const char*, locale_t);
 #endif
 
 #ifdef __cplusplus

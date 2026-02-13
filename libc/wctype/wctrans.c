@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2026 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -13,26 +13,16 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
- * wctype/wctype.c
- * Returns the character class description with the given name.
+ * wctype/wctrans.c
+ * Returns the character mapping with the given name.
  */
 
 #include <string.h>
 #include <wctype.h>
 
-wctype_t wctype(const char* name)
+wctrans_t wctrans(const char* name)
 {
-	if ( !strcmp(name, "alnum") ) return iswalnum;
-	if ( !strcmp(name, "alpha") ) return iswalpha;
-	if ( !strcmp(name, "blank") ) return iswblank;
-	if ( !strcmp(name, "cntrl") ) return iswcntrl;
-	if ( !strcmp(name, "digit") ) return iswdigit;
-	if ( !strcmp(name, "graph") ) return iswgraph;
-	if ( !strcmp(name, "lower") ) return iswlower;
-	if ( !strcmp(name, "print") ) return iswprint;
-	if ( !strcmp(name, "punct") ) return iswpunct;
-	if ( !strcmp(name, "space") ) return iswspace;
-	if ( !strcmp(name, "upper") ) return iswupper;
-	if ( !strcmp(name, "xdigit") ) return iswxdigit;
+	if ( !strcmp(name, "tolower") ) return towlower;
+	if ( !strcmp(name, "toupper") ) return towupper;
 	return NULL;
 }
