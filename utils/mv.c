@@ -172,6 +172,8 @@ int main(int argc, char* argv[])
 
 	if ( argc < 2 )
 		errx(1, "missing file operand");
+	if ( argc < 3 )
+		errx(1, "missing destination file operand after `%s'", argv[1]);
 
 	if ( !target_directory && !flag_no_target_directory && argc == 3 )
 	{
