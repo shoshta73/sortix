@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, 2017 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016, 2017, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,7 +65,8 @@ struct if_nameindex* if_nameindex(void)
 				if ( !S_ISCHR(st.st_mode) )
 					continue;
 			}
-			if ( errnum == ELOOP || errnum == EACCES || errnum == EPERM )
+			if ( errnum == ELOOP || errnum == EACCES || errnum == EPERM ||
+			     errnum == ENOTTY )
 				continue;
 			closedir(dir);
 			if_freenameindex(ifs);
