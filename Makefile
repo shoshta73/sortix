@@ -367,6 +367,7 @@ else ifneq ($(SORTIX_INCLUDE_SOURCE),no)
 	cp LICENSE -t "$(SYSROOT)/src"
 	cp Makefile -t "$(SYSROOT)/src"
 	cp README -t "$(SYSROOT)/src"
+	cp CONTRIBUTING -t "$(SYSROOT)/src"
 	cp -RT build-aux "$(SYSROOT)/src/build-aux"
 	cp -RT etc "$(SYSROOT)/src/etc"
 	cp -RT share "$(SYSROOT)/src/share"
