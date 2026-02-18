@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2017, 2021, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2017, 2021, 2024, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -35,7 +35,7 @@ bool interrupt_worker_thread_boost = false;
 
 static struct interrupt_work* first;
 static struct interrupt_work* last;
-static bool interrupt_worker_idle = false;
+static volatile bool interrupt_worker_idle = false;
 
 void WorkerThread(void* /*user*/)
 {
@@ -43,6 +43,7 @@ void WorkerThread(void* /*user*/)
 	assert(Interrupt::IsEnabled());
 	while ( true )
 	{
+		interrupt_worker_idle = false;
 		thread->futex_woken = false;
 		thread->timer_woken = false;
 		struct interrupt_work* work;
@@ -50,12 +51,12 @@ void WorkerThread(void* /*user*/)
 		work = first;
 		first = NULL;
 		last = NULL;
+		if ( !work )
+			interrupt_worker_idle = true;
 		Interrupt::Enable();
 		if ( !work )
 		{
-			interrupt_worker_idle = true;
 			kthread_wait_futex();
-			interrupt_worker_idle = false;
 			continue;
 		}
 		while ( work )
