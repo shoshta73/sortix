@@ -109,8 +109,6 @@ void PageProtectSub(addr_t mapto, int protection);
 bool MapRange(addr_t where, size_t bytes, int protection, enum page_usage usage);
 bool UnmapRange(addr_t where, size_t bytes, enum page_usage usage);
 void Statistics(size_t* used, size_t* total, size_t* purposes);
-addr_t GetKernelStack();
-size_t GetKernelStackSize();
 void GetKernelVirtualArea(addr_t* from, size_t* size);
 void GetUserVirtualArea(uintptr_t* from, size_t* size);
 void UnmapMemory(Process* process, uintptr_t addr, size_t size);

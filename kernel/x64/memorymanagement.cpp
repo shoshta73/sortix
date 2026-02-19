@@ -91,16 +91,12 @@ void DestroyAddressSpace(addr_t fallback)
 	Page::Put(dir & PML_ADDRESS, PAGE_USAGE_PAGING_OVERHEAD);
 }
 
-const size_t KERNEL_STACK_SIZE = 256UL * 1024UL;
-const addr_t KERNEL_STACK_END = 0xFFFF800000001000UL;
-const addr_t KERNEL_STACK_START = KERNEL_STACK_END + KERNEL_STACK_SIZE;
-
-const addr_t VIRTUAL_AREA_LOWER = KERNEL_STACK_START;
+const addr_t VIRTUAL_AREA_LOWER = 0xFFFF800000001000UL;
 const addr_t VIRTUAL_AREA_UPPER = 0xFFFFFE8000000000UL;
 
 void GetKernelVirtualArea(addr_t* from, size_t* size)
 {
-	*from = KERNEL_STACK_END;
+	*from = VIRTUAL_AREA_LOWER;
 	*size = VIRTUAL_AREA_UPPER - VIRTUAL_AREA_LOWER;
 }
 
@@ -108,16 +104,6 @@ void GetUserVirtualArea(uintptr_t* from, size_t* size)
 {
 	*from = 0x400000; // 4 MiB.
 	*size = 0x800000000000 - *from; // 128 TiB - 4 MiB.
-}
-
-addr_t GetKernelStack()
-{
-	return KERNEL_STACK_START;
-}
-
-size_t GetKernelStackSize()
-{
-	return KERNEL_STACK_SIZE;
 }
 
 } // namespace Memory
