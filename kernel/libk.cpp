@@ -66,7 +66,10 @@ void* libk_heap_expand(size_t* num_bytes)
 	int prot = PROT_KREAD | PROT_KWRITE;
 	enum Sortix::page_usage page_usage = Sortix::PAGE_USAGE_KERNEL_HEAP;
 	if ( !Sortix::Memory::MapRange(mapto, *num_bytes, prot, page_usage) )
+	{
+		ShrinkHeap(*num_bytes);
 		return NULL;
+	}
 	Sortix::Memory::Flush();
 
 	return mapping;
