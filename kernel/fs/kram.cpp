@@ -501,8 +501,6 @@ int Dir::rename_here(ioctx_t* ctx, Ref<Inode> from, const char* oldname,
 	{
 		mutex_ptr1 = &this->dir_lock,
 		mutex_ptr2 = NULL;
-		if ( !strcmp(oldname, newname) )
-			return 0;
 	}
 	else
 	{
