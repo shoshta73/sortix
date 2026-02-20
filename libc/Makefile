@@ -360,6 +360,10 @@ dirent/opendir.o \
 dirent/readdir.o \
 dirent/rewinddir.o \
 dirent/scandir.o \
+dirent/seekdir.o \
+dirent/seekdiro.o \
+dirent/telldir.o \
+dirent/telldiro.o \
 dlfcn/dlfcn.o \
 err/err.o \
 err/errc.o \

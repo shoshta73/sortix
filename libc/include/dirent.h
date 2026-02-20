@@ -22,7 +22,16 @@
 
 #include <sys/cdefs.h>
 
+#include <sys/__/types.h>
+
 #include <sortix/dirent.h>
+
+#if __USE_SORTIX
+#ifndef __off_t_defined
+#define __off_t_defined
+typedef __off_t off_t;
+#endif
+#endif
 
 #if defined(__is_sortix_libc)
 #include <DIR.h>
@@ -43,8 +52,8 @@ struct dirent* readdir(DIR*);
 void rewinddir(DIR*);
 
 #if __USE_SORTIX || __USE_XOPEN
-/* TODO: seekdir */
-/* TODO: telldir */
+void seekdir(DIR*, long);
+long telldir(DIR*);
 #endif
 
 /* Functions from POSIX 1995. */
@@ -75,6 +84,8 @@ int dscandir_r(DIR*, struct dirent***,
                int (*)(const struct dirent**, const struct dirent**, void*),
                void*);
 int versionsort_r(const struct dirent**, const struct dirent**, void*);
+int seekdiro(DIR*, off_t);
+off_t telldiro(DIR*);
 #endif
 
 #ifdef __cplusplus
