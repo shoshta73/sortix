@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,10 +24,6 @@
 
 #include <sys/__/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef __time_t_defined
 #define __time_t_defined
 typedef __time_t time_t;
@@ -47,7 +43,13 @@ struct timeval
 };
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#if __USE_SORTIX || __USE_XOPEN <= 700
 int gettimeofday(struct timeval* __restrict tp, void* __restrict tzp);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

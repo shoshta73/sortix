@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,10 +22,8 @@
 
 #include <sys/cdefs.h>
 
+#if __USE_SORTIX
 #include <stdarg.h>
-
-#ifdef __cplusplus
-extern "C" {
 #endif
 
 #define LOG_PRISHIFT 0
@@ -82,6 +80,10 @@ extern "C" {
 #define LOG_PERROR (1 << 4)
 #define LOG_PID (1 << 5)
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if defined(__is_sortix_libc)
 extern char* __syslog_identity;
 extern int __syslog_facility;
@@ -94,8 +96,10 @@ void openlog(const char*, int, int);
 int setlogmask(int);
 __attribute__ ((__format__ (__printf__, 2, 3)))
 void syslog(int, const char*, ...);
+#if __USE_SORTIX
 __attribute__ ((__format__ (__printf__, 2, 0)))
 void vsyslog(int, const char*, va_list);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */

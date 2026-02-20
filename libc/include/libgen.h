@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -26,8 +26,8 @@
 extern "C" {
 #endif
 
-char* dirname(char* path);
-char* basename(char* path);
+char* dirname(char*);
+char* basename(char*);
 
 #ifdef __cplusplus
 } /* extern "C" */

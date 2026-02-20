@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,10 +24,6 @@
 
 #include <sys/__/types.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #ifndef __size_t_defined
 #define __size_t_defined
 #define __need_size_t
@@ -39,13 +35,11 @@ extern "C" {
 typedef __ssize_t ssize_t;
 #endif
 
+#if __USE_SORTIX
 #ifndef __off_t_defined
 #define __off_t_defined
 typedef __off_t off_t;
 #endif
-
-#ifdef __cplusplus
-} /* extern "C" */
 #endif
 
 #include <sortix/uio.h>
@@ -56,8 +50,11 @@ extern "C" {
 
 ssize_t readv(int, const struct iovec*, int);
 ssize_t writev(int, const struct iovec*, int);
+
+#if __USE_SORTIX
 ssize_t preadv(int, const struct iovec*, int, off_t);
 ssize_t pwritev(int, const struct iovec*, int, off_t);
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
