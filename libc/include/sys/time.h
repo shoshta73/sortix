@@ -22,6 +22,10 @@
 
 #include <sys/cdefs.h>
 
+#if __USE_SORTIX || __USE_XOPEN
+#include <sys/select.h>
+#endif
+
 #include <sys/__/types.h>
 
 #ifndef __time_t_defined

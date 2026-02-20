@@ -276,17 +276,6 @@ can be used instead.
 and
 .Xr mmap 2
 are the standard interfaces for memory allocation.
-.Ss select
-.Xr select 2
-is implemented, but is defined in
-.In sys/select.h
-instead of
-.In sys/time.h
-per POSIX, however the superior
-.Xr poll 2
-should be used instead as the
-.Vt fdset_t
-type overflows on file descriptors whose value is too large.
 .Ss sigaction SA_RESTART
 Restarting system calls after signal delivery is not currently implemented and
 system calls instead fail with
