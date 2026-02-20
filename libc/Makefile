@@ -678,6 +678,7 @@ sys/statvfs/fstatvfsat.o \
 sys/statvfs/fstatvfs.o \
 sys/statvfs/statvfs.o \
 sys/time/gettimeofday.o \
+sys/time/utimes.o \
 sys/times/times.o \
 sys/uio/preadv.o \
 sys/uio/pwritev.o \
