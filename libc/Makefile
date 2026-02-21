@@ -457,9 +457,13 @@ poll/ppoll.o \
 psctl/psctl.o \
 pthread/pthread_attr_destroy.o \
 pthread/pthread_attr_getdetachstate.o \
+pthread/pthread_attr_getguardsize.o \
+pthread/pthread_attr_getstack.o \
 pthread/pthread_attr_getstacksize.o \
 pthread/pthread_attr_init.o \
 pthread/pthread_attr_setdetachstate.o \
+pthread/pthread_attr_setguardsize.o \
+pthread/pthread_attr_setstack.o \
 pthread/pthread_attr_setstacksize.o \
 pthread/pthread_condattr_destroy.o \
 pthread/pthread_condattr_getclock.o \

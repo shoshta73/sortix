@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2017, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2017, 2021, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -32,12 +32,16 @@ extern "C" {
 typedef struct
 {
 	__SIZE_TYPE__ stack_size;
+	__SIZE_TYPE__ guard_size;
+	void* stack_addr;
 	int detach_state;
 } __pthread_attr_t;
 #else
 typedef struct
 {
 	__SIZE_TYPE__ __pthread_stack_size;
+	__SIZE_TYPE__ __pthread_guard_size;
+	void* __pthread_stack_addr;
 	int __pthread_detached_state;
 } __pthread_attr_t;
 #endif

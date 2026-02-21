@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -187,22 +187,24 @@ struct pthread* pthread_allocate_tls(void);
 /* TODO: pthread_atfork */
 int pthread_attr_destroy(pthread_attr_t*);
 int pthread_attr_getdetachstate(const pthread_attr_t*, int*);
-/* TODO: pthread_attr_getguardsize */
+int pthread_attr_getguardsize(const pthread_attr_t* __restrict,
+                              size_t* __restrict);
 /* TODO: pthread_attr_getinheritsched */
 /* TODO: pthread_attr_getschedparam */
 /* TODO: pthread_attr_getschedpolicy */
 /* TODO: pthread_attr_getscope */
-/* TODO: pthread_attr_getstack */
+int pthread_attr_getstack(const pthread_attr_t* __restrict, void** __restrict,
+                          size_t* __restrict);
 int pthread_attr_getstacksize(const pthread_attr_t* __restrict,
                               size_t* __restrict);
 int pthread_attr_init(pthread_attr_t*);
 int pthread_attr_setdetachstate(pthread_attr_t*, int);
-/* TODO: pthread_attr_setguardsize */
+int pthread_attr_setguardsize(pthread_attr_t*, size_t);
 /* TODO: pthread_attr_setinheritsched */
 /* TODO: pthread_attr_setschedparam */
 /* TODO: pthread_attr_setschedpolicy */
 /* TODO: pthread_attr_setscope */
-/* TODO: pthread_attr_setstack */
+int pthread_attr_setstack(pthread_attr_t*, void*, size_t);
 int pthread_attr_setstacksize(pthread_attr_t*, size_t);
 /* TODO: pthread_barrier_destroy */
 /* TODO: pthread_barrier_init */

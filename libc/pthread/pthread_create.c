@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -21,6 +21,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdalign.h>
 #include <stddef.h>
@@ -29,6 +30,11 @@
 #include <string.h>
 #include <pthread.h>
 #include <unistd.h>
+
+/* TODO: Remove this compatibility after releasing Sortix 1.1. */
+#ifdef __sortix__
+#include <sortix/limits.h>
+#endif
 
 // Utility function that rounds size upwards to a multiple of alignment.
 static size_t align_size(size_t size, size_t alignment)
@@ -68,8 +74,10 @@ unused static const unsigned long FLAGS_ID           = 1 << 21; // 0x200000
 #endif
 
 #if defined(__i386__)
+#define STACK_DIRECTION -1 /* down */
 static const unsigned long MINIMUM_STACK_SIZE = 4 * sizeof(unsigned long);
-static void setup_thread_state(struct pthread* thread, struct tfork* regs)
+static void setup_thread_state(struct pthread* thread, struct tfork* regs,
+                               void* stack_start, size_t stack_size)
 {
 	assert(MINIMUM_STACK_SIZE <= thread->uthread.stack_size);
 
@@ -79,8 +87,7 @@ static void setup_thread_state(struct pthread* thread, struct tfork* regs)
 	regs->gsbase = (unsigned long) thread;
 
 	unsigned long* stack =
-		(unsigned long*) ((uint8_t*) thread->uthread.stack_mmap +
-		                             thread->uthread.stack_size);
+		(unsigned long*) ((uint8_t*) stack_start + stack_size);
 
 	*--stack = 0; // Alignment.
 	*--stack = (unsigned long) thread;
@@ -93,8 +100,10 @@ static void setup_thread_state(struct pthread* thread, struct tfork* regs)
 #endif
 
 #if defined(__x86_64__)
+#define STACK_DIRECTION -1 /* down */
 static const unsigned long MINIMUM_STACK_SIZE = 2 * sizeof(unsigned long);
-static void setup_thread_state(struct pthread* thread, struct tfork* regs)
+static void setup_thread_state(struct pthread* thread, struct tfork* regs,
+                               void* stack_start, size_t stack_size)
 {
 	assert(MINIMUM_STACK_SIZE <= thread->uthread.stack_size);
 
@@ -105,8 +114,7 @@ static void setup_thread_state(struct pthread* thread, struct tfork* regs)
 	regs->fsbase = (unsigned long) thread;
 
 	unsigned long* stack =
-		(unsigned long*) ((uint8_t*) thread->uthread.stack_mmap +
-		                             thread->uthread.stack_size);
+		(unsigned long*) ((uint8_t*) stack_start + stack_size);
 
 	*--stack = 0; // rip=0
 
@@ -199,21 +207,54 @@ int pthread_create(pthread_t* restrict thread_ptr,
 	thread->entry_function = entry_function;
 	thread->entry_cookie = entry_cookie;
 
-	// Set up a stack for the new thread.
-	int stack_prot = PROT_READ | PROT_WRITE;
-	int stack_flags = MAP_PRIVATE | MAP_ANONYMOUS;
-	thread->uthread.stack_size = attr->stack_size;
-	thread->uthread.stack_mmap =
-		mmap(NULL, thread->uthread.stack_size, stack_prot, stack_flags, -1, 0);
-	if ( thread->uthread.stack_mmap == MAP_FAILED )
+	// Set up a stack for the new thread with optional guard pages.
+	void* stack;
+	size_t stack_size;
+	if ( !attr->stack_addr )
 	{
-		munmap(thread->uthread.tls_mmap, thread->uthread.tls_size);
-		return errno;
+		int stack_prot = PROT_READ | PROT_WRITE;
+		int stack_flags = MAP_PRIVATE | MAP_ANONYMOUS;
+		size_t guard_aligned = align_size(attr->guard_size, PAGE_SIZE);
+		size_t size_aligned = align_size(attr->stack_size, PAGE_SIZE);
+		size_t mmap_size = 0;
+		if ( !size_aligned ||
+		     __builtin_add_overflow(guard_aligned, size_aligned, &mmap_size) )
+		{
+			munmap(thread->uthread.tls_mmap, thread->uthread.tls_size);
+			return errno = EINVAL;
+		}
+		thread->uthread.stack_size = mmap_size;
+		thread->uthread.stack_mmap =
+			mmap(NULL, thread->uthread.stack_size, stack_prot, stack_flags, -1, 0);
+		if ( thread->uthread.stack_mmap == MAP_FAILED )
+		{
+			munmap(thread->uthread.tls_mmap, thread->uthread.tls_size);
+			return errno;
+		}
+		size_t guard_offset = STACK_DIRECTION == -1 ? 0 : size_aligned;
+		stack = STACK_DIRECTION == -1 ?
+		        (char*) thread->uthread.stack_mmap + guard_aligned : 0;
+		stack_size = size_aligned;
+		if ( guard_aligned )
+		{
+			void* guard = (char*) thread->uthread.stack_mmap + guard_offset;
+			if ( mprotect(guard, guard_aligned, PROT_NONE) < 0 )
+			{
+				munmap(thread->uthread.stack_mmap, thread->uthread.stack_size);
+				munmap(thread->uthread.tls_mmap, thread->uthread.tls_size);
+				return errno;
+			}
+		}
+	}
+	else
+	{
+		stack = attr->stack_addr;
+		stack_size = attr->stack_size;
 	}
 
 	// Prepare the registers and initial stack for the new thread.
 	struct tfork regs;
-	setup_thread_state(thread, &regs);
+	setup_thread_state(thread, &regs, stack, stack_size);
 	memset(&regs.altstack, 0, sizeof(regs.altstack));
 	regs.altstack.ss_flags = SS_DISABLE;
 	sigprocmask(SIG_SETMASK, NULL, &regs.sigmask);

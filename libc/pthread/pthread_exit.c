@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2021 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2021, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -53,11 +53,15 @@ void pthread_exit(void* return_value)
 
 	pthread_mutex_lock(&thread->detach_lock);
 	thread->exit_result = return_value;
-	int exit_flags = EXIT_THREAD_UNMAP;
+	int exit_flags = 0;
 	struct exit_thread extended;
 	memset(&extended, 0, sizeof(extended));
-	extended.unmap_from = thread->uthread.stack_mmap;
-	extended.unmap_size = thread->uthread.stack_size;
+	if ( thread->uthread.stack_mmap )
+	{
+		extended.unmap_from = thread->uthread.stack_mmap;
+		extended.unmap_size = thread->uthread.stack_size;
+		exit_flags |= EXIT_THREAD_UNMAP;
+	}
 	if ( thread->detach_state == PTHREAD_CREATE_JOINABLE )
 	{
 		extended.zero_from = &thread->join_lock.lock;

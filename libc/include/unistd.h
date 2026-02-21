@@ -99,7 +99,7 @@ extern "C" {
 #define _POSIX_SPIN_LOCKS 202405L
 /*TODO: _POSIX_SPORADIC_SERVER - Research what this is. */
 /*TODO: _POSIX_SYNCHRONIZED_IO - Research what this is. */
-/*TODO: _POSIX_THREAD_ATTR_STACKADDR - Research what this is. */
+#define _POSIX_THREAD_ATTR_STACKADDR 202405L
 #define _POSIX_THREAD_ATTR_STACKSIZE 202405L
 #define _POSIX_THREAD_CPUTIME 202405L
 /*TODO: _POSIX_THREAD_PRIO_INHERIT - Research what this is. */
