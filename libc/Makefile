@@ -512,6 +512,11 @@ pthread/pthread_rwlock_unlock.o \
 pthread/pthread_rwlock_wrlock.o \
 pthread/pthread_self.o \
 pthread/pthread_setspecific.o \
+pthread/pthread_spin_destroy.o \
+pthread/pthread_spin_init.o \
+pthread/pthread_spin_lock.o \
+pthread/pthread_spin_trylock.o \
+pthread/pthread_spin_unlock.o \
 pwd/bcrypt_newhash.o \
 pwd/endpwent.o \
 pwd/fgetpwent.o \

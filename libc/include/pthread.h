@@ -61,7 +61,8 @@ extern "C" {
 /* TODO: #define PTHREAD_PRIO_INHERIT */
 /* TODO: #define PTHREAD_PRIO_NONE */
 /* TODO: #define PTHREAD_PRIO_PROTECT */
-/* TODO: #define PTHREAD_PROCESS_SHARED */
+#define PTHREAD_PROCESS_PRIVATE 0
+#define PTHREAD_PROCESS_SHARED 1
 /* TODO: #define PTHREAD_PROCESS_PRIVATE */
 /* TODO: #define PTHREAD_SCOPE_PROCESS */
 /* TODO: #define PTHREAD_SCOPE_SYSTEM */
@@ -294,11 +295,11 @@ pthread_t pthread_self(void);
 /* TODO: pthread_setschedparam */
 /* TODO: pthread_setschedprio */
 int pthread_setspecific(pthread_key_t, const void*);
-/* TODO: pthread_spin_destroy */
-/* TODO: pthread_spin_init */
-/* TODO: pthread_spin_lock */
-/* TODO: pthread_spin_trylock */
-/* TODO: pthread_spin_unlock */
+int pthread_spin_destroy(pthread_spinlock_t*);
+int pthread_spin_init(pthread_spinlock_t*, int);
+int pthread_spin_lock(pthread_spinlock_t*);
+int pthread_spin_trylock(pthread_spinlock_t*);
+int pthread_spin_unlock(pthread_spinlock_t*);
 /* TODO: pthread_testcancel */
 
 #if __USE_SORTIX || 202405L <= __USE_POSIX || defined(__cplusplus)
