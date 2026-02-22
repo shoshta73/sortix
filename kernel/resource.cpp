@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2016 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2016, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,6 +60,11 @@ static Process* CurrentProcessGroup()
 	return CurrentProcess()->group;
 }
 
+static Process* CurrentInit()
+{
+	return CurrentProcess()->init;
+}
+
 static int GetProcessGroupPriority(pid_t who)
 {
 	if ( who < 0 )
@@ -92,14 +97,50 @@ static int SetProcessGroupPriority(pid_t who, int prio)
 	return 0;
 }
 
-static int GetUserPriority(uid_t /*who*/)
+static int GetUserPriority(uid_t who)
 {
-	return errno = ENOSYS, -1;
+	Process* init = CurrentInit();
+	if ( !init )
+		return errno = ESRCH, -1;
+	int lowest = INT_MAX;
+	bool any = false;
+	for ( Process* process = init->init_first;
+	      process;
+	      process = process->init_next )
+	{
+		ScopedLock id_lock(&process->id_lock);
+		if ( process->uid != who )
+			continue;
+		id_lock.Reset();
+		ScopedLock nice_lock(&process->nice_lock);
+		if ( process->nice < lowest )
+			lowest = process->nice;
+	}
+	if ( !any )
+		return errno = ESRCH, -1;
+	return lowest;
 }
 
-static int SetUserPriority(uid_t /*who*/, int /*prio*/)
+static int SetUserPriority(uid_t who, int prio)
 {
-	return errno = ENOSYS, -1;
+	Process* init = CurrentInit();
+	if ( !init )
+		return errno = ESRCH, -1;
+	bool any = false;
+	for ( Process* process = init->init_first;
+	      process;
+	      process = process->init_next )
+	{
+		ScopedLock id_lock(&process->id_lock);
+		if ( process->uid != who )
+			continue;
+		id_lock.Reset();
+		ScopedLock nice_lock(&process->nice_lock);
+		process->nice = prio;
+	}
+	if ( !any )
+		return errno = ESRCH, -1;
+	return 0;
 }
 
 int sys_getpriority(int which, id_t who)
