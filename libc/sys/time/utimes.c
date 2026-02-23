@@ -22,7 +22,7 @@
 
 #include <time.h>
 
-int utimes(const char* path, struct timeval tvs[2])
+int utimes(const char* path, const struct timeval tvs[2])
 {
 	if ( !tvs )
 		return utimens(path, NULL);

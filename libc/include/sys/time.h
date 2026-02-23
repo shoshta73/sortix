@@ -52,7 +52,7 @@ extern "C" {
 #endif
 
 #if __USE_SORTIX || __USE_XOPEN
-int utimes(const char*, struct timeval[2]);
+int utimes(const char*, const struct timeval[2]);
 #endif
 
 #if __USE_SORTIX || __USE_XOPEN <= 700
