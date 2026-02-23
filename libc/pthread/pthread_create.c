@@ -79,7 +79,7 @@ static const unsigned long MINIMUM_STACK_SIZE = 4 * sizeof(unsigned long);
 static void setup_thread_state(struct pthread* thread, struct tfork* regs,
                                void* stack_start, size_t stack_size)
 {
-	assert(MINIMUM_STACK_SIZE <= thread->uthread.stack_size);
+	assert(MINIMUM_STACK_SIZE <= stack_size);
 
 	memset(regs, 0, sizeof(*regs));
 	regs->eip = (uintptr_t) pthread_entrance;
@@ -105,7 +105,7 @@ static const unsigned long MINIMUM_STACK_SIZE = 2 * sizeof(unsigned long);
 static void setup_thread_state(struct pthread* thread, struct tfork* regs,
                                void* stack_start, size_t stack_size)
 {
-	assert(MINIMUM_STACK_SIZE <= thread->uthread.stack_size);
+	assert(MINIMUM_STACK_SIZE <= stack_size);
 
 	memset(regs, 0, sizeof(*regs));
 	regs->rip = (uintptr_t) pthread_entrance;
@@ -262,7 +262,8 @@ int pthread_create(pthread_t* restrict thread_ptr,
 	// Create a new thread with the requested state.
 	if ( tfork(SFTHREAD, &regs) < 0 )
 	{
-		munmap(thread->uthread.stack_mmap, thread->uthread.stack_size);
+		if ( !attr->stack_addr )
+			munmap(thread->uthread.stack_mmap, thread->uthread.stack_size);
 		munmap(thread->uthread.tls_mmap, thread->uthread.tls_size);
 		return errno;
 	}

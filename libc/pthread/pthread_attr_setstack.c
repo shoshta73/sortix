@@ -18,13 +18,22 @@
  */
 
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
+
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
+#ifdef __sortix__
+#include <sortix/limits.h>
+#endif
 
 int pthread_attr_setstack(pthread_attr_t* attr, void* stack_addr,
                           size_t stack_size)
 {
 	// Require 16-byte alignment.
 	if ( (uintptr_t) stack_addr & (16-1) )
+		return errno = EINVAL;
+	// Fail if the stack is too small.
+	if ( stack_size < PTHREAD_STACK_MIN )
 		return errno = EINVAL;
 	attr->stack_addr = stack_addr;
 	attr->stack_size = stack_size;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,10 +17,20 @@
  * Sets the requested stack size in a thread attribute object.
  */
 
+#include <errno.h>
+#include <limits.h>
 #include <pthread.h>
+
+// TODO: After releasing Sortix 1.1, remove this bootstrap compatibility.
+#ifdef __sortix__
+#include <sortix/limits.h>
+#endif
 
 int pthread_attr_setstacksize(pthread_attr_t* attr, size_t stack_size)
 {
+	// Fail if the stack is too small.
+	if ( stack_size < PTHREAD_STACK_MIN )
+		return errno = EINVAL;
 	attr->stack_size = stack_size;
 	return 0;
 }
