@@ -197,6 +197,7 @@ private:
 	void NotifyChildExit(Process* child, bool zombify);
 	void DeleteTimers();
 	bool IsLimboDone();
+	bool IsWaitedForProcess(Process* other, pid_t thepid);
 
 public:
 	void OnLastThreadExit();

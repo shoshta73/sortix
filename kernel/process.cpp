@@ -537,43 +537,53 @@ void Process::NotifyChildExit(Process* child, bool zombify)
 		kthread_cond_broadcast(&zombie_cond);
 }
 
+bool Process::IsWaitedForProcess(Process* other, pid_t thepid)
+{
+	// Don't wait for processes that won't zombify.
+	if ( other->no_zombify )
+		return false;
+	// Match any process.
+	if ( thepid == -1 )
+		return true;
+	// Match a process exactly by pid.
+	if ( 0 < thepid  )
+		return other->pid == thepid;
+	// Match a process if it's in our process group.
+	if ( thepid == 0 )
+		return other->group == group;
+	// Match a process by its process group.
+	if ( !other->group )
+		return false;
+	return -other->group->pid == thepid;
+}
+
 pid_t Process::Wait(pid_t thepid, int* status_ptr, int options)
 {
-	// TODO: Process groups are not supported yet.
-	if ( thepid < -1 || thepid == 0 )
-		return errno = ENOSYS, -1;
-
 	ScopedLock lock(&process_family_lock);
-
-	// Processes can only wait for their own children to exit.
-	if ( 0 < thepid )
-	{
-		// TODO: This is a slow but multithread safe way to verify that the
-		// target process has the correct parent.
-		bool found = false;
-		for ( Process* p = first_child; !found && p; p = p->next_sibling )
-			if ( p->pid == thepid && !p->no_zombify )
-				found = true;
-		for ( Process* p = zombie_child; !found && p; p = p->next_sibling )
-			if ( p->pid == thepid && !p->no_zombify )
-				found = true;
-		if ( !found )
-			return errno = ECHILD, -1;
-	}
 
 	Process* zombie = NULL;
 	while ( !zombie )
 	{
-		// A process can only wait if it has children.
-		if ( !first_child && !zombie_child )
-			return errno = ECHILD, -1;
+		// Check if any zombie processes match the criteria.
 		for ( zombie = zombie_child; zombie; zombie = zombie->next_sibling )
-			if ( (thepid == -1 || thepid == zombie->pid) && !zombie->no_zombify )
+			if ( IsWaitedForProcess(zombie, thepid) )
 				break;
 		if ( zombie )
 			break;
+		// Verify that such a child actually exists. Even if we verify that it
+		// does exist now, it might later move to another process group, or
+		// another thread might wait for the child and succeed first.
+		bool found = false;
+		for ( Process* p = first_child; !found && p; p = p->next_sibling )
+			if ( IsWaitedForProcess(p, thepid) )
+				found = true;
+		// Fail if no such child exists.
+		if ( !found )
+			return errno = ECHILD, -1;
+		// Don't block if requested not to block.
 		if ( options & WNOHANG )
 			return 0;
+		// Otherwise wait for a child to exit or to move process group.
 		if ( !kthread_cond_wait_signal(&zombie_cond, &process_family_lock) )
 			return errno = EINTR, -1;
 	}
@@ -1865,6 +1875,11 @@ int sys_setpgid(pid_t pid, pid_t pgid)
 	group->group_first = process;
 	process->group = group;
 
+	// The parent process may be waiting on the old process group and needs to
+	// be awoken and notice the process is no longer there.
+	if ( !process->no_zombify && process->parent )
+		kthread_cond_broadcast(&process->zombie_cond);
+
 	return 0;
 }
 
@@ -1897,6 +1912,11 @@ pid_t sys_setsid(void)
 	process->group_next = NULL;
 	process->group_first = process;
 	process->group = process;
+
+	// The parent process may be waiting on the old process group and needs to
+	// be awoken and notice the process is no longer there.
+	if ( !process->no_zombify && process->parent )
+		kthread_cond_broadcast(&process->zombie_cond);
 
 	return process->pid;
 }
@@ -1940,6 +1960,11 @@ int sys_setinit(void)
 	process->group_next = NULL;
 	process->group_first = process;
 	process->group = process;
+
+	// The parent process may be waiting on the old process group and needs to
+	// be awoken and notice the process is no longer there.
+	if ( !process->no_zombify && process->parent )
+		kthread_cond_broadcast(&process->zombie_cond);
 
 	return process->pid;
 }
