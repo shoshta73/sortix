@@ -52,6 +52,7 @@ const char* inet_ntop(int af,
 				return NULL;
 			if ( size <= (size_t) len )
 				return errno = ENOSPC, (const char*) NULL;
+			return dst;
 		}
 		size_t longest_zeroes_offset = 0;
 		size_t longest_zeroes_length = 0;
