@@ -29,7 +29,7 @@ size_t fread_unlocked(void* ptr,
                       FILE* fp)
 {
 	if ( !(fp->flags & _FILE_READABLE) )
-		return errno = EBADF, fp->flags |= _FILE_STATUS_ERROR, EOF;
+		return errno = EBADF, fp->flags |= _FILE_STATUS_ERROR, 0;
 
 	unsigned char* buf = (unsigned char*) ptr;
 	size_t count = element_size * num_elements;
