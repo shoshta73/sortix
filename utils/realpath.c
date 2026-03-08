@@ -89,6 +89,11 @@ int main(int argc, char* argv[])
 
 	compact_arguments(&argc, &argv);
 
+	if ( argc <= 1 )
+	{
+		help(stderr, argv0);
+		exit(1);
+	}
 	int result = 0;
 	for ( int i = 1; i < argc; i++ )
 	{
