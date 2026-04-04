@@ -38,8 +38,10 @@ typedef unsigned long sigjmp_buf[6 + 1 + __SIGSET_NUM_SIGNALS / (sizeof(unsigned
 
 typedef sigjmp_buf jmp_buf;
 
+__attribute__((__noreturn__))
 void longjmp(jmp_buf, int);
 int setjmp(jmp_buf);
+__attribute__((__noreturn__))
 void siglongjmp(sigjmp_buf, int);
 int sigsetjmp(sigjmp_buf, int);
 
