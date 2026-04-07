@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2014, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -177,5 +177,7 @@ int setenv(const char* name, const char* value, int overwrite)
 	                   name, name_length,
 	                   value, value_length) )
 		return -1;
-	return __environ_used++, 0;
+	__environ_used++;
+	environ[__environ_used] = NULL;
+	return 0;
 }
