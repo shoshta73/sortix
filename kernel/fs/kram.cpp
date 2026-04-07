@@ -289,6 +289,7 @@ void Dir::RemoveChild(size_t index)
 		children[children_used-1] = tmp;
 		index = children_used-1;
 	}
+	children[index].inode->unlinked();
 	children[index].inode.Reset();
 	delete[] children[index].name;
 	children_used--;
