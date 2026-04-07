@@ -58,6 +58,8 @@ struct if_nameindex* if_nameindex(void)
 				if ( fstatat(dirfd(dir), entry->d_name, &st,
 				             AT_SYMLINK_NOFOLLOW) < 0 )
 				{
+					if ( errno == ENOTTY )
+						continue;
 					closedir(dir);
 					if_freenameindex(ifs);
 					return NULL;
