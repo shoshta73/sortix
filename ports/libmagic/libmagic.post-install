@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
+tix-eradicate-libtool-la
+# Provided by file:
+rm -rf "$TIX_INSTALL_DIR$PREFIX/bin"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/man/man1"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/man/man4"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/man/man5"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/misc"

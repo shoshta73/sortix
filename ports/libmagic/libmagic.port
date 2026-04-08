@@ -1,0 +1,11 @@
+NAME=libmagic
+BUILD_LIBRARIES='libz? libbz2? liblzma? libzstd? liblz? liblrzip?'
+SOURCE_PORT=file
+LICENSE=BSD-2-Clause-alike
+USE_BOOTSTRAP=true
+BOOTSTRAP_BUILD_SYSTEM=configure
+BOOTSTRAP_MAKE_VARS=V=1
+BUILD_SYSTEM=configure
+CONFIGURE_ARGS='--enable-fsect-man5'
+MAKE_VARS=V=1
+POST_INSTALL=../../libmagic/libmagic.post-install

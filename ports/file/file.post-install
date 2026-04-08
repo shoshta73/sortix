@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+[ -n "$TIX_INSTALL_DIR" ]
+# Provided by libmagic:
+rm -rf "$TIX_INSTALL_DIR$PREFIX/include"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/lib"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/man/man3"
+rm -rf "$TIX_INSTALL_DIR$PREFIX/share/man/man4"
