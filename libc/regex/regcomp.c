@@ -200,6 +200,7 @@ static inline int re_parse(struct re_parse* parse,
 		}
 		// TODO: This is not properly implemented.
 		// TODO: This is not properly unicode-aware.
+		// TODO: This logic needs to be synchronized with glob.
 		else if ( !escaped && c == '[' )
 		{
 			re->re_type = RE_TYPE_SET;
@@ -209,14 +210,21 @@ static inline int re_parse(struct re_parse* parse,
 				pattern_index += 1;
 				negate = true;
 			}
+			if ( pattern[pattern_index] == ']' )
+			{
+				unsigned char uc = pattern[pattern_index];
+				size_t byte_index = uc / 8;
+				size_t bit_index = uc % 8;
+				re->re_set.set[byte_index] |= (1 << bit_index);
+			}
 			while ( pattern[pattern_index] != ']' )
 			{
 				if ( pattern[pattern_index] == '\0' )
 					return free(re), REG_EBRACK;
-				// TODO: This is wrong and fragile.
 				unsigned char c_from;
 				unsigned char c_to;
-				if ( pattern[pattern_index + 1] == '-' )
+				if ( pattern[pattern_index + 1] == '-' &&
+				     pattern[pattern_index + 2] != ']' )
 				{
 					c_from = (unsigned char) pattern[pattern_index + 0];
 					c_to = (unsigned char) pattern[pattern_index + 2];
