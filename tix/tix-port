@@ -448,7 +448,7 @@ extract_package() {(
         patch -f -d "$port" -p1 < "$port.patch" || true
         # .rej files might already have been applied
         (cd "$port" &&
-         find \
+         find . \
            -name '*.rej' \
            -exec sh -c 'patch -fRs -p0 --dry-run < "$0" >/dev/null 2>&1' \
            '{}' ';' -delete)

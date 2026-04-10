@@ -113,7 +113,7 @@ metadata)
 
   LC_ALL=C sort -t: -k1,1 manifest.list -o manifest.list
 
-  find -type f '!' -name 'sha256sum' '!' -name '*.sha256sum' -exec sha256sum '{}' '+' |
+  find . -type f '!' -name 'sha256sum' '!' -name '*.sha256sum' -exec sha256sum '{}' '+' |
   sed -E 's,  \./,  ,' |
   LC_ALL=C sort -k 2 > sha256sum
 
