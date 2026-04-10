@@ -324,11 +324,16 @@ bool Filesystem::MarkUnmounted()
 
 void Filesystem::RequestCheck()
 {
+	if ( !device->write || request_check )
+		return;
 	request_check = true;
+	warn("filesystem may be inconsistent, scheduling check");
 }
 
 void Filesystem::Corrupted()
 {
+	if ( !device->write )
+		return;
 	request_check = true;
 	device->write = false;
 	warn("filesystem may be corrupted, remounting read-only");
