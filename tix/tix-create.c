@@ -107,7 +107,7 @@ static void copy_release_key(const char* release_key, const char* tix_path)
 		err(1, "fork");
 	if ( !pid )
 	{
-		execlp("cp", "cp", release_key, "--", release_pub_path, NULL);
+		execlp("cp", "cp", "--", release_key, release_pub_path, NULL);
 		warn("cp");
 		_exit(127);
 	}
