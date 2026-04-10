@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2023, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2016, 2023, 2025-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -264,10 +264,6 @@ int main(int argc, char* argv[])
 	if ( sb.s_log_block_size > (15-10) /* 32 KiB blocks */ )
 		errx(1, "%s: Filesystem has excess block size", device_path);
 
-	// Check whether the filesystem was unmounted cleanly.
-	if ( sb.s_state != EXT2_VALID_FS )
-		warnx("warning: %s: Filesystem wasn't unmounted cleanly", device_path);
-
 	uint32_t block_size = 1024U << sb.s_log_block_size;
 	size_t block_limit = cache_size / block_size;
 
@@ -277,6 +273,10 @@ int main(int argc, char* argv[])
 	Filesystem* fs = new Filesystem(dev, pretend_mount_path);
 	if ( !fs ) // TODO: Use operator new nothrow!
 		err(1, "malloc");
+	if ( !fs->WasUnmountedCleanly() )
+		warnx("warning: %s: Filesystem wasn't unmounted cleanly", device_path);
+	if ( write && !fs->MarkMounted() )
+		err(1, "failed to mark filesystem as mounted");
 
 	fs->block_groups = new BlockGroup*[fs->num_groups];
 	if ( !fs->block_groups ) // TODO: Use operator new nothrow!

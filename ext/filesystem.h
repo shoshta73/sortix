@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -50,14 +50,20 @@ public:
 	time_t mtime_realtime;
 	time_t mtime_monotonic;
 	bool dirty;
+	bool request_check;
 
 public:
+	bool WasUnmountedCleanly();
+	bool MarkMounted();
+	bool MarkUnmounted();
+	void RequestCheck();
+	void Corrupted();
 	BlockGroup* GetBlockGroup(uint32_t group_id);
 	Inode* GetInode(uint32_t inode_id);
 	uint32_t AllocateBlock(BlockGroup* preferred = NULL);
-	uint32_t AllocateInode(BlockGroup* preferred = NULL);
+	uint32_t AllocateInode(bool is_directory, BlockGroup* preferred = NULL);
 	void FreeBlock(uint32_t block_id);
-	void FreeInode(uint32_t inode_id);
+	void FreeInode(uint32_t inode_id, bool is_directory);
 	void BeginWrite();
 	void FinishWrite();
 	void Sync();

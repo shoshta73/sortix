@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016-2018, 2020-2021, 2023-2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2016-2018, 2020-2021, 2023-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -623,6 +623,11 @@ void upgrade_prepare(const struct release* old_release,
 		// Recreate the directories if needed post-upgrade.
 		hook_want_finalization(target_prefix, "sortix-1.1-home-mnt");
 	}
+
+	// TODO: After releasing Sortix 1.1, remove this compatibility.
+	//       sortix-1.1-ext2-inconsistent is handled in init/sysupgrade because
+	//       it has to force a fsck when the filesystems are mounted, which
+	//       happens before this code is invoked.
 }
 
 void upgrade_finalize(const struct release* old_release,

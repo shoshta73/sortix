@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -119,13 +119,16 @@ uint32_t BlockGroup::AllocateBlock()
 		block_bitmap_chunk->Unref();
 		block_bitmap_chunk = NULL;
 	}
+	// This case means the filesystem was inconsistent. Continue and fsck on
+	// the next mount since this is mild inconsistency.
+	filesystem->RequestCheck();
 	BeginWrite();
 	data->bg_free_blocks_count = 0;
 	FinishWrite();
 	return errno = ENOSPC, 0;
 }
 
-uint32_t BlockGroup::AllocateInode()
+uint32_t BlockGroup::AllocateInode(bool is_directory)
 {
 	if ( !filesystem->device->write )
 		return errno = EROFS, 0;
@@ -158,6 +161,8 @@ uint32_t BlockGroup::AllocateInode()
 				inode_bitmap_chunk->FinishWrite();
 				BeginWrite();
 				data->bg_free_inodes_count--;
+				if ( is_directory )
+					data->bg_used_dirs_count++;
 				FinishWrite();
 				filesystem->BeginWrite();
 				filesystem->sb->s_free_inodes_count--;
@@ -170,6 +175,9 @@ uint32_t BlockGroup::AllocateInode()
 		inode_bitmap_chunk->Unref();
 		inode_bitmap_chunk = NULL;
 	}
+	// This case means the filesystem was inconsistent. Continue and fsck on
+	// the next mount since this is mild inconsistency.
+	filesystem->RequestCheck();
 	BeginWrite();
 	data->bg_free_inodes_count = 0;
 	FinishWrite();
@@ -197,7 +205,7 @@ void BlockGroup::FreeBlock(uint32_t block_id)
 	uint8_t* chunk_bits = block_bitmap_chunk->block_data;
 	clearbit(chunk_bits, chunk_bit);
 	block_bitmap_chunk->FinishWrite();
-	if ( chunk_bit < inode_bitmap_chunk_i )
+	if ( chunk_bit < block_bitmap_chunk_i )
 		block_bitmap_chunk_i = chunk_bit;
 	BeginWrite();
 	data->bg_free_blocks_count++;
@@ -207,7 +215,7 @@ void BlockGroup::FreeBlock(uint32_t block_id)
 	filesystem->FinishWrite();
 }
 
-void BlockGroup::FreeInode(uint32_t inode_id)
+void BlockGroup::FreeInode(uint32_t inode_id, bool is_directory)
 {
 	assert(filesystem->device->write);
 	inode_id -= first_inode_id;
@@ -232,6 +240,8 @@ void BlockGroup::FreeInode(uint32_t inode_id)
 		inode_bitmap_chunk_i = chunk_bit;
 	BeginWrite();
 	data->bg_free_inodes_count++;
+	if ( is_directory && data->bg_used_dirs_count )
+		data->bg_used_dirs_count--;
 	FinishWrite();
 	filesystem->BeginWrite();
 	filesystem->sb->s_free_inodes_count++;

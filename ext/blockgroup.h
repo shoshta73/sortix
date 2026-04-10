@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -51,9 +51,9 @@ public:
 
 public:
 	uint32_t AllocateBlock();
-	uint32_t AllocateInode();
+	uint32_t AllocateInode(bool is_directory);
 	void FreeBlock(uint32_t block_id);
-	void FreeInode(uint32_t inode_id);
+	void FreeInode(uint32_t inode_id, bool is_directory);
 	void Refer();
 	void Unref();
 	void Sync();

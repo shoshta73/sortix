@@ -1,5 +1,5 @@
 #!/bin/sh
-# Copyright (c) 2015, 2016, 2017, 2023 Jonas 'Sortie' Termansen.
+# Copyright (c) 2015, 2016, 2017, 2023, 2026 Jonas 'Sortie' Termansen.
 #
 # Permission to use, copy, modify, and distribute this software for any
 # purpose with or without fee is hereby granted, provided that the above
@@ -93,6 +93,13 @@ require chain exit-code
 EOF
 fi
 mkdir -p "$output/boot"
+# TODO: After releasing Sortix 1.1, remove this compatibility that requires
+#       a fsck upon upgrade, since older systems had wrong ext2 blockgroup
+#       bookkeeping that could leak disk space.
+if [ -e /share/sysinstall/hooks/sortix-1.1-ext2-inconsistent ]; then
+  mkdir -p "$tmp/share/sysinstall/hooks"
+  touch "$tmp/share/sysinstall/hooks/sortix-1.1-ext2-inconsistent"
+fi
 LC_AL=C ls -A "$tmp" |
 tar -C "$tmp" -cf "$output/boot/sortix.initrd.new" \
     --numeric-owner --owner=0 --group=0 -T -

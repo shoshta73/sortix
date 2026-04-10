@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -20,6 +20,7 @@
 #include <sys/types.h>
 
 #include <assert.h>
+#include <err.h>
 #include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -63,23 +64,6 @@ Filesystem::Filesystem(Device* device, const char* mount_path)
 	this->mtime_realtime = now_realtime.tv_sec;
 	this->mtime_monotonic = now_monotonic.tv_sec;
 	this->dirty = false;
-
-	if ( device->write )
-	{
-		BeginWrite();
-		sb->s_mtime = mtime_realtime;
-		sb->s_mnt_count++;
-		sb->s_state = EXT2_ERROR_FS;
-		// TODO: Remove this temporarily compatibility when this driver is moved
-		//       into the kernel and the FUSE frontend is removed.
-#ifdef __GLIBC__
-		strncpy(sb->s_last_mounted, mount_path, sizeof(sb->s_last_mounted));
-#else
-		strlcpy(sb->s_last_mounted, mount_path, sizeof(sb->s_last_mounted));
-#endif
-		FinishWrite();
-		Sync();
-	}
 }
 
 Filesystem::~Filesystem()
@@ -90,14 +74,58 @@ Filesystem::~Filesystem()
 	for ( size_t i = 0; i < num_groups; i++ )
 		delete block_groups[i];
 	delete[] block_groups;
-	if ( device->write )
-	{
-		BeginWrite();
-		sb->s_state = EXT2_VALID_FS;
-		FinishWrite();
-		Sync();
-	}
 	sb_block->Unref();
+}
+
+bool Filesystem::WasUnmountedCleanly()
+{
+	return sb->s_state == EXT2_VALID_FS;
+}
+
+bool Filesystem::MarkMounted()
+{
+	BeginWrite();
+	sb->s_mtime = mtime_realtime;
+	sb->s_mnt_count++;
+	sb->s_state = EXT2_ERROR_FS;
+	// TODO: Remove this temporarily compatibility when this driver is moved
+	//       into the kernel and the FUSE frontend is removed.
+#ifdef __GLIBC__
+	strncpy(sb->s_last_mounted, mount_path, sizeof(sb->s_last_mounted));
+#else
+	strlcpy(sb->s_last_mounted, mount_path, sizeof(sb->s_last_mounted));
+#endif
+	FinishWrite();
+	Sync();
+	return true;
+}
+
+bool Filesystem::MarkUnmounted()
+{
+	if ( request_check )
+		return false;
+	BeginWrite();
+	sb->s_state = EXT2_VALID_FS;
+	FinishWrite();
+	Sync();
+	return true;
+}
+
+void Filesystem::RequestCheck()
+{
+	if ( request_check )
+		return;
+	request_check = true;
+	warn("filesystem may be inconsistent, scheduling check");
+}
+
+void Filesystem::Corrupted()
+{
+	if ( !device->write )
+		return;
+	request_check = true;
+	device->write = false;
+	warn("filesystem may be corrupted, remounting read-only");
 }
 
 void Filesystem::BeginWrite()
@@ -214,34 +242,33 @@ uint32_t Filesystem::AllocateBlock(BlockGroup* preferred)
 	for ( uint32_t group_id = 0; group_id < num_groups; group_id++ )
 		if ( uint32_t block_id = GetBlockGroup(group_id)->AllocateBlock() )
 			return block_id;
-	// TODO: This case should only be fit in the event of corruption. We should
-	//       rebuild all these values upon filesystem mount instead so we know
-	//       this can't happen. That also allows us to make the linked list
-	//       requested above.
+	// This case means the filesystem was inconsistent. Continue and fsck on
+	// the next mount since this is mild inconsistency.
+	RequestCheck();
 	BeginWrite();
 	sb->s_free_blocks_count = 0;
 	FinishWrite();
 	return errno = ENOSPC, 0;
 }
 
-uint32_t Filesystem::AllocateInode(BlockGroup* preferred)
+uint32_t Filesystem::AllocateInode(bool is_directory, BlockGroup* preferred)
 {
 	if ( !device->write )
 		return errno = EROFS, 0;
 	if ( !sb->s_free_inodes_count )
 		return errno = ENOSPC, 0;
 	if ( preferred )
-		if ( uint32_t inode_id = preferred->AllocateInode() )
+		if ( uint32_t inode_id = preferred->AllocateInode(is_directory) )
 			return inode_id;
 	// TODO: This can be made faster by maintaining a linked list of block
 	//       groups that definitely have free inodes.
 	for ( uint32_t group_id = 0; group_id < num_groups; group_id++ )
-		if ( uint32_t inode_id = GetBlockGroup(group_id)->AllocateInode() )
+		if ( uint32_t inode_id =
+		         GetBlockGroup(group_id)->AllocateInode(is_directory) )
 			return inode_id;
-	// TODO: This case should only be fit in the event of corruption. We should
-	//       rebuild all these values upon filesystem mount instead so we know
-	//       this can't happen. That also allows us to make the linked list
-	//       requested above.
+	// This case means the filesystem was inconsistent. Continue and fsck on
+	// the next mount since this is mild inconsistency.
+	RequestCheck();
 	BeginWrite();
 	sb->s_free_inodes_count = 0;
 	FinishWrite();
@@ -257,12 +284,12 @@ void Filesystem::FreeBlock(uint32_t block_id)
 	assert(group_id < num_groups);
 	BlockGroup* group = GetBlockGroup(group_id);
 	if ( !group )
-		return;
+		return; // TODO: Panic
 	group->FreeBlock(block_id);
 	group->Unref();
 }
 
-void Filesystem::FreeInode(uint32_t inode_id)
+void Filesystem::FreeInode(uint32_t inode_id, bool is_directory)
 {
 	assert(device->write);
 	assert(inode_id);
@@ -271,7 +298,7 @@ void Filesystem::FreeInode(uint32_t inode_id)
 	assert(group_id < num_groups);
 	BlockGroup* group = GetBlockGroup(group_id);
 	if ( !group )
-		return;
-	group->FreeInode(inode_id);
+		return; // TODO: Panic
+	group->FreeInode(inode_id, is_directory);
 	group->Unref();
 }

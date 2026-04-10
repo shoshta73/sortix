@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2018 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2018, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -469,12 +469,12 @@ Inode* Inode::Open(const char* elem, int flags, mode_t mode)
 		if ( !filesystem->device->write )
 			return errno = EROFS, (Inode*) NULL;
 		// TODO: Preferred block group!
-		uint32_t result_inode_id = filesystem->AllocateInode();
+		uint32_t result_inode_id = filesystem->AllocateInode(false);
 		if ( !result_inode_id )
 			return NULL;
 		Inode* result = filesystem->GetInode(result_inode_id);
 		if ( !result )
-			return filesystem->FreeInode(result_inode_id), (Inode*) NULL;
+			return filesystem->FreeInode(result_inode_id, false), (Inode*) NULL;
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 		result->BeginWrite();
@@ -917,13 +917,13 @@ bool Inode::Symlink(const char* elem, const char* dest)
 		return errno = EROFS, false;
 
 	// TODO: Preferred block group!
-	uint32_t result_inode_id = filesystem->AllocateInode();
+	uint32_t result_inode_id = filesystem->AllocateInode(false);
 	if ( !result_inode_id )
 		return NULL;
 
 	Inode* result = filesystem->GetInode(result_inode_id);
 	if ( !result )
-		return filesystem->FreeInode(result_inode_id), false;
+		return filesystem->FreeInode(result_inode_id, false), false;
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	result->BeginWrite();
@@ -956,13 +956,13 @@ Inode* Inode::CreateDirectory(const char* path, mode_t mode)
 		return errno = EROFS, (Inode*) NULL;
 
 	// TODO: Preferred block group!
-	uint32_t result_inode_id = filesystem->AllocateInode();
+	uint32_t result_inode_id = filesystem->AllocateInode(true);
 	if ( !result_inode_id )
 		return NULL;
 
 	Inode* result = filesystem->GetInode(result_inode_id);
 	if ( !result )
-		return filesystem->FreeInode(result_inode_id), (Inode*) NULL;
+		return filesystem->FreeInode(result_inode_id, true), (Inode*) NULL;
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	result->BeginWrite();
@@ -1078,6 +1078,7 @@ void Inode::Delete()
 	Truncate(0);
 
 	uint32_t deleted_inode_id = inode_id;
+	bool is_directory = EXT2_S_ISDIR(Mode());
 
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
@@ -1087,7 +1088,7 @@ void Inode::Delete()
 	data->i_dtime = now.tv_sec;
 	FinishWrite();
 
-	filesystem->FreeInode(deleted_inode_id);
+	filesystem->FreeInode(deleted_inode_id, is_directory);
 }
 
 void Inode::Refer()

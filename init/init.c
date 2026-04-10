@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -4332,6 +4332,13 @@ static bool mountpoint_mount(struct mountpoint* mountpoint)
 	const char* options = mountpoint->entry.fs_mntops;
 	const char* where = mountpoint->absolute;
 	bool read_only = false;
+	// TODO: After releasing Sortix 1.1, remove this compatibility that requires
+	//       a fsck upon upgrade, since older systems had wrong ext2 blockgroup
+	//       bookkeeping that could leak disk space.
+	if ( !strcmp(fs->fstype_name, "ext2") &&
+	     access("/share/sysinstall/hooks/sortix-1.1-ext2-inconsistent",
+	            F_OK) < 0 )
+		fs->flags |= FILESYSTEM_FLAG_FSCK_SHOULD;
 	if ( !(fs->flags & FILESYSTEM_FLAG_WRITABLE) )
 		read_only = true;
 	else if ( fs->flags & (FILESYSTEM_FLAG_FSCK_SHOULD |

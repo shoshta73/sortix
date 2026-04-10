@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, 2022-2023, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2016, 2022-2023, 2025-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -848,7 +848,10 @@ int fsmarshall_main(const char* argv0,
 
 	// Sync the filesystem before shutting down.
 	if ( dev->write )
+	{
 		fs->Sync();
+		fs->MarkUnmounted();
+	}
 
 	close(serverfd);
 

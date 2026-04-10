@@ -65,6 +65,7 @@ install: all
 	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-grub-cache
 	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-collection-conf
 	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-home-mnt
+	umask 0022 && touch $(DESTDIR)$(DATADIR)/sysinstall/hooks/sortix-1.1-ext2-inconsistent
 
 sysinstall: $(SYSINSTALL_OBJS)
 	$(CC) $(SYSINSTALL_OBJS) -o $@ -lmount -ldisplay

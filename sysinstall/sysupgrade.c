@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016, 2020-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015-2016, 2020-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -65,6 +65,10 @@ struct installation
 	struct mountpoint* mountpoints;
 	size_t mountpoints_used;
 	char* platform;
+	// TODO: After releasing Sortix 1.1, remove this compatibility that requires
+	//       a fsck upon upgrade, since older systems had wrong ext2 blockgroup
+	//       bookkeeping that could leak disk space.
+	bool require_fsck;
 };
 
 static struct installation* installations;
@@ -98,7 +102,8 @@ static bool add_installation(struct blockdevice* bdev,
                              struct release* release,
                              struct mountpoint* mountpoints,
                              size_t mountpoints_used,
-                             char* platform)
+                             char* platform,
+                             bool require_fsck)
 {
 	if ( installations_count == installations_length )
 	{
@@ -118,6 +123,7 @@ static bool add_installation(struct blockdevice* bdev,
 	installation->mountpoints = mountpoints;
 	installation->mountpoints_used = mountpoints_used;
 	installation->platform = platform;
+	installation->require_fsck = require_fsck;
 	return true;
 }
 
@@ -126,12 +132,18 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 	char* etc_release = join_paths(mnt, "etc/sortix-release");
 	char* lib_release = join_paths(mnt, "lib/sortix-release");
 	char* fstab_path = join_paths(mnt, "etc/fstab");
-	if ( !etc_release || !lib_release || !fstab_path )
+	// TODO: After releasing Sortix 1.1, remove this compatibility that requires
+	//       a fsck upon upgrade, since older systems had wrong ext2 blockgroup
+	//       bookkeeping that could leak disk space.
+	char* ext2_path =
+		join_paths(mnt, "share/sysinstall/hooks/sortix-1.1-ext2-inconsistent");
+	if ( !etc_release || !lib_release || !fstab_path || !ext2_path )
 	{
 		warn("malloc");
 		free(etc_release);
 		free(lib_release);
 		free(fstab_path);
+		free(ext2_path);
 		return;
 	}
 	const char* release_path = !access(etc_release, F_OK) ?
@@ -144,13 +156,16 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 		free(etc_release);
 		free(lib_release);
 		free(fstab_path);
+		free(ext2_path);
 		return;
 	}
+	bool require_fsck = access(ext2_path, F_OK) < 0;
 	struct release release;
 	bool status = os_release_load(&release, release_path, release_errpath);
 	free(release_errpath);
 	free(etc_release);
 	free(lib_release);
+	free(ext2_path);
 	if ( !status )
 	{
 		free(fstab_path);
@@ -169,7 +184,7 @@ static void search_installation_path(const char* mnt, struct blockdevice* bdev)
 	if ( platform && !release.architecture )
 		release.architecture = strndup(platform, strcspn(platform, "-"));
 	if ( !add_installation(bdev, &release, mountpoints, mountpoints_used,
-	                       platform) )
+	                       platform, require_fsck) )
 	{
 		warn("malloc");
 		free(platform);
@@ -774,6 +789,11 @@ int main(void)
 			err(2, "asprintf");
 		free(mnt->absolute);
 		mnt->absolute = absolute;
+		// TODO: After releasing Sortix 1.1, remove this compatibility that requires
+		//       a fsck upon upgrade, since older systems had wrong ext2 blockgroup
+		//       bookkeeping that could leak disk space.
+		if ( !strcmp(mnt->fs->fstype_name, "ext2") && target->require_fsck )
+			mnt->fs->flags |= FILESYSTEM_FLAG_FSCK_SHOULD;
 		if ( !mountpoint_mount(mnt) )
 			exit(2);
 	}

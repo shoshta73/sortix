@@ -69,6 +69,22 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Fix incorrect extfs(8) block group bookkeeping leaking blocks
+The
+.Xr extfs 8
+ext2 filesystem driver has doing incorrect bookkeeping for block groups, which
+can possibly lead to permanently leaked disk space when files are deleted.
+This bug can cause ext2 filesystems to run out of disk space in some situations,
+even though there is actually plenty of available space.
+If this problem has occured, a
+.Xr fsck.ext2 8
+.Fl f
+invocation on the block device (while unmounted) will fix the problem.
+.Pp
+This commit fixes the problem, and forces a
+.Xr fsck.ext2 8
+invocation when the filesystems are mounted when upgrading to this commit, so
+previous problems are fixed.
 .Ss Rename kernel from /boot/sortix.bin to /boot/sortix
 The
 .Xr kernel 7

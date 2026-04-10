@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -72,8 +72,11 @@ void ext2_fuse_destroy(void* fs_private)
 		else if ( inode->reference_count )
 			inode->Unref();
 	}
-	ext2_fuse_ctx->fs->Sync();
-	ext2_fuse_ctx->dev->Sync();
+	if ( ext2_fuse_ctx->dev->write )
+	{
+		ext2_fuse_ctx->fs->Sync();
+		ext2_fuse_ctx->fs->MarkUnmounted();
+	}
 	delete ext2_fuse_ctx->fs; ext2_fuse_ctx->fs = NULL;
 	delete ext2_fuse_ctx->dev; ext2_fuse_ctx->dev = NULL;
 }
