@@ -535,7 +535,7 @@ bool Inode::ReadDirectory(Block** block_inout,
 			// care about the file name or free space.
 			if ( !name && !free_search )
 				continue;
-			// Invalidate the orphraned long entries if the checksum changes.
+			// Invalidate the orphaned long entries if the checksum changes.
 			if ( has_long && entry->checksum != long_checksum )
 			{
 				has_long = false;
