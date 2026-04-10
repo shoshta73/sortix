@@ -764,20 +764,6 @@ diff -Paur --no-dereference -- php.upstream/ext/mysqlnd/mysqlnd_wireprotocol.c p
  	}
  	DBG_INF(ret == PASS ? "PASS":"FAIL");
  	DBG_RETURN(ret);
-diff -Paur --no-dereference -- php.upstream/ext/openssl/openssl.c php/ext/openssl/openssl.c
---- php.upstream/ext/openssl/openssl.c
-+++ php/ext/openssl/openssl.c
-@@ -828,8 +828,10 @@
- 	** the value of timezone - 3600 seconds. Otherwise, we need to overcorrect and
- 	** set the adjustment to the main timezone + 3600 seconds.
- 	*/
-+#if !defined(__sortix__) || defined(__SORTIX_HAS_TIMEZONE__)
- 	gmadjust = -(thetime.tm_isdst ? (long)timezone - 3600 : (long)timezone);
- #endif
-+#endif
- 	ret += gmadjust;
- 
- 	efree(strbuf);
 diff -Paur --no-dereference -- php.upstream/ext/pcntl/pcntl.stub.php php/ext/pcntl/pcntl.stub.php
 --- php.upstream/ext/pcntl/pcntl.stub.php
 +++ php/ext/pcntl/pcntl.stub.php
@@ -888,19 +874,6 @@ diff -Paur --no-dereference -- php.upstream/ext/posix/posix.c php/ext/posix/posi
  }
  /* }}} */
  
-diff -Paur --no-dereference -- php.upstream/ext/soap/php_encoding.c php/ext/soap/php_encoding.c
---- php.upstream/ext/soap/php_encoding.c
-+++ php/ext/soap/php_encoding.c
-@@ -2953,6 +2953,9 @@
- # if defined(__CYGWIN__) || (defined(PHP_WIN32) && defined(_MSC_VER) && _MSC_VER >= 1900)
- 		snprintf(tzbuf, sizeof(tzbuf), "%c%02d:%02d", ((ta->tm_isdst ? _timezone - 3600:_timezone)>0)?'-':'+', abs((ta->tm_isdst ? _timezone - 3600 : _timezone) / 3600), abs(((ta->tm_isdst ? _timezone - 3600 : _timezone) % 3600) / 60));
- # else
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_TIMEZONE__)
-+		int timezone = 0;
-+#endif
- 		snprintf(tzbuf, sizeof(tzbuf), "%c%02d:%02d", ((ta->tm_isdst ? timezone - 3600:timezone)>0)?'-':'+', abs((ta->tm_isdst ? timezone - 3600 : timezone) / 3600), abs(((ta->tm_isdst ? timezone - 3600 : timezone) % 3600) / 60));
- # endif
- #endif
 diff -Paur --no-dereference -- php.upstream/ext/sockets/multicast.c php/ext/sockets/multicast.c
 --- php.upstream/ext/sockets/multicast.c
 +++ php/ext/sockets/multicast.c

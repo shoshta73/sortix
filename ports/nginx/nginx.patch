@@ -1261,20 +1261,6 @@ diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_thread_mutex.c ngi
  
      err = pthread_mutex_init(mtx, &attr);
      if (err != 0) {
-diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_time.h nginx/src/os/unix/ngx_time.h
---- nginx.upstream/src/os/unix/ngx_time.h
-+++ nginx/src/os/unix/ngx_time.h
-@@ -41,6 +41,10 @@
- #define ngx_tm_zone           tm_zone
- #endif
- 
-+#ifdef __sortix__
-+#define timezone 0
-+#endif
-+
- 
- #if (NGX_SOLARIS)
- 
 diff -Paur --no-dereference -- nginx.upstream/src/os/unix/ngx_user.c nginx/src/os/unix/ngx_user.c
 --- nginx.upstream/src/os/unix/ngx_user.c
 +++ nginx/src/os/unix/ngx_user.c

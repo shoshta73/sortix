@@ -18,18 +18,6 @@ diff -Paur --no-dereference -- mtools.upstream/configure mtools/configure
    ;
    return 0;
  }
-diff -Paur --no-dereference -- mtools.upstream/file.c mtools/file.c
---- mtools.upstream/file.c
-+++ mtools/file.c
-@@ -522,7 +522,7 @@
- 		extern long timezone;
- #endif
- 		tzset();
--		tzone = (long) timezone;
-+		tzone = (long) 0;
- 	}
- #else
- 	tzone = 0;
 diff -Paur --no-dereference -- mtools.upstream/mainloop.h mtools/mainloop.h
 --- mtools.upstream/mainloop.h
 +++ mtools/mainloop.h

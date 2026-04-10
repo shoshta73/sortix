@@ -420,35 +420,6 @@ diff -Paur --no-dereference -- python.upstream/Modules/socketmodule.c python/Mod
  }
  
  #ifdef HAVE_INET_NTOA
-diff -Paur --no-dereference -- python.upstream/Modules/timemodule.c python/Modules/timemodule.c
---- python.upstream/Modules/timemodule.c
-+++ python/Modules/timemodule.c
-@@ -1773,13 +1773,25 @@
- #if !defined(MS_WINDOWS) || defined(MS_WINDOWS_DESKTOP) || defined(MS_WINDOWS_SYSTEM)
-     tzset();
- #endif
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_TIMEZONE__)
-+    ADD_INT("timezone", 0);
-+#else
-     ADD_INT("timezone", _Py_timezone);
-+#endif
- #ifdef HAVE_ALTZONE
-     ADD_INT("altzone", altzone);
- #else
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_TIMEZONE__)
-+    ADD_INT("altzone", -3600);
-+#else
-     ADD_INT("altzone", _Py_timezone-3600);
- #endif
-+#endif
-+#if defined(__sortix__) && !defined(__SORTIX_HAS_DAYLIGHT__)
-+    ADD_INT("daylight", 0);
-+#else
-     ADD_INT("daylight", _Py_daylight);
-+#endif
- #ifdef MS_WINDOWS
-     TIME_ZONE_INFORMATION tzinfo = {0};
-     GetTimeZoneInformation(&tzinfo);
 diff -Paur --no-dereference -- python.upstream/Programs/_testembed.c python/Programs/_testembed.c
 --- python.upstream/Programs/_testembed.c
 +++ python/Programs/_testembed.c
