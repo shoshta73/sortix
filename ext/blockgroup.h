@@ -30,6 +30,10 @@ public:
 	~BlockGroup();
 
 public:
+	BlockGroup* prev_free_blocks;
+	BlockGroup* next_free_blocks;
+	BlockGroup* prev_free_inodes;
+	BlockGroup* next_free_inodes;
 	Block* data_block;
 	struct ext_blockgrpdesc* data;
 	Filesystem* filesystem;
@@ -48,6 +52,8 @@ public:
 	uint32_t num_block_bitmap_chunks;
 	uint32_t num_inode_bitmap_chunks;
 	bool dirty;
+	bool has_free_blocks;
+	bool has_free_inodes;
 
 public:
 	uint32_t AllocateBlock();
@@ -60,8 +66,12 @@ public:
 	void BeginWrite();
 	void FinishWrite();
 	void Use();
-	void Unlink();
-	void Prelink();
+	void UpdateFreeBlocks();
+	void UpdateFreeInodes();
+	void UnlinkFreeBlocks();
+	void UnlinkFreeInodes();
+	void PrelinkFreeBlocks();
+	void PrelinkFreeInodes();
 
 };
 

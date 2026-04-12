@@ -53,6 +53,11 @@ Filesystem::Filesystem(Device* device, const char* mount_path)
 	this->num_blocks = this->sb->s_blocks_count;
 	this->num_groups = divup(this->sb->s_blocks_count, this->sb->s_blocks_per_group);
 	this->num_inodes = this->sb->s_inodes_count;
+	this->initialized_groups = 0;
+	this->first_free_blocks_bg = NULL;
+	this->last_free_blocks_bg = NULL;
+	this->first_free_inodes_bg = NULL;
+	this->last_free_inodes_bg = NULL;
 	this->mru_inode = NULL;
 	this->lru_inode = NULL;
 	this->dirty_inode = NULL;
@@ -188,7 +193,13 @@ BlockGroup* Filesystem::GetBlockGroup(uint32_t group_id)
 	group->data_block = block;
 	uint8_t* buf = group->data_block->block_data + offset;
 	group->data = (struct ext_blockgrpdesc*) buf;
-	return block_groups[group_id] = group;
+	// An optimization. All block groups below initialized_groups must exist.
+	if ( initialized_groups == group_id )
+		initialized_groups++;
+	block_groups[group_id] = group;
+	group->UpdateFreeBlocks();
+	group->UpdateFreeInodes();
+	return group;
 }
 
 Inode* Filesystem::GetInode(uint32_t inode_id)
@@ -232,18 +243,25 @@ uint32_t Filesystem::AllocateBlock(BlockGroup* preferred)
 {
 	if ( !device->write )
 		return errno = EROFS, 0;
+	// Fail if the filesystem is out of blocks.
 	if ( !sb->s_free_blocks_count )
 		return errno = ENOSPC, 0;
+	// Use the preferred block group if it has space.
 	if ( preferred )
 		if ( uint32_t block_id = preferred->AllocateBlock() )
 			return block_id;
-	// TODO: This can be made faster by maintaining a linked list of block
-	//       groups that definitely have free blocks.
-	for ( uint32_t group_id = 0; group_id < num_groups; group_id++ )
-		if ( uint32_t block_id = GetBlockGroup(group_id)->AllocateBlock() )
+	// Allocate in constant time using a block group that we know has space.
+	if ( first_free_blocks_bg )
+		if ( uint32_t block_id = first_free_blocks_bg->AllocateBlock() )
 			return block_id;
-	// This case means the filesystem was inconsistent. Continue and fsck on
-	// the next mount since this is mild inconsistency.
+	// No block groups in memory has space. Read some more.
+	for ( ; initialized_groups < num_groups; initialized_groups++ )
+		if ( uint32_t block_id =
+		         GetBlockGroup(initialized_groups)->AllocateBlock() )
+			return block_id;
+	// We unexpected ran out of blocks, even though the superblock said there
+	// were available blocks. This case means the filesystem was inconsistent.
+	// Continue and fsck on the next mount since this is mild inconsistency.
 	RequestCheck();
 	BeginWrite();
 	sb->s_free_blocks_count = 0;
@@ -255,19 +273,28 @@ uint32_t Filesystem::AllocateInode(bool is_directory, BlockGroup* preferred)
 {
 	if ( !device->write )
 		return errno = EROFS, 0;
+	// Fail if the filesystem is out of inode.
 	if ( !sb->s_free_inodes_count )
 		return errno = ENOSPC, 0;
+	// Use the preferred block group if it has space.
 	if ( preferred )
 		if ( uint32_t inode_id = preferred->AllocateInode(is_directory) )
 			return inode_id;
-	// TODO: This can be made faster by maintaining a linked list of block
-	//       groups that definitely have free inodes.
-	for ( uint32_t group_id = 0; group_id < num_groups; group_id++ )
+	// Allocate in constant time using a block group that we know has space.
+	if ( first_free_inodes_bg )
 		if ( uint32_t inode_id =
-		         GetBlockGroup(group_id)->AllocateInode(is_directory) )
+		         first_free_inodes_bg->AllocateInode(is_directory) )
 			return inode_id;
-	// This case means the filesystem was inconsistent. Continue and fsck on
-	// the next mount since this is mild inconsistency.
+	// No block groups in memory has space. Read some more.
+	for ( ; initialized_groups < num_groups; initialized_groups++ )
+	{
+		BlockGroup* group = GetBlockGroup(initialized_groups);
+		if ( uint32_t inode_id = group->AllocateInode(is_directory) )
+			return inode_id;
+	}
+	// We unexpected ran out of inodes, even though the superblock said there
+	// were available inodes. This case means the filesystem was inconsistent.
+	// Continue and fsck on the next mount since this is mild inconsistency.
 	RequestCheck();
 	BeginWrite();
 	sb->s_free_inodes_count = 0;

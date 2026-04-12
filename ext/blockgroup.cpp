@@ -35,6 +35,10 @@
 
 BlockGroup::BlockGroup(Filesystem* filesystem, uint32_t group_id)
 {
+	this->prev_free_blocks = NULL;
+	this->next_free_blocks = NULL;
+	this->prev_free_inodes = NULL;
+	this->next_free_inodes = NULL;
 	this->data_block = NULL;
 	this->data = NULL;
 	this->filesystem = filesystem;
@@ -60,6 +64,8 @@ BlockGroup::BlockGroup(Filesystem* filesystem, uint32_t group_id)
 	this->num_block_bitmap_chunks = divup(num_blocks, (uint32_t) num_chunk_bits);
 	this->num_inode_bitmap_chunks = divup(num_inodes, (uint32_t) num_chunk_bits);
 	this->dirty = false;
+	this->has_free_blocks = false;
+	this->has_free_inodes = false;
 }
 
 BlockGroup::~BlockGroup()
@@ -97,7 +103,6 @@ uint32_t BlockGroup::AllocateBlock()
 		uint32_t chunk_offset = block_alloc_chunk * num_chunk_bits;
 		uint8_t* chunk_bits = block_bitmap_chunk->block_data;
 		size_t num_bits = last ? num_blocks - chunk_offset : num_chunk_bits;
-		// TODO: This can be made faster by caching if previous bits were set.
 		for ( ; block_bitmap_chunk_i < num_bits; block_bitmap_chunk_i++ )
 		{
 			if ( !checkbit(chunk_bits, block_bitmap_chunk_i) )
@@ -113,6 +118,7 @@ uint32_t BlockGroup::AllocateBlock()
 				filesystem->FinishWrite();
 				uint32_t group_block_id = chunk_offset + block_bitmap_chunk_i++;
 				uint32_t block_id = first_block_id + group_block_id;
+				UpdateFreeBlocks();
 				return block_id;
 			}
 		}
@@ -125,6 +131,7 @@ uint32_t BlockGroup::AllocateBlock()
 	BeginWrite();
 	data->bg_free_blocks_count = 0;
 	FinishWrite();
+	UpdateFreeBlocks();
 	return errno = ENOSPC, 0;
 }
 
@@ -151,7 +158,6 @@ uint32_t BlockGroup::AllocateInode(bool is_directory)
 		uint32_t chunk_offset = inode_alloc_chunk * num_chunk_bits;
 		uint8_t* chunk_bits = inode_bitmap_chunk->block_data;
 		size_t num_bits = last ? num_inodes - chunk_offset : num_chunk_bits;
-		// TODO: This can be made faster by caching if previous bits were set.
 		for ( ; inode_bitmap_chunk_i < num_bits; inode_bitmap_chunk_i++ )
 		{
 			if ( !checkbit(chunk_bits, inode_bitmap_chunk_i) )
@@ -167,6 +173,7 @@ uint32_t BlockGroup::AllocateInode(bool is_directory)
 				filesystem->BeginWrite();
 				filesystem->sb->s_free_inodes_count--;
 				filesystem->FinishWrite();
+				UpdateFreeInodes();
 				uint32_t group_inode_id = chunk_offset + inode_bitmap_chunk_i++;
 				uint32_t inode_id = first_inode_id + group_inode_id;
 				return inode_id;
@@ -181,6 +188,7 @@ uint32_t BlockGroup::AllocateInode(bool is_directory)
 	BeginWrite();
 	data->bg_free_inodes_count = 0;
 	FinishWrite();
+	UpdateFreeInodes();
 	return errno = ENOSPC, 0;
 }
 
@@ -213,6 +221,7 @@ void BlockGroup::FreeBlock(uint32_t block_id)
 	filesystem->BeginWrite();
 	filesystem->sb->s_free_blocks_count++;
 	filesystem->FinishWrite();
+	UpdateFreeBlocks();
 }
 
 void BlockGroup::FreeInode(uint32_t inode_id, bool is_directory)
@@ -246,6 +255,7 @@ void BlockGroup::FreeInode(uint32_t inode_id, bool is_directory)
 	filesystem->BeginWrite();
 	filesystem->sb->s_free_inodes_count++;
 	filesystem->FinishWrite();
+	UpdateFreeInodes();
 }
 
 void BlockGroup::Refer()
@@ -283,4 +293,74 @@ void BlockGroup::FinishWrite()
 
 void BlockGroup::Use()
 {
+}
+
+void BlockGroup::UpdateFreeBlocks()
+{
+	if ( data->bg_free_blocks_count && !has_free_blocks )
+	{
+		PrelinkFreeBlocks();
+		has_free_blocks = true;
+	}
+	else if ( !data->bg_free_blocks_count && has_free_blocks )
+	{
+		UnlinkFreeBlocks();
+		has_free_blocks = false;
+	}
+}
+
+void BlockGroup::UpdateFreeInodes()
+{
+	if ( data->bg_free_inodes_count && !has_free_inodes )
+	{
+		PrelinkFreeInodes();
+		has_free_inodes = true;
+	}
+	else if ( !data->bg_free_inodes_count && has_free_inodes )
+	{
+		UnlinkFreeInodes();
+		has_free_inodes = false;
+	}
+}
+
+void BlockGroup::UnlinkFreeBlocks()
+{
+	(prev_free_blocks ?
+	 prev_free_blocks->next_free_blocks :
+	 filesystem->first_free_blocks_bg) = next_free_blocks;
+	(next_free_blocks ?
+	 next_free_blocks->prev_free_blocks :
+	 filesystem->last_free_blocks_bg) = prev_free_blocks;
+}
+
+void BlockGroup::UnlinkFreeInodes()
+{
+	(prev_free_inodes ?
+	 prev_free_inodes->next_free_inodes :
+	 filesystem->first_free_inodes_bg) = next_free_inodes;
+	(next_free_inodes ?
+	 next_free_inodes->prev_free_inodes :
+	 filesystem->last_free_inodes_bg) = prev_free_inodes;
+}
+
+void BlockGroup::PrelinkFreeBlocks()
+{
+	prev_free_blocks = NULL;
+	next_free_blocks = filesystem->first_free_blocks_bg;
+	if ( filesystem->first_free_blocks_bg )
+		filesystem->first_free_blocks_bg->prev_free_blocks = this;
+	filesystem->first_free_blocks_bg = this;
+	if ( !filesystem->last_free_inodes_bg )
+		filesystem->last_free_inodes_bg = this;
+}
+
+void BlockGroup::PrelinkFreeInodes()
+{
+	prev_free_inodes = NULL;
+	next_free_inodes = filesystem->first_free_inodes_bg;
+	if ( filesystem->first_free_inodes_bg )
+		filesystem->first_free_inodes_bg->prev_free_inodes = this;
+	filesystem->first_free_inodes_bg = this;
+	if ( !filesystem->last_free_inodes_bg )
+		filesystem->last_free_inodes_bg = this;
 }

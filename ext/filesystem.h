@@ -43,6 +43,11 @@ public:
 	uint32_t num_blocks;
 	uint32_t num_groups;
 	uint32_t num_inodes;
+	uint32_t initialized_groups;
+	BlockGroup* first_free_blocks_bg;
+	BlockGroup* last_free_blocks_bg;
+	BlockGroup* first_free_inodes_bg;
+	BlockGroup* last_free_inodes_bg;
 	Inode* mru_inode;
 	Inode* lru_inode;
 	Inode* dirty_inode;
