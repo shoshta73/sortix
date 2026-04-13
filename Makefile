@@ -208,6 +208,13 @@ install-cross-compiler:
 	chmod +x "$(PREFIX)/bin/$(TARGET)-c99"
 	printf '#!/bin/sh\nexec %s -std=c17 "$$@"\n' "$(PREFIX)/bin/$(TARGET)-gcc" > "$(PREFIX)/bin/$(TARGET)-c17"
 	chmod +x "$(PREFIX)/bin/$(TARGET)-c17"
+ifeq ($(HOST),$(TARGET))
+	ln -f "$(PREFIX)/bin/gcc" "$(PREFIX)/bin/cc"
+	printf '#!/bin/sh\nexec %s -std=c99 "$$@"\n' "$(PREFIX)/bin/gcc" > "$(PREFIX)/bin/c99"
+	chmod +x "$(PREFIX)/bin/c99"
+	printf '#!/bin/sh\nexec %s -std=c17 "$$@"\n' "$(PREFIX)/bin/gcc" > "$(PREFIX)/bin/c17"
+	chmod +x "$(PREFIX)/bin/c17"
+endif
 
 .PHONY: clean-cross-toolchain
 clean-cross-toolchain: clean-sysroot clean-build-tools clean-cross-compiler
