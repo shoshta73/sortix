@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, 2016, 2021, 2022, 2024 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2015, 2016, 2021, 2022, 2024, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -201,6 +201,7 @@ PTS::PTS(mode_t mode, uid_t owner, gid_t group)
 	inode_type = INODE_TYPE_DIR;
 	dev = (dev_t) this;
 	ino = 0;
+	stat_nlink = 2;
 	stat_gid = owner;
 	stat_gid = group;
 	type = S_IFDIR;
@@ -485,6 +486,7 @@ private:
 PTY::PTY(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group,
          int ptynum) : TTY(dev, ino, mode, owner, group, "")
 {
+	stat_nlink = 1;
 	tio.c_cflag |= CREAD;
 	output_ready_cond = KTHREAD_COND_INITIALIZER;
 	output_possible_cond = KTHREAD_COND_INITIALIZER;
@@ -738,6 +740,7 @@ PTMX::PTMX(dev_t dev, ino_t ino, mode_t mode, uid_t owner, gid_t group)
 	this->ino = ino;
 	this->type = S_IFFACTORY | S_IFFACTORY_NOSTAT;
 	this->stat_mode = (mode & S_SETABLE) | S_IFCHR;
+	this->stat_nlink = 1;
 	this->stat_uid = owner;
 	this->stat_gid = group;
 }
