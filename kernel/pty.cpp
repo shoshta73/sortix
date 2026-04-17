@@ -79,13 +79,13 @@ static int AllocatePTYNumber()
 			unsigned long mask = 1UL << n;
 			if ( word & mask )
 				continue;
-			ptynum_bitmap[i] = word | mask;
-			size_t result = i * ULONG_MAX + n;
-			if ( PTY_LIMIT < result || INT_MAX < result )
+			size_t result = i * ULONG_BIT + n;
+			if ( PTY_LIMIT <= result || INT_MAX < result )
 			{
 				ptynum_none_below = result;
 				return errno = EMFILE, -1;
 			}
+			ptynum_bitmap[i] = word | mask;
 			ptynum_none_below = result + 1;
 			return result;
 		}
