@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2018, 2023, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2015, 2018, 2023, 2025-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -235,6 +235,11 @@ bool Inode::ZeroCluster(fat_ino_t cluster)
 
 bool Inode::Iterate(Block** block_ptr, struct position* position)
 {
+	if ( filesystem->eio_cluster < position->cluster )
+	{
+		errno = filesystem->eio_cluster == position->cluster ? EIO : 0;
+		return false;
+	}
 	if ( position->offset == filesystem->bytes_per_sector )
 	{
 		position->offset = 0;
@@ -294,7 +299,7 @@ fat_ino_t Inode::SeekCluster(fat_off_t cluster_id)
 		if ( cluster < 2 || filesystem->eio_cluster == cluster )
 			return errno = EIO, filesystem->eio_cluster;
 		if ( filesystem->eio_cluster < cluster )
-			return errno = EIO, filesystem->eio_cluster;
+			return cluster;
 	}
 	if ( 0 < cluster_id )
 	{
@@ -302,6 +307,47 @@ fat_ino_t Inode::SeekCluster(fat_off_t cluster_id)
 		cached_cluster = cluster;
 	}
 	return cluster;
+}
+
+bool Inode::SeekOffset(fat_off_t offset, struct position* out_position)
+{
+	if ( inode_id == filesystem->root_inode_id && filesystem->fat_type != 32 )
+	{
+		fat_block_t end = filesystem->root_dirent_count *
+		                  sizeof(struct fat_dirent);
+		if ( end <= offset )
+		{
+			out_position->cluster = filesystem->eof_cluster;
+			out_position->sector = 0;
+			out_position->offset = 0;
+		}
+		else
+		{
+			out_position->cluster = offset / filesystem->bytes_per_sector;
+			out_position->sector = 0;
+			out_position->offset = offset % filesystem->bytes_per_sector;
+		}
+		return true;
+	}
+	if ( S_ISREG(Mode()) )
+	{
+		fat_off_t file_size = Size();
+		if ( file_size < offset )
+			return errno = EINVAL, false;
+	}
+	fat_off_t cluster_id = offset / filesystem->cluster_size;
+	fat_off_t cluster_offset = offset % filesystem->cluster_size;
+	fat_ino_t cluster = SeekCluster(cluster_id);
+	if ( filesystem->eio_cluster <= cluster )
+	{
+		if ( filesystem->eio_cluster == cluster )
+			return false;
+		return true; // EOF
+	}
+	out_position->cluster = cluster;
+	out_position->sector = cluster_offset / filesystem->bytes_per_sector;
+	out_position->offset = cluster_offset % filesystem->bytes_per_sector;
+	return true;
 }
 
 bool Inode::FreeClusters(fat_ino_t cluster)
@@ -344,7 +390,7 @@ bool Inode::Truncate(uint64_t new_size_64)
 		cluster_offset = filesystem->cluster_size;
 	}
 	fat_ino_t cluster = SeekCluster(cluster_id);
-	if ( cluster_id == filesystem->eio_cluster )
+	if ( filesystem->eio_cluster <= cluster_id )
 		return errno = EIO, false;
 	if ( old_size < new_size )
 	{
@@ -449,13 +495,14 @@ static bool EncodeUTF16(const char* in, char16_t* out, size_t out_size)
 	}
 }
 
-bool Inode::ReadDirectory(Block** block_inout,
+bool Inode::ReadDirectory(Block** block_inout, fat_off_t* next_offset_inout,
                           struct position* next_position_inout, char* name,
                           uint8_t* file_type_out, fat_ino_t* inode_id_out,
                           struct fat_dirent** entry_out,
                           struct free_search* free_search,
+                          fat_off_t* entry_offset_out,
                           struct position* position_out,
-                          size_t* entry_length_out)
+                          size_t* entry_length_out, bool trusted_offset)
 {
 	// Manually provide . and .. entries for the root directory.
 	if ( inode_id == filesystem->root_inode_id &&
@@ -463,16 +510,23 @@ bool Inode::ReadDirectory(Block** block_inout,
 	{
 		if ( next_position_inout->offset < 2  )
 		{
+			if ( entry_offset_out )
+				*entry_offset_out = next_position_inout->offset;
+			if ( position_out )
+				*position_out = *next_position_inout;
 			const char* entry = next_position_inout->offset ? ".." : ".";
 			if ( name )
 				strcpy(name, entry);
 			*file_type_out = DT_DIR;
 			*inode_id_out = filesystem->root_inode_id;
+			if ( next_offset_inout )
+				(*next_offset_inout)++;
 			next_position_inout->offset++;
 			*entry_out = NULL;
 			return true;
 		}
-		next_position_inout->offset = 0;
+		else if ( next_position_inout->offset == 2 )
+			next_position_inout->offset = 0;
 	}
 	bool has_long = false;
 	bool has_long_name = false;
@@ -480,12 +534,15 @@ bool Inode::ReadDirectory(Block** block_inout,
 	char16_t long_name[20 * 13 + 1] = {0};
 	unsigned char ord_next = 0;
 	unsigned char long_in_streak = 0;
+	fat_off_t entry_offset = next_offset_inout ? *next_offset_inout : 0;
+	fat_ino_t next_offset = entry_offset;
 	struct position entry_position = *next_position_inout;
 	size_t entry_length = 0;
 	// Read directory entries until we have a full record.
 	while ( Iterate(block_inout, next_position_inout) )
 	{
 		// Assume this directory record is free space until proven otherwise.
+		fat_ino_t offset = next_offset;
 		struct position position = *next_position_inout;
 		if ( free_search )
 			free_search->last_cluster = position.cluster;
@@ -509,6 +566,19 @@ bool Inode::ReadDirectory(Block** block_inout,
 			errno = 0;
 			break;
 		}
+		if ( next_offset_inout )
+		{
+			// If the root directory, place the . entry as offset 0, and .. as
+			// offset 1, and fake the actual first entry as offset 2, and then
+			// the second entry as offset 32, and then increment by 32.
+			if ( inode_id == filesystem->root_inode_id &&
+				 next_position_inout->cluster == first_cluster &&
+				 offset == 2 )
+				next_offset = sizeof(struct fat_dirent);
+			else
+				next_offset += sizeof(struct fat_dirent);
+			*next_offset_inout = next_offset;
+		}
 		next_position_inout->offset += sizeof(struct fat_dirent);
 		// Continue to the next record if a free entry is found.
 		if ( !entry->name[0] || (unsigned char) entry->name[0] == 0xE5 )
@@ -519,7 +589,8 @@ bool Inode::ReadDirectory(Block** block_inout,
 				has_long = false;
 				has_long_name = false;
 				long_in_streak = 0;
-				filesystem->RequestCheck();
+				if ( trusted_offset )
+					filesystem->RequestCheck();
 			}
 			continue;
 		}
@@ -541,13 +612,15 @@ bool Inode::ReadDirectory(Block** block_inout,
 				has_long = false;
 				has_long_name = false;
 				long_in_streak = 0;
-				filesystem->RequestCheck();
+				if ( trusted_offset )
+					filesystem->RequestCheck();
 			}
 			// Begin a new long directory record if needed.
 			if ( !has_long )
 			{
 				has_long = true;
 				long_checksum = entry->checksum;
+				entry_offset = offset;
 				entry_position = position;
 				entry_length = 0;
 			}
@@ -563,7 +636,8 @@ bool Inode::ReadDirectory(Block** block_inout,
 				has_long = false;
 				has_long_name = false;
 				long_in_streak = 0;
-				filesystem->RequestCheck();
+				if ( trusted_offset )
+					filesystem->RequestCheck();
 				continue;
 			}
 			if ( entry->ord & FAT_LONG_NAME_LAST )
@@ -604,6 +678,9 @@ bool Inode::ReadDirectory(Block** block_inout,
 		// If there was no long data, then the directory record begins here.
 		if ( !has_long )
 		{
+			if ( next_offset_inout )
+				entry_offset = *next_offset_inout;
+			entry_offset = offset;
 			entry_position = position;
 			entry_length = 0;
 		}
@@ -711,6 +788,8 @@ bool Inode::ReadDirectory(Block** block_inout,
 		*file_type_out = file_type;
 		*inode_id_out = inode_id;
 		*entry_out = entry;
+		if ( entry_offset_out )
+			*entry_offset_out = entry_offset;
 		if ( position_out )
 			*position_out = entry_position;
 		if ( entry_length_out )
@@ -738,8 +817,9 @@ Inode* Inode::Open(const char* elem, int flags, mode_t mode)
 	uint8_t file_type;
 	fat_ino_t child_inode_id;
 	struct fat_dirent* entry;
-	while ( ReadDirectory(&block, &position, name, &file_type, &child_inode_id,
-	                      &entry, NULL, NULL, NULL) )
+	while ( ReadDirectory(&block, NULL, &position, name, &file_type,
+	                      &child_inode_id, &entry, NULL, NULL, NULL, NULL,
+	                      true) )
 	{
 		if ( strcmp(elem, name) != 0 )
 			continue;
@@ -970,8 +1050,9 @@ bool Inode::Link(const char* elem, Inode* dest, bool directories)
 	struct free_search free_search;
 	memset(&free_search, 0, sizeof(free_search));
 	free_search.needed = needed_entries;
-	while ( ReadDirectory(&block, &position, name, &file_type, &child_inode_id,
-	                      &entry, &free_search, NULL, NULL) )
+	while ( ReadDirectory(&block, NULL, &position, name, &file_type,
+	                      &child_inode_id, &entry, &free_search, NULL, NULL,
+	                      NULL, true) )
 	{
 		if ( !entry ) // Root directory . and .. are not important here.
 			continue;
@@ -1149,8 +1230,9 @@ Inode* Inode::UnlinkKeep(const char* elem, bool directories, bool force)
 	fat_ino_t child_inode_id;
 	struct fat_dirent* entry;
 	size_t entry_length;
-	while ( ReadDirectory(&block, &position, name, &file_type, &child_inode_id,
-	                      &entry, NULL, &entry_position, &entry_length) )
+	while ( ReadDirectory(&block, NULL, &position, name, &file_type,
+	                      &child_inode_id, &entry, NULL, NULL,
+	                      &entry_position, &entry_length, true) )
 	{
 		if ( !entry || !strcmp(name, ".") || !strcmp(name, "..") )
 			continue;
@@ -1294,8 +1376,9 @@ bool Inode::RelinkParent(Inode* new_parent)
 	uint8_t file_type;
 	fat_ino_t child_inode_id;
 	struct fat_dirent* entry;
-	while ( ReadDirectory(&block, &position, name, &file_type, &child_inode_id,
-	                      &entry, NULL, NULL, NULL) )
+	while ( ReadDirectory(&block, NULL, &position, name, &file_type,
+	                      &child_inode_id, &entry, NULL, NULL, NULL, NULL,
+	                      true) )
 	{
 		if ( strcmp("..", name) != 0 )
 			continue;
@@ -1345,7 +1428,7 @@ ssize_t Inode::ReadAt(uint8_t* buf, size_t count, off_t o_offset)
 	fat_off_t cluster_offset = offset % filesystem->cluster_size;
 	fat_ino_t cluster = SeekCluster(cluster_id);
 	if ( filesystem->eio_cluster <= cluster )
-		return -1;
+		return errno = EIO, -1;
 	while ( sofar < count )
 	{
 		// Follow the FAT cluster singly linked list for the next cluster.
@@ -1413,7 +1496,7 @@ ssize_t Inode::WriteAt(const uint8_t* buf, size_t count, off_t o_offset)
 	fat_off_t cluster_offset = offset % filesystem->cluster_size;
 	fat_ino_t cluster = SeekCluster(cluster_id);
 	if ( filesystem->eio_cluster <= cluster )
-		return -1;
+		return errno = EIO, -1;
 	while ( sofar < count )
 	{
 		// Follow the FAT cluster singly linked list for the next cluster.

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2016, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2016, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -325,6 +325,27 @@ typedef __pid_t pid_t;
 #define SCNoPID __SCNoPID
 #define SCNuPID __SCNuPID
 #define SCNxPID __SCNxPID
+#endif
+
+#ifndef __reclen_t_defined
+#define __reclen_t_defined
+typedef __reclen_t reclen_t;
+#endif
+#if __USE_SORTIX
+#define RECLEN_C(c) __RECLEN_C(c)
+#define RECLEN_MIN __RECLEN_MIN
+#define RECLEN_MAX __RECLEN_MAX
+#define PRIdRECLEN __PRIdRECLEN
+#define PRIiRECLEN __PRIiRECLEN
+#define PRIoRECLEN __PRIoRECLEN
+#define PRIuRECLEN __PRIuRECLEN
+#define PRIxRECLEN __PRIxRECLEN
+#define PRIXRECLEN __PRIXRECLEN
+#define SCNdRECLEN __SCNdRECLEN
+#define SCNiRECLEN __SCNiRECLEN
+#define SCNoRECLEN __SCNoRECLEN
+#define SCNuRECLEN __SCNuRECLEN
+#define SCNxRECLEN __SCNxRECLEN
 #endif
 
 #ifndef __size_t_defined

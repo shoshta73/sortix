@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2022, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -219,35 +219,52 @@ Dir::~Dir()
 	delete[] children;
 }
 
-ssize_t Dir::readdirents(ioctx_t* ctx, struct dirent* dirent, size_t size,
-                         off_t start)
+ssize_t Dir::getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+                      off_t* offset)
 {
+	if ( flags & ~(GETDENTS_ONE) )
+		return errno = EINVAL;
+	ssize_t result = 0;
 	ScopedLock lock(&dir_lock);
-	if ( children_used <= (uintmax_t) start )
-		return 0;
-	struct dirent retdirent;
-	memset(&retdirent, 0, sizeof(retdirent));
-	const char* name = children[start].name;
-	size_t namelen = strlen(name);
-	Ref<Inode> inode = children[start].inode;
-	retdirent.d_reclen = sizeof(*dirent) + namelen + 1;
-	retdirent.d_namlen = namelen;
-	retdirent.d_ino = inode->ino;
-	retdirent.d_dev = inode->dev;
-	retdirent.d_type = ModeToDT(inode->type);
-	if ( !ctx->copy_to_dest(dirent, &retdirent, sizeof(retdirent)) )
-		return -1;
-	if ( size < retdirent.d_reclen )
-		return errno = ERANGE, -1;
-	if ( !ctx->copy_to_dest(dirent->d_name, name, namelen+1) )
-		return -1;
-	return (ssize_t) retdirent.d_reclen;
+	while ( (uintmax_t) *offset < children_length )
+	{
+		size_t index = (size_t) *offset;
+		if ( !children[index].name )
+		{
+			(*offset)++;
+			continue;
+		}
+		struct dirent dent;
+		memset(&dent, 0, sizeof(dent));
+		const char* name = children[index].name;
+		size_t name_len = strlen(name);
+		Ref<Inode> inode = children[index].inode;
+		reclen_t reclen = offsetof(struct dirent, d_name) + name_len + 1;
+		reclen = -(-reclen & ~(alignof(dent) - 1));
+		dent.d_reclen = reclen;
+		dent.d_namlen = name_len;
+		dent.d_ino = inode->ino;
+		dent.d_dev = inode->dev;
+		dent.d_type = ModeToDT(inode->type);
+		size_t left = size - (size_t) result;
+		if ( left < dent.d_reclen )
+			return result ? result : (errno = EINVAL, -1);
+		struct dirent* out = (struct dirent*) ((char*) buf + result);
+		if ( !ctx->copy_to_dest(out, &dent, sizeof(dent)) ||
+		     !ctx->copy_to_dest(out->d_name, name, name_len+1) )
+			return -1;
+		result += reclen;
+		(*offset)++;
+		if ( flags & GETDENTS_ONE )
+			break;
+	}
+	return result;
 }
 
 size_t Dir::FindChild(const char* filename)
 {
-	for ( size_t i = 0; i < children_used; i++ )
-		if ( !strcmp(filename, children[i].name) )
+	for ( size_t i = 0; i < children_length; i++ )
+		if ( children[i].name && !strcmp(filename, children[i].name) )
 			return i;
 	return SIZE_MAX;
 }
@@ -260,7 +277,7 @@ bool Dir::AddChild(const char* filename, Ref<Inode> inode)
 		DirEntry* new_children = new DirEntry[new_children_length];
 		if ( !new_children )
 			return false;
-		for ( size_t i = 0; i < children_used; i++ )
+		for ( size_t i = 0; i < children_length; i++ )
 		{
 			new_children[i].inode = children[i].inode;
 			new_children[i].name = children[i].name;
@@ -269,29 +286,27 @@ bool Dir::AddChild(const char* filename, Ref<Inode> inode)
 		delete[] children; children = new_children;
 		children_length = new_children_length;
 	}
+	size_t index = 0;
+	while ( children[index].name )
+		index++;
 	char* filename_copy = String::Clone(filename);
 	if ( !filename_copy )
 		return false;
 	inode->linked();
-	DirEntry* dirent = &children[children_used++];
-	dirent->inode = inode;
-	dirent->name = filename_copy;
+	DirEntry* entry = &children[index];
+	entry->inode = inode;
+	entry->name = filename_copy;
+	children_used++;
 	return true;
 }
 
 void Dir::RemoveChild(size_t index)
 {
-	assert(index < children_used);
-	if ( index != children_used-1 )
-	{
-		DirEntry tmp = children[index];
-		children[index] = children[children_used-1];
-		children[children_used-1] = tmp;
-		index = children_used-1;
-	}
+	assert(index < children_length);
 	children[index].inode->unlinked();
 	children[index].inode.Reset();
 	delete[] children[index].name;
+	children[index].name = NULL;
 	children_used--;
 }
 
@@ -368,15 +383,18 @@ int Dir::rmdir_me(ioctx_t* /*ctx*/)
 	ScopedLock lock(&dir_lock);
 	if ( shut_down )
 		return errno = ENOENT, -1;
-	for ( size_t i = 0; i < children_used; i++ )
-		if ( !IsDotOrDotDot(children[i].name) )
+	for ( size_t i = 0; i < children_length; i++ )
+		if ( children[i].name && !IsDotOrDotDot(children[i].name) )
 			return errno = ENOTEMPTY, -1;
 	shut_down = true;
-	for ( size_t i = 0; i < children_used; i++ )
+	for ( size_t i = 0; i < children_length; i++ )
 	{
-		children[i].inode->unlinked();
-		children[i].inode.Reset();
-		delete[] children[i].name;
+		if ( children[i].name )
+		{
+			children[i].inode->unlinked();
+			children[i].inode.Reset();
+			delete[] children[i].name;
+		}
 	}
 	delete[] children; children = NULL;
 	children_used = children_length = 0;

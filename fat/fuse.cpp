@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -489,9 +489,9 @@ int fat_fuse_readdir(const char* /*path*/, void* buf, fuse_fill_dir_t filler,
 	uint8_t file_type;
 	fat_ino_t inode_id;
 	struct fat_dirent* entry;
-	while ( inode->ReadDirectory(&block, &next_position, rec_num ? NULL : name,
-	                             &file_type, &inode_id, &entry, NULL, NULL,
-	                             NULL) )
+	while ( inode->ReadDirectory(&block, NULL, &next_position,
+	                             rec_num ? NULL : name, &file_type, &inode_id,
+	                             &entry, NULL, NULL, NULL, NULL, true) )
 	{
 		if ( !rec_num || !rec_num-- )
 		{

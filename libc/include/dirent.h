@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2014, 2015, 2018, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2014, 2015, 2018, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -30,6 +30,13 @@
 #ifndef __off_t_defined
 #define __off_t_defined
 typedef __off_t off_t;
+#endif
+#endif
+
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+#ifndef __ssize_t_defined
+#define __ssize_t_defined
+typedef __ssize_t ssize_t;
 #endif
 #endif
 
@@ -70,8 +77,15 @@ int scandir(const char*, struct dirent***, int (*)(const struct dirent*),
             int (*)(const struct dirent**, const struct dirent**));
 #endif
 
+/* Functions from POSIX 2024. */
+#if __USE_SORTIX || 202405L <= __USE_POSIX
+#define posix_dent dirent
+ssize_t posix_getdents(int, void*, size_t, int);
+#endif
+
 /* Functions copied from elsewhere. */
 #if __USE_SORTIX
+ssize_t getdents(int, void*, size_t, int);
 int versionsort(const struct dirent**, const struct dirent**);
 #endif
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -27,8 +27,12 @@
 namespace Sortix {
 namespace KRAMFS {
 
-struct DirEntry
+class DirEntry
 {
+public:
+	inline DirEntry() : name(NULL) {};
+
+public:
 	Ref<Inode> inode;
 	char* name;
 };
@@ -60,8 +64,8 @@ class Dir : public AbstractInode
 public:
 	Dir(dev_t dev, ino_t ino, uid_t owner, gid_t group, mode_t mode);
 	virtual ~Dir();
-	virtual ssize_t readdirents(ioctx_t* ctx, struct dirent* dirent,
-	                            size_t size, off_t start);
+	virtual ssize_t getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+	                         off_t* offset);
 	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
 	                        mode_t mode);
 	virtual int mkdir(ioctx_t* ctx, const char* filename, mode_t mode);

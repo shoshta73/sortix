@@ -401,6 +401,52 @@ void Inode::Truncate(uint64_t new_size)
 	FinishWrite();
 }
 
+bool Inode::ReadDirectory(uint64_t* offset_inout,
+                          uint64_t* entry_offset_out,
+                          Block** block_inout,
+                          uint64_t* block_id_inout,
+                          char* name,
+                          uint8_t* file_type_out,
+                          uint32_t* inode_id_out)
+{
+	uint64_t file_size = Size();
+	while ( *offset_inout < file_size )
+	{
+		*entry_offset_out = *offset_inout;
+		uint64_t entry_block_id = *offset_inout / filesystem->block_size;
+		uint64_t entry_block_offset = *offset_inout % filesystem->block_size;
+		if ( *block_inout && *block_id_inout != entry_block_id )
+			(*block_inout)->Unref(), *block_inout = NULL;
+		if ( !*block_inout &&
+		     !(*block_inout = GetBlock(*block_id_inout = entry_block_id)) )
+			return false;
+		const uint8_t* block_data =
+			(*block_inout)->block_data + entry_block_offset;
+		const struct ext_dirent* entry = (const struct ext_dirent*) block_data;
+		uint64_t block_left = filesystem->block_size - entry_block_offset;
+		if ( block_left < sizeof(*entry) || !entry->reclen ||
+		     block_left < entry->reclen )
+		{
+			filesystem->Corrupted();
+			return errno = EIO, false;
+		}
+		*offset_inout += entry->reclen;
+		if ( entry->inode && entry->name_len )
+		{
+			memcpy(name, entry->name, entry->name_len);
+			name[entry->name_len] = '\0';
+			uint8_t file_type = EXT2_FT_UNKNOWN;
+			if ( filesystem->sb->s_feature_incompat &
+			     EXT2_FEATURE_INCOMPAT_FILETYPE )
+				file_type = entry->file_type;
+			*file_type_out = file_type;
+			*inode_id_out = entry->inode;
+			return true;
+		}
+	}
+	return errno = 0, false;
+}
+
 Inode* Inode::Open(const char* elem, int flags, mode_t mode)
 {
 	if ( !EXT2_S_ISDIR(Mode()) )
@@ -425,6 +471,13 @@ Inode* Inode::Open(const char* elem, int flags, mode_t mode)
 			return NULL;
 		const uint8_t* block_data = block->block_data + entry_block_offset;
 		const struct ext_dirent* entry = (const struct ext_dirent*) block_data;
+		uint64_t block_left = filesystem->block_size - entry_block_offset;
+		if ( block_left < sizeof(*entry) || !entry->reclen ||
+		     block_left < entry->reclen )
+		{
+			filesystem->Corrupted();
+			return errno = EIO, (Inode*) NULL;
+		}
 		if ( entry->inode &&
 		     entry->name_len == elem_length &&
 		     memcmp(elem, entry->name, elem_length) == 0 )
@@ -533,6 +586,13 @@ bool Inode::Link(const char* elem, Inode* dest, bool directories)
 			return NULL;
 		const uint8_t* block_data = block->block_data + entry_block_offset;
 		const struct ext_dirent* entry = (const struct ext_dirent*) block_data;
+		uint64_t block_left = filesystem->block_size - entry_block_offset;
+		if ( block_left < sizeof(*entry) || !entry->reclen ||
+		     block_left < entry->reclen )
+		{
+			filesystem->Corrupted();
+			return errno = EIO, (Inode*) NULL;
+		}
 		if ( entry->name_len == elem_length &&
 		     memcmp(elem, entry->name, elem_length) == 0 )
 		{

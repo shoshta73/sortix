@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2022, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -468,7 +468,7 @@ int iso9660_fuse_readdir(const char* /*path*/, void* buf,
 	char name[256];
 	uint8_t file_type;
 	iso9660_ino_t inode_id;
-	while ( inode->ReadDirectory(&offset, &block, &block_id,
+	while ( inode->ReadDirectory(&offset, NULL, &block, &block_id,
 	                             rec_num ? NULL : name, &file_type, &inode_id) )
 	{
 		if ( !rec_num || !rec_num-- )

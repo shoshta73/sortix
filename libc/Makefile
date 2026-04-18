@@ -356,7 +356,9 @@ ctype/toupper_l.o \
 dirent/closedir.o \
 dirent/dscandir_r.o \
 dirent/fdopendir.o \
+dirent/getdents.o \
 dirent/opendir.o \
+dirent/posix_getdents.o \
 dirent/readdir.o \
 dirent/rewinddir.o \
 dirent/scandir.o \

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2018, 2021-2023, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2018, 2021-2023, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -413,15 +413,30 @@ int sys_ioctl(int fd, int cmd, uintptr_t arg)
 	return desc->ioctl(&ctx, cmd, arg);
 }
 
+// TODO: After releasing Sortix 1.1, remove this syscall and its special header
+//       <sys/readdirents.h>, which are retained only for binary compatibility
+//       during the hybrid ABI phase of the Sortix 1.0 -> 1.1 bootstrap.
 ssize_t sys_readdirents(int fd, struct dirent* dirent, size_t size)
 {
-	if ( SSIZE_MAX < size )
-		size = SSIZE_MAX;
+	if ( size <= sizeof(struct dirent) )
+	{
+		struct dirent entry;
+		memset(&entry, 0, sizeof(entry));
+		entry.d_reclen = 4096;
+		if ( !CopyToUser(dirent, &entry, sizeof(entry)) )
+			return -1;
+		return errno = ERANGE, -1;
+	}
+	return sys_getdents(fd, dirent, size, GETDENTS_ONE);
+}
+
+ssize_t sys_getdents(int fd, void* buf, size_t size, int flags)
+{
 	Ref<Descriptor> desc = CurrentProcess()->GetDescriptor(fd);
 	if ( !desc )
 		return -1;
 	ioctx_t ctx; SetupUserIOCtx(&ctx);
-	return desc->readdirents(&ctx, dirent, size);
+	return desc->getdents(&ctx, buf, size, flags);
 }
 
 int sys_fchdir(int fd)

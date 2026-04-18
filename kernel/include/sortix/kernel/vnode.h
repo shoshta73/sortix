@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -77,8 +77,8 @@ public:
 	                off_t off);
 	int utimens(ioctx_t* ctx, const struct timespec* times);
 	int isatty(ioctx_t* ctx);
-	ssize_t readdirents(ioctx_t* ctx, struct dirent* dirent, size_t size,
-	                    off_t start);
+	ssize_t getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+	                 off_t* offset);
 	Ref<Vnode> open(ioctx_t* ctx, const char* filename, int flags, mode_t mode);
 	int mkdir(ioctx_t* ctx, const char* filename, mode_t mode);
 	int unlink(ioctx_t* ctx, const char* filename);

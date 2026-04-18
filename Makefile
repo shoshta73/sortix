@@ -313,7 +313,7 @@ sysroot-system: sysroot-fsh sysroot-base-headers
 	 echo 'VERSION_ID="$(VERSION)"' && \
 	 echo 'PRETTY_NAME="Sortix $(VERSION)"' && \
 	 echo 'ARCHITECTURE="$(HOST_MACHINE)"' && \
-	 echo 'SORTIX_ABI=3.5' && \
+	 echo 'SORTIX_ABI=3.6' && \
 	 true) > "$(SYSROOT)/lib/sortix-release"
 	echo /lib/sortix-release >> "$(SYSROOT)/tix/manifest/system"
 	ln -sf sortix-release "$(SYSROOT)/lib/os-release"

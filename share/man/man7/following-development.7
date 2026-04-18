@@ -69,6 +69,23 @@ releasing Sortix x.y, foo." to allow the maintainer to easily
 .Xr grep 1
 for it after a release.
 .Sh CHANGES
+.Ss Replace readdirents(2) with getdents(2)
+The
+.Xr readdirents 2
+system call is made obsolete and replaced with the newer
+.Xr getdents 2
+system call.
+This new syscall has the semantics of the
+.Xr posix_getdents 3
+function, and improves performance since it is capable of reading multiple
+directory entries at the same unlike
+.Xr readdirents 2 .
+.Pp
+This is a compatible ABI addition.
+The old
+.Xr readdirents 2
+syscall is retained for temporary ABI compatibility with the 1.0 stable release,
+and will be removed after the next stable release.
 .Ss Fix incorrect extfs(8) block group bookkeeping leaking blocks
 The
 .Xr extfs 8

@@ -492,43 +492,31 @@ int ext2_fuse_readdir(const char* /*path*/, void* buf, fuse_fill_dir_t filler,
 		return -errno;
 	if ( !S_ISDIR(inode->Mode()) )
 		return inode->Unref(), -(errno = ENOTDIR);
-
-	uint64_t file_size = inode->Size();
 	uint64_t offset = 0;
 	Block* block = NULL;
 	uint64_t block_id = 0;
-	while ( offset < file_size )
+	char name[256];
+	uint8_t file_type;
+	uint32_t inode_id;
+	while ( inode->ReadDirectory(&offset, NULL, &block, &block_id,
+	                             rec_num ? NULL : name, &file_type, &inode_id) )
 	{
-		uint64_t entry_block_id = offset / fs->block_size;
-		uint64_t entry_block_offset = offset % fs->block_size;
-		if ( block && block_id != entry_block_id )
-			block->Unref(),
-			block = NULL;
-		if ( !block && !(block = inode->GetBlock(block_id = entry_block_id)) )
-			return inode->Unref(), -errno;
-		const uint8_t* block_data = block->block_data + entry_block_offset;
-		const struct ext_dirent* entry = (const struct ext_dirent*) block_data;
-		if ( entry->inode && entry->name_len && (!rec_num || !rec_num--) )
+		if ( !rec_num || !rec_num-- )
 		{
-			char* entry_name = strndup(entry->name, entry->name_len);
-			if ( !entry_name )
-				return block->Unref(), inode->Unref(), -errno;
-			memcpy(entry_name, entry->name, entry->name_len);
-			bool full = filler(buf, entry_name, NULL, 0);
-			free(entry_name);
-			if ( full )
+			if ( filler(buf, name, NULL, 0) )
 			{
 				block->Unref();
 				inode->Unref();
 				return 0;
 			}
 		}
-		offset += entry->reclen;
 	}
+	int errnum = errno;
 	if ( block )
 		block->Unref();
-
 	inode->Unref();
+	if ( errnum )
+		return -errnum;
 	return 0;
 }
 

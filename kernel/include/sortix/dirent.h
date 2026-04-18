@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012, 2014, 2015, 2018, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012, 2014, 2015, 2018, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -36,6 +36,11 @@ typedef __dev_t dev_t;
 typedef __ino_t ino_t;
 #endif
 
+#ifndef __reclen_t_defined
+#define __reclen_t_defined
+typedef __reclen_t reclen_t;
+#endif
+
 #ifndef __size_t_defined
 #define __size_t_defined
 #define __need_size_t
@@ -58,9 +63,13 @@ typedef __ino_t ino_t;
 #define DTTOIF(x) __DTTOIF(x)
 #endif
 
+#if __USE_SORTIX
+#define GETDENTS_ONE (1 << 0)
+#endif
+
 struct dirent
 {
-	size_t d_reclen;
+	reclen_t d_reclen;
 	size_t d_namlen;
 	ino_t d_ino;
 	dev_t d_dev;

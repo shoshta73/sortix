@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,8 +82,8 @@ public:
 	                       off_t off) = 0;
 	virtual int utimens(ioctx_t* ctx, const struct timespec* times) = 0;
 	virtual int isatty(ioctx_t* ctx) = 0;
-	virtual ssize_t readdirents(ioctx_t* ctx, struct dirent* dirent,
-	                            size_t size, off_t start) = 0;
+	virtual ssize_t getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+	                         off_t* offset) = 0;
 	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
 	                        mode_t mode) = 0;
 	virtual Ref<Inode> factory(ioctx_t* ctx, const char* filename, int flags,
@@ -192,8 +192,8 @@ public:
 	                       off_t off);
 	virtual int utimens(ioctx_t* ctx, const struct timespec* times);
 	virtual int isatty(ioctx_t* ctx);
-	virtual ssize_t readdirents(ioctx_t* ctx, struct dirent* dirent,
-	                            size_t size, off_t start);
+	virtual ssize_t getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+	                         off_t* offset);
 	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
 	                        mode_t mode);
 	virtual Ref<Inode> factory(ioctx_t* ctx, const char* filename, int flags,

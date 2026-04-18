@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021, 2022, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2022, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -386,13 +386,12 @@ int AbstractInode::isatty(ioctx_t* /*ctx*/)
 	return errno = ENOTTY, 0;
 }
 
-ssize_t AbstractInode::readdirents(ioctx_t* /*ctx*/,
-                                   struct dirent* /*dirent*/,
-                                   size_t /*size*/,
-                                   off_t /*start*/)
+ssize_t AbstractInode::getdents(ioctx_t* /*ctx*/,
+                                void* /*bvuf*/,
+                                size_t /*size*/,
+                                int /*flags*/,
+                                off_t* /*offset*/)
 {
-	if ( inode_type == INODE_TYPE_DIR )
-		return errno = ENOTDIR, -1;
 	return errno = ENOTDIR, -1;
 }
 

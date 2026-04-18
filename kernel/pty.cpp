@@ -66,6 +66,15 @@ static unsigned long* ptynum_bitmap = NULL;
 static size_t ptynum_bitmap_words = 0;
 static size_t ptynum_none_below = 0;
 
+static bool IsPTYAllocated(int pty)
+{
+	size_t word = ((size_t) pty) / ULONG_BIT;
+	size_t bit = ((size_t) pty) % ULONG_BIT;
+	if ( ptynum_bitmap_words <= word )
+		return false;
+	return ptynum_bitmap[word] & (1UL << bit);
+}
+
 static int AllocatePTYNumber()
 {
 	ScopedLock lock(&ptynum_lock);
@@ -226,46 +235,65 @@ bool PTS::ContainsFile(const char* name) // dirlock held
 	return false;
 }
 
-ssize_t PTS::readdirents(ioctx_t* ctx, struct dirent* dirent, size_t size,
-                         off_t start)
+ssize_t PTS::getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+                      off_t* offset)
 {
 	static const char* const names[3] = { ".", "..", "ptmx" };
 	static const ino_t inos[3] = { 0, 0, 1 };
 	static const unsigned char dtypes[3] = { DT_DIR, DT_DIR, DT_CHR };
-	struct dirent retdirent;
-	memset(&retdirent, 0, sizeof(retdirent));
-	retdirent.d_dev = dev;
-	const char* name;
-	ino_t ino;
-	unsigned char dtype;
-	ScopedLock lock(&dirlock);
-	if ( start < 3 )
+	if ( flags & ~(GETDENTS_ONE) )
+		return errno = EINVAL;
+	ssize_t result = 0;
+	ScopedLock lock(&ptynum_lock);
+	while ( (uintmax_t) *offset < 3 + ptynum_bitmap_words * ULONG_BIT )
 	{
-		name = names[start];
-		ino = inos[start];
-		dtype = dtypes[start];
+		size_t index = (size_t) *offset;
+		char str[sizeof(int) * 3];
+		const char* name;
+		ino_t ino;
+		unsigned char type;
+		if ( index < 3 )
+		{
+			name = names[index];
+			ino = inos[index];
+			type = dtypes[index];
+		}
+		else
+		{
+			int pty = (int) (index - 3);
+			if ( !IsPTYAllocated(pty) )
+			{
+				(*offset)++;
+				continue;
+			}
+			snprintf(str, sizeof(str), "%d", pty);
+			name = str;
+			ino = 3 + pty;
+			type = DT_CHR;
+		}
+		struct dirent dent;
+		memset(&dent, 0, sizeof(dent));
+		size_t name_len = strlen(name);
+		reclen_t reclen = offsetof(struct dirent, d_name) + name_len + 1;
+		reclen = -(-reclen & ~(alignof(dent) - 1));
+		dent.d_reclen = reclen;
+		dent.d_namlen = name_len;
+		dent.d_ino = ino;
+		dent.d_dev = dev;
+		dent.d_type = type;
+		size_t left = size - (size_t) result;
+		if ( left < dent.d_reclen )
+			return result ? result : (errno = EINVAL, -1);
+		struct dirent* out = (struct dirent*) ((char*) buf + result);
+		if ( !ctx->copy_to_dest(out, &dent, sizeof(dent)) ||
+		     !ctx->copy_to_dest(out->d_name, name, name_len+1) )
+			return -1;
+		result += reclen;
+		(*offset)++;
+		if ( flags & GETDENTS_ONE )
+			break;
 	}
-	else
-	{
-		start -= 3;
-		if ( (uintmax_t) entries_count <= (uintmax_t) start )
-			return 0;
-		name = entries[start].name;
-		ino = entries[start].ino;
-		dtype = DT_CHR;
-	}
-	size_t namelen = strlen(name);
-	retdirent.d_reclen = sizeof(*dirent) + namelen + 1;
-	retdirent.d_namlen = namelen;
-	retdirent.d_ino = ino;
-	retdirent.d_type = dtype;
-	if ( !ctx->copy_to_dest(dirent, &retdirent, sizeof(retdirent)) )
-		return -1;
-	if ( size < retdirent.d_reclen )
-		return errno = ERANGE, -1;
-	if ( !ctx->copy_to_dest(dirent->d_name, name, namelen+1) )
-		return -1;
-	return (ssize_t) retdirent.d_reclen;
+	return result;
 }
 
 Ref<Inode> PTS::open(ioctx_t* /*ctx*/, const char* filename, int flags,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -318,10 +318,10 @@ int Vnode::isatty(ioctx_t* ctx)
 	return inode->isatty(ctx);
 }
 
-ssize_t Vnode::readdirents(ioctx_t* ctx, struct dirent* dirent,
-                           size_t size, off_t start)
+ssize_t Vnode::getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+	                    off_t* offset)
 {
-	return inode->readdirents(ctx, dirent, size, start);
+	return inode->getdents(ctx, buf, size, flags, offset);
 }
 
 int Vnode::mkdir(ioctx_t* ctx, const char* filename, mode_t mode)

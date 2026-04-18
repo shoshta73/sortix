@@ -217,6 +217,7 @@ void* syscall_list[SYSCALL_MAX_NUM + 1] =
 	[SYSCALL_GETGROUPS] = (void*) sys_getgroups,
 	[SYSCALL_SETGROUPS] = (void*) sys_setgroups,
 	[SYSCALL_SOCKATMARK] = (void*) sys_sockatmark,
+	[SYSCALL_GETDENTS] = (void*) sys_getdents,
 	[SYSCALL_MAX_NUM] = (void*) sys_bad_syscall,
 };
 } /* extern "C" */

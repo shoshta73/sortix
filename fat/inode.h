@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2023, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2023, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,13 +82,15 @@ public:
 	bool ZeroCluster(fat_ino_t cluster);
 	bool Iterate(Block** block_ptr, struct position* position);
 	fat_ino_t SeekCluster(fat_off_t cluster_id);
-	bool ReadDirectory(Block** block_inout,
+	bool SeekOffset(fat_off_t offset, struct position* position);
+	bool ReadDirectory(Block** block_inout, fat_off_t* next_offset_inout,
 	                   struct position* next_position_inout, char* name,
 	                   uint8_t* file_type_out, fat_ino_t* inode_id_out,
 	                   struct fat_dirent** entry,
 	                   struct free_search* free_search,
+	                   fat_off_t* entry_offset_out,
 	                   struct position* position_out,
-	                   size_t* entry_length_out);
+	                   size_t* entry_length_out, bool trusted_offset);
 	Inode* Open(const char* elem, int flags, mode_t mode);
 	bool Link(const char* elem, Inode* dest, bool directories);
 	bool Symlink(const char* elem, const char* dest);

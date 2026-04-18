@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2016, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2016, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -180,22 +180,6 @@ struct fsm_req_utimens
 struct fsm_req_isatty
 {
 	ino_t ino;
-};
-
-#define FSM_REQ_READDIRENTS 20
-struct fsm_req_readdirents
-{
-	ino_t ino;
-	off_t rec_num;
-};
-
-#define FSM_RESP_READDIRENTS 21
-struct fsm_resp_readdirents
-{
-	ino_t ino;
-	unsigned char type;
-	size_t namelen;
-	/*char name[namelen];*/
 };
 
 #define FSM_REQ_OPEN 22
@@ -492,7 +476,24 @@ struct fsm_resp_pathconf
 	long value;
 };
 
-#define FSM_MSG_NUM 66
+#define FSM_REQ_GETDENTS 66
+struct fsm_req_getdents
+{
+	ino_t ino;
+	size_t amount;
+	int flags;
+	off_t offset;
+};
+
+#define FSM_RESP_GETDENTS 67
+struct fsm_resp_getdents
+{
+	off_t next_off;
+	size_t count;
+	/*uint8_t data[count];*/
+};
+
+#define FSM_MSG_NUM 68
 
 #ifdef __cplusplus
 } /* extern "C" */

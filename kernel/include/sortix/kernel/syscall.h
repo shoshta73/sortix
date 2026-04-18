@@ -98,6 +98,7 @@ int sys_ftruncate(int, off_t);
 int sys_futex(int*, int, int, const struct timespec*);
 int sys_futimens(int, const struct timespec*);
 int sys_getdnsconfig(struct dnsconfig*);
+ssize_t sys_getdents(int, void*, size_t, int);
 gid_t sys_getegid(void);
 int sys_getentropy(void*, size_t);
 uid_t sys_geteuid(void);

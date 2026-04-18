@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -739,10 +739,10 @@ int Descriptor::isatty(ioctx_t* ctx)
 	return vnode->isatty(ctx);
 }
 
-ssize_t Descriptor::readdirents(ioctx_t* ctx,
-                                struct dirent* dirent,
-                                size_t size)
+ssize_t Descriptor::getdents(ioctx_t* ctx, void* buf, size_t size, int flags)
 {
+	if ( flags & ~(GETDENTS_ONE) )
+		return errno = EINVAL, -1;
 	// TODO: COMPATIBILITY HACK: Traditionally, you can open a directory with
 	//       O_RDONLY and pass it to fdopendir and then use it, which doesn't
 	//       set the needed O_SEARCH flag! I think some software even do it with
@@ -760,16 +760,12 @@ ssize_t Descriptor::readdirents(ioctx_t* ctx,
 		return errno = EBADF, -1;
 	if ( SSIZE_MAX < size )
 		size = SSIZE_MAX;
-	if ( size < sizeof(*dirent) )
+	if ( size < sizeof(struct dirent) )
 		return errno = EINVAL, -1;
 	ScopedLock lock(&current_offset_lock);
-	if ( current_offset == OFF_MAX && size )
+	if ( current_offset == OFF_MAX )
 		return 0;
-	ssize_t ret = vnode->readdirents(ctx, dirent, size, current_offset);
-	if ( 0 < ret &&
-	     __builtin_add_overflow(current_offset, 1, &current_offset) )
-		current_offset = OFF_MAX;
-	return ret;
+	return vnode->getdents(ctx, buf, size, flags, &current_offset);
 }
 
 static bool IsSaneFlagModeCombination(int flags, mode_t /*mode*/)

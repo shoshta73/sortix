@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -203,6 +203,7 @@
 #define SYSCALL_GETGROUPS 180
 #define SYSCALL_SETGROUPS 181
 #define SYSCALL_SOCKATMARK 182
-#define SYSCALL_MAX_NUM 183 /* index of highest constant + 1 */
+#define SYSCALL_GETDENTS 183
+#define SYSCALL_MAX_NUM 184 /* index of highest constant + 1 */
 
 #endif

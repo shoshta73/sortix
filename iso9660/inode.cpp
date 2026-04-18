@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2018, 2022, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013-2015, 2018, 2022, 2025-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -381,6 +381,7 @@ Block* Inode::GetBlock(uint32_t offset)
 }
 
 bool Inode::ReadDirectory(uint64_t* offset_inout,
+                          uint64_t* entry_offset_out,
                           Block** block_inout,
                           uint64_t* block_id_inout,
                           char* name,
@@ -412,6 +413,8 @@ next_block:
 	uint64_t reclen = dirent_len + (dirent_len & 1);
 	if ( !reclen )
 		return errno = EINVAL, false;
+	if ( entry_offset_out )
+		*entry_offset_out = offset;
 	offset += reclen;
 	*offset_inout = offset;
 	uint8_t name_len = block_data[32];
@@ -562,7 +565,7 @@ Inode* Inode::Open(const char* elem, int flags, mode_t mode)
 	char name[256];
 	uint8_t file_type;
 	iso9660_ino_t inode_id;
-	while ( ReadDirectory(&offset, &block, &block_id, name, &file_type,
+	while ( ReadDirectory(&offset, NULL, &block, &block_id, name, &file_type,
 	                      &inode_id) )
 	{
 		size_t name_len = strlen(name);
@@ -620,7 +623,7 @@ bool Inode::Link(const char* elem, Inode* dest)
 	char name[256];
 	uint8_t file_type;
 	iso9660_ino_t inode_id;
-	while ( ReadDirectory(&offset, &block, &block_id, name, &file_type,
+	while ( ReadDirectory(&offset, NULL, &block, &block_id, name, &file_type,
 	                      &inode_id) )
 	{
 		size_t name_len = strlen(name);
@@ -648,7 +651,7 @@ Inode* Inode::UnlinkKeep(const char* elem, bool directories, bool force)
 	char name[256];
 	uint8_t file_type;
 	iso9660_ino_t inode_id;
-	while ( ReadDirectory(&offset, &block, &block_id, name, &file_type,
+	while ( ReadDirectory(&offset, NULL, &block, &block_id, name, &file_type,
 	                      &inode_id) )
 	{
 		size_t name_len = strlen(name);

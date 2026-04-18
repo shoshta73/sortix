@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, 2021-2022, 2024-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2012-2017, 2021-2022, 2024-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -222,8 +222,8 @@ public:
 
 	virtual int utimens(ioctx_t* ctx, const struct timespec* times);
 	virtual int isatty(ioctx_t* ctx);
-	virtual ssize_t readdirents(ioctx_t* ctx, struct dirent* dirent,
-	                            size_t size, off_t start);
+	virtual ssize_t getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+	                         off_t* offset);
 	virtual Ref<Inode> open(ioctx_t* ctx, const char* filename, int flags,
 	                        mode_t mode);
 	virtual Ref<Inode> factory(ioctx_t* ctx, const char* filename, int flags,
@@ -450,7 +450,8 @@ size_t Channel::KernelRecv(ioctx_t* ctx, void* ptr, size_t least, size_t max)
 		return errno = EINTR, 0;
 	CurrentThread()->yield_to_tid = 0;
 	Scheduler::ScheduleTrueThread();
-	return from_user.Recv(ctx, ptr, least, max);
+	size_t result = from_user.Recv(ctx, ptr, least, max);
+	return result;
 }
 
 void Channel::KernelClose()
@@ -1181,46 +1182,86 @@ int Unode::isatty(ioctx_t* ctx)
 	return ret;
 }
 
-ssize_t Unode::readdirents(ioctx_t* ctx, struct dirent* dirent, size_t size,
-                           off_t start)
+ssize_t Unode::getdents(ioctx_t* ctx, void* buf, size_t size, int flags,
+	                    off_t* offset)
 {
+	// Limit the buffer size to avoid overwhelming the filesystem with too
+	// large buffer allocations.
+	if ( 65536 < size )
+		size = 65536;
 	Channel* channel = server->Connect(ctx);
 	if ( !channel )
 		return -1;
 	ssize_t ret = -1;
-	struct fsm_req_readdirents msg;
-	struct fsm_resp_readdirents resp;
+	struct fsm_req_getdents msg;
+	struct fsm_resp_getdents resp;
 	msg.ino = ino;
-	msg.rec_num = start;
+	msg.amount = size;
+	msg.flags = flags;
+	msg.offset = *offset;
 	errno = 0;
-	if ( SendMessage(channel, FSM_REQ_READDIRENTS, &msg, sizeof(msg)) &&
-	     RecvMessage(channel, FSM_RESP_READDIRENTS, &resp, sizeof(resp)) )
+	if ( SendMessage(channel, FSM_REQ_GETDENTS, &msg, sizeof(msg)) &&
+	     RecvMessage(channel, FSM_RESP_GETDENTS, &resp, sizeof(resp)) )
 	{
-		if ( !resp.namelen )
+		if ( size < resp.count || resp.next_off < 0 )
+			errno = EIO, ret = -1;
+		for ( ret = 0; ret != -1 && (size_t) ret < resp.count; )
 		{
-			ret = 0;
-			goto break_if;
+			// TODO: NAME_MAX
+			// TODO: 765=3*255 is used due to FAT.
+			union
+			{
+				struct dirent entry;
+				char buf[offsetof(struct dirent, d_name) + 765+1];
+			} dent;
+			size_t entry_size = offsetof(struct dirent, d_name);
+			if ( size - ret < entry_size )
+			{
+				errno = EIO, ret = -1;
+				break;
+			}
+			if ( !channel->KernelRecv(&kctx, &dent.entry, entry_size) )
+			{
+				ret = -1;
+				break;
+			}
+			dent.entry.d_dev = (dev_t) server.Get();
+			if ( dent.entry.d_reclen < offsetof(struct dirent, d_name) ||
+			     dent.entry.d_namlen == 0 || 765 < dent.entry.d_namlen )
+			{
+				errno = EIO, ret = -1;
+				break;
+			}
+			reclen_t reclen = entry_size + dent.entry.d_namlen + 1;
+			reclen = -(-reclen & ~(alignof(struct dirent) - 1));
+			if ( dent.entry.d_reclen != reclen )
+			{
+				errno = EIO, ret = -1;
+				break;
+			}
+			size_t remaining = reclen - entry_size;
+			if ( !channel->KernelRecv(&kctx, dent.entry.d_name, remaining) )
+			{
+				ret = -1;
+				break;
+			}
+			if ( !dent.entry.d_name[0] ||
+			     dent.entry.d_name[dent.entry.d_namlen] != '\0' )
+			{
+				errno = EIO, ret = -1;
+				break;
+			}
+			struct dirent* out = (struct dirent*) ((char*) buf + ret);
+			if ( !ctx->copy_to_dest(out, &dent, reclen)  )
+			{
+				ret = -1;
+				break;
+			}
+			ret += reclen;
 		}
-
-		struct dirent entry;
-		memset(&entry, 0, sizeof(entry));
-		entry.d_reclen = sizeof(entry) + resp.namelen + 1;
-		entry.d_namlen = resp.namelen;
-		entry.d_dev = (dev_t) server.Get();
-		entry.d_ino = resp.ino;
-		entry.d_type = resp.type;
-
-		if ( !ctx->copy_to_dest(dirent, &entry, sizeof(entry)) )
-			goto break_if;
-
-		if ( size < entry.d_reclen && (errno = ERANGE) )
-			goto break_if;
-
-		char nul = '\0';
-		if ( channel->KernelRecv(ctx, dirent->d_name, resp.namelen) &&
-		     ctx->copy_to_dest(&dirent->d_name[resp.namelen], &nul, 1) )
-			ret = (ssize_t) entry.d_reclen;
-	} break_if:
+		if ( 0 <= ret )
+			*offset = resp.next_off;
+	}
 	channel->KernelClose();
 	return ret;
 }

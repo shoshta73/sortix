@@ -146,14 +146,13 @@ bool RespondMakeDir(int chl, ino_t ino)
 	return RespondMessage(chl, FSM_RESP_MKDIR, &body, sizeof(body));
 }
 
-bool RespondReadDir(int chl, struct dirent* dirent)
+bool RespondReadDir(int chl, const void* data, size_t data_size, off_t next_off)
 {
-	struct fsm_resp_readdirents body;
-	body.ino = dirent->d_ino;
-	body.type = dirent->d_type;
-	body.namelen = dirent->d_namlen;
-	return RespondMessage(chl, FSM_RESP_READDIRENTS, &body, sizeof(body)) &&
-	       RespondData(chl, dirent->d_name, dirent->d_namlen);
+	struct fsm_resp_getdents body;
+	body.count = data_size;
+	body.next_off = next_off;
+	return RespondMessage(chl, FSM_RESP_GETDENTS, &body, sizeof(body)) &&
+	       RespondData(chl, data, data_size);
 }
 
 bool RespondTCGetBlob(int chl, const void* data, size_t data_size)
@@ -376,8 +375,9 @@ void HandleMakeDir(int chl, struct fsm_req_mkdir* msg, Filesystem* fs)
 	result->Unref();
 }
 
-void HandleReadDir(int chl, struct fsm_req_readdirents* msg, Filesystem* fs)
+void HandleReadDir(int chl, struct fsm_req_getdents* msg, Filesystem* fs)
 {
+	if ( msg->flags & ~(GETDENTS_ONE) ) { RespondError(chl, EINVAL); return; }
 	Inode* inode = SafeGetInode(fs, msg->ino);
 	if ( !inode ) { RespondError(chl, errno); return; }
 	if ( !S_ISDIR(inode->Mode()) )
@@ -386,58 +386,72 @@ void HandleReadDir(int chl, struct fsm_req_readdirents* msg, Filesystem* fs)
 		RespondError(chl, ENOTDIR);
 		return;
 	}
-	union
+	char* buf = (char*) calloc(msg->amount, 1);
+	if ( !buf )
 	{
-		struct dirent kernel_entry;
-		uint8_t padding[sizeof(struct dirent) + 256];
-	};
-	memset(&kernel_entry, 0, sizeof(kernel_entry));
-
+		inode->Unref();
+		RespondError(chl, errno);
+		return;
+	}
 	uint64_t file_size = inode->Size();
-	uint64_t offset = 0;
+	if ( (uintmax_t) file_size < (uintmax_t) msg->offset )
+		msg->offset = file_size;
+	// Only trust the starting block, not the offset into the block. Directory
+	// entries cannot cross a block boundary, so this way we won't start reading
+	// in the middle of a directory entry.
+	uint64_t start_offset = (uint64_t) msg->offset;
+	uint64_t offset = start_offset & ~((uint64_t) fs->block_size - 1);
 	Block* block = NULL;
 	uint64_t block_id = 0;
-	while ( offset < file_size )
+	char name[256];
+	uint8_t file_type;
+	uint32_t inode_id;
+	uint64_t entry_offset;
+	size_t result = 0;
+	while ( inode->ReadDirectory(&offset, &entry_offset, &block, &block_id,
+	                             name, &file_type, &inode_id) )
 	{
-		uint64_t entry_block_id = offset / fs->block_size;
-		uint64_t entry_block_offset = offset % fs->block_size;
-		if ( block && block_id != entry_block_id )
-			block->Unref(),
-			block = NULL;
-		if ( !block && !(block = inode->GetBlock(block_id = entry_block_id)) )
+		if ( start_offset <= entry_offset )
 		{
-			inode->Unref();
-			RespondError(chl, errno);
-			return;
+			size_t name_len = strlen(name);
+			reclen_t reclen = offsetof(struct dirent, d_name) + name_len + 1;
+			reclen = -(-reclen & ~(alignof(struct dirent) - 1));
+			size_t left = msg->amount - result;
+			if ( left < reclen && !result )
+			{
+				errno = EINVAL;
+				break;
+			}
+			else if ( left < reclen )
+			{
+				errno = 0;
+				offset = entry_offset;
+				break;
+			}
+			struct dirent* dent = (struct dirent*) ((char*) buf + result);
+			memset(dent, 0, offsetof(struct dirent, d_name));
+			dent->d_reclen = reclen;
+			dent->d_ino = inode_id;
+			dent->d_type = HostDTFromExtDT(file_type);
+			dent->d_namlen = name_len;
+			memcpy(dent->d_name, name, name_len + 1);
+			result += reclen;
+			if ( msg->flags & GETDENTS_ONE )
+			{
+				errno = 0;
+				break;
+			}
 		}
-		const uint8_t* block_data = block->block_data + entry_block_offset;
-		const struct ext_dirent* entry = (const struct ext_dirent*) block_data;
-		if ( entry->inode && entry->name_len && !(msg->rec_num--) )
-		{
-			uint8_t file_type = EXT2_FT_UNKNOWN;
-			if ( fs->sb->s_feature_incompat & EXT2_FEATURE_INCOMPAT_FILETYPE )
-				file_type = entry->file_type;
-			kernel_entry.d_reclen = sizeof(kernel_entry) + entry->name_len;
-			kernel_entry.d_ino = entry->inode;
-			kernel_entry.d_dev = 0;
-			kernel_entry.d_type = HostDTFromExtDT(file_type);
-			kernel_entry.d_namlen = entry->name_len;
-			memcpy(kernel_entry.d_name, entry->name, entry->name_len);
-			size_t dname_offset = offsetof(struct dirent, d_name);
-			padding[dname_offset + kernel_entry.d_namlen] = '\0';
-			block->Unref();
-			inode->Unref();
-			RespondReadDir(chl, &kernel_entry);
-			return;
-		}
-		offset += entry->reclen;
 	}
+	int errnum = errno;
 	if ( block )
 		block->Unref();
 	inode->Unref();
-
-	kernel_entry.d_reclen = sizeof(kernel_entry);
-	RespondReadDir(chl, &kernel_entry);
+	if ( errnum )
+		RespondError(chl, errnum);
+	else
+		RespondReadDir(chl, buf, result, (off_t) offset);
+	free(buf);
 }
 
 void HandleIsATTY(int chl, struct fsm_req_isatty* msg, Filesystem* fs)
@@ -695,7 +709,7 @@ void HandleIncomingMessage(int chl, struct fsm_msg_header* hdr, Filesystem* fs)
 	handlers[FSM_REQ_LSEEK] = (handler_t) HandleSeek;
 	handlers[FSM_REQ_PREAD] = (handler_t) HandleReadAt;
 	handlers[FSM_REQ_OPEN] = (handler_t) HandleOpen;
-	handlers[FSM_REQ_READDIRENTS] = (handler_t) HandleReadDir;
+	handlers[FSM_REQ_GETDENTS] = (handler_t) HandleReadDir;
 	handlers[FSM_REQ_PWRITE] = (handler_t) HandleWriteAt;
 	handlers[FSM_REQ_ISATTY] = (handler_t) HandleIsATTY;
 	handlers[FSM_REQ_UTIMENS] = (handler_t) HandleUTimens;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -58,6 +58,10 @@ public:
 	                  int indirection, uint64_t entry_span);
 	Block* GetBlock(uint64_t offset);
 	Block* GetBlockFromTable(Block* table, uint32_t index);
+	bool ReadDirectory(uint64_t* offset_inout, uint64_t* entry_offset_out,
+	                   Block** block_inout, uint64_t* block_id_inout,
+	                   char* name, uint8_t* file_type_out,
+	                   uint32_t* inode_id_out);
 	Inode* Open(const char* elem, int flags, mode_t mode);
 	bool Link(const char* elem, Inode* dest, bool directories);
 	bool Symlink(const char* elem, const char* dest);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2015, 2022, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2015, 2022, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -59,9 +59,10 @@ public:
 	uint32_t GroupId();
 	uint64_t Size();
 	Block* GetBlock(uint32_t offset);
-	bool ReadDirectory(uint64_t* offset_inout, Block** block_inout,
-	                   uint64_t* block_id_inout, char* name,
-	                   uint8_t* file_type_out, iso9660_ino_t* inode_id_out);
+	bool ReadDirectory(uint64_t* offset_inout, uint64_t* entry_offset_out,
+	                   Block** block_inout, uint64_t* block_id_inout,
+	                   char* name, uint8_t* file_type_out,
+	                   iso9660_ino_t* inode_id_out);
 	Inode* Open(const char* elem, int flags, mode_t mode);
 	bool Link(const char* elem, Inode* dest);
 	bool Unlink(const char* elem, bool directories, bool force=false);

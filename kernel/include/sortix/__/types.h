@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, 2014, 2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2013, 2014, 2025, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -269,6 +269,30 @@ typedef __intptr_t __pid_t;
 #define __SCNoPID __SCNoPTR
 #define __SCNuPID __SCNuPTR
 #define __SCNxPID __SCNxPTR
+
+typedef __SIZE_TYPE__ __reclen_t;
+#define __RECLEN_UNSIGNED
+/* TODO: Get this from a __SIZE_C */
+#if defined(__i386__)
+#define __RECLEN_C(c) c ## u
+#elif defined(__x86_64__)
+#define __RECLEN_C(c) c ## ul
+#else
+#error "You need to provide __RECLEN_C for your platform"
+#endif
+#define __RECLEN_MIN 0
+#define __RECLEN_MAX __SIZE_MAX__
+#define __PRIdRECLEN "zd"
+#define __PRIiRECLEN "zi"
+#define __PRIoRECLEN "zo"
+#define __PRIuRECLEN "zu"
+#define __PRIxRECLEN "zx"
+#define __PRIXRECLEN "zX"
+#define __SCNdRECLEN "zd"
+#define __SCNiRECLEN "zi"
+#define __SCNoRECLEN "zo"
+#define __SCNuRECLEN "zu"
+#define __SCNxRECLEN "zx"
 
 /* TODO: __size_t */
 
