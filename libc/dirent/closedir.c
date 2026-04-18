@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,7 +24,7 @@
 int closedir(DIR* dir)
 {
 	close(dir->fd);
-	free(dir->entry);
+	free(dir->buffer);
 	free(dir);
 	return 0;
 }

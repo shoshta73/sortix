@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2012, 2013, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2012, 2013, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -49,7 +49,9 @@ typedef struct __DIR DIR;
 
 struct __DIR
 {
-	struct dirent* entry;
+	unsigned char* buffer;
+	size_t offset;
+	size_t used;
 	size_t size;
 	int fd;
 };

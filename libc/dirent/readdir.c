@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2014, 2015 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011, 2014, 2015, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,8 +17,7 @@
  * Reads a directory entry from a directory stream into a DIR-specific buffer.
  */
 
-#include <sys/readdirents.h>
-
+#include <assert.h>
 #include <dirent.h>
 #include <errno.h>
 #include <stdlib.h>
@@ -26,25 +25,29 @@
 struct dirent* readdir(DIR* dir)
 {
 	int old_errno = errno;
-	struct dirent fallback;
-	struct dirent* entry = dir->entry ? dir->entry : &fallback;
-	size_t size = dir->entry ? dir->size : sizeof(fallback);
-	ssize_t amount;
-	while ( (amount = readdirents(dir->fd, entry, size)) < 0 )
+	if ( !dir->buffer )
 	{
-		if ( errno != ERANGE )
+		size_t size = 32768;
+		dir->buffer = malloc(size);
+		if ( !dir->buffer )
 			return NULL;
-		errno = old_errno;
-		size_t needed = entry->d_reclen;
-		free(dir->entry);
-		dir->entry = NULL;
-		struct dirent* new_dirent = (struct dirent*) malloc(needed);
-		if ( !new_dirent )
-			return NULL;
-		entry = dir->entry = new_dirent;
-		size = dir->size = needed;
+		dir->offset = 0;
+		dir->used = 0;
+		dir->size = size;
 	}
-	if ( amount == 0 )
-		return NULL;
-	return dir->entry;
+	if ( dir->offset == dir->used )
+	{
+		ssize_t amount = getdents(dir->fd, dir->buffer, dir->size, 0);
+		if ( amount < 0 )
+			return NULL;
+		if ( !amount )
+			return errno = old_errno, NULL;
+		dir->offset = 0;
+		dir->used = (size_t) amount;
+		assert(dir->used <= dir->used);
+	}
+	struct dirent* entry = (struct dirent*) (dir->buffer + dir->offset);
+	dir->offset += entry->d_reclen;
+	assert(dir->offset <= dir->used);
+	return entry;
 }
