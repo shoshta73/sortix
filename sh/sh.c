@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2021-2025 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2021-2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -1130,22 +1130,6 @@ struct execute_result execute(char** tokens,
 		internal = false;
 	}
 
-	int foreground_pipe[2];
-	bool has_foreground_pipe = false;
-	if ( !internal && foreground && job_control && pgid == -1 )
-	{
-		if ( !pipe2(foreground_pipe, O_CLOEXEC) )
-			has_foreground_pipe = true;
-		else
-		{
-			warn("pipe2");
-			internal_status = 1;
-			failure = true;
-			internal = true;
-			childpid = getpid();
-		}
-	}
-
 	sigset_t blocked, oldset;
 	sigemptyset(&blocked);
 	sigaddset(&blocked, SIGHUP);
@@ -1154,7 +1138,6 @@ struct execute_result execute(char** tokens,
 	sigaddset(&blocked, SIGTSTP);
 	sigaddset(&blocked, SIGTTIN);
 	sigaddset(&blocked, SIGTTOU);
-	sigaddset(&blocked, SIGCHLD);
 	sigaddset(&blocked, SIGTERM);
 
 	if ( !internal )
@@ -1202,17 +1185,7 @@ struct execute_result execute(char** tokens,
 		}
 
 		if ( job_control )
-		{
 			setpgid(childpid, pgid != -1 ? pgid : childpid);
-			// Wait for the child to enter the foreground.
-			if ( has_foreground_pipe )
-			{
-				close(foreground_pipe[1]);
-				char c;
-				read(foreground_pipe[0], &c, sizeof(c));
-				close(foreground_pipe[0]);
-			}
-		}
 
 		struct execute_result result;
 		memset(&result, 0, sizeof(result));
@@ -1221,14 +1194,10 @@ struct execute_result execute(char** tokens,
 		return result;
 	}
 
-	// Tell the parent when we have successfully entered the foreground.
-	setpgid(0, pgid != -1 ? pgid : 0);
-	if ( has_foreground_pipe )
-	{
-		close(foreground_pipe[0]);
-		tcsetpgrp(0, getpgid(0));
-		close(foreground_pipe[1]);
-	}
+	if ( job_control )
+		setpgid(0, pgid != -1 ? pgid : 0);
+	if ( foreground && job_control && pgid == -1 )
+		tcsetpgrp(0, pgid == -1 ? getpgid(0) : pgid);
 
 	signal(SIGHUP, SIG_DFL);
 	signal(SIGINT, SIG_DFL);
@@ -1236,7 +1205,6 @@ struct execute_result execute(char** tokens,
 	signal(SIGTSTP, SIG_DFL);
 	signal(SIGTTIN, SIG_DFL);
 	signal(SIGTTOU, SIG_DFL);
-	signal(SIGCHLD, SIG_DFL);
 	signal(SIGTERM, SIG_DFL);
 
 	sigprocmask(SIG_UNBLOCK, &blocked, NULL);
@@ -1282,7 +1250,8 @@ struct execute_result execute(char** tokens,
 	if ( interactive && errno == ENOENT )
 	{
 		int errno_saved = errno;
-		execlp("command-not-found", "command-not-found", argv[0], (const char*) NULL);
+		execlp("command-not-found", "command-not-found", argv[0],
+		       (const char*) NULL);
 		errno = errno_saved;
 	}
 
@@ -1345,10 +1314,10 @@ readcmd:
 		foreground = false;
 	else if ( !strcmp(execmode, "|") )
 	{
-		size_t realcmdend;
-		for ( realcmdend = cmdnext; realcmdend < tokens_count; realcmdend++ )
+		const char* token = "";
+		for ( size_t i = cmdnext; i < tokens_count; i++ )
 		{
-			const char* token = tokens[cmdend];
+			token = tokens[i];
 			if ( strcmp(token, ";") == 0 ||
 				 strcmp(token, "&") == 0 ||
 				 strcmp(token, "&&") == 0 ||
@@ -1356,8 +1325,7 @@ readcmd:
 				 false )
 				break;
 		}
-		foreground = realcmdend < tokens_count &&
-		             strcmp(tokens[realcmdend], "&") != 0;
+		foreground = strcmp(token, "&") != 0;
 	}
 
 	if ( short_circuited_or )
@@ -1410,7 +1378,7 @@ readcmd:
 		        pipeout,
 		        pgid);
 
-	if ( !result.internal && pgid == -1 )
+	if ( interactive && !result.internal && pgid == -1 )
 		pgid = result.pid;
 
 	if ( pipein != 0 )
@@ -1446,19 +1414,6 @@ readcmd:
 
 	if ( strcmp(execmode, "&") == 0 )
 	{
-		// TODO: We probably shouldn't have made the progress group foreground
-		//       as that may have side effects if a process checks for this
-		//       behavior and then unexpectedly the shell takes back support
-		//       without the usual ^Z mechanism.
-		if ( interactive )
-		{
-			sigset_t oldset, sigttou;
-			sigemptyset(&sigttou);
-			sigaddset(&sigttou, SIGTTOU);
-			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-			tcsetpgrp(0, getpgid(0));
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
-		}
 		pgid = -1;
 		status = 0;
 		goto readcmd;
@@ -1473,23 +1428,37 @@ readcmd:
 	}
 	else
 	{
+		int exitstatus_of_pid = -1;
 		int exitstatus;
-		if ( waitpid(result.pid, &exitstatus, 0) < 0 )
+		// TODO: Use a job data structure to keep track of pids and stop when
+		//       all the pids in pipeline has finished. Processes may switch to
+		//       their own process group, which makes it inaccurate to wait for
+		//       the process group to terminate.
+		if ( interactive )
+		{
+			pid_t pid;
+			while ( 0 < (pid = waitpid(-pgid, &exitstatus, 0)) )
+			{
+				if ( pid == result.pid )
+					exitstatus_of_pid = exitstatus;
+			}
+			if ( errno != ECHILD )
+				warn("waitpid");
+			exitstatus = exitstatus_of_pid;
+		}
+		if ( exitstatus < 0 && waitpid(result.pid, &exitstatus, 0) < 0 )
 		{
 			warn("waitpid");
+			exitstatus = -1;
+		}
+		if ( interactive )
+			tcsetpgrp(0, getpgid(0));
+		if ( exitstatus < 0 )
+		{
 			if ( !interactive || exit_on_error )
 				*script_exited = true;
 			status = 1;
 			return status;
-		}
-		if ( interactive )
-		{
-			sigset_t oldset, sigttou;
-			sigemptyset(&sigttou);
-			sigaddset(&sigttou, SIGTTOU);
-			sigprocmask(SIG_BLOCK, &sigttou, &oldset);
-			tcsetpgrp(0, getpgid(0));
-			sigprocmask(SIG_SETMASK, &oldset, NULL);
 		}
 		if ( WIFSIGNALED(exitstatus) && WTERMSIG(exitstatus) == SIGINT )
 			printf("^C\n");
@@ -2179,34 +2148,63 @@ static int top(FILE* fp,
                int status)
 {
 	int tty_fd = fileno(fp);
-	job_control = interactive && isatty(tty_fd);
+	bool tty_fd_is_tty = isatty(tty_fd);
+	job_control = interactive && tty_fd_is_tty;
 
+	pid_t pid = -1;
+	pid_t initial_pgid = -1;
 	if ( job_control )
 	{
 		// TODO: What happens if sh | sh?
-		pid_t pgid = getpid();
+		pid = getpid();
+		pid_t pgid = pid;
+		// TODO: An atomic syscall is needed that puts the process in a new
+		//       process group and puts it in the foreground only if the old
+		//       process group is in the foreground. Right now there is a race
+		//       condition between seeing we are in the foreground and putting
+		//       ourselves in a new process group, where another shell in the
+		//       process group could try the same thing, or we might get ^Z.
+		initial_pgid = getpgid(0);
+		// TODO: Just because we're the session leader doesn't mean we're in the
+		//       foreground process group.
 		if ( getsid(0) != pgid )
 		{
 			while ( tcgetpgrp(tty_fd) != (pgid = getpgid(0)) )
 				kill(-pgid, SIGTTIN);
-			if ( pgid != getpid() )
-				pgid = setpgid(0, 0);
+			if ( pgid != pid )
+			{
+				setpgid(0, 0);
+				pgid = pid;
+			}
 		}
-		// TODO: Unify signal handling. Should this happen after tcsetpgrp?
-		signal(SIGINT, SIG_IGN); // TODO: Really?
-		signal(SIGQUIT, SIG_IGN); // TODO: Really?
 		signal(SIGTSTP, SIG_IGN);
 		signal(SIGTTIN, SIG_IGN);
 		signal(SIGTTOU, SIG_IGN);
-		// TODO: Ignore SIGTERM per POSIX if interactive.
-		// TODO: Place ourselves back in the original process group upon exit?
-		tcsetpgrp(tty_fd, pgid);
-		struct termios tio; // TODO: Where to use and restore this?
-		tcgetattr(tty_fd, &tio);
+		if ( pgid != initial_pgid )
+			tcsetpgrp(tty_fd, pgid);
 	}
+
+	// If stdin is a terminal or FIFO, read in blocking mode.
+	// TODO: Do we want to do this for other file types too? POSIX only says
+	//       terminal and FIFO but it feels a bit special cases. What does other
+	//       shells do in this case?
+	struct stat st;
+	if ( fp == stdin &&
+	     (tty_fd_is_tty || (fstat(tty_fd, &st) && S_ISFIFO(st.st_mode))) )
+		fcntl(tty_fd, F_SETFL, fcntl(tty_fd, F_GETFL) & ~O_NONBLOCK);
 
 	if ( interactive )
 	{
+		// TODO: Catch SIGINT during command editing as the signal can come from
+		//       kill(2) in addition to the raw byte on the terminal. SIGINT
+		//       also needs to be caught for commands like wait.
+		signal(SIGINT, SIG_IGN);
+		signal(SIGQUIT, SIG_IGN);
+		// TODO: Ignoring SIGTERM here does not play nice with Sortix init.
+		//       POSIX does require it though so you can do 'kill 0' without
+		//       destroying the shell. I don't see a good way to support both.
+		//signal(SIGTERM, SIG_IGN);
+
 		const char* home = getenv("HOME");
 		const char* histfile = getenv("HISTFILE");
 		if ( !histfile && home )
@@ -2249,6 +2247,18 @@ static int top(FILE* fp,
 	{
 		edit_line_history_save(&edit_state, getenv("HISTFILE"));
 		signal(SIGHUP, SIG_DFL);
+	}
+
+	// TODO: We might want an atexit handler for this logic? Do we always end up
+	//       back here? What about exec?
+	// Give back the foreground and return to our original process group.
+	if ( job_control )
+	{
+		if ( pid != initial_pgid )
+		{
+			tcsetpgrp(tty_fd, initial_pgid);
+			setpgid(0, initial_pgid);
+		}
 	}
 
 	return status;
@@ -2413,6 +2423,8 @@ int main(int argc, char* argv[])
 
 	setenv("0", argv[0], 1);
 
+	signal(SIGCHLD, SIG_DFL);
+
 	bool script_exited = false;
 	int status = 0;
 
@@ -2445,7 +2457,9 @@ int main(int argc, char* argv[])
 
 		if ( flag_s_stdin )
 		{
-			bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
+			bool is_interactive = flag_i_interactive ||
+				                  (isatty(fileno(stdin)) &&
+				                   isatty(fileno(stderr)));
 			status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
 			             flag_l_login, &script_exited, status);
 			if ( script_exited || (status != 0 && flag_e_exit_on_error) )
@@ -2461,7 +2475,8 @@ int main(int argc, char* argv[])
 			setenv(varname, argv[i], 1);
 		}
 
-		bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
+		bool is_interactive = flag_i_interactive ||
+		                      (isatty(fileno(stdin)) && isatty(fileno(stderr)));
 		status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
 		             flag_l_login, &script_exited, status);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
@@ -2488,7 +2503,8 @@ int main(int argc, char* argv[])
 	}
 	else
 	{
-		bool is_interactive = flag_i_interactive || isatty(fileno(stdin));
+		bool is_interactive = flag_i_interactive ||
+		                      (isatty(fileno(stdin)) && isatty(fileno(stderr)));
 		status = top(stdin, "<stdin>", is_interactive, flag_e_exit_on_error,
 		             flag_l_login, &script_exited, status);
 		if ( script_exited || (status != 0 && flag_e_exit_on_error) )
