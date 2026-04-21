@@ -20,8 +20,18 @@
 #ifndef SHOWLINE_H
 #define SHOWLINE_H
 
+#include <sys/ioctl.h>
+
 #include <stddef.h>
 #include <termios.h>
+
+#ifndef __sortix__
+struct wincurpos
+{
+	size_t wcp_col;
+	size_t wcp_row;
+};
+#endif
 
 // TODO: Predict the terminal colors as well!
 struct cursor_predict
@@ -37,11 +47,12 @@ struct show_line
 	int out_fd;
 	char* current_line;
 	size_t current_cursor;
+	size_t max_row;
 	bool invalidated;
-	bool wcp_pending;
 };
 
 struct wincurpos predict_cursor(struct cursor_predict* cursor_predict,
+                                struct wincurpos* actual_out,
                                 struct wincurpos wcp,
                                 struct winsize ws,
                                 wchar_t c);
@@ -50,9 +61,6 @@ bool predict_will_scroll(struct cursor_predict cursor_predict,
                          struct winsize ws,
                          wchar_t c);
 void show_line_begin(struct show_line* show_state, int out_fd);
-void show_line_wincurpos(struct show_line* show_state,
-                         unsigned int r,
-                         unsigned int c);
 bool show_line_is_weird(const char* line);
 void show_line_change_cursor(struct show_line* show_state, struct wincurpos wcp);
 bool show_line_optimized(struct show_line* show_state, const char* line, size_t cursor);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2022, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -652,7 +652,9 @@ bool edit_line_history_save(struct edit_line* edit_state, const char* path)
 	return success;
 }
 
+#ifdef ISORTIX_KBKEY
 #define SORTIX_LFLAGS (ISORTIX_KBKEY | ISORTIX_32BIT)
+#endif
 
 void edit_line(struct edit_line* edit_state)
 {
@@ -672,6 +674,7 @@ void edit_line(struct edit_line* edit_state)
 	struct termios old_tio, tio;
 	tcgetattr(edit_state->in_fd, &old_tio);
 
+#ifdef SORTIX_LFLAGS
 	// TODO: There's no good way in Sortix for processes to restore the terminal
 	//       attributes on exit, even if that exit is a crash. Restore default
 	//       terminal attributes here to ensure programs run in the expected
@@ -686,9 +689,9 @@ void edit_line(struct edit_line* edit_state)
 		old_tio.c_oflag &= ~(OCRNL);
 		old_tio.c_oflag |= OPOST | ONLCR;
 	}
+#endif
 
 	memcpy(&tio, &old_tio, sizeof(tio));
-	tio.c_lflag &= ~(ISORTIX_KBKEY | ISORTIX_32BIT);
 	tio.c_lflag &= ~(ISIG | ICANON | ECHO | IEXTEN);
 
 	tcsetattr(edit_state->in_fd, TCSANOW, &tio);
@@ -757,13 +760,6 @@ void edit_line(struct edit_line* edit_state)
 					break;
 				case 'F': edit_line_type_end(edit_state); break;
 				case 'H': edit_line_type_home(edit_state); break;
-				case 'R':
-				{
-					unsigned int r = params[0] - 1;
-					unsigned int c = params[1] - 1;
-					show_line_wincurpos(&edit_state->show_state, r, c);
-					edit_line_show(edit_state);
-				} break;
 				case '~':
 					if ( params[0] == 1 )
 						edit_line_type_home(edit_state);
