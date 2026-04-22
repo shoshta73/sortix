@@ -737,7 +737,22 @@ void edit_line(struct edit_line* edit_state)
 				if ( param_index < 16 )
 					++param_index;
 			}
-			else if ( 64 <= c && c <= 126 )
+			else if ( escape == 1 && 64 <= c && c <= 126 )
+			{
+				switch ( c )
+				{
+				case 'B':
+				case 'b':
+					edit_line_type_previous_word(edit_state);
+					break;
+				case 'F':
+				case 'f':
+					edit_line_type_next_word(edit_state);
+					break;
+				}
+				escape = 0;
+			}
+			else if ( escape == 2 && 64 <= c && c <= 126 )
 			{
 				for ( size_t i = 0; i < 16; i++ )
 					if ( params[i] == 0 )
@@ -771,6 +786,8 @@ void edit_line(struct edit_line* edit_state)
 				}
 				escape = 0;
 			}
+			else if ( 64 <= c && c <= 126 )
+				escape = 0;
 		}
 		else if ( c == CONTROL('A') )
 			edit_line_type_home(edit_state);
