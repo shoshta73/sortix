@@ -1129,6 +1129,22 @@ struct execute_result execute(char** tokens,
 		internal = false;
 	}
 
+	int foreground_pipe[2];
+	bool has_foreground_pipe = false;
+	if ( !internal && foreground && job_control && pgid == -1 )
+	{
+		if ( !pipe2(foreground_pipe, O_CLOEXEC) )
+			has_foreground_pipe = true;
+		else
+		{
+			warn("pipe2");
+			internal_status = 1;
+			failure = true;
+			internal = true;
+			childpid = getpid();
+		}
+	}
+
 	sigset_t blocked, oldset;
 	sigemptyset(&blocked);
 	sigaddset(&blocked, SIGHUP);
@@ -1184,7 +1200,17 @@ struct execute_result execute(char** tokens,
 		}
 
 		if ( job_control )
+		{
 			setpgid(childpid, pgid != -1 ? pgid : childpid);
+			// Wait for the child to enter the foreground.
+			if ( has_foreground_pipe )
+			{
+				close(foreground_pipe[1]);
+				char c;
+				read(foreground_pipe[0], &c, sizeof(c));
+				close(foreground_pipe[0]);
+			}
+		}
 
 		struct execute_result result;
 		memset(&result, 0, sizeof(result));
@@ -1193,10 +1219,15 @@ struct execute_result execute(char** tokens,
 		return result;
 	}
 
+	// Tell the parent when we have successfully entered the foreground.
 	if ( job_control )
 		setpgid(0, pgid != -1 ? pgid : 0);
-	if ( foreground && job_control && pgid == -1 )
-		tcsetpgrp(0, pgid == -1 ? getpgid(0) : pgid);
+	if ( has_foreground_pipe )
+	{
+		close(foreground_pipe[0]);
+		tcsetpgrp(0, getpgid(0));
+		close(foreground_pipe[1]);
+	}
 
 	signal(SIGHUP, SIG_DFL);
 	signal(SIGINT, SIG_DFL);
