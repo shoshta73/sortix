@@ -311,21 +311,26 @@ bool show_line_optimized(struct show_line* show_state, const char* line,
 		// Determine where the character was actually positioned, which may be
 		// different from the old cursor (see predict_cursor), and predict the
 		// next cursor position.
+		bool was_escaped = old_predict.escaped || new_predict.escaped;
 		struct wincurpos old_actual;
 		struct wincurpos new_actual;
 		struct wincurpos next_old_wcp =
 			predict_cursor(&old_predict, &old_actual, old_wcp, ws, old_wc);
 		struct wincurpos next_new_wcp =
 			predict_cursor(&new_predict, &new_actual, new_wcp, ws, new_wc);
+		bool is_escaped = old_predict.escaped || new_predict.escaped;
 
 		// An update is only needed if there is any difference.
 		if ( old_wc != new_wc ||
 		     old_actual.wcp_row != new_actual.wcp_row ||
 		     old_actual.wcp_col != new_actual.wcp_col )
 		{
+			// Fail if the old and new prompts have a different escape sequence.
+			if ( (was_escaped || is_escaped) && old_wc != new_wc )
+				return false;
 			// Match a newline with a newline, even if the actual columns are
 			// difference, as we'll be in sync afterwards.
-			if ( old_wc == L'\n' && new_wc == L'\n' )
+			else if ( old_wc == L'\n' && new_wc == L'\n' )
 			{
 				// Good enough as newlines are invisible.
 			}
