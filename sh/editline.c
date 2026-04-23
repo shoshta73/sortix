@@ -21,6 +21,8 @@
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
+#include <poll.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -893,8 +895,22 @@ bool edit_line_history_save(struct edit_line* edit_state, const char* path)
 #define SORTIX_LFLAGS (ISORTIX_KBKEY | ISORTIX_32BIT)
 #endif
 
+static volatile sig_atomic_t got_winch;
+
+static void on_winch(int signo)
+{
+	got_winch = signo;
+}
+
 void edit_line(struct edit_line* edit_state)
 {
+	sigset_t winch_set, old_set;
+	sigemptyset(&winch_set);
+	sigaddset(&winch_set, SIGWINCH);
+	sigprocmask(SIG_BLOCK, &winch_set, &old_set);
+	struct sigaction old_sa, sa = { .sa_handler = on_winch };
+	sigaction(SIGWINCH, &sa, &old_sa);
+
 	edit_state->editing = true;
 	edit_state->abort_editing = false;
 	edit_state->eof_condition = false;
@@ -940,10 +956,22 @@ void edit_line(struct edit_line* edit_state)
 	unsigned int params[16];
 	size_t param_index = 0;
 
+	struct pollfd pfd = { .fd = 0, .events = POLLIN };
+
 	mbstate_t ps = { 0 };
 	while ( edit_state->editing )
 	{
 		edit_line_show(edit_state);
+
+		while ( ppoll(&pfd, 1, NULL, &old_set) < 0 )
+		{
+			assert(errno == EINTR);
+			if ( got_winch )
+			{
+				show_line_winch(&edit_state->show_state);
+				got_winch = 0;
+			}
+		}
 
 		char c;
 		if ( read(0, &c, sizeof(c)) != sizeof(c) )
@@ -1086,4 +1114,6 @@ void edit_line(struct edit_line* edit_state)
 	}
 
 	tcsetattr(edit_state->in_fd, TCSANOW, &old_tio);
+	sigaction(SIGWINCH, &old_sa, NULL);
+	sigprocmask(SIG_SETMASK, &old_set, NULL);
 }

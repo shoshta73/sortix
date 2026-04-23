@@ -65,6 +65,7 @@ bool show_line_is_weird(const char* line);
 void show_line_change_cursor(struct show_line* show_state, struct wincurpos wcp);
 bool show_line_optimized(struct show_line* show_state, const char* line, size_t cursor);
 void show_line(struct show_line* show_state, const char* line, size_t cursor);
+void show_line_winch(struct show_line* show_state);
 void show_line_clear(struct show_line* show_state);
 void show_line_abort(struct show_line* show_state);
 void show_line_finish(struct show_line* show_state);

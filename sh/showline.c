@@ -209,7 +209,9 @@ void show_line_change_cursor(struct show_line* show_state, struct wincurpos wcp)
 	// If we're on the edge of the screen, we might be within the window or
 	// outside the window depending on the terminal emulator. We cannot use
 	// relative column movement in this case, so use absolute movement instead.
-	if ( show_state->ws.ws_col <= show_state->wcp_current.wcp_col )
+	// We are also unable to trust the column if the window size changed.
+	if ( show_state->ws.ws_col <= show_state->wcp_current.wcp_col ||
+	     show_state->invalidated )
 	{
 		if ( !wcp.wcp_col )
 			snprintf(mov_x, sizeof(mov_x), "\e[G");
@@ -431,7 +433,6 @@ bool show_line_optimized(struct show_line* show_state, const char* line,
 
 void show_line(struct show_line* show_state, const char* line, size_t cursor)
 {
-	// TODO: We don't currently invalidate on SIGWINCH.
 	struct winsize ws;
 	ioctl(show_state->out_fd, TIOCGWINSZ, &ws);
 	if ( ws.ws_col != show_state->ws.ws_col ||
@@ -516,6 +517,11 @@ void show_line(struct show_line* show_state, const char* line, size_t cursor)
 
 	// Everything is good now.
 	show_state->invalidated = false;
+}
+
+void show_line_winch(struct show_line* show_state)
+{
+	show_line(show_state, show_state->current_line, show_state->current_cursor);
 }
 
 void show_line_end(struct show_line* show_state, const char* line)
