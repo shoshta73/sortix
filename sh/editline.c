@@ -36,53 +36,54 @@
 
 #define CONTROL(x) (((x) - 64) & 127)
 
-void edit_line_show(struct edit_line* edit_state)
+bool edit_line_show(struct edit_line* edit_state)
 {
-	size_t line_length = 0;
-
-	mbstate_t ps;
-	memset(&ps, 0, sizeof(ps));
-
-	line_length += strlen(edit_state->ps1);
-
-	for ( size_t i = 0; i < edit_state->line_used; i++ )
+	char* line;
+	size_t line_size;
+	FILE* fp = open_memstream(&line, &line_size);
+	if ( !fp )
+		return false;
+	if ( edit_state->searching )
 	{
-		char mb[MB_CUR_MAX];
-		line_length += wcrtomb(mb, edit_state->line[i], &ps);
-		if ( edit_state->line[i] == L'\n' )
-			line_length += strlen(edit_state->ps2);
+		fputc('(', fp);
+		if ( edit_state->search_failed )
+			fputs("failed ", fp);
+		if ( edit_state->search_forward )
+			fputs("i-search)`", fp);
+		else
+			fputs("reverse-i-search)`", fp);
+		fprintf(fp, "%ls", edit_state->search_pattern);
+		fputs("': ", fp);
 	}
-
-	char* line = (char*) malloc(line_length + 1);
-	assert(line);
-
+	else
+		fputs(edit_state->ps1, fp);
+	mbstate_t ps = {0};
 	size_t cursor = 0;
-	size_t line_offset = 0;
-	memset(&ps, 0, sizeof(ps));
-
-	strcpy(line + line_offset, edit_state->ps1);
-	line_offset += strlen(edit_state->ps1);
-
 	for ( size_t i = 0; i < edit_state->line_used; i++ )
 	{
 		if ( edit_state->line_offset == i )
-			cursor = line_offset;
-		line_offset += wcrtomb(line + line_offset, edit_state->line[i], &ps);
-		if ( edit_state->line[i] == L'\n' )
 		{
-			strcpy(line + line_offset, edit_state->ps2);
-			line_offset += strlen(edit_state->ps2);
+			fflush(fp);
+			cursor = strlen(line);
 		}
+		char mb[MB_CUR_MAX];
+		size_t amount = wcrtomb(mb, edit_state->line[i], &ps);
+		fwrite(mb, 1, amount, fp);
+		if ( edit_state->line[i] == L'\n' )
+			fputs(edit_state->ps2, fp);
 	}
-
+	if ( ferror(fp) || fflush(fp) == EOF )
+	{
+		fclose(fp);
+		free(line);
+		return false;
+	}
+	fclose(fp);
 	if ( edit_state->line_offset == edit_state->line_used )
-		cursor = line_offset;
-
-	line[line_offset] = '\0';
-
+		cursor = strlen(line);
 	show_line(&edit_state->show_state, line, cursor);
-
 	free(line);
+	return true;
 }
 
 char* edit_line_result(struct edit_line* edit_state)
@@ -129,20 +130,89 @@ void edit_line_append_history(struct edit_line* edit_state, const char* line)
 {
 	if ( edit_state->history_used == edit_state->history_length )
 	{
-		size_t new_length = 2 * edit_state->history_length;
-		if ( new_length == 0 )
-			new_length = 16;
-		// TODO: Use reallocarray instead of realloc.
-		size_t new_size = sizeof(char*) * new_length;
-		char** new_history = (char**) realloc(edit_state->history, new_size);
-		assert(new_history);
+		size_t old_length = edit_state->history_length;
+		if ( old_length == 0 )
+			old_length = 8;
+		char** new_history =
+			reallocarray(edit_state->history, old_length, 2 * sizeof(char*));
+		if ( !new_history )
+		{
+			assert(new_history);
+			return;
+		}
 		edit_state->history = new_history;
-		edit_state->history_length = new_length;
+		edit_state->history_length = 2 * old_length;
 	}
 
 	size_t history_index = edit_state->history_used++;
 	edit_state->history[history_index] = strdup(line);
 	assert(edit_state->history[history_index]);
+}
+
+bool edit_line_search_matches(struct edit_line* edit_state)
+{
+	size_t line_left = edit_state->line_used - edit_state->line_offset;
+	if ( line_left < edit_state->search_pattern_used )
+		return false;
+	// TODO: The line is not null terminated, but this comparison is safe
+	//       because of the above check. Remove this comment when the line is
+	//       changed to be null terminated.
+	return !wcsncmp(edit_state->line + edit_state->line_offset,
+	                edit_state->search_pattern,
+	                edit_state->search_pattern_used);
+}
+
+void edit_line_search(struct edit_line* edit_state)
+{
+	// TODO: Change this function to use wcswcs when it's implemented
+	//       efficiently to avoid O(N^2) runtime on long lines. This change
+	//       requires changing the line to be null terminated, which is a bit
+	//       of a larger unrelated change for now, so I'll delay it for later.
+	size_t start_history_offset = edit_state->history_offset;
+	size_t start_line_offset = edit_state->line_offset;
+	do
+	{
+		if ( edit_state->search_forward )
+		{
+			if ( edit_state->line_offset == edit_state->line_used &&
+			     edit_state->history_offset + 1 == edit_state->history_used )
+			{
+				edit_state->search_failed = true;
+				break;
+			}
+			else if ( edit_state->line_offset == edit_state->line_used )
+			{
+				size_t new_offset = edit_state->history_offset + 1;
+				edit_line_type_history_offset(edit_state, new_offset);
+				edit_state->line_offset = 0;
+			}
+			else
+				edit_state->line_offset++;
+		}
+		else
+		{
+			if ( !edit_state->line_offset &&
+			     !edit_state->history_offset )
+			{
+				edit_state->search_failed = true;
+				break;
+			}
+			else if ( !edit_state->line_offset )
+			{
+				size_t new_offset = edit_state->history_offset - 1;
+				edit_line_type_history_offset(edit_state, new_offset);
+				edit_state->line_offset = edit_state->line_used;
+			}
+			else
+				edit_state->line_offset--;
+		}
+		edit_state->search_failed = false;
+	} while ( !edit_line_search_matches(edit_state) );
+	if ( edit_state->search_failed )
+	{
+		edit_line_type_history_offset(edit_state, start_history_offset);
+		edit_state->line_offset = start_line_offset;
+	}
 }
 
 void edit_line_type_use_record(struct edit_line* edit_state, const char* record)
@@ -215,6 +285,8 @@ void edit_line_type_history_save_current(struct edit_line* edit_state)
 
 void edit_line_type_history_prev(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
+
 	if ( edit_state->history_offset == 0 )
 		return;
 
@@ -227,6 +299,8 @@ void edit_line_type_history_prev(struct edit_line* edit_state)
 
 void edit_line_type_history_next(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
+
 	if ( edit_state->history_used - edit_state->history_offset <= 1 )
 		return;
 
@@ -237,27 +311,84 @@ void edit_line_type_history_next(struct edit_line* edit_state)
 	edit_line_type_use_record(edit_state, record);
 }
 
+void edit_line_type_history_offset(struct edit_line* edit_state, size_t offset)
+{
+	if ( edit_state->history_used <= offset )
+		return;
+
+	edit_line_type_history_save_current(edit_state);
+
+	edit_state->history_offset = offset;
+	const char* record = edit_state->history[edit_state->history_offset];
+	assert(record);
+	edit_line_type_use_record(edit_state, record);
+}
+
 void edit_line_type_codepoint(struct edit_line* edit_state, wchar_t wc)
 {
-	if ( wc == L'\n' && edit_line_can_finish(edit_state))
+	if ( wc == L'\n' && edit_state->searching )
+	{
+		edit_line_type_search_end(edit_state);
+		return;
+	}
+	else if ( wc == L'\r' && edit_state->searching )
+		edit_line_type_search_end(edit_state);
+
+	if ( (wc == L'\n' || wc == L'\r') && edit_line_can_finish(edit_state))
 	{
 		if ( edit_state->line_used )
-			edit_line_type_history_save_at(edit_state, edit_state->history_target);
+			edit_line_type_history_save_at(edit_state,
+			                               edit_state->history_target);
 		edit_state->editing = false;
+		return;
+	}
+
+	if ( wc == L'\r' )
+		wc = L'\n';
+
+	if ( edit_state->searching )
+	{
+		if ( edit_state->search_pattern_used + 1 ==
+		     edit_state->search_pattern_length )
+		{
+			size_t old_length = edit_state->search_pattern_length;
+			if ( !old_length )
+				old_length = 8;
+			wchar_t* new_search_pattern =
+				reallocarray(edit_state->search_pattern, old_length,
+			                 2 * sizeof(wchar_t));
+			if ( !new_search_pattern )
+			{
+				assert(new_search_pattern);
+				return;
+			}
+			edit_state->search_pattern = new_search_pattern;
+			edit_state->search_pattern_length = 2 * old_length;
+		}
+
+		edit_state->search_pattern[edit_state->search_pattern_used++] = wc;
+		edit_state->search_pattern[edit_state->search_pattern_used] = L'\0';
+
+		if ( !edit_line_search_matches(edit_state) )
+			edit_line_search(edit_state);
+
 		return;
 	}
 
 	if ( edit_state->line_used == edit_state->line_length )
 	{
-		size_t new_length = 2 * edit_state->line_length;
-		if ( !new_length )
-			new_length = 16;
-		// TODO: Use reallocarray instead of realloc.
-		size_t new_size = sizeof(wchar_t) * new_length;
-		wchar_t* new_line = (wchar_t*) realloc(edit_state->line, new_size);
-		assert(new_line);
+		size_t old_length = edit_state->line_length;
+		if ( !old_length )
+			old_length = 8;
+		wchar_t* new_line =
+			reallocarray(edit_state->line, old_length, 2 * sizeof(wchar_t));
+		if ( !new_line )
+		{
+			assert(new_line);
+			return;
+		}
 		edit_state->line = new_line;
-		edit_state->line_length = new_length;
+		edit_state->line_length = 2 * old_length;
 	}
 
 	assert(edit_state->line_offset <= edit_state->line_used);
@@ -274,11 +405,13 @@ void edit_line_type_codepoint(struct edit_line* edit_state, wchar_t wc)
 
 void edit_line_type_home(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	edit_state->line_offset = 0;
 }
 
 void edit_line_type_left(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	if ( edit_state->line_offset == 0 )
 		return;
 	edit_state->line_offset--;
@@ -286,6 +419,7 @@ void edit_line_type_left(struct edit_line* edit_state)
 
 void edit_line_type_right(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	if ( edit_state->line_offset == edit_state->line_used )
 		return;
 	edit_state->line_offset++;
@@ -293,11 +427,23 @@ void edit_line_type_right(struct edit_line* edit_state)
 
 void edit_line_type_end(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	edit_state->line_offset = edit_state->line_used;
 }
 
 void edit_line_type_backspace(struct edit_line* edit_state)
 {
+	if ( edit_state->searching )
+	{
+		if ( edit_state->search_pattern_used )
+		{
+			size_t new_used = --edit_state->search_pattern_used;
+			edit_state->search_pattern[new_used] = L'\0';
+		}
+		if ( !edit_state->search_pattern_used )
+			edit_state->search_failed = true;
+		return;
+	}
 	if ( edit_state->line_offset == 0 )
 		return;
 	edit_state->line_used--;
@@ -308,6 +454,7 @@ void edit_line_type_backspace(struct edit_line* edit_state)
 
 void edit_line_type_previous_word(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	while ( edit_state->line_offset &&
 	        iswspace(edit_state->line[edit_state->line_offset-1]) )
 		edit_state->line_offset--;
@@ -318,6 +465,7 @@ void edit_line_type_previous_word(struct edit_line* edit_state)
 
 void edit_line_type_next_word(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	while ( edit_state->line_offset != edit_state->line_used &&
 	        iswspace(edit_state->line[edit_state->line_offset]) )
 		edit_state->line_offset++;
@@ -328,6 +476,7 @@ void edit_line_type_next_word(struct edit_line* edit_state)
 
 void edit_line_type_delete(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	if ( edit_state->line_offset == edit_state->line_used )
 		return;
 	edit_state->line_used--;
@@ -337,6 +486,7 @@ void edit_line_type_delete(struct edit_line* edit_state)
 
 void edit_line_type_eof_or_delete(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	if ( edit_state->line_used )
 		return edit_line_type_delete(edit_state);
 	edit_state->editing = false;
@@ -347,6 +497,7 @@ void edit_line_type_eof_or_delete(struct edit_line* edit_state)
 
 void edit_line_type_interrupt(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	dprintf(edit_state->out_fd, "^C\n");
 	edit_state->editing = false;
 	edit_state->abort_editing = true;
@@ -354,29 +505,115 @@ void edit_line_type_interrupt(struct edit_line* edit_state)
 
 void edit_line_type_kill_after(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	while ( edit_state->line_offset < edit_state->line_used )
 		edit_line_type_delete(edit_state);
 }
 
 void edit_line_type_kill_before(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	while ( edit_state->line_offset )
 		edit_line_type_backspace(edit_state);
 }
 
 void edit_line_type_clear(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	show_line_clear(&edit_state->show_state);
 }
 
 void edit_line_type_delete_word_before(struct edit_line* edit_state)
 {
+	edit_line_type_search_movement(edit_state);
 	while ( edit_state->line_offset &&
 	        iswspace(edit_state->line[edit_state->line_offset-1]) )
 		edit_line_type_backspace(edit_state);
 	while ( edit_state->line_offset &&
 	        !iswspace(edit_state->line[edit_state->line_offset-1]) )
 		edit_line_type_backspace(edit_state);
+}
+
+void edit_line_type_abort(struct edit_line* edit_state)
+{
+	if ( edit_state->searching )
+	{
+		free(edit_state->search_pattern);
+		edit_state->search_pattern = NULL;
+		edit_state->search_pattern_used = 0;
+		edit_state->search_pattern_length = 0;
+		edit_state->search_forward = false;
+		edit_state->search_failed = false;
+		edit_state->searching = false;
+		edit_line_type_history_offset(edit_state, edit_state->search_begun_at);
+	}
+}
+
+void edit_line_type_search(struct edit_line* edit_state, bool forward)
+{
+	if ( !edit_state->searching )
+	{
+		size_t pattern_length = 16;
+		wchar_t* pattern = calloc(pattern_length, sizeof(wchar_t));
+		if ( !pattern )
+			return;
+		pattern[0] = '\0';
+		edit_state->search_pattern = pattern;
+		edit_state->search_pattern_used = 0;
+		edit_state->search_pattern_length = pattern_length;
+		edit_state->search_forward = forward;
+		edit_state->search_failed = false;
+		edit_state->search_begun_at = edit_state->history_offset;
+		edit_state->searching = true;
+		return;
+	}
+	else if ( !edit_state->search_pattern_used && edit_state->search_last )
+	{
+		wchar_t* pattern = wcsdup(edit_state->search_last);
+		if ( !pattern )
+			return;
+		free(edit_state->search_pattern);
+		edit_state->search_pattern = pattern;
+		edit_state->search_pattern_used = wcslen(pattern);
+		edit_state->search_pattern_length = wcslen(pattern) + 1;
+		edit_state->search_forward = forward;
+		edit_state->search_failed = false;
+		edit_state->searching = true;
+		edit_state->search_begun_at = edit_state->history_offset;
+	}
+	else if ( !edit_state->search_pattern_used )
+	{
+		edit_state->search_forward = forward;
+		edit_state->search_failed = true;
+		return;
+	}
+	else
+		edit_state->search_forward = forward;
+
+	edit_line_search(edit_state);
+}
+
+void edit_line_type_search_end(struct edit_line* edit_state)
+{
+	if ( edit_state->search_failed )
+	{
+		edit_line_type_abort(edit_state);
+		return;
+	}
+	free(edit_state->search_last);
+	edit_state->search_last = edit_state->search_pattern;
+	edit_state->search_pattern = NULL;
+	edit_state->search_pattern_used = 0;
+	edit_state->search_pattern_length = 0;
+	edit_state->search_forward = false;
+	edit_state->search_failed = false;
+	edit_state->searching = false;
+}
+
+void edit_line_type_search_movement(struct edit_line* edit_state)
+{
+	edit_state->search_failed = false;
+	edit_line_type_search_end(edit_state);
 }
 
 int edit_line_completion_sort(const void* a_ptr, const void* b_ptr)
@@ -692,6 +929,7 @@ void edit_line(struct edit_line* edit_state)
 #endif
 
 	memcpy(&tio, &old_tio, sizeof(tio));
+	tio.c_iflag &= ~(IGNCR | INLCR | ICRNL);
 	tio.c_lflag &= ~(ISIG | ICANON | ECHO | IEXTEN);
 
 	tcsetattr(edit_state->in_fd, TCSANOW, &tio);
@@ -805,8 +1043,14 @@ void edit_line(struct edit_line* edit_state)
 			edit_line_type_complete(edit_state);
 		else if ( c == CONTROL('K') )
 			edit_line_type_kill_after(edit_state);
+		else if ( c == CONTROL('G') )
+			edit_line_type_abort(edit_state);
 		else if ( c == CONTROL('L') )
 			show_line_clear(&edit_state->show_state);
+		else if ( c == CONTROL('R') )
+			edit_line_type_search(edit_state, false);
+		else if ( c == CONTROL('S') )
+			edit_line_type_search(edit_state, true);
 		else if ( c == CONTROL('U') )
 			edit_line_type_kill_before(edit_state);
 		else if ( c == CONTROL('W') )

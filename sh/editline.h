@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011-2016, 2022 Jonas 'Sortie' Termansen.
+ * Copyright (c) 2011-2016, 2022, 2026 Jonas 'Sortie' Termansen.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -52,20 +52,28 @@ struct edit_line
 	bool eof_condition;
 	bool error_condition;
 	bool double_tab;
-	// TODO: Should these be stored here, or outside the line editing context?
-	bool left_control;
-	bool right_control;
+	bool searching;
+	bool search_forward;
+	bool search_failed;
+	wchar_t* search_pattern;
+	size_t search_pattern_used;
+	size_t search_pattern_length;
+	wchar_t* search_last;
+	size_t search_begun_at;
 };
 
-void edit_line_show(struct edit_line* edit_state);
+bool edit_line_show(struct edit_line* edit_state);
 char* edit_line_result(struct edit_line* edit_state);
 bool edit_line_can_finish(struct edit_line* edit_state);
 void edit_line_append_history(struct edit_line* edit_state, const char* line);
+bool edit_line_search_matches(struct edit_line* edit_state);
+void edit_line_search(struct edit_line* edit_state);
 void edit_line_type_use_record(struct edit_line* edit_state, const char* record);
 void edit_line_type_history_save_at(struct edit_line* edit_state, size_t index);
 void edit_line_type_history_save_current(struct edit_line* edit_state);
 void edit_line_type_history_prev(struct edit_line* edit_state);
 void edit_line_type_history_next(struct edit_line* edit_state);
+void edit_line_type_history_offset(struct edit_line* edit_state, size_t offset);
 void edit_line_type_codepoint(struct edit_line* edit_state, wchar_t wc);
 void edit_line_type_home(struct edit_line* edit_state);
 void edit_line_type_left(struct edit_line* edit_state);
@@ -81,6 +89,10 @@ void edit_line_type_kill_after(struct edit_line* edit_state);
 void edit_line_type_kill_before(struct edit_line* edit_state);
 void edit_line_type_clear(struct edit_line* edit_state);
 void edit_line_type_delete_word_before(struct edit_line* edit_state);
+void edit_line_type_abort(struct edit_line* edit_state);
+void edit_line_type_search(struct edit_line* edit_state, bool forward);
+void edit_line_type_search_end(struct edit_line* edit_state);
+void edit_line_type_search_movement(struct edit_line* edit_state);
 int edit_line_completion_sort(const void* a_ptr, const void* b_ptr);
 void edit_line_type_complete(struct edit_line* edit_state);
 bool edit_line_history_load(struct edit_line* edit_state, const char* path);
