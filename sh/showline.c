@@ -30,6 +30,8 @@
 
 #include "showline.h"
 
+enum { NONE = 0, CSI, OSC, CHARSET, COMMAND, GREATERTHAN };
+
 struct wincurpos predict_cursor(struct cursor_predict* cursor_predict,
                                 struct wincurpos* actual_out,
                                 struct wincurpos wcp,
@@ -66,7 +68,17 @@ struct wincurpos predict_cursor(struct cursor_predict* cursor_predict,
 	// The cursor is not updated normally during escape sequences.
 	if ( cursor_predict->escaped )
 	{
-		if ( (L'a' <= c && c <= L'z') || (L'A' <= c && c <= L'Z') )
+		if ( cursor_predict->escape_state == CSI && c == '[' )
+			cursor_predict->escape_state = COMMAND;
+		else if ( cursor_predict->escape_state == CSI && c == ']' )
+			cursor_predict->escape_state = OSC;
+		else if ( cursor_predict->escape_state == OSC && c == '\e' )
+			cursor_predict->escape_state = CSI;
+		else if ( cursor_predict->escape_state == CSI && c == '\\' )
+			cursor_predict->escaped = false;
+		else if ( cursor_predict->escape_state == OSC && c == '\a' )
+			cursor_predict->escaped = false;
+		else if ( (L'a' <= c && c <= L'z') || (L'A' <= c && c <= L'Z') )
 			cursor_predict->escaped = false;
 		return wcp;
 	}
@@ -75,6 +87,7 @@ struct wincurpos predict_cursor(struct cursor_predict* cursor_predict,
 	if ( c == L'\e' )
 	{
 		cursor_predict->escaped = true;
+		cursor_predict->escape_state = CSI;
 		return wcp;
 	}
 

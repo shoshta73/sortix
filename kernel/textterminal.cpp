@@ -448,10 +448,14 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 	{
 		if ( c == '[' )
 			ansimode = COMMAND;
+		else if ( c == ']' )
+			ansimode = OSC;
+		else if ( c == '\\' )
+			ansimode = NONE;
 		else if ( c == '(' || c == ')' || c == '*' || c == '+' ||
 		          c == '-' || c == '.' || c == '/' )
 			ansimode = CHARSET;
-		// TODO: Enter and exit alternatve keypad mode.
+		// TODO: Enter and exit alternative keypad mode.
 		else if ( c == '=' || c == '>' )
 			ansimode = NONE;
 		else
@@ -465,6 +469,30 @@ void TextTerminal::PutAnsiEscaped(TextBuffer* textbuf, char c)
 	if ( ansimode == CHARSET )
 	{
 		ansimode = NONE;
+		return;
+	}
+
+	if ( ansimode == OSC && c == '\e' )
+	{
+		ansimode = CSI;
+		return;
+	}
+	else if ( ansimode == OSC && c == '\a' )
+	{
+		ansimode = NONE;
+		return;
+	}
+	else if ( 2 <= ansiusedparams && ansimode == OSC )
+	{
+		unsigned char uc = (unsigned char) c;
+		if ( ('\b' <= uc && uc <= '\r') ||
+		     (' ' <= uc && uc <= '~') ||
+		     128 <= uc )
+		{
+			// Unused at this time.
+		}
+		else
+			ansimode = NONE;
 		return;
 	}
 

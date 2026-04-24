@@ -2118,7 +2118,9 @@ void read_command_interactive(struct sh_read_command* sh_read_command)
 	edit_state.complete = do_complete;
 
 	const char* def_ps1 = !getuid() ?
+		"\\033]2;\\u@\\H \\w\\033\\\\"
 		"\\033[;1;31m\\u\033[1;33m@\\H \\033[1;34m\\w \\033[1;31m\\$\\033[m " :
+		"\\033]2;\\u@\\H \\w\\033\\\\"
 		"\\033[;1;32m\\u@\\H \\033[1;34m\\w \\$\\033[m ";
 	const char* def_ps2 = "> ";
 	edit_state.ps1 = eval_ps(getenv_safe_def("PS1", def_ps1));

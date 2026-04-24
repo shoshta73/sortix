@@ -37,6 +37,7 @@ struct wincurpos
 struct cursor_predict
 {
 	bool escaped;
+	int escape_state;
 };
 
 struct show_line

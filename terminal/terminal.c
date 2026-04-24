@@ -142,12 +142,15 @@ static uint32_t attr;
 static uint32_t next_attr;
 static unsigned ansisavedposx;
 static unsigned ansisavedposy;
-static enum { NONE = 0, CSI, CHARSET, COMMAND, GREATERTHAN, } ansimode;
+static enum { NONE = 0, CSI, OSC, CHARSET, COMMAND, GREATERTHAN, } ansimode;
 #define ANSI_NUM_PARAMS 16
 static unsigned ansiusedparams;
 static unsigned ansiparams[ANSI_NUM_PARAMS];
+static char osc_data[256];
+static size_t osc_data_used = 0;
 static bool ignore_sequence;
 static bool draw_cursor = true;
+static struct display_connection* connection;
 
 static void scrollback_resize(size_t new_rows, size_t new_columns)
 {
@@ -640,6 +643,17 @@ static void run_ansi_command(char c)
 	ansimode = NONE;
 }
 
+static void run_osc_command(void)
+{
+	ansimode = NONE;
+	if ( ansiusedparams == 0 )
+		return;
+	if ( ansiparams[0] == 0 || ansiparams[0] == 2 )
+	{
+		display_title_window(connection, WINDOW_ID, osc_data);
+	}
+}
+
 static void put_ansi_escaped(char c)
 {
 	// Check the proper prefixes are used.
@@ -647,10 +661,14 @@ static void put_ansi_escaped(char c)
 	{
 		if ( c == '[' )
 			ansimode = COMMAND;
+		else if ( c == ']' )
+			ansimode = OSC;
+		else if ( c == '\\' )
+			run_osc_command();
 		else if ( c == '(' || c == ')' || c == '*' || c == '+' ||
 		          c == '-' || c == '.' || c == '/' )
 			ansimode = CHARSET;
-		// TODO: Enter and exit alternatve keypad mode.
+		// TODO: Enter and exit alternative keypad mode.
 		else if ( c == '=' || c == '>' )
 			ansimode = NONE;
 		else
@@ -663,6 +681,34 @@ static void put_ansi_escaped(char c)
 	if ( ansimode == CHARSET )
 	{
 		ansimode = NONE;
+		return;
+	}
+
+	if ( ansimode == OSC && c == '\e' )
+	{
+		ansimode = CSI;
+		return;
+	}
+	else if ( ansimode == OSC && c == '\a' )
+	{
+		run_osc_command();
+		return;
+	}
+	else if ( 2 <= ansiusedparams && ansimode == OSC )
+	{
+		unsigned char uc = (unsigned char) c;
+		if ( ('\b' <= uc && uc <= '\r') ||
+		     (' ' <= uc && uc <= '~') ||
+		     128 <= uc )
+		{
+			if ( osc_data_used + 1 < sizeof(osc_data) )
+			{
+				osc_data[osc_data_used++] = c;
+				osc_data[osc_data_used] = '\0';
+			}
+		}
+		else
+			ansimode = NONE;
 		return;
 	}
 
@@ -802,6 +848,8 @@ static void outwc(wchar_t wc)
 		next_attr = 0;
 		ansiusedparams = 0;
 		ansiparams[0] = 0;
+		osc_data[0] = 0;
+		osc_data_used = 0;
 		ignore_sequence = false;
 		ansimode = CSI;
 	}
@@ -1060,7 +1108,7 @@ void on_keyboard(void* ctx, uint32_t window_id, uint32_t codepoint)
 	}
 }
 
-void draw(struct display_connection* connection)
+void draw(void)
 {
 	uint32_t* framebuffer =
 		calloc(WINDOW_WIDTH * WINDOW_HEIGHT, sizeof(uint32_t));
@@ -1136,7 +1184,7 @@ static void signal_handler(int signum)
 
 int main(int argc, char* argv[])
 {
-	struct display_connection* connection = display_connect_default();
+	connection = display_connect_default();
 	if ( !connection && errno == ECONNREFUSED )
 		display_spawn(argc, argv);
 	if ( !connection )
@@ -1299,7 +1347,7 @@ int main(int argc, char* argv[])
 
 		if ( need_redraw )
 		{
-			draw(connection);
+			draw();
 			need_redraw = false;
 		}
 
