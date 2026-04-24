@@ -529,26 +529,38 @@ enum sh_tokenize_result
 	SH_TOKENIZE_RESULT_ERROR,
 };
 
-bool can_continue_operator(const char* op, char c)
+size_t operator_length(const char* token)
 {
-	if ( !op )
-		return false;
-	if ( op[0] == '<' && op[1] == '<' && op[2] == '\0' )
-		return c == '-';
-	if ( op[0] == '|' && op[1] == '\0' )
-		return c == '|';
-	if ( op[0] == '&' && op[1] == '\0' )
-		return c == '&';
-	if ( op[0] == ';' && op[1] == '\0' )
-		return c == ';';
-	if ( op[0] == '<' && op[1] == '\0' )
-		return c == '<' || c == '&' || c == '>';
-	if ( op[0] == '>' && op[1] == '\0' )
-		return c == '>' || c == '&' || c == '|';
-	if ( op[0] == '\0' )
-		return c == '|' || c == '&' || c == ';' || c == '>' || c == '<' ||
-		       c == '(' || c == ')';
-	return false;
+	if ( token[0] == '|' )
+		return token[1] == '|' ? 2 : 1;
+	if ( token[0] == '&' )
+		return token[1] == '&' ? 2 : 1;
+	if ( token[0] == '&' )
+		return token[1] == '&' ? 2 : 1;
+	if ( token[0] == '(' || token[1] == 1 )
+		return 1;
+	size_t i = 0;
+	if ( '0' <= token[i] && token[i] <= '9' )
+	{
+		i++;
+		while ( '0' <= token[i] && token[i] <= '9' )
+			i++;
+	}
+	if ( token[i] == '>' && token[i+1] == '>' )
+		return i + 2;
+	else if ( token[i] == '<' || token[i] == '>' )
+	{
+		i++;
+		if ( token[i] == '&' )
+		{
+			i++;
+			while ( '0' <= token[i] && token[i] <= '9' )
+				i++;
+		}
+		return i;
+	}
+	else
+		return 0;
 }
 
 enum sh_tokenize_result sh_tokenize(const char* command,
@@ -589,7 +601,7 @@ enum sh_tokenize_result sh_tokenize(const char* command,
 		bool single_quote = false;
 		bool double_quote = false;
 		bool stop = false;
-		bool making_operator = false;
+		size_t length;
 		while ( true )
 		{
 			if ( command[command_index] == '\0' )
@@ -599,24 +611,12 @@ enum sh_tokenize_result sh_tokenize(const char* command,
 				stop = true;
 				break;
 			}
-			else if ( making_operator )
-			{
-				if ( can_continue_operator(buf.string, command[command_index]) )
-				{
-					stringbuf_append_c(&buf, command[command_index]);
-					command_index++;
-				}
-				else
-				{
-					break;
-				}
-			}
 			else if ( buf.string && buf.length == 0 &&
-			          can_continue_operator("", command[command_index]) )
+			          (length = operator_length(command + command_index)) )
 			{
-				stringbuf_append_c(&buf, command[command_index]);
-				making_operator = true;
-				command_index++;
+				for ( size_t n = 0; n < length; n++ )
+					stringbuf_append_c(&buf, command[command_index++]);
+				break;
 			}
 			else if ( !escaped && !single_quote && command[command_index] == '\\' )
 			{
@@ -638,7 +638,7 @@ enum sh_tokenize_result sh_tokenize(const char* command,
 			}
 			else if ( !(escaped || single_quote || double_quote) &&
 			          (isspace((unsigned char) command[command_index]) ||
-			           can_continue_operator("", command[command_index])) )
+			           operator_length(command + command_index)) )
 			{
 				break;
 			}
@@ -826,6 +826,31 @@ int perform_chdir(const char* path)
 	return chdir(path);
 }
 
+bool is_redirection_token(const char* token)
+{
+	size_t i = 0;
+	while ( '0' <= token[i] && token[i] <= '9' )
+		i++;
+	if ( token[i] == '>' && token[i+1] == '>' )
+		i += 2;
+	else if ( token[i] == '<' || token[i] == '>' )
+	{
+		i++;
+		if ( token[i] == '&' )
+		{
+			i++;
+			if ( !('0' <= token[i] && token[i] <= '9') )
+				return false;
+			i++;
+			while ( '0' <= token[i] && token[i] <= '9' )
+				i++;
+		}
+	}
+	else
+		return false;
+	return token[i] == '\0';
+}
+
 struct execute_result
 {
 	pid_t pid;
@@ -844,12 +869,15 @@ struct execute_result execute(char** tokens,
                               int pipeout,
                               pid_t pgid)
 {
-	char** varsv;
-	size_t varsc;
-	size_t varsv_allocated;
-	char** expandv;
-	size_t expandc;
-	size_t expandv_allocated;
+	char** varsv = NULL;
+	size_t varsc = 0;
+	size_t varsv_allocated = 0;
+	char** expandv = NULL;
+	size_t expandc = 0;
+	size_t expandv_allocated = 0;
+	char** redirectv = NULL;
+	size_t redirectc = 0;
+	size_t redirectv_allocated = 0;
 	char** argv;
 	size_t argc;
 	size_t argv_allocated;
@@ -857,8 +885,6 @@ struct execute_result execute(char** tokens,
 	bool failure = false;
 	bool critical = false;
 	bool do_exit = false;
-	bool set_pipein = false;
-	bool set_pipeout = false;
 	bool had_not_varassign = false;
 	pid_t childpid;
 
@@ -866,14 +892,6 @@ struct execute_result execute(char** tokens,
 	char statusstr[sizeof(int) * 3];
 	snprintf(statusstr, sizeof(statusstr), "%i", status);
 	setenv("?", statusstr, 1);
-
-	varsv = NULL;
-	varsc = 0;
-	varsv_allocated = 0;
-
-	expandv = NULL;
-	expandc = 0;
-	expandv_allocated = 0;
 
 	for ( size_t i = 0; !failure && i < tokens_count; i++ )
 	{
@@ -921,10 +939,23 @@ struct execute_result execute(char** tokens,
 
 	for ( size_t i = 0; !failure && i < expandc; i++ )
 	{
-		if ( !strcmp(expandv[i], "<") ||
-		     !strcmp(expandv[i], ">") ||
-		   /*!strcmp(expandv[i], "<<") ||*/
-		     !strcmp(expandv[i], ">>") )
+		const char* redirection = expandv[i];
+		bool is_redirection = is_redirection_token(redirection);
+		if ( is_redirection )
+		{
+			char* copy = strdup(redirection);
+			if ( !copy ||
+			     !array_add((void***) &redirectv, &redirectc,
+			                &redirectv_allocated, copy) )
+			{
+				free(copy);
+				warn("malloc");
+				failure = true;
+				critical = true;
+				break;
+			}
+		}
+		if ( is_redirection && !strchr(redirection, '&') )
 		{
 			const char* type = expandv[i++];
 
@@ -971,36 +1002,17 @@ struct execute_result execute(char** tokens,
 				break;
 			}
 
-			int fd = -1;
-			if ( !strcmp(type, "<") )
-				fd = open(target, O_RDONLY | O_CLOEXEC);
-			else if ( !strcmp(type, ">") )
-				fd = open(target, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0666);
-			else if ( !strcmp(type, ">>") )
-				fd = open(target, O_WRONLY | O_CREAT | O_APPEND | O_CLOEXEC, 0666);
-
-			if ( fd < 0 )
+			if ( !array_add((void***) &redirectv, &redirectc,
+			                &redirectv_allocated, target) )
 			{
-				warn("%s", target);
 				free(target);
+				warn("malloc");
 				failure = true;
+				critical = true;
 				break;
 			}
-
-			if ( !strcmp(type, "<") )
-			{
-				pipein = fd;
-				set_pipein = true;
-			}
-			else if ( !strcmp(type, ">") || !strcmp(type, ">>") )
-			{
-				pipeout = fd;
-				set_pipeout = true;
-			}
-
-			free(target);
 		}
-		else
+		else if ( !is_redirection )
 		{
 			if ( !token_expand_wildcards((void***) &argv,
 				                         &argc,
@@ -1238,11 +1250,9 @@ struct execute_result execute(char** tokens,
 		if ( !internal )
 			sigprocmask(SIG_SETMASK, &oldset, NULL);
 
-		if ( set_pipein )
-			close(pipein);
-
-		if ( set_pipeout )
-			close(pipeout);
+		for ( size_t i = 0; i < redirectc; i++ )
+			free(redirectv[i]);
+		free(redirectv);
 
 		for ( size_t i = 0; i < varsc; i++ )
 			free(varsv[i]);
@@ -1321,10 +1331,87 @@ struct execute_result execute(char** tokens,
 		int ret = setenv(key, value, 1);
 		*eq = '=';
 		if ( ret < 0 )
+			err(1, "setenv");
+	}
+
+	for ( size_t i = 0; i < redirectc; i++ )
+	{
+		const char* redirection = redirectv[i];
+		int fd = -1;
+		size_t offset = 0;
+		if ( '0' <= redirection[offset] && redirection[offset] <= '9' )
 		{
-			warn("setenv");
-			status = 1;
+			fd = redirection[offset] - '0';
+			offset++;
+			while ( '0' <= redirection[offset] && redirection[offset] <= '9' )
+			{
+				int d = redirection[offset++] - '0';
+				if ( __builtin_mul_overflow(fd, 10, &fd) ||
+				     __builtin_add_overflow(fd, d, &fd) )
+					errx(1, "invalid redirection: %s", redirection);
+			}
 		}
+		int type = 0;
+		if ( redirection[offset] == '>' && redirection[offset+1] == '>' )
+		{
+			type = 2;
+			offset += 2;
+			if ( fd < 0 )
+				fd = 1;
+		}
+		else if ( redirection[offset] == '>' )
+		{
+			type = 1;
+			offset++;
+			if ( fd < 0 )
+				fd = 1;
+		}
+		else if ( redirection[offset] == '<' )
+		{
+			type = 0;
+			offset++;
+			if ( fd < 0 )
+				fd = 0;
+		}
+		else
+			errx(1, "invalid redirection: %s", redirection);
+		if ( redirection[offset] == '&' )
+		{
+			offset++;
+			if ( !('0' <= redirection[offset] && redirection[offset] <= '9') )
+				errx(1, "invalid redirection: %s", redirection);
+			int src_fd = redirection[offset] - '0';
+			offset++;
+			while ( '0' <= redirection[offset] && redirection[offset] <= '9' )
+			{
+				int d = redirection[offset++] - '0';
+				if ( __builtin_mul_overflow(src_fd, 10, &src_fd) ||
+				     __builtin_add_overflow(src_fd, d, &src_fd) )
+					errx(1, "invalid redirection: %s", redirection);
+			}
+			if ( redirection[offset] )
+				errx(1, "invalid redirection: %s", redirection);
+			if ( src_fd != fd && dup2(src_fd, fd) < 0 )
+				err(1, "redirection failed: %s", redirection);
+		}
+		else if ( !redirection[offset] )
+		{
+			if ( i + 1 == redirectc )
+				errx(1, "invalid redirection: %s", redirection);
+			const char* path = redirectv[++i];
+			int flags = type == 2 ? O_WRONLY | O_CREAT | O_APPEND :
+			            type == 1 ? O_WRONLY | O_CREAT :
+			                        O_RDONLY;
+			int src_fd = open(path, flags, 0777);
+			if ( src_fd < 0 )
+				err(1, "%s", path);
+			if ( src_fd != fd && dup2(src_fd, fd) < 0 )
+				err(1, "redirection failed: %s", redirection);
+			if ( src_fd != fd )
+				close(src_fd);
+		}
+		else
+			errx(1, "invalid redirection: %s", redirection);
 	}
 
 	if ( strcmp(argv[0], "history") == 0 )
