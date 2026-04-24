@@ -35,6 +35,7 @@
 
 #include "editline.h"
 #include "showline.h"
+#include "util.h"
 
 #define CONTROL(x) (((x) - 64) & 127)
 
@@ -687,6 +688,9 @@ void edit_line_type_complete(struct edit_line* edit_state)
 			break;
 		assert(num_bytes != (size_t) -1);
 		assert(num_bytes != (size_t)  0);
+		// TODO: Use a callback to know what characters need quoting.
+		if ( wc <= 128 && might_need_shell_quote((char) wc) )
+			edit_line_type_codepoint(edit_state, L'\\');
 		edit_line_type_codepoint(edit_state, wc);
 		prefix_ends_with_slash = wc == L'/';
 		i += num_bytes;
@@ -716,7 +720,7 @@ void edit_line_type_complete(struct edit_line* edit_state)
 			write(edit_state->out_fd, partial + complete_at, used_after);
 			first = false;
 		}
-		if ( !first)
+		if ( !first )
 		{
 			write(edit_state->out_fd, "\n", 1);
 			show_line_begin(&edit_state->show_state, edit_state->out_fd);
