@@ -32,6 +32,7 @@
 #include <libgen.h>
 #include <limits.h>
 #include <locale.h>
+#include <pwd.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -169,6 +170,14 @@ bool is_identifier_char(char c)
 	       c == '_';
 }
 
+bool is_variable_assignment_token(const char* token)
+{
+	size_t i = 0;
+	while ( is_identifier_char(token[i]) )
+		i++;
+	return i != 0 && token[i] == '=';
+}
+
 char* token_expand_variables(const char* token)
 {
 	struct stringbuf buf;
@@ -176,9 +185,73 @@ char* token_expand_variables(const char* token)
 	bool escape = false;
 	bool single_quote = false;
 	bool double_quote = false;
+	// TODO: The parser doesn't know right now whether this token is actually
+	//       an assignment, so the special assignment logic for '=' and ':'
+	//       happens in cases where they should not happen.
+	bool is_assignment = is_variable_assignment_token(token);
 	for ( size_t i = 0; token[i]; i++ )
 	{
-		if ( !escape && !single_quote && token[i] == '\\' )
+		if ( token[i] == '~' &&
+		     (i == 0 ||
+		      (i && !single_quote && !double_quote && !escape &&
+		       (token[i-1] == '=' || (token[i-1] == ':' && is_assignment)))) )
+		{
+			i++;
+			size_t length = 0;
+			// TODO: The username may contain an escaped slash/colon. Of course
+			//       that is not an allowed username, but the parser should
+			//       probably parse correctly and reject later.
+			while ( token[i] && token[i] != '/' &&
+			        (!is_assignment || token[i] != ':') &&
+			        !might_need_shell_quote(token[i]) &&
+			        ' ' < (unsigned char) token[i] )
+				length++, i++;
+			if ( token[i] && token[i] != '/' )
+			{
+				stringbuf_append_c(&buf, '~');
+				i -= length + 1;
+				continue;
+			}
+			char* home = NULL;
+			if ( !length )
+				home = getenv("HOME");
+			else
+			{
+				char* user = strndup(token + i - length, length);
+				if ( !user )
+					return free(buf.string), (char*) NULL;
+				errno = 0;
+				struct passwd* pwd = getpwnam(user);
+				free(user);
+				if ( pwd )
+					home = pwd->pw_dir;
+				else if ( errno )
+				{
+					// TODO: How to do error handling here?
+				}
+			}
+			if ( !home )
+			{
+				stringbuf_append_c(&buf, '~');
+				i -= length + 1;
+				continue;
+			}
+			stringbuf_append_c(&buf, '\'');
+			for ( size_t n = 0; home[n]; n++ )
+			{
+				if ( home[n] == '\'' )
+				{
+					stringbuf_append_c(&buf, '\'');
+					stringbuf_append_c(&buf, '\\');
+				}
+				stringbuf_append_c(&buf, home[n]);
+				if ( home[n] == '\'' )
+					stringbuf_append_c(&buf, '\'');
+			}
+			stringbuf_append_c(&buf, '\'');
+			i--;
+		}
+		else if ( !escape && !single_quote && token[i] == '\\' )
 		{
 			stringbuf_append_c(&buf, '\\');
 			escape = true;
@@ -751,14 +824,6 @@ int perform_chdir(const char* path)
 	}
 
 	return chdir(path);
-}
-
-bool is_variable_assignment_token(const char* token)
-{
-	size_t i = 0;
-	while ( is_identifier_char(token[i]) )
-		i++;
-	return i != 0 && token[i] == '=';
 }
 
 struct execute_result
