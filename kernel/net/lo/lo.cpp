@@ -116,11 +116,10 @@ void Loopback::Recv()
 	}
 	kthread_mutex_lock(&socket_lock);
 	bool should_schedule = first_packet;
-	if ( !should_schedule )
+	if ( !should_schedule ||
+	     !Worker::TrySchedule(Loopback__Recv, this) )
 		worker_scheduled = false;
 	kthread_mutex_unlock(&socket_lock);
-	if ( should_schedule )
-		Worker::Schedule(Loopback__Recv, this);
 }
 
 bool Loopback::Send(Ref<Packet> pkt)
@@ -131,11 +130,12 @@ bool Loopback::Send(Ref<Packet> pkt)
 	else
 		first_packet = pkt;
 	last_packet = pkt;
-	bool should_schedule = !worker_scheduled;
-	worker_scheduled = true;
+	// TODO: Refactor to use a reliable worker queue with preallocated node
+	//       memory that cannot fail. See also above.
+	if ( !worker_scheduled &&
+	     Worker::TrySchedule(Loopback__Recv, this) )
+		worker_scheduled = true;
 	kthread_mutex_unlock(&socket_lock);
-	if ( should_schedule )
-		Worker::Schedule(Loopback__Recv, this);
 	return true;
 }
 
