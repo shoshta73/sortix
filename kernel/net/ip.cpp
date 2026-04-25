@@ -32,6 +32,7 @@
 #include <sortix/kernel/packet.h>
 #include <sortix/kernel/random.h>
 #include <sortix/kernel/refcount.h>
+#include <sortix/kernel/worker.h>
 
 #include "arp.h"
 #include "ether.h"
@@ -65,6 +66,11 @@ struct ipv4
 #define IPV4_FRAGMENT_MORE (1 << (13 + 0))
 #define IPV4_FRAGMENT_DONT (1 << (13 + 1))
 #define IPV4_FRAGMENT_EVIL (1 << (13 + 2))
+
+static kthread_mutex_t worker_lock;
+static Ref<Packet> worker_first_packet;
+static Ref<Packet> worker_last_packet;
+static bool worker_scheduled;
 
 uint16_t ipsum_word(uint16_t sum, uint16_t word)
 {
@@ -334,6 +340,45 @@ void Handle(Ref<Packet> pkt,
 		UDP::HandleIP(pkt, in_src, in_dst, in_dst_broadcast);
 }
 
+static void ReceiveLoopback(void* ctx)
+{
+	(void) ctx;
+	kthread_mutex_lock(&worker_lock);
+	Ref<Packet> next_packet = worker_first_packet;
+	worker_first_packet.Reset();
+	worker_last_packet.Reset();
+	kthread_mutex_unlock(&worker_lock);
+	while ( next_packet )
+	{
+		Ref<Packet> packet = next_packet;
+		next_packet = next_packet->next;
+		packet->next.Reset();
+		Handle(packet, NULL, NULL, false);
+	}
+	kthread_mutex_lock(&worker_lock);
+	bool should_schedule = worker_first_packet;
+	if ( !should_schedule ||
+	     !Worker::TrySchedule(ReceiveLoopback, NULL) )
+		worker_scheduled = false;
+	kthread_mutex_unlock(&worker_lock);
+}
+
+static void SendLoopback(Ref<Packet> pkt)
+{
+	kthread_mutex_lock(&worker_lock);
+	if ( worker_last_packet )
+		worker_last_packet->next = pkt;
+	else
+		worker_first_packet = pkt;
+	worker_last_packet = pkt;
+	// TODO: Refactor to use a reliable worker queue with preallocated node
+	//       memory that cannot fail. See also above.
+	if ( !worker_scheduled &&
+	     Worker::TrySchedule(ReceiveLoopback, NULL) )
+		worker_scheduled = true;
+	kthread_mutex_unlock(&worker_lock);
+}
+
 bool Send(Ref<Packet> pktin,
           const struct in_addr* src,
           const struct in_addr* dst,
@@ -393,12 +438,18 @@ bool Send(Ref<Packet> pktin,
 	kthread_mutex_unlock(&netif->cfg_lock);
 
 	struct in_addr route;
+	// Deliver deliver to ourselves if the address is our own.
+	if ( dst_ip == address_ip )
+	{
+		pkt->netif = netif;
+		SendLoopback(pkt);
+		return true;
+	}
 	// Route directly to the destination if the destination is broadcast.
-	if ( dst_ip == htobe32(INADDR_BROADCAST) || dst_ip == broadcast_ip )
+	else if ( dst_ip == htobe32(INADDR_BROADCAST) || dst_ip == broadcast_ip )
 		memcpy(&route, &dst_ip, sizeof(route));
 	// Route directly to the destination if the destination is on the subnet.
-	else if ( (dst_ip & subnet_ip) == (address_ip & subnet_ip) &&
-	          dst_ip != address_ip )
+	else if ( (dst_ip & subnet_ip) == (address_ip & subnet_ip) )
 		memcpy(&route, dst, sizeof(route));
 	// Route to the default route if any.
 	else if ( router_ip != htobe32(INADDR_ANY) )
