@@ -347,6 +347,8 @@ The implementation is incomplete and has known bugs.
 .Pp
 Out-of-band data is not yet supported and is ignored on receipt.
 .Pp
+RST responses are not sent in all cases for established connections.
+.Pp
 The round trip time is not estimated which prevents efficient retransmission
 when data is lost.
 Retransmissions happen after a second, which means unnecessary retransmissions

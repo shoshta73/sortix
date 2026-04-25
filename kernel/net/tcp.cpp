@@ -2555,17 +2555,69 @@ void HandleIP(Ref<Packet> pkt,
 		socket = socket_listener;
 	if ( !socket )
 		socket = any_socket_listener;
-	// No socket wanted to receive the packet.
-	if ( !socket )
-	{
-		// TODO: Send RST.
-		return;
-	}
 	// If the socket is bound to a network interface, require the packet to
 	// have been received on that network interface.
-	if ( socket->ifindex && socket->ifindex != pkt->netif->ifinfo.linkid )
+	unsigned int ifindex = pkt->netif->ifinfo.linkid;
+	if ( socket && ifindex && ifindex != pkt->netif->ifinfo.linkid )
+		socket = NULL;
+	// No socket wanted to receive the packet, reply RST.
+	if ( !socket )
 	{
-		// TODO: Send RST.
+		// Don't reply to RST with RST.
+		if ( hdr.th_flags & TH_RST )
+			return;
+		size_t mtu;
+		union tcp_sockaddr sendfrom;
+		if ( !IP::GetSourceIP(dst, src, &sendfrom.in.sin_addr, ifindex, &mtu) )
+			return;
+		if ( mtu < sizeof(struct tcphdr) )
+			return;
+		mtu -= sizeof(struct tcphdr);
+		Ref<Packet> reply = GetPacket();
+		if ( !reply )
+			return;
+		reply->length = sizeof(struct tcphdr);
+		unsigned char* out = reply->from;
+		struct tcphdr replyhdr;
+		replyhdr.th_sport = htobe16(hdr.th_dport);
+		replyhdr.th_dport = htobe16(hdr.th_sport);
+
+		if ( hdr.th_flags & TH_ACK )
+		{
+			replyhdr.th_flags = TH_RST;
+			replyhdr.th_seq = htobe32(be32toh(hdr.th_ack));
+			replyhdr.th_ack = htobe32(0);
+		}
+		else
+		{
+			uint32_t offset = TCP_OFFSET_DECODE(hdr.th_offset) * 4;
+			uint32_t length = inlen - offset;
+			if ( hdr.th_flags & TH_SYN )
+				length++;
+			if ( hdr.th_flags & TH_FIN )
+				length++;
+			replyhdr.th_flags = TH_RST | TH_ACK;
+			replyhdr.th_seq = htobe32(0);
+			replyhdr.th_ack = htobe32(be32toh(hdr.th_seq) + length);
+		}
+
+		replyhdr.th_offset = TCP_OFFSET_ENCODE(sizeof(struct tcphdr) / 4);
+		replyhdr.th_win = htobe16(0);
+		replyhdr.th_urp = htobe16(0);
+		replyhdr.th_sum = htobe16(0);
+		memcpy(out, &replyhdr, sizeof(replyhdr));
+		uint16_t checksum = 0;
+		checksum = IP::ipsum_buf(checksum, &sendfrom.in.sin_addr,
+		                         sizeof(struct in_addr));
+		checksum = IP::ipsum_buf(checksum, src, sizeof(struct in_addr));
+		checksum = IP::ipsum_word(checksum, IPPROTO_TCP);
+		checksum = IP::ipsum_word(checksum, reply->length);
+		checksum = IP::ipsum_buf(checksum, out, reply->length);
+		replyhdr.th_sum = htobe16(IP::ipsum_finish(checksum));
+		memcpy(out, &replyhdr, sizeof(replyhdr));
+		if ( !IP::Send(reply, &sendfrom.in.sin_addr, src,
+			           IPPROTO_TCP, ifindex, false) )
+			return;
 		return;
 	}
 	union tcp_sockaddr pkt_src;
