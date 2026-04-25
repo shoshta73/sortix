@@ -120,6 +120,7 @@ int sys_sigaction(int signum,
 		return errno = EINVAL, -1;
 
 	Process* process = CurrentProcess();
+	ScopedLock threads_lock(&process->thread_lock);
 	ScopedLock lock(&process->signal_lock);
 
 	struct sigaction* kact = &process->signal_actions[signum];
@@ -147,7 +148,6 @@ int sys_sigaction(int signum,
 		memcpy(kact, &newact, sizeof(struct sigaction));
 
 		// Signals may become discarded because of the new handler.
-		ScopedLock threads_lock(&process->thread_lock);
 		for ( Thread* t = process->first_thread; t; t = t->next_sibling )
 			UpdatePendingSignals(t);
 	}
